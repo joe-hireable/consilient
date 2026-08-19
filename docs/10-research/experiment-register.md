@@ -117,6 +117,31 @@ multiplier. Cursor's selected model identity was not recorded, so its ratio is
 supplementary rather than a third frontier comparison. EXP-07 is now the highest-priority
 replication experiment. [measured]
 
+**Replication protocol fixed 19 Aug 2026 before the run:** five synthetic, public coding
+fixtures are frozen in `experiments/exp07/run_exp07.py`. [asserted] Each fixture receives
+one `gpt-5.6-sol` Codex-subscription attempt at low reasoning effort and five independent
+`qwen3:8b` local attempts through the same Codex harness. [asserted] Attempt one is the
+unscaffolded local condition; the sum of five serial attempts is the verifier-coupled
+best-of-five condition. [asserted] Every attempt uses a fresh repository and the same
+functional-plus-changed-file-scope verifier. [asserted]
+
+The run admits at most five frontier calls only while a fresh app-server snapshot reports
+an authenticated subscription below 90% used, no reached-limit flag and no spend-control
+stop; ten percentage points are reserved for the batch. [asserted] OpenRouter, API keys,
+Claude, Cursor and Antigravity are excluded. [asserted] Stop at 30 attempts, 90 minutes or
+the first admission-rule failure. [asserted]
+
+The single-attempt multiplier is computed only where local attempt one fails and the
+frontier passes. [asserted] The five-attempt multiplier is computed only where all five
+local attempts fail and the frontier passes. [asserted] At least three eligible paired
+fixtures are required: fewer is `insufficient evidence`; otherwise a median multiplier of
+at least 2× replicates the reopening trigger and a median below 2× fails to replicate it.
+[asserted] If only best-of-five crosses 2×, the reasoning layer caused the crossing; if the
+single attempt already crosses, best-of-five is amplification rather than the cause.
+[asserted] Synthetic fixtures can replicate the latency mechanism but cannot establish
+that a learned router improves real work; that requires a separate policy comparison on
+real trajectories. [asserted]
+
 ### EXP-08 · Critic recall `BLOCKED: critic tier`
 **Decides:** the parallelism ceiling in ADR-0007, and whether CLI-only survives.
 **Procedure:** run a local 14B as a diff critic over historical PRs with known outcomes.
