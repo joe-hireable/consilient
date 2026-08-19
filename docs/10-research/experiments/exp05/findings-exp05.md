@@ -70,9 +70,10 @@ The failed local attempt took 5.6 times the Codex success latency, 4.5 times the
 Code success latency and 2.4 times the Cursor success latency. [measured]
 
 ADR-0003 says a wasted-work multiplier of at least 2× reopens the “no learned routing
-policy in v0” decision. This one-task pilot crosses that threshold against all three
-frontier successes.
-[measured]
+policy in v0” decision. This one-task pilot crosses that threshold against the Claude and
+Codex frontier successes. Cursor's 2.4× ratio also crosses numerically, but its selected
+model identity was not recorded, so it is supplementary rather than a third frontier
+comparison. [measured]
 
 It does not establish the population multiplier: this is n=1, on one trivial task, with one
 local model and one failed trajectory. [asserted] It does make EXP-07 the highest-priority

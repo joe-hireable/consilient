@@ -105,7 +105,9 @@ worthwhile" — record it that way rather than as a blanket reopening.
 Cursor success: 5.6×, 4.5× and 2.4×.
 The pre-registered 2× reopening condition was observed, so ADR-0003 is reopened for
 investigation. This is n=1 on one trivial task and does not establish a population
-multiplier. EXP-07 is now the highest-priority replication experiment. [measured]
+multiplier. Cursor's selected model identity was not recorded, so its ratio is
+supplementary rather than a third frontier comparison. EXP-07 is now the highest-priority
+replication experiment. [measured]
 
 ### EXP-08 · Critic recall `BLOCKED: critic tier`
 **Decides:** the parallelism ceiling in ADR-0007, and whether CLI-only survives.

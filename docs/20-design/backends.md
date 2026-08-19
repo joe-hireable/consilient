@@ -46,7 +46,9 @@ The failed local attempt took 5.6 times as long as the Codex success, 4.5
 times as long as the Claude success and 2.4 times as long as the Cursor
 success. [measured] This n=1 result crosses
 EXP-07's pre-registered 2× investigation threshold, but it does not estimate a
-population wasted-work multiplier. [asserted]
+population wasted-work multiplier. [asserted] Cursor's selected model identity
+was not recorded, so its 2.4× ratio is supplementary and not a third identified
+frontier comparison. [measured]
 
 The token fields are backend-native counters and were not comparable in this
 run. Cursor's live JSON separated input/output/cache usage, correcting the
