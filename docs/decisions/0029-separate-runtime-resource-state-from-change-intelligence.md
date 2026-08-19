@@ -17,6 +17,16 @@ runtime probe and cannot participate in a later consilience test as though it we
 [asserted] The monitor preserves source and observation time; it does not create a second
 truth or resource authority. [asserted]
 
+## Update: 2026-08-20 — Cursor re-probed, position unchanged and now checkable
+
+`cursor-agent about --format json` and `cursor-agent models` were run read-only with no
+inference on 20 August 2026. [measured] They return `subscriptionTier`, the configured model
+and the account's model list, and **no remaining allowance, consumed figure or reset window**.
+[measured] The dispatch-authority row below therefore stands, re-measured, and is now
+reproducible by a named command rather than resting on an inspection. [asserted] The tier is
+first-party `Ultra`, which closes the delegated `pro` misreport recorded under *Evidence
+against*. [measured] See `../20-design/backends.md`. [asserted]
+
 ## Context
 
 Claude Code, Codex and Cursor change their models, command surfaces, quota policies and

@@ -719,6 +719,16 @@ authority, constraints, provenance, current decision, lease, resource state and 
 next action; authenticated subscription-backed Claude Code Opus 5; a pinned OpenRouter
 `google/gemini-3.7-flash` record; and a separately user-authorised provider-side hard cap.
 No OpenRouter call runs before that numeric cap exists. [asserted]
+**Subscription-backed alternative, added 2026-08-20 before any run.** A read-only probe
+established that the Cursor Ultra subscription already exposes `gemini-3.7-flash-high`.
+[measured] The middle-management arm may therefore run as Cursor × Gemini 3.7 Flash High on
+included capacity, with no metered call and no cap required. Under ADR-0027 that is **a
+different composition** from OpenRouter × `google/gemini-3.7-flash` — different harness,
+system prompting, tool surface and context handling — so the two arms are reported separately
+and may never be pooled, and a result from one does not promote or reject the other.
+[asserted] Cursor's block runs supervised under a recorded user attestation, because ADR-0026
+still excludes it from unattended routing while its remaining allowance is unobservable.
+[measured]
 **Procedure:** block by task topology and exact composition. For each fixture, compare (A)
 the complete relevant record up to the composition's admitted context, (B) a frozen compact
 state manifest plus retrieval references and (C) a deliberately smaller but non-truncated

@@ -145,6 +145,43 @@ Ultra while other plans receive a weekly baseline. [cited] Admission must theref
 the CLI's live `plan_tier` and quota map, not infer Antigravity headroom from the marketing
 name alone. [asserted]
 
+## What the Cursor CLI actually exposes, 20 August 2026
+
+Probed read-only with no inference and no metered call. [measured]
+
+```bash
+cursor-agent about  --format json    # cliVersion, model, subscriptionTier, userEmail
+cursor-agent status --format json    # authentication state and user identity
+cursor-agent models                  # models available to this account
+```
+
+Four results, and the fourth matters most: [measured]
+
+1. **There is still no remaining-allowance surface.** `about` returns `subscriptionTier`
+   but no quota, no consumed figure and no reset window. ADR-0026's exclusion of Cursor from
+   unattended routing therefore stands, re-measured nine days after the original observation.
+   [measured] Supervised use under a recorded user attestation remains the only admitted
+   mode. [asserted]
+2. **Model identity is now machine-readable.** `about --format json` reports the configured
+   model — `Gemini 3.7 Flash High` on this account. [measured] EXP-07 recorded that
+   "Cursor's selected model identity was not recorded, so its ratio is supplementary"; that
+   limitation is now removable by probing before dispatch, which would let a future run treat
+   Cursor as a full third comparison rather than a supplementary one. [asserted]
+3. **The plan tier is confirmed first-party as `Ultra`.** [measured] EXP-27's delegated
+   research reported `pro`; the trajectory already recorded that as a misreport, and this
+   closes it with a first-party observation rather than a correction of a correction.
+   [measured]
+4. **The Ultra subscription already exposes `gemini-3.7-flash-high`.** [measured] ADR-0030's
+   middle-management candidate is reachable on included capacity, so the question EXP-30 asks
+   does not have to wait for an authorised OpenRouter cap. Under ADR-0027 this is **a
+   different composition**, not a cheaper route to the same one: Cursor × Gemini differs from
+   OpenRouter × Gemini in harness, system prompting, tool surface and context handling, and
+   the two may never be pooled. [asserted]
+
+The same listing marks the Fable entries `claude-fable-5-thinking-high` and
+`-xhigh` as **NO ZDR** — no zero data retention. [measured] Any Cursor work that could touch
+`../hireable-3.0` or `../jobboard-v2` must account for that before it runs. [asserted]
+
 ## Change intelligence is not quota state
 
 Claude Code and Codex publish first-party machine-readable release feeds; Cursor's
