@@ -7,6 +7,14 @@
 - **Executable model:** none yet. Strong T2 candidate once meeting logs exist — the
   termination and quorum parameters are exactly the kind of thing a model settles.
 
+## Update: 2026-08-19 — evidence overlap is an implementation gate
+
+An origin-alignment audit confirmed that the declared-class weakness below is still open.
+[measured] A class label is provenance metadata, not proof that two participants actually
+hold different facts. [asserted] No product meeting primitive may therefore rely on the
+declaration-only gate: it remains research-only until an evidence manifest and measured
+source-overlap check have passed the EXP-14 protocol. [asserted]
+
 ## Context
 
 `0011` replaced Joe's "meeting" with an evidence merge, gated by a declared-evidence-class
@@ -162,6 +170,10 @@ change and therefore a public-interface change.
 
 - Check: exactly one Owner and exactly one Escalation per decision. Rejected at write time.
 - Check: no two Evidence participants share a declared class. Carried from `0011`.
+- Pre-implementation check: each Evidence participant supplies an immutable manifest of the
+  source identifiers it actually read; the validator measures pairwise overlap and applies
+  the threshold fixed by EXP-14 before the run. [asserted] The manifest validator, threshold
+  fixtures and bypass check must ship in the same implementation commit. [asserted]
 - Check: **meeting outcome writes are attributed to the Owner only.** A meeting that produces
   a decision from consensus, vote or averaging fails validation — this is the check that
   keeps the theorem-compliance real rather than aspirational. Same commit (I1).

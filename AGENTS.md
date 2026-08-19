@@ -23,8 +23,11 @@ architecture itself is domain-blind (see `docs/20-design/architecture-sketch.md`
 β exists because of Whewell's third clause: convergence is a *test*, and tests have error
 rates. The multi-agent constraints exist because of his second clause: **different** class.
 
-**Current phase: pre-brainstorm.** No code exists. No spec exists. Do not write
-implementation code until a spec exists and the user has approved it.
+**Current phase: pre-approval.** A draft implementation specification exists at
+`docs/40-spec/v0-draft.md`, alongside experimental adapters and research instruments.
+The draft carries no implementation authority. Research, experiments, ADRs, invariant
+checks and specification work are permitted; product implementation is not permitted until
+the user explicitly approves the specification or supersedes that gate.
 
 ## Working principles for this repo
 
@@ -86,7 +89,8 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
   appear in docs; their code, file contents, excerpts and detailed file paths may
   never be committed here or included in anything published from here. (Joe,
   19 Aug 2026.)
-- Commit secrets or `.env`.
+- Commit secrets or `.env`. `.github/workflows/secret-scan.yml` enforces this against the
+  tracked tree and repository history without printing a detected credential.
 - Present a simulated figure as an empirical result.
 - Add architecture with no falsifiable claim attached to it.
 - **Add a structure that cannot be traced back to `CONSILIENCE.md`.** If a proposal does not
@@ -95,8 +99,9 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 - Invent terminology. If a concept needs a new name to sound important, it probably isn't
   a concept. (See `docs/30-source-material/gemini-session-critique.md`.)
 
-## The next step is brainstorming
+## The next step is pre-approval convergence
 
-Not spec. Not plan. Not code. Open `docs/00-context/open-questions.md` and work through it
-with the user. The design position in `docs/20-design/` is a starting point that expects to
-be substantially rewritten.
+Inspect `docs/10-research/experiment-register.md`, the current ADR index and
+`docs/40-spec/v0-draft.md`. Resolve authorised evidence gaps with pre-registered stopping
+rules, preserve dissent, and keep the draft specification aligned. Do not cross the product
+implementation gate without explicit user approval.

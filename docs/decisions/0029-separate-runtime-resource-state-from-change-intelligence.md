@@ -9,6 +9,14 @@
 - **Executable model:** none — EXP-27 measures event detection and invariant violations;
   no optimisation model is needed
 
+## Update: 2026-08-19 — trace to Consilience
+
+Vendor-change intelligence belongs here only because provenance expires: a capability or
+quota-policy claim observed before a vendor change is not the same class of fact as a fresh
+runtime probe and cannot participate in a later consilience test as though it were current.
+[asserted] The monitor preserves source and observation time; it does not create a second
+truth or resource authority. [asserted]
+
 ## Context
 
 Claude Code, Codex and Cursor change their models, command surfaces, quota policies and

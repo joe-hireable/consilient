@@ -221,12 +221,33 @@ even then, budget primitives and the permission model stay out of scope (ADR-001
 (a) one agent holding all the evidence;
 (b) an Owner plus distinct-evidence-class participants in a meeting, Owner decides;
 (c) the same agents reaching the decision by consensus vote.
-**Measures:** decision quality against a held-out ground truth; tokens; wall-clock.
+Before each run, freeze a manifest of canonical source identifiers actually available to
+each participant. [asserted] A declared-distinct pair is operationally false-distinct when
+its source-set Jaccard overlap is at least 0.50; that threshold is fixed before collection
+and remains `[asserted]`. **Measures:** decision quality against a held-out ground truth;
+tokens; wall-clock; declared class; pairwise source overlap; false-distinct rate.
 **Stopping rule:** if (b) does not beat (a), **meetings are ceremony and should be cut** —
 the whole authority matrix goes with them. If (c) beats (b), the delegation theorem does not
-apply the way ADR-0020 claims and that ADR is wrong.
+apply the way ADR-0020 claims and that ADR is wrong. For the declaration gate, stop at 40
+convocations or 120 declared-distinct pairs: a false-distinct rate above 10% rejects
+declaration-only admission; a Wilson 95% upper bound below 10% retains it provisionally;
+otherwise report insufficient data. [asserted]
 **This is the cleanest falsification test in the register.** Neither outcome is comfortable
 and both are informative.
+
+### EXP-15 · Does structured pushback improve decisions without training users to ignore it? `BLOCKED: decision log + longitudinal outcomes`
+**Decides:** ADR-0021 — whether the two-challenge protocol is useful or theatre.
+**Procedure:** record every eligible pushback, its irreversibility/material-stake grounds,
+whether it changed the decision, whether an overridden decision later received a bad
+verdict, and whether the user engaged with or dismissed the challenge. [asserted] Do not
+manufacture pushbacks to fill the sample. [asserted]
+**Measures:** decision-change rate; later-bad rate for overridden decisions; dismissal rate
+in the first and last ten resolved events; challenge count and evidence novelty. [asserted]
+**Stopping rule:** stop at 30 resolved pushbacks or 90 days. At most one changed decision in
+30 rejects the protocol as theatre; a dismissal-rate increase of at least 20 percentage
+points rejects the fixed count/form as habituating; fewer than 20 outcome-known events is
+insufficient data. [asserted] Any third challenge or second challenge without a new fact is
+an invariant failure, not an experiment outcome. [asserted]
 
 ### EXP-16 · Prototype the meeting layer on external PM tools; measure their friction directly `READY`
 **Decides:** two live claims at once. (1) ADR-0006's grounds for a *native* ticket store —
