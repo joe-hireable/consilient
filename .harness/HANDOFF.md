@@ -1,16 +1,18 @@
 # Codex → Claude Code orchestration handoff
 
-State: **STAGED — NOT RELEASED**
+State: **RELEASE AUTHORISED — successor acknowledgement controls transfer**
 Prepared: 20 August 2026
 Principal: Joe Brown
 Current owner: Codex root in the main worktree
 Successor: the existing Remote Control Claude Code session, Claude Opus 5, ultracode,
 xhigh effort, authenticated Max subscription path
+Release baseline: `ac0072e`
 
 This manifest transfers programme coordination, not hidden reasoning. Git and the append-only
 trajectory remain authoritative. Joe may send free-form messages to the successor through
 Remote Control while this handoff is staged. Until an explicit `RELEASED` message appears in
-that session, the successor must not write to the repository or dispatch workers.
+that session, the successor must not write to the repository or dispatch workers. Ownership
+transfers when the successor replies `HANDOFF-ACCEPTED` to that message.
 
 ## Non-negotiable rules
 
