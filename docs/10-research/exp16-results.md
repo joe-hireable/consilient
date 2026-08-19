@@ -44,8 +44,12 @@ family — see Limitations.
 | API errors / write conflicts / rate limits | n/a | **0 / 0 / 0** (24 concurrent comment writes) | 0 / 0 / 0 |
 | bracketed API latency (upper bound; includes agent-turn overhead) | n/a | comment post: 14.3–18.1 s (med 15.7); owner read 7.5–9.9 s; owner close 20.8–24.1 s | Slack post: 8.8–23.0 s (med 14.5) |
 
-The 4.8× / 9.7× token multiples land inside the 1.6–6.2× MAS overhead range Kim et al.
-report — Arm C exceeds it. `[measured]` vs `[cited]`.
+**Correction, 2026-08-20.** This file previously compared the 4.8× / 9.7× multiples above
+to Kim et al.'s 1.6–6.2× range. That comparison was incommensurable and has been withdrawn:
+the full text, read on 20 August 2026, reports 1.6–6.2× **realised reasoning turns**, whereas
+the figures above are **subagent tokens**. [measured] No token-overhead range from that paper
+is available to compare against, and this experiment did not record reasoning turns, so the
+arms stand on their own measured token multiples with no external referent. [measured]
 
 ## Decisions across arms
 

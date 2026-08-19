@@ -739,6 +739,78 @@ cost. Self-reported confidence is excluded. [asserted]
   its role threshold, record “insufficient or negative evidence” and keep orchestration
   supervised. [asserted]
 
+### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `READY: blocked only while EXP-07 holds the GPU`
+**Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
+specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a
+free capability floor for the local tier and a zero-cost prior for EXP-29's scope question.
+**Estimand, stated before the run:** the effect of *substituting the installed
+`gemma4:31b` for the installed `qwen3:8b`* in one fixed composition. It is **not** a size
+ablation and may never be reported as one — the two models differ in family, training data,
+tokeniser, instruction tuning and quantisation, and no same-family sibling pair is installed.
+[asserted]
+
+**Hardware admission, decided before execution (ADR-0026):** RTX 5090, 32 GB VRAM. Installed
+weights are `gemma4:31b` (19 GB, id `6316f0629137`) and `qwen3:8b` (5.2 GB, id
+`500a1f067a9f`); both are already local, so no harness-initiated download occurs. [measured]
+A feasibility probe runs first and is not scored: load each model alone, record peak VRAM,
+load time and tokens/s, and fix `num_ctx` to the largest value **both** models serve with at
+least 2 GB VRAM spare. If no common context of at least 8,192 tokens fits, the experiment is
+recorded infeasible rather than run at mismatched context. [asserted]
+
+**Exclusivity precondition — this is a hard gate.** EXP-07 times `qwen3:8b` on the same GPU.
+Running this experiment concurrently would contend for VRAM and corrupt EXP-07's durations,
+which are its entire measurement. No attempt starts until the EXP-07 process has exited and
+its result file is closed. [asserted]
+
+**Precondition:** the five frozen public fixtures in `experiments/exp07/run_exp07.py`,
+unchanged; the same Codex `--oss --local-provider ollama` control path; the same
+functional-plus-changed-file-scope verifier with its fail-closed scope gate; recorded
+modelfile digest, quantisation and served-model identity read back from Ollama rather than
+assumed from the request flag; no frontier call, no metered provider, no API key. [asserted]
+**Procedure:** 5 fixtures x 2 models x 5 attempts = 50 serial attempts. Fresh temporary
+repository per attempt. Block by fixture; within a fixture use a counterbalanced model order
+fixed and recorded before the run. Reload a model only when it changes and record load time
+separately, so model-swap cost is never charged to an attempt. Identical per-attempt timeout
+and the same minimum-attempt floor as EXP-07; overall cap three hours.
+**Measures:** verified pass/fail; censored flag; wall-clock including verifier; attempts that
+pass functional tests but fail the scope gate; outcome class (`passed` / `rejected` /
+`agent_timeout` / `verifier_timeout` / `verifier_error`); Ollama-reported eval counts and
+tokens/s; peak VRAM; model load time. Self-reported confidence is excluded. [asserted]
+**Stopping rules (fixed before the run):**
+- Run all 50 attempts without efficacy peeking. Stop for a write outside the temporary
+  repository, any non-local provider in the resolved command, GPU out-of-memory in two
+  attempts of the same model, a defective fixture or verifier, or the three-hour cap. Report
+  censored cells; never replace one after its outcome is known. [asserted]
+- **Primary, and deliberately conservative:** first-attempt verified pass rate, n=5 per model.
+  A difference is claimed only at 5-0 or 4-1 in matched pairs under an exact paired test.
+  Any other split is `insufficient evidence`, fixed now so a 3-2 result cannot be narrated
+  into a finding. [asserted]
+- **Secondary:** paired per-fixture first-attempt wall-clock ratios, reported with their range
+  rather than as a point estimate. A median ratio of at least 1.5x with all five fixtures
+  agreeing in sign is recorded as "the larger installed model is materially slower in this
+  composition"; mixed signs are `insufficient evidence`. [asserted]
+- **EXP-07 interaction, using no new frontier calls:** compare `gemma4:31b` failed-attempt
+  durations against the *already recorded* frontier durations. This is a historical control
+  and inherits unmeasured version drift. [asserted] If the larger model passes where
+  `qwen3:8b` failed and does so under 2x the recorded frontier duration on at least three
+  fixtures, EXP-07's reopening of ADR-0003 is model-specific and must be restated that way.
+  If it fails at least as often and takes longer, the reopening is robust within this pair.
+  [asserted]
+- **Censoring direction, inherited from EXP-07's own limitation:** a censored attempt makes a
+  "no crossing" verdict unavailable. Only a crossing may be concluded from censored data.
+  [asserted]
+- If no rule fires, the verdict is `insufficient data`. Do not tune context, temperature,
+  prompt or attempt count and re-run; a re-run after seeing outcomes is a new experiment
+  requiring a new registration. [asserted]
+
+**What this cannot decide, recorded before the run so it cannot be forgotten afterwards:** a
+size effect; matched reasoning effort, since Ollama defaults differ per modelfile and EXP-07
+already records that limitation; β, because the fixture oracle's own false-accept rate is
+unmeasured and a passed artefact is only *verifier-accepted*; anything about frontier models,
+since none is called; generalisation to real repositories from five synthetic fixtures; and
+whether a learned router improves real work, which EXP-07's own limitation already excludes.
+[asserted]
+
 ### EXP-19 · Feedback-prompt completion rate over time `BLOCKED: feedback prompts (v1+)`
 **Decides:** whether the outcome-feedback friction budget
 (`../20-design/feedback-signals.md`) is exceeded — the ADR-0007 "annoying verdict prompt

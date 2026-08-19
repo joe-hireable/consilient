@@ -6,6 +6,20 @@
 - **Inquiry tier reached:** T1 ground (a theorem, plus published measurements)
 - **Executable model:** none — the constraint is a theorem, not a parameter.
 
+## Update: 2026-08-20 — Kim et al. corrected after promotion to `[FULL]`
+
+The Kim et al. entry was cited from a snippet and was wrong in three ways. The source was
+read in full on 20 August 2026 and the bibliography entry promoted `[SNIP]` → `[FULL]`;
+ADR-0023 makes that a T1 correction rather than a supersession, because the decision has not
+changed. [cited] The overhead is **realised reasoning turns, not tokens**; the 94% sign
+prediction covers **16 later configurations and did not survive cluster-robust correction**;
+and the paper also reports **domains improving by as much as 80.8%**, which this ADR had
+omitted. [measured]
+
+The decision stands: its primary ground is the Ao, Gao & Simchi-Levi theorem, not Kim et al.
+[asserted] But the capability-threshold evidence is weaker than this ADR claimed, and the
+80.8% figure belongs in *Evidence against*, where it now appears. [asserted]
+
 ## Context
 
 Q7. The project's original scope included real-time inter-agent communication, model
@@ -49,10 +63,12 @@ echo.**
   matched thinking-token budgets; Data Processing Inequality argument. Predicts MAS becomes
   competitive precisely when single-agent context utilisation degrades — **which is the
   justification for parallel worktrees and against debate.**
-- `[cited]` Kim et al., *Nature Machine Intelligence* 2026: 260 configurations, compute
-  matched; capability-saturation threshold predicts the sign of the multi-agent effect on
-  SWE-bench Verified and Terminal-Bench in 94% of validation configs. MAS overheads
-  1.6–6.2× tokens at matched performance.
+- `[cited]` Kim et al., *Nature Machine Intelligence* 2026 (`[FULL]`, read 2026-08-20):
+  across 260 configurations, multi-agent systems used **1.6–6.2× the realised reasoning
+  turns** of the single-agent baseline, and every tested multi-agent architecture degraded on
+  SWE-bench Verified by 1.3–12.8%. The proposed ~45% capability threshold predicted the sign
+  in 94% of 16 later configurations, **but the interaction did not survive cluster-robust
+  correction**, so treat the threshold as a hypothesis rather than a result.
 - `[cited]` *The Illusion of Multi-Agent Advantage* (arXiv:2606.13003): audit of six
   automatic MAS-design frameworks found architectural bloat and functional collapse back to
   a single agent.
@@ -67,6 +83,11 @@ echo.**
 - **Escalation passes on a technicality.** A fresh sample from a different model is new
   information in the statistical sense, but not new *evidence about the world*. The
   guarantee here is weaker than for the critic tier and this ADR does not resolve it.
+- **The same Kim et al. paper reports domains improving by as much as 80.8%.** [cited] Its
+  own conclusion is that task topology and inference budget decide the sign, not that
+  collaboration is uniformly bad. This ADR's cut is therefore narrower than it reads: it is
+  justified for shared-context deliberation in a domain that has an oracle, not as a general
+  claim about multi-agent systems.
 - Rejecting debate outright forgoes any benefit in domains without an oracle. Coding has
   one, so the cost is bounded — but the rule as stated would misfire if the harness were
   ever pointed at open-ended work.
