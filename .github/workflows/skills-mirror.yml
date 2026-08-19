@@ -1,0 +1,20 @@
+name: skills-mirror
+# ADR-0014: .agents/skills is the source of truth; .claude/skills is a symlink to it.
+# A symlink cannot drift, so the only failure mode is someone replacing it with a
+# stale copy — this asserts it is still a resolving symlink (I1: the invariant ships
+# with its check).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: .claude/skills is a symlink resolving into .agents/skills
+        run: |
+          test -L .claude/skills
+          test -f .claude/skills/README.md
+          [ "$(readlink .claude/skills)" = "../.agents/skills" ]

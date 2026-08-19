@@ -17,3 +17,6 @@ venv/
 # workflow-agent scratch snapshots — never commit
 *_models.json
 modelsdev.json
+
+# regenerable graphify artifacts (rebuilt by post-commit hook)
+graphify-out/
