@@ -1,7 +1,8 @@
 # Architecture sketch
 
-**Status: one turn old, one reviewer, conflict of interest declared. Expect to rewrite.**
-This exists to be attacked in the brainstorm, not to be implemented.
+**Status: provisional design position, reconciled through ADR-0028 but not approved for
+implementation.** [asserted] This exists to be attacked in the brainstorm; the reviewable
+implementation boundary is the explicitly unapproved `../40-spec/v0-draft.md`. [asserted]
 
 ---
 
@@ -62,10 +63,11 @@ maximises incremental verified value, while metered calls retain hard monetary c
 (ADR-0026, ADR-0028). [asserted]
 
 ### 3. The ticket store
-Native, agent-first, local-first. Git-backed or SQLite — **undecided (Q6)**.
-Git-backed gives the trajectory record free: every state transition is a commit.
+Native, agent-first, local-first. SQLite WAL holds mutable coordination state and is a
+rebuildable projection of the versioned append-only JSONL trajectory committed to git
+(ADR-0006). [asserted]
 Optional one-way sync adapters out to Linear / ClickUp for humans who want to watch.
-Build the state machine, not a Trello competitor.
+[asserted] Build the state machine, not a Trello competitor. [asserted]
 
 ### 4. Parallel orchestration
 Across git worktrees on **independent work units**. This is the regime where the
@@ -86,9 +88,14 @@ measures both.
 ## What is deliberately absent from v0
 
 Learned router · trajectory corpus as an asset · debate / model battling · RL ·
-multi-channel access · voice · on-device models · self-updating model catalogue ·
-autonomous unbounded spending · CASB / ToS scanning / compliance trails · the Inquiry tier
-(Q14).
+multi-channel access · voice · a home-grown model engine or catalogue · autonomous
+unbounded spending · CASB / ToS scanning / compliance trails · the Inquiry tier (Q14).
+[asserted]
+
+Stable logical identity, performance personas and same-turn typed control remain behind
+EXP-24–26. [asserted] Runtime identity, principal, task role, evidence class, artefact,
+verifier and authority are required provenance fields from the first implementation
+because they describe what happened rather than claiming a persona effect. [asserted]
 
 Each of these was argued through and cut or deferred. See `decisions-so-far.md`.
 

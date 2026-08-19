@@ -1,6 +1,7 @@
 # The brainstorm agenda
 
-**This is the next step. Work these with the user before writing any spec.**
+**Brainstorming remains open, but an explicitly unapproved draft specification now records
+the current boundary for attack. It grants no implementation authority.** [asserted]
 
 **Status as of 19 Aug 2026.** Several are now closed by ADRs; several others are not
 argument questions at all and have become entries in
@@ -12,7 +13,7 @@ argument questions at all and have become entries in
 | Q2 β measurable | Answered analytically in ADR-0002; **EXP-01** decides it empirically |
 | Q3 bimodal difficulty | **Closed.** β* is distribution-free: β* = (1−α)·e^(−kΔ). ADR-0002 |
 | Q4 what v0 optimises for | Answered: both. Bias warning recorded in ADR-0002 |
-| Q5 adapter surface | **EXP-05** — do this first, one day |
+| Q5 adapter surface | **Closed for first pass** — EXP-05 DONE; continue measuring maintenance drift |
 | Q6 ticket store | **Closed** — ADR-0006 |
 | Q7 exogenous signal | **Closed** — ADR-0010 |
 | Q8 meeting primitive | **Closed** — ADR-0011 (became an evidence merge) |
@@ -21,19 +22,20 @@ argument questions at all and have become entries in
 | Q11–Q12 dispersion gate | **EXP-09** |
 | Q13 executable-model ratchet | **EXP-10** |
 | Q14 Inquiry tier in v0 | Judgement call — still open |
-| Q15 / Q23 scope | Judgement calls — still open |
+| Q15 / Q23 scope | **Closed by Joe's EXP-16 decision** — full candidate list, sequenced; three months below 10 trajectory hours/week reinstates the narrow provisional |
 | Q16 surface | **Closed** — ADR-0007 |
 | Q17 evaluation | **Closed** — ADR-0013 |
 | Q18 name | **Closed** — ADR-0008, Consilience |
-| Q19 what was missed | Still open — needs a different reader, see the register |
+| Q19 what was missed | Open — first cold local-model pass used no repository tools and produced no verifiable finding; a capable different reader is still required [measured] |
 | Q20 model library | **Closed** — ADR-0005: wrap, don't build |
 | Q21–Q22 feasibility & β composition | **EXP-11** |
 | Q24 β outside coding | **Open — Tier 0 for the expanded scope.** Added 19 Aug 2026 |
 | Q25 reasoning layer on reasoning models | Open — see `../20-design/reasoning-layer.md` |
 | Q26 agent identity, personality and real-time collaboration | Open — **EXP-24–26** separate accountable identity, persona effects and typed control |
 
-What genuinely remains for a human to decide: **Q14, Q15/Q23, Q19.** Everything else is
-either settled or scheduled.
+What genuinely remains a user preference in this agenda is **Q14**. [asserted] Q19 needs a
+different reader rather than a preference, and Q24–Q26 need evidence rather than agreement.
+[asserted]
 
 ---
 
