@@ -65,8 +65,14 @@ task-directed: [asserted]
 
 Scathing or person-directed criticism is excluded from the default culture because no
 reviewed LLM result establishes a reliable accuracy advantage and human collaborators bear
-its cost. [asserted] EXP-28 retains a bounded mildly scathing arm so that exclusion remains
-falsifiable rather than moralised into a performance claim. [asserted]
+its cost. [asserted] EXP-28 retains a bounded mildly scathing arm so the exclusion can be
+falsified rather than merely asserted. [asserted] That arm is admitted with a handicap and
+this is a value choice, not a neutral test: it must beat calibrated constructive feedback by
+four of 36 verified outcomes, whereas generic praise needs three against neutral and
+calibrated feedback needs only non-inferiority. [asserted] The asymmetry is deliberate,
+because a style that harms human collaborators should have to earn its place by more than a
+tie — but it means a null result is evidence about the threshold as much as about the style.
+[asserted]
 
 ## Context architecture
 
