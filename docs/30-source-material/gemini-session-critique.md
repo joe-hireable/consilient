@@ -1,0 +1,112 @@
+# The earlier Gemini design session — keep / fix / cut
+
+Source: 78-page PDF export of a Gemini "AI Agent Architecture Brainstorming Session",
+producing an "Enterprise Autonomous Agent Harness: Concept Document and Governance Ethos"
+in six chapters.
+
+---
+
+## Read this first: provenance
+
+Joe's total input across 78 pages was **four messages**:
+
+1. "Integrate with major platforms like ClickUp (I have), Linear (I have), Slack (I have)"
+2. "Human approval for code changes. Agent should discuss the need to learn with the human
+   operator and decide"
+3. "1. Linear 2. Yes 3. Idk whatever u think 4. Semantic required using LLM"
+4. "Proceed with priority 1 document and also priority 2 document"
+
+**Everything else is Gemini's unchallenged first draft.** The document *reads* as settled
+architecture. It is one model's proposal, agreed to by silence. Do not inherit it wholesale.
+
+---
+
+## KEEP
+
+**The Engineering Ratchet.** The strongest idea in the document: when an agent fails, the
+fix lives in code validation, sandbox constraints or state tracking — never in a longer
+system prompt. Once fixed, it cannot regress. This is the same philosophy as verifier-gating
+and it is already implemented in `jobboard-v2` (~20 CI ratchets).
+
+**The four-tier sandbox model.** Reader (quarantine, no MCP, out-of-band instructions
+stripped, outputs schema-validated) / Orchestrator (read-only MCP, blocked from untrusted
+documents) / Resolver (write-only MCP, no internet egress, no bash) / Critic (independent
+audit before state merge). This is a real prompt-injection defence, not theatre.
+
+**Tickets, not prompts, as the unit of work.** Correct, and now Joe's own position — though
+against a *native* store rather than Linear (`decisions-so-far.md` D8).
+
+**The five-section agent template.** Frontmatter / Identity / Deliverables / Workflow /
+Guardrails, where Guardrails are explicit negative-space rules. Good structure.
+
+**Mode-based permission profiles.** Guided (default, confirmation before writes) / Auto
+(free within sandbox) / Dangerously-skip (read-only analytical runs only). Sound shape.
+
+---
+
+## FIX
+
+**Confidence-based risk gates — the central flaw.** The document gates automated actions on
+the agent's *self-assessed confidence*: ≥0.60 low risk, ≥0.75 medium (deploy to staging),
+≥0.90 high (merge to main). This is precisely the failure mode the routing literature
+documents: LLM self-reported confidence is badly calibrated, so you auto-merge on
+confident-and-wrong and block on unconfident-and-right — optimising the cost number while
+silently degrading the quality number.
+
+**Replace self-assessed confidence with verifier outcomes throughout**: tests pass, types
+check, build succeeds, reviewer accepted the diff unedited. Those are observable.
+See `decisions-so-far.md` D12.
+
+**The Return on Learning (RoL) formula.**
+
+```
+RoL = (V_saved × N_runs) / (C_compute + C_tokens + C_human_review)
+```
+
+Gemini's invention, not Joe's. `V_saved` (human hours saved per execution) and `N_runs`
+(projected 90-day frequency) are both **unobservable at decision time** — the agent would be
+gating skill acquisition on two numbers it invents. Dressing a guess in a fraction does not
+make it a measurement.
+
+**Fix:** don't estimate, observe. Let the agent build the skill cheaply, then compute RoL
+*retrospectively* from the trajectory log — actual invocations, actual token cost, actual
+reviewer time — and prune skills that don't earn their place. Gate on evidence, not on a pitch.
+
+*(The same defect appears in the constrained-optimisation screenshot Joe shared separately:
+`max U(x) s.t. Q(x) ≥ Q_max`. Two problems — if `Q_max` is the maximum attainable the
+feasible set collapses to the argmax and the weights become tie-breakers, contradicting the
+"90% of tasks don't need a genius" premise; and more fundamentally `Q(x)` is not observable
+before you pay for it. The correct form is a chance constraint,
+`min E[cost] s.t. P(Q ≥ Q_target) ≥ 1−δ`, whose practical solution is a verifier-gated
+cascade. That correction is the origin of this entire project.)*
+
+---
+
+## CUT
+
+**Agent CASB, semantic ToS pre-flight scanner, SOC 2 / NIST / HIPAA audit trails,
+mTLS handshakes to GCP Secret Manager.** Enterprise-procurement cosplay for a solo
+open-source project. The ToS scanner in particular is not a legal defence — an LLM's reading
+of a terms page protects nobody from anything.
+
+Ship instead: OS-keychain credential storage and an outbound allowlist. That is the 5% that
+matters, at ~1% of the work.
+
+**PSN auto-refactor at 150 lines.** An arbitrary threshold triggering autonomous rewrites of
+your own skill library is a machine for silently breaking things you rely on.
+
+**The invented vocabulary.** "Programmatic Skill Network", "Sovereignty & Stewardship
+Protocol", "Agent CASB", "Memento-Skills", "Maturity-Aware Gating". These are names without
+falsifiable content, generated by a model asked to be impressive. Treat the appearance of
+new terminology as a signal to check whether there is a referent underneath. This is
+recorded as a standing rule in `AGENTS.md`.
+
+**"Symphony" as specified.** The ticket-driven pattern is right; the implementation binds it
+to Linear polling with a BEAM/Elixir supervisor, inheriting Linear's rate limits, webhook
+round-trips and human-shaped state machine for agents running dozens of parallel tickets.
+Joe has since chosen a native store (D8).
+
+**The multi-agent org-chart ("Governance Layer of CEO, CTO, COO agents").** Fails the
+exogenous-signal test (`decisions-so-far.md` D10): these agents reprocess shared context and
+are, by the theorem in `literature-review.md` §3, a lossy compression of information the
+system already had.

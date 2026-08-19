@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# workflow-agent scratch snapshots — never commit
+*_models.json
+modelsdev.json
