@@ -2,6 +2,63 @@
 
 We publish rarely. The default answer to "should this be a paper?" is **no**.
 
+We nevertheless publish the **research record continuously**: a frozen protocol before a
+run, the runnable instrument, machine-readable results, an evidence-tagged finding and an
+honest stopping-rule verdict. [asserted] Formal papers remain rare; reproducible research
+notes and negative results do not wait for a paper-sized story. [asserted]
+
+## Two publication lanes
+
+### Lane A — continuous open research
+
+Every completed experiment receives a public disposition in its findings file. [asserted]
+The disposition is one of: `not publishable`, `research note`, `dataset/instrument release`,
+or `paper candidate`, with the reason and unmet gates stated. [asserted]
+
+A research note may ship when the protocol was fixed before the result, the instrument and
+safe artefacts are reproducible, the stopping rule was applied unchanged, and limitations
+are explicit. [asserted] It may report `insufficient evidence`; a null or underpowered result
+is not rewritten as a success. [asserted] Repository findings are the first publication
+surface; a versioned archive, dataset venue or practitioner article is added only when it
+improves reuse. [asserted]
+
+Private measurement corpora remain private. [asserted] Notes may report aggregate metrics
+from `hireable-3.0` or `jobboard-v2`, but never their content, excerpts or detailed paths;
+a result that cannot be reproduced without private material must say so and needs a public
+replication before it can clear G1 for a formal paper. [asserted]
+
+### Lane B — formal synthesis
+
+The four gates below decide papers and equivalent headline publications. [asserted] Several
+Lane-A records should be synthesised when together they establish one clean, novel and
+useful claim; experiment count and release cadence are not substitutes for that claim.
+[asserted]
+
+## First-draft standard
+
+“First draft” means the first version offered for human or external review, not an internal
+scratchpad. [asserted] Before that version exists, the publication owner must have:
+
+- frozen a claim map linking every headline, table and figure to its evidence class and
+  reproducible artefact; [asserted]
+- completed a primary-source novelty matrix containing the strongest near misses and the
+  result that would make the paper unnecessary; [asserted]
+- reproduced every reported number from a clean checkout and recorded software, model,
+  prompt, seed and hardware versions where they can change the result; [asserted]
+- obtained an evidence-class-different reader's blind re-derivation of the conclusion from
+  the artefacts, with disagreements preserved and disposed individually; [asserted]
+- run explicit audits for overclaim, leakage, citation support, private-corpus exposure and
+  forbidden `[SNIP]`/`[2ND]` sources; [asserted]
+- included stopping-rule outcomes, nulls, sample-size limits, unresolved confounds,
+  conflicts of interest and the experiments that were not run; [asserted]
+- prepared the artefact card, reproduction instructions and public-data boundary alongside
+  the prose rather than after it. [asserted]
+
+Failure of any item keeps the work in Lane A and out of a formal first draft. [asserted]
+Review is exacting about claims and constructive about contributors: criticism names the
+unsupported statement, evidence gap or failed check and the smallest repair; status,
+seniority, persona and rhetorical confidence carry no weight. [asserted]
+
 ## Why the bar is high
 
 Publishing "as we go" is how you build a reputation for noise. arXiv cs.AI receives
