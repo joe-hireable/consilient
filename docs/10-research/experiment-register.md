@@ -511,9 +511,12 @@ elapsed time; recovery after restart.
 - Unsupported native semantics are recorded as `unsupported`, not scored as a failed
   approximation. Fewer than two eligible adapters is “insufficient evidence”. [asserted]
 
-### EXP-27 · First-party change intelligence versus dispatch-time discovery `READY: phase A; 30-day phase blocked on collector`
+### EXP-27 · First-party change intelligence versus dispatch-time discovery `IN PROGRESS: phase A PASS; 30-day phase blocked on collector`
 **Decides:** ADR-0029 — whether vendor change monitoring earns v0 scope as an early-warning
 and invalidation layer, while authenticated resource state remains a separate authority.
+**Phase-A result:** all six fixed endpoints returned HTTP 200 and the resource-mutation
+invariant fixtures passed on 19 August 2026. This proves reachability, not recall; the
+promotion verdict remains insufficient pending the fixed 30-day phase. [measured]
 **Precondition:** phase A requires only the fixed six unauthenticated first-party endpoints
 in `experiments/exp27/probe_sources.py`; the longitudinal phase requires a read-only
 collector, append-only event log and dispatch-time version/capability probes for Claude
