@@ -268,11 +268,20 @@ def verify(repo, baseline, timeout_s=VERIFIER_TIMEOUT_S):
         tests_passed = False
         tail = "verifier timeout"
         timed_out = True
-    changed_files = changed_since(repo, baseline)
+    scope_error = None
+    try:
+        changed_files = changed_since(repo, baseline)
+    except (OSError, subprocess.SubprocessError) as exc:
+        # Scope verification is an acceptance gate. If its evidence disappears,
+        # fail closed and retain the diagnostic rather than aborting the batch.
+        changed_files = []
+        scope_error = f"{type(exc).__name__}: {exc}"
     return {
-        "passed": tests_passed and changed_files == ["solution.py"],
+        "passed": scope_error is None and tests_passed and changed_files == ["solution.py"],
         "tests_passed": tests_passed,
         "timeout": timed_out,
+        "scope_valid": scope_error is None,
+        "scope_error": scope_error,
         "changed_files": changed_files,
         "duration_s": round(time.monotonic() - started, 3),
         "test_tail": tail,
@@ -332,6 +341,8 @@ def run_attempt(fixture, condition, attempt, timeout_s, configured_timeout_s):
         usage = usage_from_events(process.stdout)
         if verifier["timeout"]:
             outcome, error = "verifier_timeout", "verifier timeout"
+        elif not verifier["scope_valid"]:
+            outcome, error = "verifier_error", verifier["scope_error"]
         elif verifier["passed"]:
             outcome, error = "passed", None
         else:
@@ -344,6 +355,8 @@ def run_attempt(fixture, condition, attempt, timeout_s, configured_timeout_s):
             "passed": False,
             "tests_passed": False,
             "timeout": True,
+            "scope_valid": False,
+            "scope_error": "agent timed out before scope verification",
             "changed_files": [],
             "duration_s": 0,
             "test_tail": "agent timeout",

@@ -1,6 +1,7 @@
 import json
 import subprocess
 
+import run_exp07
 from headroom import admission_reason
 from run_exp07 import (
     FIXTURES,
@@ -212,6 +213,21 @@ def test_verifier_timeout_is_reported_rather_than_raised():
     assert result["timeout"] is True
     assert result["tests_passed"] is False
     assert result["passed"] is False
+
+
+def test_verifier_fails_closed_when_scope_evidence_is_unavailable(monkeypatch):
+    repo, baseline = make_repo(FIXTURES[0])
+    (repo / "solution.py").write_text(SOLUTION, encoding="utf-8")
+
+    def unavailable(*_args):
+        raise subprocess.CalledProcessError(128, [GIT, "diff"])
+
+    monkeypatch.setattr(run_exp07, "changed_since", unavailable)
+    result = verify(repo, baseline)
+    assert result["passed"] is False
+    assert result["tests_passed"] is True
+    assert result["scope_valid"] is False
+    assert "CalledProcessError" in result["scope_error"]
 
 
 def test_checkpoint_is_valid_and_retains_spent_attempts():

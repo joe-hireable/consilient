@@ -131,6 +131,16 @@ stop; ten percentage points are reserved for the batch. [asserted] OpenRouter, A
 Claude, Cursor and Antigravity are excluded. [asserted] Stop at 30 attempts, 90 minutes or
 the first admission-rule failure. [asserted]
 
+**Instrument-repair amendment fixed before the replication rerun:** the interrupted first
+run was invalidated before any verdict because the original instrument could reject a
+committed correct artefact, lose partial results and mishandle right-censored timeouts.
+[measured] A reduced attempt now starts only when at least 30 seconds remain; below that
+floor the run stops instead of creating a nominal comparison from an arbitrarily truncated
+attempt. [asserted] Verifier and agent timeouts are separate right-censored outcomes,
+scope-verifier failure is a recorded fail-closed outcome, and every headroom observation
+and attempt is atomically checkpointed. [asserted] The frozen fixtures, five-attempt serial
+intervention, eligibility rule and 2× threshold are unchanged. [asserted]
+
 The single-attempt multiplier is computed only where local attempt one fails and the
 frontier passes. [asserted] The five-attempt multiplier is computed only where all five
 local attempts fail and the frontier passes. [asserted] At least three eligible paired
