@@ -1,67 +1,110 @@
 # EXP-05 findings — the adapter surface, measured
 
-Run 19 Aug 2026. Adapter #1 (Claude Code 2.1.235) written first with its assumptions
-recorded; adapter #2 (codex-cli 0.148.0) written **without modifying adapter #1**; every
-divergence recorded here. Total build+run time: well inside the one-day budget (~40 min).
+Run on 19 August 2026 against the five backend adapters in
+`docs/10-research/experiments/exp05/`. [measured]
 
-## Headline: the stopping rule does NOT fire — with stated limits
+## Verdict
 
-ADR-0001's stopping rule: *"if adapter #2 forces a redesign of the interface and #3
-forces another, the surface is not stable enough for one maintainer."* **Adapter #2 did
-not force an interface redesign.** The `run(ticket) → outcome` contract (spawn, feed a
-ticket, collect a diff + verdict) absorbed every difference inside ~80 adapter lines.
-But 4 of the 6 assumptions baked into adapter #1 broke *within* it:
+**ADR-0001's stopping rule does not fire.** [measured]
 
-| Assumption (from adapter #1) | Codex reality | Verdict |
-|---|---|---|
-| A1 one-shot non-interactive invocation | `codex exec` is exactly that | **held** |
-| A2 single JSON result object on stdout | JSONL *event stream* (`--json`); final message goes to a **file** (`--output-last-message`) | **broke** |
-| A3 token/cost accounting in the result | No `cost_usd` anywhere; usage via stream events with different field names. And A3 was already misleading in adapter #1: Claude's `usage.input_tokens` is the *last call*, not the session (measured: 6 tokens in for a 19.6 s run costing $1.02) | **broke, both ways** |
-| A4 artifact = `git diff` afterwards | identical | **held** |
-| A5 permissions pre-granted via one flag | Two-axis model: sandbox (`read-only`/`workspace-write`/`danger-full-access`) × approval policy — mapped approximately, not equivalently | **broke** |
-| A6 process cwd scopes the agent | Explicit `-C` flag; non-git dirs also need `--skip-git-repo-check` | **broke** |
+The second adapter did not require an interface redesign. The third exposed a genuine
+ticket-schema question: repository paths live in the backend's namespace, not necessarily
+the host's. A per-adapter path-translation seam absorbed that difference without changing
+the common ticket/result contract. [measured]
 
-**Consequences for the real interface** (design input, not yet an ADR change):
-- `cost_usd` and token fields must be *optional and per-adapter-approximate* — no common
-  accounting contract exists across the two vendors measured, or even reliably within
-  one.
-- The result channel must be adapter-owned (stdout-JSON vs stream+file); only the
-  *outcome schema* is common.
-- Permission mapping is per-adapter policy, not a shared flag — and it is safety-relevant
-  (the closest Codex equivalent to Claude's skip flag disables sandboxing entirely).
+That is evidence for keeping the meta-harness boundary, not evidence that every future
+backend will fit it. Only five adapters and one comparable ticket have been exercised.
+[asserted]
 
-## Smoke results `[measured]`
+## Adapter results
 
-| | Claude Code | Codex |
-|---|---|---|
-| ok | true | false — **401 Unauthorized** (not logged in; interactive `codex login` required) |
-| diff correct / tests pass | yes / yes (2 passed) | no run — auth-blocked |
-| duration | 19.6 s | 17.9 s to 5× websocket retry exhaustion |
-| cost | $1.02 (reported) | not reported (by design) |
+| # | backend | state | interface consequence |
+|---:|---|---|---|
+| 1 | Claude Code | Live run passed | Established the initial ticket/result shape. [measured] |
+| 2 | Codex | Live run passed | Fit the same shape; no redesign. [measured] |
+| 3 | Cursor CLI | Adapter and four path-seam tests passed; live run blocked on WSL login | Required host-to-WSL path translation inside the adapter. [measured] |
+| 4 | Ollama-local | Live run completed; verifier failed | Fit through the model-backed adapter; runner completion and artifact acceptance must remain separate. [measured] |
+| 5 | OpenRouter | Adapter written; live run blocked on `OPENROUTER_API_KEY` | Uses the same model-backed seam; no interface redesign observed in code, but no live result yet. [measured] |
 
-The auth block is the third instance of the EXP-16 finding: **interactive human-at-a-
-browser auth is a standing friction class across the delegated-agent ecosystem** (Linear
-OAuth, ClickUp identity, now Codex login). The native store/adapters must treat
-"credentialed but headless" as the design case, not the exception.
+Cursor's path issue is not cosmetic. A ticket containing
+`C:\work\repo\file.py` is invalid for a Linux-only process until the adapter translates
+it to the mounted WSL namespace. The common schema can carry a repository-relative path;
+the adapter owns conversion to the backend's execution namespace. [measured]
 
-## Bonus finding — Codex as a local-tier runner
+The Ollama and OpenRouter adapters also weaken the original two-path description of
+“delegated harness” versus “native open-model execution”. Both can share a model-backed
+adapter boundary while differing in transport, credentials, accounting and locality.
+[measured]
 
-`codex exec --oss --local-provider {lmstudio,ollama}` runs the same harness against
-local open models. That is a potential **cheap-tier execution path the cascade gets for
-free** — one adapter, two tiers — and it interacts with ADR-0025's probe (the paired
-probe could run both tiers through the *same* adapter, holding harness effects
-constant). `[cited from --help; unmeasured]`
+## First comparable backend run
 
-## Honest limits
+One synthetic Python ticket was run through every ready backend. Cursor and OpenRouter were
+excluded by the authentication blockers above. [measured]
 
-- Smoke-scale: one trivial ticket. Interface stress (long runs, mid-run failures,
-  streaming progress, budget caps) untested.
-- The live Codex leg is pending `codex login` — parked, not skipped.
-- Adapter #3 (opencode or Antigravity CLI) unwritten; the stopping rule's second clause
-  is still open. opencode's registry (models.dev) suggests its surface is closest to
-  Codex's; Antigravity is the wildcard.
+| backend | runner `ok` | verifier | elapsed | reported input tokens | reported cost |
+|---|---:|---:|---:|---:|---:|
+| Claude Code | true | pass | 25.6 s | 8 | $0.53987225 |
+| Codex | true | pass | 20.4 s | 87,356 | unavailable |
+| Ollama `qwen3:8b` | true | fail | 114.2 s | 559,095 | unavailable |
 
-## Register status
+The token fields are backend-native counters and are not comparable units in this run.
+Claude's field counted a narrow reported input while Codex and Ollama reported much larger
+context-processing totals. [measured]
 
-EXP-05: partially DONE — adapters #1+#2 written, breakage recorded, stopping rule not
-fired on this evidence. Remaining: live Codex run (auth), adapter #3.
+Inspection of the saved Ollama scratch repository found that `util.py` was unchanged,
+`tests/test_util.py` still imported the missing `add` function, and `git diff` was
+empty. The saved raw output ended with “no last agent message”; therefore the evidence does
+**not** support saying that the model self-reported success. The process-level runner
+returned zero and the adapter recorded `ok=true`, while the verifier correctly rejected
+the artifact. [measured]
+
+This is direct evidence for working principle 5: backend completion is not an acceptance
+signal. The verifier must remain the gate. It is also the cascade's critic function
+rejecting a cheap failed attempt on first contact. [measured]
+
+## Consequence for EXP-07 and ADR-0003
+
+The failed local attempt took 5.6 times the Codex success latency and 4.5 times the Claude
+Code success latency. [measured]
+
+ADR-0003 says a wasted-work multiplier of at least 2× reopens the “no learned routing
+policy in v0” decision. This one-task pilot crosses that threshold in both comparisons.
+[measured]
+
+It does not establish the population multiplier: this is n=1, on one trivial task, with one
+local model and one failed trajectory. [asserted] It does make EXP-07 the highest-priority
+routing experiment because the pre-registered threshold has been crossed at the first
+observation. [asserted] At a 5× multiplier, ADR-0003's simulation reports +0.123 headroom,
+the largest value in its sensitivity table. [simulated]
+
+The honest current verdict is: **ADR-0003 is reopened for investigation, not overturned.**
+[asserted]
+
+## ADR-0001 stopping-rule audit
+
+ADR-0001 would be overturned if the second adapter forced enough interface redesign to
+show that the proposed boundary was really a Claude-specific wrapper. Adapter #2 did not
+do that. Adapter #3 introduced one genuine portability requirement, but it was contained
+within the adapter and left the common ticket/result interface intact. Adapters #4 and #5
+also fit without redesign. [measured]
+
+The stopping rule therefore does not fire. Cursor's live capability remains unmeasured
+until login, and OpenRouter remains unmeasured until a key is available, so this is not a
+claim of universal backend portability. [measured]
+
+## Limitations
+
+- The comparison has one task and no task-family variation. [measured]
+- Cursor and OpenRouter have not completed live runs. [measured]
+- Cost fields mix a measured Claude charge with unavailable subscription/local marginal
+  costs; “free” must not be inferred from `null`. [measured]
+- Elapsed time includes different backend setup and protocol work, so it measures
+  end-to-end user wait for this run, not pure inference speed. [measured]
+- The Ollama failure identifies a gate and a routing risk; it does not estimate local-model
+  failure probability. [asserted]
+
+## Status
+
+**DONE for the five-adapter surface question.** Cursor login and the OpenRouter key remain
+follow-up live-validation blockers, not reasons to keep ADR-0001's stopping-rule test open.
+[asserted]

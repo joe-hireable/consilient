@@ -67,12 +67,13 @@ more sweep.
 The minimum harness needed to unblock most of these: **adapter for one agent + ticket store
 + trajectory log + verdict prompt.** Nothing else.
 
-### EXP-05 · Adapter surface across four CLIs `PARTIALLY DONE 19 Aug 2026 — see experiments/exp05/findings-exp05.md`
-**Result so far:** adapter #2 (Codex) did **not** force an interface redesign — the
-stopping rule does not fire on this evidence — but 4 of 6 baked assumptions broke inside
-the adapter (result channel, cost accounting, permission model, working-root semantics).
-Cost/token fields are per-adapter-approximate; no common accounting contract exists.
-Remaining: live Codex run (blocked on interactive `codex login`), adapter #3.
+### EXP-05 · Adapter surface across five backends `DONE 19 Aug 2026 — see experiments/exp05/findings-exp05.md`
+**Result:** Claude Code and Codex passed a live ticket. Adapter #2 (Codex) did not
+force an interface redesign. Adapter #3 (Cursor) exposed a genuine namespace-dependent
+path question, absorbed by a per-adapter translation seam with four passing tests.
+Adapters #4 (Ollama) and #5 (OpenRouter) fit the model-backed seam; Ollama completed a
+live run but failed verification, while Cursor and OpenRouter remain blocked on login/key
+for live validation. The stopping rule does not fire. [measured]
 **Decides:** Q5, and the viability of ADR-0001.
 **Procedure:** write an adapter for Claude Code. Then write a second for Codex **without
 refactoring the first**. Record what the second breaks.
@@ -80,7 +81,7 @@ refactoring the first**. Record what the second breaks.
 **Stopping rule:** if adapter #2 forces a redesign of the interface and #3 forces another,
 the surface is not stable enough for one maintainer and ADR-0001 must be reconsidered —
 including the OpenHarness-plugin alternative recorded there.
-**Budget: one day.** This is the single highest-information experiment in the register.
+**Budget used:** one day. [measured]
 
 ### EXP-06 · Where in a run do failures occur? `BLOCKED: trajectory log`
 **Decides:** Q9 / ADR-0009, which is PROVISIONAL pending this.
@@ -88,7 +89,7 @@ including the OpenHarness-plugin alternative recorded there.
 **Stopping rule:** heavily front-loaded → consider a step-level *abort* (not step-level
 routing, which the β-label argument still blocks).
 
-### EXP-07 · Wasted-work multiplier `BLOCKED: cascade + local tier`
+### EXP-07 · Wasted-work multiplier `IN PROGRESS: n=1 pilot crossed the threshold`
 **Decides:** whether ADR-0003 (no learned router) reopens.
 **Procedure:** time a failed local cheap attempt end-to-end *including verifier* against a
 frontier call, on the 5090. **Amended 19 Aug 2026: run each condition WITH and WITHOUT the
@@ -98,6 +99,11 @@ wall-clock on a single serialising GPU and can cross the threshold by itself.
 +0.002 → +0.024 → +0.123 at 1× / 2× / 5×. If the multiplier crosses 2× *only* with the
 reasoning layer enabled, the finding is "scaffolding is what makes routing priors
 worthwhile" — record it that way rather than as a blanket reopening.
+**Pilot result, 19 Aug 2026:** one failed `qwen3:8b` attempt took 114.2 s versus
+20.4 s for a Codex success and 25.6 s for a Claude Code success: 5.6× and 4.5×.
+The pre-registered 2× reopening condition was observed, so ADR-0003 is reopened for
+investigation. This is n=1 on one trivial task and does not establish a population
+multiplier. EXP-07 is now the highest-priority replication experiment. [measured]
 
 ### EXP-08 · Critic recall `BLOCKED: critic tier`
 **Decides:** the parallelism ceiling in ADR-0007, and whether CLI-only survives.

@@ -1,0 +1,48 @@
+[
+ {
+  "ticket_id": "smoke-claude",
+  "agent": "claude-code",
+  "ok": true,
+  "tokens_in": 8,
+  "tokens_out": 458,
+  "cost_usd": 0.53987225,
+  "duration_s": 25.6,
+  "raw_tail": "anonicalModel\":\"claude-opus-5\",\"provider\":\"firstParty\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"```python\\ndef add(a, b):\\n    return a + b\\n```\\n\\n2 passed. Skipped: type hints/docstring \u2014 util.py has neither.\",\"ttft_ms\":2327,\"ttft_stream_ms\":1572,\"time_to_request_ms\":340,\"type\":\"result\",\"duration_ms\":16432,\"uuid\":\"5995a5ab-4b1c-40e6-b1cf-ab8e653800f9\"}\n",
+  "verifier": {
+   "passed": true,
+   "tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                                       [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m2 passed\u001b[0m\u001b[32m in 0.00s\u001b[0m\u001b[0m\n"
+  },
+  "repo": "C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_6orhyw16"
+ },
+ {
+  "ticket_id": "smoke-codex",
+  "agent": "codex",
+  "ok": true,
+  "tokens_in": 87356,
+  "tokens_out": 335,
+  "cost_usd": null,
+  "duration_s": 20.4,
+  "raw_tail": "Added `add(a, b)` to `util.py`. No other changes.\n\nVerification: `test_util.py` passes \u2014 2/2 tests.",
+  "errors": [],
+  "verifier": {
+   "passed": true,
+   "tail": "\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                                                                       [100%]\u001b[0m\n\u001b[32m\u001b[32m\u001b[1m2 passed\u001b[0m\u001b[32m in 0.00s\u001b[0m\u001b[0m\n"
+  },
+  "repo": "C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_c0a8lawj"
+ },
+ {
+  "ticket_id": "smoke-ollama:qwen3:8b",
+  "agent": "ollama:qwen3:8b",
+  "ok": true,
+  "tokens_in": 559095,
+  "tokens_out": 9005,
+  "cost_usd": null,
+  "duration_s": 114.2,
+  "raw_tail": "22:41.940478Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_core::tools::router\u001b[0m\u001b[2m:\u001b[0m \u001b[3merror\u001b[0m\u001b[2m=\u001b[0munsupported call: \n\u001b[2m2026-08-19T18:22:43.482416Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_core::tools::router\u001b[0m\u001b[2m:\u001b[0m \u001b[3merror\u001b[0m\u001b[2m=\u001b[0munsupported call: \n\u001b[2m2026-08-19T18:22:46.008224Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_core::tools::router\u001b[0m\u001b[2m:\u001b[0m \u001b[3merror\u001b[0m\u001b[2m=\u001b[0munsupported call: \nWarning: no last agent message; wrote empty content to C:\\Users\\jpbpr\\AppData\\Local\\Temp\\codex_last_gn9dfgss.txt\n",
+  "verifier": {
+   "passed": false,
+   "tail": "AppData\\Local\\Temp\\exp05_byap744i\\util.py)\u001b[0m\u001b[0m\n\u001b[36m\u001b[1m=========================== short test summary info ===========================\u001b[0m\n\u001b[31mERROR\u001b[0m test_util.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n\u001b[31m\u001b[31m\u001b[1m1 error\u001b[0m\u001b[31m in 0.12s\u001b[0m\u001b[0m\n"
+  },
+  "repo": "C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_byap744i"
+ }
+]
