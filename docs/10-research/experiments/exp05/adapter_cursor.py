@@ -48,25 +48,77 @@ def to_wsl_path(win_path):
     return p
 
 
+def cursor_command(ticket, model=None):
+    """Build the headless WSL command for Cursor CLI."""
+    wsl_dir = to_wsl_path(ticket["repo_dir"])
+    goal = ticket["goal"].replace("'", "'\\''")
+    requested_model = model or ticket.get("model")
+    model_arg = f" --model '{requested_model}'" if requested_model else ""
+    return (
+        f"cd '{wsl_dir}' && {CURSOR_WSL} --print --force --output-format json{model_arg} '{goal}'"
+    )
+
+
+def parse_result(stdout):
+    """Extract and parse the trailing JSON result object from Cursor CLI output."""
+    try:
+        return json.loads((stdout or "").strip().splitlines()[-1])
+    except (json.JSONDecodeError, IndexError):
+        return {}
+
+
 def usage_fields(result):
     """Extract the usage fields observed in Cursor's final JSON result."""
-    usage = result.get("usage") or {}
+    if not isinstance(result, dict):
+        return {
+            "tokens_in": None,
+            "tokens_out": None,
+            "cache_read_tokens": None,
+            "cache_write_tokens": None,
+        }
+    usage = result.get("usage")
+    if not isinstance(usage, dict):
+        usage = result if "inputTokens" in result or "tokens_in" in result else {}
     return {
-        "tokens_in": usage.get("inputTokens"),
-        "tokens_out": usage.get("outputTokens"),
-        "cache_read_tokens": usage.get("cacheReadTokens"),
-        "cache_write_tokens": usage.get("cacheWriteTokens"),
+        "tokens_in": usage.get("inputTokens", usage.get("tokens_in")),
+        "tokens_out": usage.get("outputTokens", usage.get("tokens_out")),
+        "cache_read_tokens": usage.get("cacheReadTokens", usage.get("cache_read_tokens")),
+        "cache_write_tokens": usage.get("cacheWriteTokens", usage.get("cache_write_tokens")),
     }
 
 
-def run(ticket):
+def identity_fields(result):
+    """Preserve session and request identifiers emitted by the runtime."""
+    if not isinstance(result, dict):
+        return {"session_id": None, "request_id": None}
+    return {
+        "session_id": result.get("session_id") or result.get("sessionId"),
+        "request_id": result.get("request_id") or result.get("requestId"),
+    }
+
+
+def model_fields(requested_model, result):
+    """Record requested model separately from selected-model evidence."""
+    selected_model = None
+    if isinstance(result, dict):
+        selected_model = (
+            result.get("model")
+            or result.get("selected_model")
+            or result.get("selectedModel")
+        )
+    model = selected_model or requested_model or "unknown:not-reported-by-runtime"
+    return {
+        "model": model,
+        "model_requested": requested_model,
+        "model_selected": selected_model,
+    }
+
+
+def run(ticket, model=None):
     if not WSL:
         raise RuntimeError("wsl not found; Cursor CLI is linux/darwin only")
-    wsl_dir = to_wsl_path(ticket["repo_dir"])
-    goal = ticket["goal"].replace("'", "'\\''")
-    inner = (
-        f"cd '{wsl_dir}' && {CURSOR_WSL} --print --force --output-format json '{goal}'"
-    )
+    requested_model = model or ticket.get("model")
+    inner = cursor_command(ticket, model=requested_model)
     t0 = time.time()
     proc = subprocess.run(
         [WSL, "-d", "Ubuntu", "-e", "bash", "-lc", inner],
@@ -78,12 +130,10 @@ def run(ticket):
     )
     duration = time.time() - t0
 
-    result = {}
-    try:
-        result = json.loads((proc.stdout or "").strip().splitlines()[-1])
-    except (json.JSONDecodeError, IndexError):
-        pass
+    result = parse_result(proc.stdout)
     usage = usage_fields(result)
+    models = model_fields(requested_model, result)
+    identities = identity_fields(result)
 
     diff = subprocess.run(  # A4 holds — git is the common ground across all three
         [GIT, "diff"],
@@ -95,11 +145,12 @@ def run(ticket):
 
     return {
         "ticket_id": ticket["id"],
-        "agent": "cursor",
+        "agent": f"cursor:{requested_model}" if requested_model else "cursor",
         "domain": "coding",
         "harness": "cursor",
         "provider": "cursor-subscription",
-        "model": "unknown:not-recorded-by-adapter",
+        **models,
+        **identities,
         "ok": proc.returncode == 0 and not result.get("is_error", False),
         "diff": diff,
         **usage,

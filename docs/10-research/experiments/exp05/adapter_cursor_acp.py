@@ -13,11 +13,18 @@ import subprocess
 import threading
 import time
 
-from adapter_cursor import to_wsl_path
+from adapter_cursor import model_fields, to_wsl_path, usage_fields
 
 WSL = shutil.which("wsl")
 GIT = shutil.which("git")
 CURSOR_WSL = "/home/jpbpr/.local/bin/cursor-agent"
+
+KNOWN_SUCCESS_STOP_REASONS = {"end_turn", "stop", "completed", "complete"}
+
+
+def is_success_stop_reason(stop_reason):
+    """Fail closed unless stopReason is one of the explicit success reasons."""
+    return stop_reason in KNOWN_SUCCESS_STOP_REASONS
 
 
 class CursorAcpClient:
@@ -155,9 +162,63 @@ def agent_text(messages):
     return "".join(chunks)
 
 
-def run(ticket):
+def parse_acp_outcome(
+    ticket_id,
+    session,
+    result,
+    requested_model,
+    diff,
+    duration_s,
+    raw_tail,
+):
+    """Assemble the normalized ACP outcome dictionary."""
+    session = session if isinstance(session, dict) else {}
+    result = result if isinstance(result, dict) else {}
+
+    stop_reason = (
+        result.get("stopReason")
+        if "stopReason" in result
+        else result.get("stop_reason")
+    )
+    ok = is_success_stop_reason(stop_reason)
+
+    session_id = session.get("sessionId") or session.get("session_id")
+    request_id = result.get("requestId") or result.get("request_id")
+
+    usage = usage_fields(result)
+    models = model_fields(requested_model, result)
+    if models["model_selected"] is None and "model" in session:
+        models["model_selected"] = session.get("model")
+        if requested_model is None:
+            models["model"] = session.get("model")
+
+    agent_name = f"cursor-acp:{requested_model}" if requested_model else "cursor-acp"
+
+    return {
+        "ticket_id": ticket_id,
+        "agent": agent_name,
+        "domain": "coding",
+        "harness": "cursor",
+        "provider": "cursor-subscription",
+        **models,
+        "control_protocol": "acp-v1-stdio",
+        "session_id": session_id,
+        "request_id": request_id,
+        "stop_reason": stop_reason,
+        "ok": ok,
+        "diff": diff,
+        **usage,
+        "cost_usd": None,
+        "duration_s": round(duration_s, 1),
+        "raw_tail": raw_tail,
+    }
+
+
+def run(ticket, model=None):
     t0 = time.time()
+    requested_model = model or ticket.get("model")
     client = CursorAcpClient(ticket.get("timeout_s", 600))
+    session = {}
     result = {}
     try:
         client.request(
@@ -172,10 +233,10 @@ def run(ticket):
             },
         )
         client.request("authenticate", {"methodId": "cursor_login"})
-        session = client.request(
-            "session/new",
-            {"cwd": to_wsl_path(ticket["repo_dir"]), "mcpServers": []},
-        )
+        session_params = {"cwd": to_wsl_path(ticket["repo_dir"]), "mcpServers": []}
+        if requested_model:
+            session_params["model"] = requested_model
+        session = client.request("session/new", session_params)
         result = client.request(
             "session/prompt",
             {
@@ -186,6 +247,7 @@ def run(ticket):
     finally:
         client.close()
 
+    duration = time.time() - t0
     diff = subprocess.run(
         [GIT, "diff"],
         cwd=ticket["repo_dir"],
@@ -203,19 +265,13 @@ def run(ticket):
         },
         separators=(",", ":"),
     )[-1000:]
-    return {
-        "ticket_id": ticket["id"],
-        "agent": "cursor-acp",
-        "domain": "coding",
-        "harness": "cursor",
-        "provider": "cursor-subscription",
-        "model": "unknown:not-recorded-by-adapter",
-        "control_protocol": "acp-v1-stdio",
-        "ok": result.get("stopReason") not in {"cancelled", "error"},
-        "diff": diff,
-        "tokens_in": None,
-        "tokens_out": None,
-        "cost_usd": None,
-        "duration_s": round(time.time() - t0, 1),
-        "raw_tail": raw_tail,
-    }
+
+    return parse_acp_outcome(
+        ticket_id=ticket["id"],
+        session=session,
+        result=result,
+        requested_model=requested_model,
+        diff=diff,
+        duration_s=duration,
+        raw_tail=raw_tail,
+    )
