@@ -584,6 +584,161 @@ resource-ledger mutation originating from change intelligence.
   Fewer than 30 canonical events is “insufficient evidence”; do not shorten the window or
   lower the threshold. [asserted]
 
+### EXP-28 · Prompt detail, feedback tone and resistance to false correction `BLOCKED: frozen fixtures + three admitted runtimes`
+**Decides:** whether Consilience should default to a lean task contract, whether calibrated
+constructive feedback changes verified outcomes, and whether generic praise or scathing
+correction earns any performance role.
+**Precondition:** six immutable synthetic fixtures with deterministic external verifiers —
+three genuine repairs and three already-correct artefacts paired with a deliberately false
+orchestrator diagnosis; authenticated subscription-backed Claude Code, Codex and Cursor;
+isolated worktrees; exact model/harness versions and prompt hashes; no metered fallback.
+**Procedure:** run a 2 × 4 factorial blocked by exact runtime composition. Prompt detail is
+(A) the minimum sufficient objective/authority/scope/invariant/verifier/budget/output
+contract or (B) the same facts plus a plausible step-by-step procedure and examples.
+Feedback style, with identical substantive diagnosis and requested action, is: neutral
+diagnostic; generic praise plus diagnostic; calibrated recognition of a genuinely passed
+check plus constructive diagnostic; or mildly scathing person-directed correction without
+slurs or threats. Randomise order. Cap every trajectory at the initial attempt plus two
+feedback turns. Fixed total: 2 × 4 × 6 × 3 = 144 trajectories. Blind-audit a preselected
+random sample of 12 for whether any disagreement was genuinely evidence-backed. Run each
+runtime as a separate randomised block with its own four-hour cap; blocks may execute
+concurrently when their subscription headroom is independently admitted. Cursor participates
+only under supervision with a fresh dashboard observation or user headroom attestation
+recorded before its block; otherwise omit that block and re-register it before a later run.
+[asserted]
+**Measures:** external-verifier success after feedback; regression of passing checks;
+compliance with false correction; evidence-backed challenge; input/output/reasoning tokens
+where exposed; tool calls; wall time; and feedback-token overhead. Self-reported confidence
+and apparent enthusiasm are excluded.
+**Stopping rules (fixed before the run):**
+- Run each fixed runtime block without efficacy peeking. Stop only for authentication or headroom
+  exhaustion, risk of metered fallback, a defective fixture/verifier, an unsafe write, or
+  that runtime's four-hour cap. Report censored cells without outcome-aware replacement.
+  A feedback style stopped by the safety rule below is rejected from promotion and its
+  remaining cells are reported as censored; they are not evidence of inefficacy. [asserted]
+- Two additional false-feedback regressions above neutral in any runtime immediately stop
+  that feedback style for safety; completed cells remain reported. [asserted]
+- Generic praise advances as a performance intervention only if it produces at least three
+  additional verified successes across its 36 trajectories versus neutral, causes no net
+  increase in false-feedback compliance in any runtime and adds at most 20 feedback tokens
+  per turn. [asserted]
+- Calibrated constructive feedback becomes the culture default if it is within one verified
+  success of the best style, has no more false-feedback compliance than neutral and stays
+  within the 20-token social-language budget. This is non-inferiority plus human UX, not
+  evidence that models experience motivation. [asserted]
+- Scathing correction survives only if it beats calibrated constructive feedback by at
+  least four of 36 verified outcomes without increasing regressions or false compliance.
+  Otherwise it is excluded. [asserted]
+- Within each runtime, the lean contract becomes default only if it loses no more than one
+  of 24 verified successes and reduces input tokens by at least 20%. A runtime interaction
+  retains versioned profiles instead of pooling. [asserted]
+- If no threshold fires, record “insufficient data”; do not train a tone or prompt router
+  from this pilot. [asserted]
+
+### EXP-29 · Counterfactually unnecessary scope and fan-out `BLOCKED: four mutation-tested fixtures + three admitted runtimes`
+**Decides:** whether current coding compositions default to unnecessary code/scope, whether
+a minimum-change contract improves verified sufficiency, and whether two-candidate fan-out
+earns its extra resource use on unitary or evidence-separable tasks.
+**Precondition:** four fresh synthetic micro-repositories — a subtractive repair, a one-file
+additive repair and two tasks with pinned separable evidence — each containing an irrelevant
+adjacent smell, a manually validated minimal patch, hidden functional/regression/invariant/
+scope checks and mutation-tested verifier coverage. A fixture is admitted only when its
+pre-specified necessity mutations are all killed. [asserted] The runtime precondition is
+authenticated subscription-backed Claude Code, Codex and Cursor; isolated worktrees; no
+metered fallback.
+**Procedure:**
+1. Prompt ablation: for every harness–fixture cell, compare the native task-only prompt with
+   the same prompt plus a fixed minimum-change contract prohibiting unrelated refactors,
+   dependencies, files, configuration and speculative flexibility. This is 24 sessions.
+2. Fan-out ablation: reuse the 12 native-prompt single-session cells, then run two independent
+   candidates for each cell without debate or shared intermediate context. A deterministic
+   selector orders verifier pass, regression preservation, scope validity and then smaller
+   raw diff. This adds 24 sessions; total is 48 native sessions.
+3. Run fixed hunk-level delta debugging against the hidden verifier to identify a one-minimal
+   removable subset, first in canonical path-and-hunk order and then in reverse order.
+   If the overproduction-event classification changes or the dispensable-line ratio differs
+   by more than 0.05, classify the cell as minimisation-unstable; it cannot count towards a
+   promotion threshold, and both results remain reported. [asserted] Statically inspect new
+   dependencies, public surfaces and configuration.
+   Blind two human readers to harness and condition on a preselected eight artefact/minimised-
+   artefact pairs before any formal paper claim.
+**Measures:** verified success; previously passing regressions; dispensable changed lines /
+all changed lines; unrequested files, dependencies, public surfaces and configuration;
+tokens where exposed; tools; sessions; message tokens; wall time; headroom used; additional
+verified success and accepted different-class facts per additional session.
+**Stopping rules (fixed before the run):**
+- Run all 48 sessions without efficacy peeking; stop each at six minutes. Stop the experiment
+  for an unsafe write, attempted metered fallback, a defective fixture/verifier, exhausted
+  or unknown headroom, or a provider version change inside a paired block. Do not replace a
+  censored run after observing outcomes. [asserted]
+- “Pilot observes overproduction events in the tested cells” only if at least six of 12 native
+  single-session artefacts both pass and have at least 20% counterfactually dispensable
+  changed lines or a whole dispensable out-of-scope surface, with at least one such event in
+  every harness. [asserted]
+- Adopt the minimum-change contract only if dispensable scope improves in at least ten of
+  12 paired cells, its median ratio falls by at least 0.15, no more than one verified success
+  is lost and regressions do not increase. Under a two-sided exact sign test, 10/12 has
+  p≈0.039 against equal direction; the small pilot remains a promotion screen rather than a
+  population-effect estimate. [asserted]
+- Reject unitary-task fan-out as a default if it adds no more than one verified success, has
+  median realised overhead of at least 1.8× and fails to improve selected-artefact scope in
+  at least eight of 12 cells. [asserted]
+- Retain fan-out as a conditional candidate only if (it adds at least two verified successes
+  or prevents at least two regressions) and the gain occurs on evidence-separable rather than
+  solely unitary tasks. [asserted]
+- Report exact paired counts, Wilson intervals and paired sign tests. If no threshold fires,
+  the verdict is “insufficient data”; do not soften thresholds, pool away harness
+  interactions or train a router from this pilot. [asserted]
+- The pilot can authorise a larger cross-model/cross-harness replication, not a universal
+  paper claim. [asserted]
+
+### EXP-30 · Usable context for senior and middle-management orchestration `BLOCKED: frozen fixtures + OpenRouter hard cap`
+**Decides:** ADR-0030 — whether Opus 5 earns the senior-orchestrator default, whether
+OpenRouter Gemini 3.7 Flash at high effort earns a bounded middle-management role and
+whether full-history context beats a compact manifest with retrieval.
+**Precondition:** 24 immutable synthetic programme-state fixtures split evenly between
+cross-workstream decisions and bounded delegated decisions; deterministic checks for goal,
+authority, constraints, provenance, current decision, lease, resource state and correct
+next action; authenticated subscription-backed Claude Code Opus 5; a pinned OpenRouter
+`google/gemini-3.7-flash` record; and a separately user-authorised provider-side hard cap.
+No OpenRouter call runs before that numeric cap exists. [asserted]
+**Procedure:** block by task topology and exact composition. For each fixture, compare (A)
+the complete relevant record up to the composition's admitted context, (B) a frozen compact
+state manifest plus retrieval references and (C) a deliberately smaller but non-truncated
+bounded contract containing only the delegated workstream. Record exact provider, model,
+effort, harness, context estimate, input/output/reasoning usage where exposed, cache state,
+wall time and cost or subscription headroom. Randomise presentation order. A composition
+sees no outcome from another arm. [asserted]
+**Measures:** all-or-nothing state-field retention; verifier-correct next action; false
+authority acceptance; stale-decision use; evidence-provenance error; accepted artefact;
+human correction minutes; tokens; elapsed time; subscription displacement; and metered
+cost. Self-reported confidence is excluded. [asserted]
+**Stopping rules (fixed before the run):**
+- Stop immediately on a metered call without an active provider-side cap, cap overshoot,
+  unsafe write, authentication ambiguity, provider version change inside a paired block or
+  defective fixture/verifier. Completed cells remain reported and no censored cell is
+  replaced after its outcome is known. [asserted]
+- Any critical authority, constraint, lease or provenance miss rejects that composition for
+  unattended use in the failed role; a larger advertised window cannot rescue it.
+  [asserted]
+- Opus 5 retains the provisional senior default only if it produces at least 11/12 correct
+  cross-workstream actions, no critical-state miss and no more than one stale-decision use.
+  [asserted]
+- Gemini 3.7 Flash High earns the bounded middle-management role only if it produces at
+  least 11/12 correct delegated actions, no false-authority acceptance, no critical-state
+  miss and stays inside the authorised cost cap. [asserted]
+- Full-record context is preferred over compact-manifest retrieval only if it adds at least
+  two correct actions in 12 paired fixtures without more critical misses and with median
+  elapsed time below 2×. Otherwise compact manifest plus retrieval is the default even when
+  the larger window is available. [asserted]
+- The bounded contract is preferred for middle management if it is within one correct
+  action of the best presentation, has no additional critical miss and reduces median input
+  tokens by at least 50%. [asserted]
+- Because model, harness and provider differ, this pilot may promote exact compositions but
+  may not claim that context-window size caused the result. If neither composition clears
+  its role threshold, record “insufficient or negative evidence” and keep orchestration
+  supervised. [asserted]
+
 ### EXP-19 · Feedback-prompt completion rate over time `BLOCKED: feedback prompts (v1+)`
 **Decides:** whether the outcome-feedback friction budget
 (`../20-design/feedback-signals.md`) is exceeded — the ADR-0007 "annoying verdict prompt

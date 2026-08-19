@@ -229,6 +229,34 @@ separates personality complementarity from different evidence classes; EXP-26 te
 typed control against transcript injection. [asserted] See
 `../10-research/agent-identity-and-collaboration.md`.
 
+**Q27. Which prompt and feedback interventions improve verified work without teaching false
+compliance?**
+
+Current provider guidance supports removing repeated procedural scaffolding while retaining
+an explicit task contract, but it does not support one universal prompt profile. [cited]
+Generic praise has no established verifier-level benefit, while unsupported correction can
+move a model away from a previously correct answer. [cited] EXP-28 crosses prompt detail
+with neutral, generic-praise, calibrated-constructive and mildly scathing feedback on both
+real defects and deliberately false diagnoses. [asserted] See
+`../10-research/prompt-context-and-feedback.md`.
+
+**Q28. When does model or harness activity become counterfactually unnecessary work?**
+
+Current evidence documents iterative code bloat, deletion avoidance and task-dependent
+multi-agent overhead, but does not establish one universal model preference for “more”.
+[cited] EXP-29 measures whether code, scope or fan-out can be removed without changing the
+external verifier outcome, and reports the interaction by exact model–harness composition.
+[asserted] See `../10-research/unnecessary-scope-and-fanout.md`.
+
+**Q29. How much usable context does each orchestration role require?**
+
+The current senior-orchestrator default is subscription-backed Claude Code Opus 5, while
+OpenRouter Gemini 3.7 Flash at high effort is a candidate for bounded middle-management
+delegation. [asserted] Both providers advertise roughly one-million-token capacity, but
+advertised length does not establish state retention or decision quality. [cited] ADR-0030
+separates hard context fit from measured capability, and EXP-30 compares full relevant
+records with compact manifests, retrieval and bounded contracts. [asserted]
+
 ## Method note for the brainstorm
 
 Joe has asked for a multi-agent approach to research → brainstorm → spec → plan.

@@ -1,6 +1,6 @@
 # Decision index
 
-29 ADRs, 19 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+30 ADRs, 20 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED
@@ -34,6 +34,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0027](0027-compose-domain-harness-provider-and-model.md) | **Compose domain, execution harness, provider and model separately**; OpenRouter is a standalone provider | 🟡 |
 | [0028](0028-optimise-expiring-subscription-capacity-for-verified-value.md) | **Allocate expiring included subscription capacity by incremental verified value**; never burn quota for its own sake | 🟡 |
 | [0029](0029-separate-runtime-resource-state-from-change-intelligence.md) | **Separate authenticated resource state from first-party change intelligence**; change feeds invalidate but never create headroom | 🟡 |
+| [0030](0030-size-orchestration-by-usable-context-and-measured-outcomes.md) | **Size orchestration roles by usable context and measured outcomes**; Opus 5 senior default, Gemini 3.7 Flash High candidate | 🟡 |
 
 ## Behaviour and safety
 
@@ -77,4 +78,5 @@ to every ADR and every PR:
 - **0027** — PROVISIONAL pending EXP-22.
 - **0028** — PROVISIONAL pending EXP-23.
 - **0029** — PROVISIONAL pending EXP-27.
+- **0030** — PROVISIONAL pending EXP-30.
 - **0018** — decision 2 conditional on EXP-12 *and* EXP-13.

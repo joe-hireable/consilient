@@ -59,94 +59,149 @@ Review is exacting about claims and constructive about contributors: criticism n
 unsupported statement, evidence gap or failed check and the smallest repair; status,
 seniority, persona and rhetorical confidence carry no weight. [asserted]
 
+## Human authorship, AI assistance and submission authority
+
+Joe is the accountable human author and submission principal for Consilience papers unless
+a later human collaborator independently satisfies the target venue's authorship rules.
+[asserted] An AI system is never listed as an author: arXiv, NeurIPS, AAAI and ACL state
+that directly, while all make the human authors responsible for the submitted content.
+[cited]
+
+Agents may autonomously discover literature, challenge novelty, design and run authorised
+experiments, preserve artefacts, draft and revise prose, build tables and figures, compile
+the paper, prepare checklists and produce a frozen submission package. [asserted] This work
+does not turn Joe into an author by proxy. Before a formal submission he must understand the
+claim and methods, reproduce or inspect the retained evidence sufficiently to exercise
+scientific judgement, approve every claim and disclosure, and accept responsibility for
+originality, accuracy, rights, privacy, ethics and correction. [cited]
+
+The final package carries an immutable payload hash and records `human_approved: false`
+until Joe approves that exact payload. [asserted] Joe personally authenticates and performs
+the binding submission, licence or copyright action. [asserted] OpenReview forbids a user
+from giving a third party account access, and arXiv expects self-submission unless its
+trusted-proxy requirements and any required automated-deposit permission are satisfied.
+[cited] A later officially authorised API path may upload an already approved immutable
+payload, but it may not invent, alter or accept representations after approval. [asserted]
+
+Repo-local preregistrations, instruments, safe results and research notes may continue under
+Lane A without pretending they are peer-reviewed papers. [asserted] External formal
+submission remains behind the human-author gate above. [asserted]
+
+### Disclosure record
+
+Every formal paper carries a disclosure generated from the trajectory, not from memory.
+[asserted] It names each material provider, model or harness; its access date or version;
+its roles in ideation, research, methods, implementation, orchestration, analysis, figures
+and writing; and the human checks actually completed. [asserted] ICLR 2027 requires an AI-use
+section and form disclosure, AAAI requires every AI role in developing the work to be
+documented, ACL requires content-generating use to be disclosed, and NeurIPS requires
+important or non-standard methodological use to be described. [cited]
+
+Venue-neutral minimum wording, rendered only with true fields, is: [asserted]
+
+> **AI assistance and human accountability.** Generative AI systems — [provider, model,
+> harness, version/access date] — assisted with [material roles]. Joe Brown selected and
+> approved [the research questions, hypotheses and stopping rules actually approved];
+> completed [the citation, code, result, provenance, rights and privacy checks actually
+> completed]; reviewed every final claim, table and figure; and approved this exact
+> manuscript. No AI system is an author. Joe Brown accepts responsibility for the work's
+> originality, accuracy, integrity and correction. [asserted]
+
+A claim that a human check occurred must point to its first-party approval or verification
+event; an agent-authored summary cannot manufacture it. [asserted]
+
 ## Why the bar is high
 
-Publishing "as we go" is how you build a reputation for noise. arXiv cs.AI receives
-thousands of submissions a month and most sink without trace; a stream of thin preprints
-from one author is read as volume, not contribution, and it is *harder* to recover from
-than silence. One well-cited paper does more for an open-source community than ten
-forgettable ones — and this project's entire strategy depends on community.
-
-A useful reference point: Meta-Harness (arXiv:2603.28052) reached ~94 citations in five
-months because it made one clean, surprising, reproducible claim with released code. That
-is the shape to aim for.
+arXiv may decline work that lacks originality, novelty or significance, may ask similar
+submissions to be consolidated and may limit excessive submission rates. [cited] NeurIPS
+also prohibits “thin slicing” very similar papers. [cited] Continuous experiment records
+therefore feed a publishability register; they do not create one paper per experiment.
+[asserted]
 
 ## The four gates
 
-A result publishes only if it clears **all four**:
+A formal result publishes only if it clears **all four**. [asserted]
 
 **G1 — Is it true?** Reproduced from a seed. Code released. A second party re-derived the
 conclusion from the artefact without seeing our writeup. `[measured]` or `[algebra]`
-evidence, not `[simulated]` alone.
+evidence, not `[simulated]` alone. [asserted]
 
 **G2 — Is it new?** A real literature search, documented, including the near misses. If
 someone did it already, cite them and move on — that is a *win*, not a loss, because it
-means we can adopt instead of build.
+means we can adopt instead of build. [asserted]
 
 **G3 — Is it useful to someone who is not us?** Would a stranger change what they build
 because of it? "We built a thing and here is its architecture" fails this. "Here is a
-measurement everyone assumed and nobody checked" passes.
+measurement everyone assumed and nobody checked" is the target shape. [asserted]
 
 **G4 — Is it honest about its limits?** Sample sizes, assumed functional forms, conflicts of
-interest, the experiments we did not run. Every claim tagged as in `../decisions/README.md`.
+interest and experiments not run are explicit. [asserted] Every claim is tagged as in
+`../decisions/README.md`. [asserted]
 
 ## Negative results count
 
-A well-executed null result clears the gates as readily as a positive one, and there are
-fewer of them, so they are often more valuable. "We tried X, it did not beat the baseline
-under conditions Y, here is the code" saves other people months. Do not treat a failed
-hypothesis as an unpublishable one.
+A well-executed null result can clear the gates as readily as a positive one. [asserted]
+“We tried X, it did not beat the baseline under conditions Y, here is the code” is useful
+when the protocol and artefacts let others avoid repeating the same unsupported assumption.
+[asserted] Do not relabel a failed hypothesis as an unpublishable experiment. [asserted]
 
 ## Practical notes on arXiv
 
-- **cs.AI, cs.LG, cs.SE all require endorsement for first-time submitters** without an
-  institutional affiliation. Joe has no academic affiliation, so an endorser is needed
-  before the first submission. Plan for that lead time — it is usually the binding
-  constraint, not the writing. Ask a co-author, or someone who has cited or engaged with
-  the work.
-- Consider **co-authoring with someone already endorsed**. It solves the endorsement
-  problem, adds the independent verification G1 requires, and materially improves the
-  paper.
-- Licence: arXiv's non-exclusive licence is compatible with everything here. Use CC BY 4.0
-  for the paper; code stays MIT.
-- **Hugging Face** is the right venue for artefacts — datasets, trace corpora, evaluation
-  harnesses — not for the paper itself. A dataset with a good card is often more used than
-  the paper describing it.
-- A repo-local `docs/publications/NNNN-title/` with the paper source, code and data is the
-  minimum. arXiv is optional on top; not every write-up needs to leave the repo.
+- A new arXiv user or a user submitting to a new category may require endorsement. [cited]
+  A first submission checks Joe's current account state instead of inferring it from his
+  affiliation. [asserted]
+- Joe has no recorded academic affiliation in this repository, so endorsement may be
+  needed before the first submission. [asserted]
+- Consider a co-author only when that person makes an authorship-level contribution and
+  accepts accountability; endorsement alone does not make a co-author. [asserted]
+- arXiv requires an irrevocable distribution licence selected by the submitter. [cited]
+  Paper and code licences are separate decisions; do not assume CC BY 4.0 until Joe approves
+  the paper licence for the exact submission. [asserted]
+- Hugging Face is a candidate artefact venue for datasets, trace corpora and evaluation
+  harnesses; venue choice remains a judgement based on reuse and rights. [asserted]
+- A repo-local `docs/publications/NNNN-title/` with paper source, safe code/data and a gate
+  record is the minimum publication package. [asserted] arXiv is optional; not every
+  write-up needs to leave the repository. [asserted]
 
 ## Candidate list
 
-Ordered by how close they are to clearing the gates. Nothing here is committed.
+Ordered by how close they appear to clearing the gates; the order is a current judgement,
+not a measured ranking. [asserted] Nothing here commits a submission. [asserted]
 
 ### C1. Verifier reliability as a control parameter for agent orchestration
-**Status: not ready — needs T3.** The β work (`../decisions/0002-*`). Clears G3 and possibly
-G2, fails G1 today (simulation only) and cannot pass G2 until arXiv:2605.00663 is read.
+**Status: not ready — needs T3.** [asserted] The β work (`../decisions/0002-*`) appears to
+clear G3 and possibly G2, fails G1 today because its central surface is simulation-only,
+and cannot pass G2 until arXiv:2605.00663 is read. [asserted]
 Ready when: β measured on ≥3 real repositories, the β ≡ 1 − critic-recall identity holds
-empirically, and the bimodal-difficulty check (Q3) has been run.
+empirically, and the bimodal-difficulty check (Q3) has been run. [asserted]
 
 ### C2. CASD / constrained decoding — **a null result**
-**Status: closest to ready, and it should be written as a negative.**
+**Status: closest to ready, and it should be written as a negative.** [asserted]
 
-The honest state of that work: the replication landed marginal on clean inputs, bimodal
+The recorded state of that work is that the replication landed marginal on clean inputs, bimodal
 across cases, and the comparison against the real production baseline — jump-forward
-decoding — was never run. Written up as "constrained decoding did not beat jump-forward
+decoding — was never run. [measured] Written up as "constrained decoding did not beat jump-forward
 under conditions X, here is the code and the traces", it clears G1 (if the missing
 comparison is finally run), G2 (null results here are scarce), G3 (people are actively
 building on the assumption it wins) and G4 (the limits are the point).
+[asserted]
 
-Written up as a success it would clear none of them, and would be found out.
+Written up as a success would contradict the recorded evidence. [asserted]
 
-**The missing experiment is the whole paper.** Run the jump-forward comparison first.
+**The missing experiment is the whole paper.** [asserted] Run the jump-forward comparison
+first. [asserted]
 
 ### C3. Escalation-on-verification vs learned routing in the coding domain
-**Status: bundle into C1.** Too small alone, and simulation-only today.
+**Status: bundle into C1.** [asserted] It is simulation-only today and does not yet carry a
+separate paper-sized claim. [asserted]
 
 ### C4. Meta-harness adapter interface across heterogeneous coding agents
-**Status: speculative.** Only interesting if the interface turns out to be non-obvious and
-we have run it against four real CLIs. More likely a good blog post than a paper.
+**Status: speculative.** [asserted] It is a paper candidate only if the interface proves
+non-obvious across four real CLIs; otherwise it remains a research note or practitioner
+article. [asserted]
 
 ## Format
 
-`docs/publications/NNNN-short-title/` containing `paper.md` (or `.tex`), `code/`, `data/`,
-and a `README.md` stating which gates it clears and which it does not.
+`docs/publications/NNNN-short-title/` contains `paper.md` (or `.tex`), safe `code/`, safe
+`data/`, a disclosure record, a frozen submission manifest and a `README.md` stating which
+gates it clears and which it does not. [asserted]

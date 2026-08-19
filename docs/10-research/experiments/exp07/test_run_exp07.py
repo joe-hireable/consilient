@@ -1,6 +1,7 @@
 import json
 import subprocess
 
+import pytest
 import run_exp07
 from headroom import admission_reason
 from run_exp07 import (
@@ -15,6 +16,12 @@ from run_exp07 import (
     verify,
     write_results,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolate_result_path(monkeypatch, tmp_path):
+    """A test must never create, replace or delete the retained experiment result."""
+    monkeypatch.setattr(run_exp07, "RESULTS", tmp_path / "results-exp07.json")
 
 SOLUTION = """import re
 
