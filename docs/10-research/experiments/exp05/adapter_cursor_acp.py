@@ -13,7 +13,7 @@ import subprocess
 import threading
 import time
 
-from adapter_cursor import to_wsl_path
+from adapter_cursor import model_fields, to_wsl_path, usage_fields
 
 WSL = shutil.which("wsl")
 GIT = shutil.which("git")
@@ -155,9 +155,53 @@ def agent_text(messages):
     return "".join(chunks)
 
 
+def is_success_stop_reason(stop_reason):
+    """Fail closed: only the explicit normal ACP turn ending is runner success."""
+    return stop_reason == "end_turn"
+
+
+def parse_acp_outcome(ticket_id, session, result, requested_model, diff, duration_s, raw_tail):
+    """Normalise the ACP observation without inventing absent runtime evidence."""
+    session = session if isinstance(session, dict) else {}
+    result = result if isinstance(result, dict) else {}
+    stop_reason = result.get("stopReason", result.get("stop_reason"))
+    model_evidence = dict(result)
+    if not any(key in model_evidence for key in ("model", "selected_model", "selectedModel")):
+        if session.get("model"):
+            model_evidence["model"] = session["model"]
+    return {
+        "ticket_id": ticket_id,
+        "agent": "cursor-acp",
+        "domain": "coding",
+        "harness": "cursor",
+        "provider": "cursor-subscription",
+        **model_fields(requested_model, model_evidence),
+        "control_protocol": "acp-v1-stdio",
+        "session_id": session.get("sessionId") or session.get("session_id"),
+        "request_id": result.get("requestId") or result.get("request_id"),
+        "stop_reason": stop_reason,
+        "ok": is_success_stop_reason(stop_reason),
+        "diff": diff,
+        **usage_fields(result),
+        "cost_usd": None,
+        "duration_s": round(duration_s, 1),
+        "raw_tail": raw_tail,
+    }
+
+
+def acp_requested_model(ticket):
+    """Reject an unproved ACP model-selection request rather than silently ignoring it."""
+    requested_model = ticket.get("model")
+    if requested_model is not None:
+        raise ValueError("Cursor ACP model selection has not been exercised by EXP-05")
+    return None
+
+
 def run(ticket):
+    requested_model = acp_requested_model(ticket)
     t0 = time.time()
     client = CursorAcpClient(ticket.get("timeout_s", 600))
+    session = {}
     result = {}
     try:
         client.request(
@@ -203,19 +247,12 @@ def run(ticket):
         },
         separators=(",", ":"),
     )[-1000:]
-    return {
-        "ticket_id": ticket["id"],
-        "agent": "cursor-acp",
-        "domain": "coding",
-        "harness": "cursor",
-        "provider": "cursor-subscription",
-        "model": "unknown:not-recorded-by-adapter",
-        "control_protocol": "acp-v1-stdio",
-        "ok": result.get("stopReason") not in {"cancelled", "error"},
-        "diff": diff,
-        "tokens_in": None,
-        "tokens_out": None,
-        "cost_usd": None,
-        "duration_s": round(time.time() - t0, 1),
-        "raw_tail": raw_tail,
-    }
+    return parse_acp_outcome(
+        ticket_id=ticket["id"],
+        session=session,
+        result=result,
+        requested_model=requested_model,
+        diff=diff,
+        duration_s=time.time() - t0,
+        raw_tail=raw_tail,
+    )

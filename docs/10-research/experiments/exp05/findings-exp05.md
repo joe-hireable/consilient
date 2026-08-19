@@ -52,6 +52,20 @@ must enter the coordinator before that coordinator drives Cursor through ACP. [a
 Allowing an MCP caller to spawn Cursor directly would bypass the proposed authority,
 resource-admission and trajectory chokepoints. [asserted]
 
+The adapter now retains Cursor's emitted session/request identity and usage fields, while
+separating a directly requested model from evidence of the model actually selected.
+[measured] The historical direct row remains selected-model unknown because its result did
+not expose that field; supplying `--model` in a future run would record a request, not
+retroactively prove selection here. [measured]
+
+ACP runner completion now fails closed unless the exact stop reason is `end_turn`, and it
+retains the exact stop reason, session/request identity and any usage the response exposes.
+[measured] The ACP schema defines `end_turn` as successful completion and separately
+enumerates token/request limits, refusal and cancellation; Cursor's official example also
+returns `stopReason` from `session/prompt`. [cited] The current Cursor ACP model-selection
+surface has not been exercised, so a model-bearing ACP ticket is rejected rather than
+silently recorded as honoured. [asserted]
+
 ## First comparable coding runs
 
 One synthetic Python ticket was run through six coding compositions. Cursor was added

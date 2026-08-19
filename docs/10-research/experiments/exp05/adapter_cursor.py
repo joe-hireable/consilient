@@ -48,9 +48,32 @@ def to_wsl_path(win_path):
     return p
 
 
+def cursor_command(ticket, model=None):
+    """Build Cursor's headless WSL command without conflating model request and evidence."""
+    wsl_dir = to_wsl_path(ticket["repo_dir"])
+    goal = ticket["goal"].replace("'", "'\\''")
+    model_arg = f" --model '{model}'" if model else ""
+    return (
+        f"cd '{wsl_dir}' && {CURSOR_WSL} --print --force "
+        f"--output-format json{model_arg} '{goal}'"
+    )
+
+
+def parse_result(stdout):
+    """Extract the trailing Cursor result object, or an empty observation."""
+    try:
+        return json.loads((stdout or "").strip().splitlines()[-1])
+    except (json.JSONDecodeError, IndexError):
+        return {}
+
+
 def usage_fields(result):
     """Extract the usage fields observed in Cursor's final JSON result."""
+    if not isinstance(result, dict):
+        result = {}
     usage = result.get("usage") or {}
+    if not isinstance(usage, dict):
+        usage = {}
     return {
         "tokens_in": usage.get("inputTokens"),
         "tokens_out": usage.get("outputTokens"),
@@ -59,14 +82,37 @@ def usage_fields(result):
     }
 
 
-def run(ticket):
+def identity_fields(result):
+    """Preserve runtime identifiers when Cursor emits them."""
+    if not isinstance(result, dict):
+        result = {}
+    return {
+        "session_id": result.get("session_id") or result.get("sessionId"),
+        "request_id": result.get("request_id") or result.get("requestId"),
+    }
+
+
+def model_fields(requested_model, result):
+    """Keep a request separate from evidence of the model actually selected."""
+    if not isinstance(result, dict):
+        result = {}
+    selected_model = (
+        result.get("model")
+        or result.get("selected_model")
+        or result.get("selectedModel")
+    )
+    return {
+        "model": selected_model or "unknown:not-reported-by-runtime",
+        "model_requested": requested_model,
+        "model_selected": selected_model,
+    }
+
+
+def run(ticket, model=None):
     if not WSL:
         raise RuntimeError("wsl not found; Cursor CLI is linux/darwin only")
-    wsl_dir = to_wsl_path(ticket["repo_dir"])
-    goal = ticket["goal"].replace("'", "'\\''")
-    inner = (
-        f"cd '{wsl_dir}' && {CURSOR_WSL} --print --force --output-format json '{goal}'"
-    )
+    requested_model = model or ticket.get("model")
+    inner = cursor_command(ticket, requested_model)
     t0 = time.time()
     proc = subprocess.run(
         [WSL, "-d", "Ubuntu", "-e", "bash", "-lc", inner],
@@ -78,12 +124,10 @@ def run(ticket):
     )
     duration = time.time() - t0
 
-    result = {}
-    try:
-        result = json.loads((proc.stdout or "").strip().splitlines()[-1])
-    except (json.JSONDecodeError, IndexError):
-        pass
+    result = parse_result(proc.stdout)
     usage = usage_fields(result)
+    identity = identity_fields(result)
+    models = model_fields(requested_model, result)
 
     diff = subprocess.run(  # A4 holds — git is the common ground across all three
         [GIT, "diff"],
@@ -99,7 +143,8 @@ def run(ticket):
         "domain": "coding",
         "harness": "cursor",
         "provider": "cursor-subscription",
-        "model": "unknown:not-recorded-by-adapter",
+        **models,
+        **identity,
         "ok": proc.returncode == 0 and not result.get("is_error", False),
         "diff": diff,
         **usage,
