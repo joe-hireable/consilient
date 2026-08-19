@@ -281,6 +281,52 @@ closed-form model first, demote the probe to advisory, and record which violatio
 in v1. If agreement requires n > 200, the probe is not cheap and ADR-0025 §"What would
 overturn this" fires.
 
+### EXP-21 · Routing under subscription, budget and hardware constraints `BLOCKED: admission prototype + 16 GB reference machine`
+**Decides:** ADR-0026 — whether deterministic feasibility vetoes prevent exhausted-plan,
+budget-overrun and local-fit failures without refusing too much usable capacity.
+**Precondition:** an injectable routing-admission prototype; provider headroom readers;
+an OpenRouter management key whose provider-side task-key cap is set before any paid call;
+cached or small models on the 5090/64 GB system; and one real 16 GB-system-RAM machine
+for the constraint-case validation. No new paid model call is required for the replay
+phase.
+**Procedure:**
+1. Replay provider snapshots at available, near-exhausted, exhausted, stale/unknown and
+   reset-boundary states for Claude, Codex and Cursor. Include concurrent reservations,
+   retries and usage outside the harness.
+2. Compare decisions with authoritative live snapshots gathered during ordinary
+   subscription use: Claude status-line data, Codex app-server rate limits and Cursor
+   dashboard observations. Do not create model traffic solely to refresh a snapshot.
+3. Exercise OpenRouter first against a fake ledger, then with one provider-capped live key.
+   Attempt concurrent tasks and retries whose combined reservations straddle both the
+   per-task and per-period caps.
+4. Measure peak system and accelerator memory for at least 12
+   model-revision × quantisation × context tuples on the 5090/64 GB system, with at least
+   half within 10% of one tested profile's binding memory boundary. Replay those measured
+   demands against profiles spanning 16–64 GB system RAM and 0–32 GB accelerator memory,
+   then validate admitted near-boundary cases on the real 16 GB machine. Refused models
+   are checked from metadata and the larger machine's measured peak; they are not
+   downloaded to the constraint machine.
+**Measures:** false admits; false refusals; provider-reported cap overshoot; headroom
+estimation error; model bytes transferred before refusal; load/OOM result at the configured
+context; capacity left idle; and task completion.
+**Stopping rules (fixed before the run):**
+- Any provider-reported spend above a configured hard cap removes that provider from
+  unattended metered routing until a provider-enforced boundary replaces the failed one.
+- Any dispatch when a fresh authoritative subscription snapshot already says exhausted
+  makes that subscription adapter manual-only until fixed and re-run.
+- Any model admitted and then unable to load at the configured context, or any model bytes
+  transferred after an infeasible/unknown verdict, disables automatic local downloads
+  until the fit provider or gate is superseded.
+- A false-refusal rate above 20% over at least 30 authoritative feasible cases **per
+  constraint class** overturns fail-closed autonomous routing for that class; require an
+  explicit user decision instead.
+- If Cursor's local estimate differs from its dashboard by more than 10 percentage points
+  at three consecutive observations, Cursor stays manual-only; a reset-window model is not
+  an adequate hard constraint.
+**Acceptance rule:** no hard-rule violation and false refusals at or below 20% in each
+class promotes ADR-0026 from PROVISIONAL. Hardware acceptance additionally requires the
+real 16 GB validation; the 5090 profile replay alone is `[simulated]`.
+
 ### EXP-19 · Feedback-prompt completion rate over time `BLOCKED: feedback prompts (v1+)`
 **Decides:** whether the outcome-feedback friction budget
 (`../20-design/feedback-signals.md`) is exceeded — the ADR-0007 "annoying verdict prompt

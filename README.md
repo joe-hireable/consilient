@@ -87,7 +87,7 @@ design position to Claude Code. Nothing is built. Nothing is specified.
 **Read, in order:**
 
 1. [`CONSILIENCE.md`](CONSILIENCE.md) — the definition everything derives from
-2. [`docs/decisions/index.md`](docs/decisions/index.md) — 24 ADRs; the load-bearing four are
+2. [`docs/decisions/index.md`](docs/decisions/index.md) — the formal ADR index; the load-bearing four are
    marked
 3. [`docs/10-research/findings.md`](docs/10-research/findings.md) — the simulations
 4. [`docs/10-research/experiment-register.md`](docs/10-research/experiment-register.md) —
@@ -122,7 +122,7 @@ AGENTS.md · CLAUDE.md         working rules for any agent
 CONTRIBUTING.md               DCO, contributor agreement position
 .agents/skills/               portable skills (source of truth; .claude/ mirrors)
 docs/
-  decisions/                  24 ADRs + index.md
+  decisions/                  ADRs + index.md
   publications/               publication policy (high bar) + candidates
   legal/                      MIT, ICLA, CCLA, Relicensing Promise, solicitor brief
   00-context/                 how we got here, open questions, friction log, bypass log

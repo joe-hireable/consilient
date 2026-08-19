@@ -1,6 +1,6 @@
 # Decision index
 
-24 ADRs, 19 Aug 2026. Format and rules: [`README.md`](README.md).
+26 ADRs, 19 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED
@@ -21,7 +21,7 @@ Read these before anything else. Everything downstream depends on them.
 | # | Decision | Status |
 |---|---|---|
 | [0003](0003-no-learned-routing-policy-in-v0.md) | No learned routing policy in v0 | ✅ |
-| [0005](0005-local-model-library-with-hardware-gating.md) | Local model library — **wrap, don't build** | ⛔ in part |
+| [0005](0005-local-model-library-with-hardware-gating.md) | Local model library with hardware gating (superseded by 0026) | ⛔ |
 | [0006](0006-ticket-store-sqlite-plus-git-log.md) | Ticket store: SQLite for coordination, append-only JSONL in git for the record | ✅ |
 | [0007](0007-cli-only-no-review-surface.md) | CLI only, and **build no review surface** | ✅ |
 | [0009](0009-route-per-task-not-per-step.md) | Route per task, not per step | 🟡 |
@@ -29,6 +29,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0012](0012-composite-beta-with-per-check-diagnostics.md) | Measure composite β directly; per-check as diagnostics | ✅ |
 | [0020](0020-meetings-and-authority-matrix.md) | **Meetings + the Owner/Evidence authority matrix** | 📋 |
 | [0025](0025-model-discovery-and-capability-probing.md) | Model discovery + capability probing; GNNs considered and rejected with reopen conditions | 📋 |
+| [0026](0026-admit-only-budget-and-hardware-feasible-backends.md) | **Admit only budget- and hardware-feasible backends to routing**; subscription headroom, hard metered caps and pre-download local-fit vetoes | 🟡 |
 
 ## Behaviour and safety
 
@@ -68,4 +69,5 @@ to every ADR and every PR:
   unrecoverable afterwards.
 - **0008** — trademark clearance on "Consilience" not yet run.
 - **0002, 0009** — PROVISIONAL pending EXP-01 and EXP-06.
+- **0026** — PROVISIONAL pending EXP-21.
 - **0018** — decision 2 conditional on EXP-12 *and* EXP-13.
