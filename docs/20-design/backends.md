@@ -145,6 +145,26 @@ Ultra while other plans receive a weekly baseline. [cited] Admission must theref
 the CLI's live `plan_tier` and quota map, not infer Antigravity headroom from the marketing
 name alone. [asserted]
 
+## Change intelligence is not quota state
+
+Claude Code and Codex publish first-party machine-readable release feeds; Cursor's
+inspected first-party changelog is HTML. [measured] Claude, OpenAI and Cursor also expose
+public machine-readable service-status data. [measured] These surfaces can invalidate
+cached adapter, model, accounting or availability knowledge and require a new capability
+probe. [asserted]
+
+They cannot report the remaining allowance for this authenticated account and therefore
+cannot increase subscription headroom. [asserted] A quota-policy announcement requests a
+fresh authenticated observation; it does not credit the ledger. [asserted] Community
+forums or Discord messages may trigger a grounding task but never a routing transition.
+[asserted]
+
+Resource windows remain provider-native and separately keyed; a five-hour, seven-day or
+monthly bucket is not flattened into one generic reset. [asserted] A current user
+attestation can authorise a bounded supervised run where a provider exposes no
+machine-readable individual counter, but is labelled user authority rather than provider
+measurement and cannot admit unattended work. [asserted] See ADR-0029 and EXP-27.
+
 ## What this unlocks
 
 - **EXP-07** now has its first cheap-tier/frontier comparison. Its stopping

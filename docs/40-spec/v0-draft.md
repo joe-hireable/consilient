@@ -170,6 +170,12 @@ API access and OpenRouter-hosted Gemini are separate compositions and accounting
 Cursor ACP is an external control surface; MCP supplies tools to Cursor and is not itself
 a substitute control protocol. [asserted]
 
+First-party release, changelog, documentation and status events are change intelligence,
+not account-resource observations. [asserted] They may invalidate cached capability or
+temporarily remove an explicitly affected service, but may never increase headroom, move a
+reset or admit unknown resource state. [asserted] Every dispatch still performs the
+composition's required version/capability handshake. [asserted]
+
 Admission constructs a feasible candidate set before β-centred selection. [asserted] A
 backend is infeasible if any applicable subscription-headroom, monetary-budget,
 authentication, permission or local-hardware constraint is false or unknown for unattended
@@ -187,6 +193,11 @@ Provider-native quota windows are recorded without conversion into a fictional s
 token unit. [asserted] Fresh authoritative headroom is preferred; local trajectory
 accounting can lower an availability estimate but cannot promote it to provider truth
 because usage may occur outside Consilience. [asserted]
+
+Resource records are keyed by account, provider, plan, native bucket and native window;
+concurrent or nested windows remain separate. [asserted] A current user attestation may
+authorise a bounded supervised subscription attempt but is not provider truth and cannot
+admit unattended work. [asserted]
 
 Unknown or stale headroom excludes a subscription from unattended routing. [asserted]
 Reset-aware scheduling may rank only a user-authorised backlog and must maximise incremental
@@ -256,8 +267,9 @@ machine-readable `--json` form, and human output is a rendering of the same resu
 than a second semantics. [asserted]
 
 `consil doctor` reports authentication, control-path readiness, headroom freshness,
-hardware-fit provider state, gate state, fallback health and reasons a composition is
-ineligible. [asserted] It cannot waive Gate A, Gate B or a resource veto. [asserted]
+hardware-fit provider state, installed/runtime capability freshness, watched-source
+freshness, gate state, fallback health and reasons a composition is ineligible. [asserted]
+It cannot waive Gate A, Gate B or a resource veto. [asserted]
 
 The remaining command names are intentionally not fixed by this draft; behaviour and event
 contracts must be approved before naming surface area. [asserted]
@@ -286,6 +298,7 @@ not satisfy the invariant. [asserted]
 | V0-14 | Every command has one JSON contract. [asserted] | CLI contract tests compare human rendering against the JSON result. [asserted] | ADR-0007 |
 | V0-15 | Dogfooding gates and bare fallback cannot be bypassed. [asserted] | Gate matrix plus weekly fallback job fail closed. [asserted] | ADR-0015 |
 | V0-16 | Secrets never enter chat, git or trajectory. [asserted] | Secret scan plus credential-provider contract test; raw values are rejected before event append. [asserted] | working boundary, ADR-0019 |
+| V0-17 | Change intelligence cannot create resource state or replace dispatch-time capability probes. [asserted] | Source-authority fixtures reject headroom/reset mutations and prove relevant events force a probe while missing feeds still fail closed. [asserted] | ADR-0029 |
 
 ## 12. Acceptance evidence and release decision
 

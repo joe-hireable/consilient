@@ -1,6 +1,6 @@
 # Decision index
 
-28 ADRs, 19 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+29 ADRs, 19 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED
@@ -33,6 +33,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0026](0026-admit-only-budget-and-hardware-feasible-backends.md) | **Admit only budget- and hardware-feasible backends to routing**; superseded in part by 0028's subscription allocation | 🟡 |
 | [0027](0027-compose-domain-harness-provider-and-model.md) | **Compose domain, execution harness, provider and model separately**; OpenRouter is a standalone provider | 🟡 |
 | [0028](0028-optimise-expiring-subscription-capacity-for-verified-value.md) | **Allocate expiring included subscription capacity by incremental verified value**; never burn quota for its own sake | 🟡 |
+| [0029](0029-separate-runtime-resource-state-from-change-intelligence.md) | **Separate authenticated resource state from first-party change intelligence**; change feeds invalidate but never create headroom | 🟡 |
 
 ## Behaviour and safety
 
@@ -75,4 +76,5 @@ to every ADR and every PR:
 - **0026** — PROVISIONAL pending EXP-21.
 - **0027** — PROVISIONAL pending EXP-22.
 - **0028** — PROVISIONAL pending EXP-23.
+- **0029** — PROVISIONAL pending EXP-27.
 - **0018** — decision 2 conditional on EXP-12 *and* EXP-13.

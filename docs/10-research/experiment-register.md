@@ -511,6 +511,45 @@ elapsed time; recovery after restart.
 - Unsupported native semantics are recorded as `unsupported`, not scored as a failed
   approximation. Fewer than two eligible adapters is “insufficient evidence”. [asserted]
 
+### EXP-27 · First-party change intelligence versus dispatch-time discovery `READY: phase A; 30-day phase blocked on collector`
+**Decides:** ADR-0029 — whether vendor change monitoring earns v0 scope as an early-warning
+and invalidation layer, while authenticated resource state remains a separate authority.
+**Precondition:** phase A requires only the fixed six unauthenticated first-party endpoints
+in `experiments/exp27/probe_sources.py`; the longitudinal phase requires a read-only
+collector, append-only event log and dispatch-time version/capability probes for Claude
+Code, Codex and Cursor. No model inference or metered provider is required.
+**Procedure:**
+1. Phase A requests the fixed release/changelog and status endpoint for each harness,
+   records HTTP/content type and runs the change-record invariant fixtures. Commit this
+   registration before running the probe.
+2. For 30 consecutive days, poll machine sources with conditional requests and Cursor's
+   HTML changelog conservatively. Freeze every source event by upstream ID/content hash.
+3. At the end of each day, compare collected events with the canonical first-party human
+   changelog and incident history. Classify misses, duplicates and source-parser failures.
+4. On every installed version change or event marked relevant to CLI/control/accounting,
+   run a zero-inference version/capability handshake before the next dispatch. Record
+   whether the probe changes the composition's capability or admission state.
+5. Inject fixtures for a community hint, a published “limits increased” notice and an
+   active outage. Prove that none can increase headroom or mark unknown resource state
+   usable; the first two request grounding/account refresh and the outage may only remove
+   an explicitly affected composition.
+**Measures:** endpoint availability; event-detection latency; canonical-event recall;
+duplicate/re-probe rate; parser failures; capability/admission decisions changed; and any
+resource-ledger mutation originating from change intelligence.
+**Stopping rules (fixed before the run):**
+- Any change event that increases headroom, changes reset state or admits unknown resource
+  state stops the run and makes the monitor notification-only. [asserted]
+- Promotion requires at least 30 canonical first-party events over 30 days, at least 95%
+  recall within one polling interval, at most 15% duplicate or no-relevant-change re-probes,
+  and zero forbidden resource mutations. [asserted]
+- A breaking dispatch-time capability change with no preceding monitored event proves the
+  feeds insufficient as a safeguard; the dispatch handshake remains mandatory even if the
+  other thresholds pass. [asserted]
+- If no monitored event changes a capability or admission decision during the window,
+  defer the monitor from v0 and retain dispatch-time handshakes plus manual notices.
+  Fewer than 30 canonical events is “insufficient evidence”; do not shorten the window or
+  lower the threshold. [asserted]
+
 ### EXP-19 · Feedback-prompt completion rate over time `BLOCKED: feedback prompts (v1+)`
 **Decides:** whether the outcome-feedback friction budget
 (`../20-design/feedback-signals.md`) is exceeded — the ADR-0007 "annoying verdict prompt
