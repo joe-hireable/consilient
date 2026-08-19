@@ -33,6 +33,7 @@ been exercised. [asserted]
 | 5 | Codex × OpenRouter × `qwen/qwen3-coder` | Live coding run failed before artefact production; verifier failed | Forced the harness/provider/model identity correction. The final isolated attempt returned `Server tool request failed`, made no edit and emitted no usage telemetry; delayed cumulative billing prevents a zero-cost attribution. [measured] |
 | 6 | OpenCode × OpenRouter × `qwen/qwen3-coder` | Runner completed and functional tests passed; artefact-scope verifier failed | Validated that the provider-neutral harness reached OpenRouter/Qwen, but it created an unrequested `test_runner.py`. The key crossed into WSL through the environment rather than the command line or a stored OpenCode credential. [measured] |
 | 7 | Cursor via ACP v1 over stdio | Live run and strengthened verifier passed | Drove the same Cursor subscription composition through `initialize` → `authenticate` → `session/new` → `session/prompt`; two execution requests were granted once and retained in the experimental transcript. [measured] |
+| 8 | Antigravity readiness probe | Model discovery passed; structured execution failed before inference | Demonstrated that installation, authentication and model discovery are insufficient admission evidence. [measured] |
 
 Cursor's path issue is not cosmetic. A ticket containing
 `C:\work\repo\file.py` is invalid for a Linux-only process until the adapter translates
@@ -65,6 +66,28 @@ enumerates token/request limits, refusal and cancellation; Cursor's official exa
 returns `stopReason` from `session/prompt`. [cited] The current Cursor ACP model-selection
 surface has not been exercised, so a model-bearing ACP ticket is rejected rather than
 silently recorded as honoured. [asserted]
+
+## Antigravity readiness probe
+
+The official Windows installer supplied Antigravity CLI 1.1.15, and `agy models` returned
+eleven Gemini models through a saved Google business/GCP identity. [measured] That result
+established installation, authentication and discovery only; it did not establish the
+account's Antigravity plan tier, remaining subscription headroom or execution readiness.
+[measured]
+
+A structured print-mode probe then selected `gemini-3.7-flash-low` but returned an error
+before inference, with zero reported tokens, no artefact change and an empty-location
+failure. [measured] The composition therefore remains excluded rather than being promoted
+from model discovery alone. [asserted]
+
+The adapter requires a successful structured result and fails closed when AI-credit
+overage is enabled or the settings file is malformed. [measured] Google documents the
+`useG1Credits` switch and a live status payload containing plan tier, remaining fractions
+and reset fields. [cited] Admission therefore requires all three signals together: a fresh
+plan/quota snapshot, a successful structured execution probe and `useG1Credits=false`.
+[asserted] Google-plan Antigravity, direct Gemini API access and OpenRouter/Gemini remain
+separate accounting compositions even when they select a model from the same family.
+[asserted]
 
 ## First comparable coding runs
 
@@ -186,9 +209,11 @@ misattribution even though the outer ticket/result fields remained stable. [meas
 
 ## Status
 
-**DONE for the original five-adapter surface question; the OpenCode and Cursor ACP
-follow-ups are also complete.** [measured] Cursor passed through both its direct CLI and
-ACP control paths; the Codex × OpenRouter composition failed before
-artefact production; OpenCode reached OpenRouter/Qwen but failed artefact scope; and the result schema
-now records domain, harness, provider and model separately. [measured] A domain-general
+**DONE for the original five-adapter surface question; the OpenCode, Cursor ACP and
+Antigravity readiness follow-ups are also complete.** [measured] Cursor passed through
+both its direct CLI and ACP control paths; Antigravity discovery passed but structured
+execution failed before inference and remains unadmitted; the Codex × OpenRouter
+composition failed before artefact production; OpenCode reached OpenRouter/Qwen but failed
+artefact scope; and the result schema now records domain, harness, provider and model
+separately. [measured] A domain-general
 standalone OpenRouter provider remains follow-up work under ADR-0027 and EXP-22. [asserted]
