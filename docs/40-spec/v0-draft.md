@@ -39,6 +39,14 @@ provisional. [measured]
 - Stable cross-runtime social identity, persona-based performance roles and same-turn
   typed steering are excluded until EXP-24, EXP-25 and EXP-26 respectively satisfy their
   pre-registered promotion rules. [asserted]
+- Executive titles are excluded from product scope as roles: a title is presentation and
+  never an authority, capability, admission or routing input, so admitting one would reinstate
+  the governance layer ADR-0010 cut and would require an ADR superseding it rather than an
+  edit. [asserted] Vendor names are excluded as roles for a different reason: under ADR-0027 a
+  backend is “a composed action rather than an indivisible coding-agent name”. [cited] The repository's own pre-spec
+  working arrangement in
+  [`../10-research/agent-identity-and-collaboration.md`](../10-research/agent-identity-and-collaboration.md)
+  is a working convenience, not v0 scope, and no check enforces it. [asserted]
 - Consilience does not distribute model weights or reproduce content from the private
   measurement corpora. [asserted]
 
@@ -49,6 +57,21 @@ provisional. [measured]
 Existing agents may produce research instruments, adapters, ADRs and this draft, but
 Consilience is not on the critical path and may not route work. [asserted] Experimental
 adapter outcomes remain measurements, not product interfaces. [asserted]
+
+Three boundaries bind who performs that work. They belong to this draft because they are the
+gate, not the staffing; the assignment itself is recorded in
+[`../10-research/agent-identity-and-collaboration.md`](../10-research/agent-identity-and-collaboration.md).
+[asserted]
+
+1. Only Joe approves, rejects or supersedes this specification, and only Joe lifts a gate. No
+   agent may author a record of such an approval on his behalf. [asserted]
+2. Mutable work has one lease holder at a time however many actors are assigned; an
+   assignment is not a licence to write concurrently. [asserted]
+3. A second actor is worth adding to a task only where it introduces a different class of
+   facts; one that re-reads the first actor's output adds no assurance. [asserted] The
+   measured case is EXP-07: the author's own four instrument tests passed, an independent
+   `claude-opus-5` audit then found four further defects, and the replication was aborted
+   before a verdict. [measured]
 
 ### Stage 2 — observe only, after Gate A
 
@@ -105,6 +128,13 @@ Every contribution record must identify at least: [asserted]
 Display names and personas are never credentials, authority signals or evidence of
 capability. [asserted] Until EXP-24 promotes logical identity, runtime identity plus
 principal, role and provenance is sufficient. [asserted]
+
+An event recording a human decision — approval, gate lift, spend authorisation or β verdict —
+is valid only when the human principal is also its author, with the arrival channel recorded.
+[asserted] The principal field names whose authority is being exercised; it is not itself an
+authority grant, and no agent-authored event becomes the human's decision. [asserted] This has
+already failed on identity-free projections: EXP-16 recorded a fabricated human-participation
+claim in a meeting no human joined. [measured]
 
 ### 4.2 Task and attempt
 
@@ -299,6 +329,9 @@ not satisfy the invariant. [asserted]
 | V0-15 | Dogfooding gates and bare fallback cannot be bypassed. [asserted] | Gate matrix plus weekly fallback job fail closed. [asserted] | ADR-0015 |
 | V0-16 | Secrets never enter chat, git or trajectory. [asserted] | Secret scan plus credential-provider contract test; raw values are rejected before event append. [asserted] | working boundary, ADR-0019 |
 | V0-17 | Change intelligence cannot create resource state or replace dispatch-time capability probes. [asserted] | Source-authority fixtures reject headroom/reset mutations and prove relevant events force a probe while missing feeds still fail closed. [asserted] | ADR-0029 |
+| V0-18 | A human approval, gate lift, spend authorisation or verdict is valid only when the human principal authored it. [asserted] | Fixtures reject an agent-authored event carrying a human decision, and reject a human decision inferred from the principal field. [asserted] | ADR-0020 proposal, EXP-16 |
+| V0-19 | Display name, title and persona are never an authority, capability, admission or routing input. [asserted] | Routing, admission and acceptance tests reject persona-derived inputs; a property test asserts that changing a display name changes no decision. [asserted] | ADR-0010, ADR-0025 |
+| V0-20 | Every convened or fanned-out structure carries hard budget, turn and depth caps, and exhaustion escalates. [asserted] | Loop test asserts an over-budget structure terminates and escalates rather than continuing; a recursion-depth assert fails closed. [asserted] | ADR-0020 proposal |
 
 ## 12. Acceptance evidence and release decision
 
@@ -328,6 +361,10 @@ not implied by shipping Stage 2. [asserted]
 3. Approve or reject `llmfit` if EXP-21 work reaches the dependency boundary. [asserted]
 4. Resolve legal preference decisions before their gates: CLA versus DCO alone, and the
    proposed safety/moderation floor. [asserted]
+5. Decide whether the pre-spec working arrangement needs its own ADR. ADR-0023's tiers
+   enumerate technical blast radius rather than organisational structure, and ADR-0010 would
+   have to be superseded rather than edited were the arrangement ever to become product
+   scope. [asserted]
 
 Authentication, metered-spend authority and blind human judgements are execution blockers,
 not architecture decisions: Antigravity plan-backed authentication, any Gemini/OpenRouter
