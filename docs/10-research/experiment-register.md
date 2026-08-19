@@ -14,7 +14,14 @@ Status: `READY` (runnable now) · `BLOCKED` (needs harness component X) · `DONE
 
 ## Runnable today — no harness required
 
-### EXP-01 · Measure β on repository history `READY`
+### EXP-01 · Measure β on repository history `IN PROGRESS 19 Aug 2026 — see experiments/exp01/findings-exp01.md`
+**First pass run on both repos** (recorded-CI-verdict mining, no replay). Raw proxy
+labels proved ~93% noise (audited precision 1/15 on both repos); corrected β̂ ≈ 0.12
+[0.02, 0.42] (jobboard-v2) — the honest verdict is "insufficient data", exactly
+ADR-0002's predicted near-threshold regime. Stopping rule NOT fired: the interval is
+audit-limited, not history-limited. Unplanned finding: 33% of jobboard-v2 merges
+overrode red CI — the human is the real acceptance gate. Next: reference-based labels,
+full-pair audit.
 **Decides:** Q2, and promotes ADR-0002 from PROVISIONAL to ACCEPTED or kills it.
 **Precondition:** none. `jobboard-v2` git history and PR outcomes.
 **Procedure:** for each historical PR, replay the repo's checks at that commit; classify the
