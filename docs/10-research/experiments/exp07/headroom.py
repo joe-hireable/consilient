@@ -100,7 +100,8 @@ def admission_reason(snapshot, maximum_used_percent=90):
         return "provider reports limit reached"
     if snapshot.get("spend_control_reached") is True:
         return "provider reports spend-control stop"
-    if snapshot["used_percent"] > maximum_used_percent:
+    # Preregistered as "below 90% used": the boundary itself is rejected.
+    if snapshot["used_percent"] >= maximum_used_percent:
         return "reserved headroom unavailable"
     return None
 

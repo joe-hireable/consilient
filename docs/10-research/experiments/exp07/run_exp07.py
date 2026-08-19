@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import statistics
 import subprocess
@@ -23,6 +24,19 @@ RESULTS = HERE / "results-exp07.json"
 MAX_ELAPSED_S = 90 * 60
 LOCAL_ATTEMPTS = 5
 MAX_FRONTIER_USED_PERCENT = 90
+VERIFIER_TIMEOUT_S = 20
+MIN_ATTEMPT_S = 30
+
+LIMITATIONS = [
+    "Reasoning modes are not matched: gpt-5.6-sol runs at explicit low reasoning effort "
+    "while qwen3:8b runs at its Ollama default. Every multiplier compares two harness "
+    "configurations as configured, not two models at matched reasoning effort.",
+    "Timed-out attempts are right-censored: their durations are lower bounds, so a "
+    "multiplier derived from one is a lower bound and can prove a crossing but can never "
+    "prove a non-crossing.",
+    "Synthetic fixtures can replicate the latency mechanism but cannot establish that a "
+    "learned router improves real work.",
+]
 
 
 FIXTURES = [
@@ -203,35 +217,65 @@ def make_repo(fixture):
     (repo / "test_runner.py").write_text(fixture["tests"], encoding="utf-8")
     subprocess.run([GIT, "add", "."], cwd=repo, check=True)
     subprocess.run([GIT, "commit", "-qm", "fixture"], cwd=repo, check=True)
-    return repo
-
-
-def verify(repo):
-    started = time.monotonic()
-    test = subprocess.run(
-        [PYTHON, "test_runner.py"],
+    baseline = subprocess.run(
+        [GIT, "rev-parse", "HEAD"],
         cwd=repo,
         capture_output=True,
         text=True,
         encoding="utf-8",
-        errors="replace",
-        timeout=20,
-    )
-    changed = subprocess.run(
-        [GIT, "status", "--porcelain"],
+        check=True,
+    ).stdout.strip()
+    return repo, baseline
+
+
+def changed_since(repo, baseline):
+    """Files differing from the immutable baseline commit, committed or not."""
+    tracked = subprocess.run(
+        [GIT, "diff", "--name-only", baseline],
         cwd=repo,
         capture_output=True,
         text=True,
         encoding="utf-8",
         check=True,
     ).stdout.splitlines()
-    changed_files = sorted(line[3:].strip() for line in changed if len(line) >= 4)
+    untracked = subprocess.run(
+        [GIT, "ls-files", "--others", "--exclude-standard"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout.splitlines()
+    return sorted({line.strip() for line in tracked + untracked if line.strip()})
+
+
+def verify(repo, baseline, timeout_s=VERIFIER_TIMEOUT_S):
+    started = time.monotonic()
+    try:
+        test = subprocess.run(
+            [PYTHON, "test_runner.py"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_s,
+        )
+        tests_passed = test.returncode == 0
+        tail = (test.stderr or test.stdout)[-300:]
+        timed_out = False
+    except subprocess.TimeoutExpired:
+        tests_passed = False
+        tail = "verifier timeout"
+        timed_out = True
+    changed_files = changed_since(repo, baseline)
     return {
-        "passed": test.returncode == 0 and changed_files == ["solution.py"],
-        "tests_passed": test.returncode == 0,
+        "passed": tests_passed and changed_files == ["solution.py"],
+        "tests_passed": tests_passed,
+        "timeout": timed_out,
         "changed_files": changed_files,
         "duration_s": round(time.monotonic() - started, 3),
-        "test_tail": (test.stderr or test.stdout)[-300:],
+        "test_tail": tail,
     }
 
 
@@ -247,8 +291,15 @@ def usage_from_events(stdout):
     return usage
 
 
-def run_attempt(fixture, condition, attempt, timeout_s):
-    repo = make_repo(fixture)
+def attempt_timeout(remaining_s, configured_s):
+    """Fit an attempt inside the outer cap; None means it cannot fit and must be skipped."""
+    if remaining_s < MIN_ATTEMPT_S:
+        return None
+    return int(min(configured_s, remaining_s))
+
+
+def run_attempt(fixture, condition, attempt, timeout_s, configured_timeout_s):
+    repo, baseline = make_repo(fixture)
     command = [
         CODEX,
         "exec",
@@ -275,11 +326,16 @@ def run_attempt(fixture, condition, attempt, timeout_s):
             errors="replace",
             timeout=timeout_s,
         )
-        verifier = verify(repo)
+        verifier = verify(repo, baseline)
         duration_s = time.monotonic() - started
         return_code = process.returncode
         usage = usage_from_events(process.stdout)
-        error = None
+        if verifier["timeout"]:
+            outcome, error = "verifier_timeout", "verifier timeout"
+        elif verifier["passed"]:
+            outcome, error = "passed", None
+        else:
+            outcome, error = "rejected", None
     except subprocess.TimeoutExpired:
         duration_s = time.monotonic() - started
         return_code = None
@@ -287,18 +343,25 @@ def run_attempt(fixture, condition, attempt, timeout_s):
         verifier = {
             "passed": False,
             "tests_passed": False,
+            "timeout": True,
             "changed_files": [],
             "duration_s": 0,
-            "test_tail": "attempt timeout",
+            "test_tail": "agent timeout",
         }
-        error = "timeout"
+        outcome, error = "agent_timeout", "agent timeout"
     return {
         "fixture": fixture["id"],
         "condition": condition,
         "attempt": attempt,
         "model": "gpt-5.6-sol" if condition == "frontier" else "qwen3:8b",
         "provider": "openai-subscription" if condition == "frontier" else "ollama",
+        "reasoning_mode": "low" if condition == "frontier" else "ollama-default",
         "duration_s_including_verifier": round(duration_s, 3),
+        # A timed-out attempt was cut short: its duration is a lower bound, not a measurement.
+        "censored": outcome in ("agent_timeout", "verifier_timeout"),
+        "outcome": outcome,
+        "timeout_s_applied": timeout_s,
+        "timeout_s_configured": configured_timeout_s,
         "return_code": return_code,
         "verifier": verifier,
         "usage": usage,
@@ -313,41 +376,81 @@ def summarise(runs):
     for fixture in FIXTURES:
         name = fixture["id"]
         frontier = next(
-            row for row in runs if row["fixture"] == name and row["condition"] == "frontier"
+            (
+                row
+                for row in runs
+                if row["fixture"] == name and row["condition"] == "frontier"
+            ),
+            None,
         )
+        if frontier is None:
+            continue
         local = sorted(
-            (row for row in runs if row["fixture"] == name and row["condition"] == "local"),
+            (
+                row
+                for row in runs
+                if row["fixture"] == name and row["condition"] == "local"
+            ),
             key=lambda row: row["attempt"],
         )
         pair = {
             "fixture": name,
             "frontier_passed": frontier["verifier"]["passed"],
             "local_passes": sum(row["verifier"]["passed"] for row in local),
+            "local_censored": sum(bool(row.get("censored")) for row in local),
         }
-        if frontier["verifier"]["passed"] and local and not local[0]["verifier"]["passed"]:
-            ratio = local[0]["duration_s_including_verifier"] / frontier[
-                "duration_s_including_verifier"
-            ]
-            pair["single_failed_multiplier"] = round(ratio, 3)
-            single_ratios.append(ratio)
-        if frontier["verifier"]["passed"] and len(local) == 5 and not any(
-            row["verifier"]["passed"] for row in local
+        if (
+            frontier["verifier"]["passed"]
+            and local
+            and not local[0]["verifier"]["passed"]
         ):
-            ratio = sum(row["duration_s_including_verifier"] for row in local) / frontier[
-                "duration_s_including_verifier"
-            ]
+            ratio = (
+                local[0]["duration_s_including_verifier"]
+                / frontier["duration_s_including_verifier"]
+            )
+            censored = bool(local[0].get("censored"))
+            pair["single_failed_multiplier"] = round(ratio, 3)
+            pair["single_multiplier_is_lower_bound"] = censored
+            single_ratios.append((ratio, censored))
+        # Best-of-five stays a separate intervention and keeps its full serial cost.
+        if (
+            frontier["verifier"]["passed"]
+            and len(local) == LOCAL_ATTEMPTS
+            and not any(row["verifier"]["passed"] for row in local)
+        ):
+            ratio = (
+                sum(row["duration_s_including_verifier"] for row in local)
+                / frontier["duration_s_including_verifier"]
+            )
+            censored = any(bool(row.get("censored")) for row in local)
             pair["five_failed_multiplier"] = round(ratio, 3)
-            five_ratios.append(ratio)
+            pair["five_multiplier_is_lower_bound"] = censored
+            five_ratios.append((ratio, censored))
         pairs.append(pair)
 
-    def verdict(values):
-        if len(values) < 3:
-            return {"eligible_pairs": len(values), "median": None, "verdict": "insufficient_evidence"}
-        median = statistics.median(values)
+    def verdict(entries):
+        censored_pairs = sum(1 for _, censored in entries if censored)
+        base = {"eligible_pairs": len(entries), "censored_pairs": censored_pairs}
+        if len(entries) < 3:
+            return {
+                **base,
+                "median": None,
+                "median_is_lower_bound": False,
+                "verdict": "insufficient_evidence",
+            }
+        median = statistics.median(value for value, _ in entries)
+        if median >= 2:
+            # Censored values are lower bounds, so a median at or above 2 is still proven.
+            outcome = "replicates_2x_trigger"
+        elif censored_pairs:
+            outcome = "insufficient_evidence"
+        else:
+            outcome = "does_not_replicate_2x_trigger"
         return {
-            "eligible_pairs": len(values),
+            **base,
             "median": round(median, 3),
-            "verdict": "replicates_2x_trigger" if median >= 2 else "does_not_replicate_2x_trigger",
+            "median_is_lower_bound": bool(censored_pairs),
+            "verdict": outcome,
         }
 
     single = verdict(single_ratios)
@@ -355,10 +458,57 @@ def summarise(runs):
     if single["verdict"] == "replicates_2x_trigger":
         interpretation = "single attempt crosses; best-of-five can only amplify it"
     elif five["verdict"] == "replicates_2x_trigger":
-        interpretation = "only best-of-five crosses; reasoning-layer cost causes the trigger"
+        interpretation = (
+            "only best-of-five crosses; reasoning-layer cost causes the trigger"
+        )
     else:
         interpretation = "no causal attribution; evidence is negative or insufficient"
-    return {"pairs": pairs, "single_attempt": single, "best_of_five": five, "interpretation": interpretation}
+    return {
+        "pairs": pairs,
+        "single_attempt": single,
+        "best_of_five": five,
+        "interpretation": interpretation,
+    }
+
+
+def build_result(runs, snapshots, elapsed_s, stop_reason):
+    complete = len(runs) == len(FIXTURES) * (1 + LOCAL_ATTEMPTS)
+    return {
+        "protocol": {
+            "fixtures": [fixture["id"] for fixture in FIXTURES],
+            "frontier": "gpt-5.6-sol, low reasoning, Codex Pro subscription",
+            "local": "qwen3:8b via Ollama, five serial attempts",
+            "maximum_frontier_used_percent": MAX_FRONTIER_USED_PERCENT,
+            "frontier_used_percent_boundary": "strictly below",
+            "attempt_cap": 30,
+            "wall_clock_cap_s": MAX_ELAPSED_S,
+            "minimum_attempt_s": MIN_ATTEMPT_S,
+            "verifier_timeout_s": VERIFIER_TIMEOUT_S,
+        },
+        "limitations": LIMITATIONS,
+        "headroom_snapshots": snapshots,
+        "complete": complete,
+        "stop_reason": stop_reason,
+        "elapsed_s": round(elapsed_s, 3),
+        "runs": runs,
+        "summary": summarise(runs) if complete else None,
+    }
+
+
+def write_results(payload):
+    """Atomic so an interrupted or failed run always leaves a readable checkpoint."""
+    tmp = RESULTS.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    # Windows denies the rename while a watcher or scanner holds a transient handle;
+    # retry briefly, then let a persistent failure surface.
+    for delay in (0, 0.05, 0.2, 0.5, 1.0):
+        time.sleep(delay)
+        try:
+            os.replace(tmp, RESULTS)
+            return
+        except PermissionError:
+            continue
+    os.replace(tmp, RESULTS)
 
 
 def main():
@@ -371,57 +521,89 @@ def main():
     started = time.monotonic()
     runs = []
     snapshots = []
+    stop_reason = None
 
-    for fixture in FIXTURES:
-        snapshot = read_codex_headroom()
-        reason = admission_reason(snapshot, MAX_FRONTIER_USED_PERCENT)
-        snapshots.append(snapshot)
-        if reason:
-            print(f"STOP frontier admission: {reason}", flush=True)
-            break
-        print(f"frontier {fixture['id']} headroom_used={snapshot['used_percent']}%", flush=True)
-        runs.append(run_attempt(fixture, "frontier", 1, args.frontier_timeout))
+    def checkpoint():
+        write_results(
+            build_result(runs, snapshots, time.monotonic() - started, stop_reason)
+        )
+
+    def report():
         print(
-            f"  pass={runs[-1]['verifier']['passed']} "
-            f"seconds={runs[-1]['duration_s_including_verifier']}",
+            f"  outcome={runs[-1]['outcome']} "
+            f"seconds={runs[-1]['duration_s_including_verifier']}"
+            f"{'+' if runs[-1]['censored'] else ''}",
             flush=True,
         )
 
-    if len([row for row in runs if row["condition"] == "frontier"]) == len(FIXTURES):
+    try:
         for fixture in FIXTURES:
-            for attempt in range(1, LOCAL_ATTEMPTS + 1):
-                if time.monotonic() - started >= MAX_ELAPSED_S:
-                    print("STOP 90-minute wall-clock cap", flush=True)
-                    break
-                print(f"local {fixture['id']} attempt={attempt}/5", flush=True)
-                runs.append(run_attempt(fixture, "local", attempt, args.local_timeout))
-                print(
-                    f"  pass={runs[-1]['verifier']['passed']} "
-                    f"seconds={runs[-1]['duration_s_including_verifier']}",
-                    flush=True,
-                )
-            if time.monotonic() - started >= MAX_ELAPSED_S:
+            try:
+                snapshot = read_codex_headroom()
+            except Exception as exc:
+                stop_reason = f"headroom probe failed: {exc}"
+                print(f"STOP {stop_reason}", flush=True)
                 break
+            snapshots.append(snapshot)
+            checkpoint()
+            reason = admission_reason(snapshot, MAX_FRONTIER_USED_PERCENT)
+            if reason:
+                stop_reason = f"frontier admission: {reason}"
+                print(f"STOP {stop_reason}", flush=True)
+                break
+            timeout_s = attempt_timeout(
+                MAX_ELAPSED_S - (time.monotonic() - started), args.frontier_timeout
+            )
+            if timeout_s is None:
+                stop_reason = "wall-clock cap: no frontier attempt fits"
+                print(f"STOP {stop_reason}", flush=True)
+                break
+            print(
+                f"frontier {fixture['id']} headroom_used={snapshot['used_percent']}% "
+                f"timeout={timeout_s}s",
+                flush=True,
+            )
+            runs.append(
+                run_attempt(fixture, "frontier", 1, timeout_s, args.frontier_timeout)
+            )
+            checkpoint()
+            report()
 
-    complete = len(runs) == len(FIXTURES) * (1 + LOCAL_ATTEMPTS)
-    result = {
-        "protocol": {
-            "fixtures": [fixture["id"] for fixture in FIXTURES],
-            "frontier": "gpt-5.6-sol, low reasoning, Codex Pro subscription",
-            "local": "qwen3:8b via Ollama, five serial attempts",
-            "maximum_frontier_used_percent": MAX_FRONTIER_USED_PERCENT,
-            "attempt_cap": 30,
-            "wall_clock_cap_s": MAX_ELAPSED_S,
-        },
-        "headroom_snapshots": snapshots,
-        "complete": complete,
-        "elapsed_s": round(time.monotonic() - started, 3),
-        "runs": runs,
-        "summary": summarise(runs) if complete else None,
-    }
-    RESULTS.write_text(json.dumps(result, indent=2), encoding="utf-8")
-    print(f"result={RESULTS} complete={complete}", flush=True)
-    if complete:
+        if len([row for row in runs if row["condition"] == "frontier"]) == len(
+            FIXTURES
+        ):
+            for fixture in FIXTURES:
+                for attempt in range(1, LOCAL_ATTEMPTS + 1):
+                    timeout_s = attempt_timeout(
+                        MAX_ELAPSED_S - (time.monotonic() - started), args.local_timeout
+                    )
+                    if timeout_s is None:
+                        stop_reason = "wall-clock cap: no local attempt fits"
+                        print(f"STOP {stop_reason}", flush=True)
+                        break
+                    print(
+                        f"local {fixture['id']} attempt={attempt}/{LOCAL_ATTEMPTS} "
+                        f"timeout={timeout_s}s",
+                        flush=True,
+                    )
+                    runs.append(
+                        run_attempt(
+                            fixture, "local", attempt, timeout_s, args.local_timeout
+                        )
+                    )
+                    checkpoint()
+                    report()
+                if stop_reason:
+                    break
+    except KeyboardInterrupt:
+        stop_reason = "interrupted"
+        print("STOP interrupted", flush=True)
+    finally:
+        result = build_result(runs, snapshots, time.monotonic() - started, stop_reason)
+        write_results(result)
+
+    print(f"result={RESULTS} complete={result['complete']}", flush=True)
+    if result["complete"]:
         print(json.dumps(result["summary"], indent=2), flush=True)
 
 
