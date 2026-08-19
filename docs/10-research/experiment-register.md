@@ -68,12 +68,13 @@ The minimum harness needed to unblock most of these: **adapter for one agent + t
 + trajectory log + verdict prompt.** Nothing else.
 
 ### EXP-05 · Adapter surface across five backends `DONE 19 Aug 2026 — see experiments/exp05/findings-exp05.md`
-**Result:** Claude Code and Codex passed a live ticket. Adapter #2 (Codex) did not
+**Result:** Claude Code, Codex and Cursor passed a live ticket. Adapter #2 (Codex) did not
 force an interface redesign. Adapter #3 (Cursor) exposed a genuine namespace-dependent
-path question, absorbed by a per-adapter translation seam with four passing tests.
-Adapters #4 (Ollama) and #5 (OpenRouter) fit the model-backed seam; Ollama completed a
-live run but failed verification, while Cursor and OpenRouter remain blocked on login/key
-for live validation. The stopping rule does not fire. [measured]
+path question, absorbed by a per-adapter translation seam with four passing tests; its
+first live result also exposed input/output/cache usage fields. Adapters #4 (Ollama) and
+#5 (OpenRouter) fit the model-backed seam; Ollama completed a live run but failed
+verification, while OpenRouter remains blocked on a key for live validation. The stopping
+rule does not fire. [measured]
 **Decides:** Q5, and the viability of ADR-0001.
 **Procedure:** write an adapter for Claude Code. Then write a second for Codex **without
 refactoring the first**. Record what the second breaks.
@@ -100,7 +101,8 @@ wall-clock on a single serialising GPU and can cross the threshold by itself.
 reasoning layer enabled, the finding is "scaffolding is what makes routing priors
 worthwhile" — record it that way rather than as a blanket reopening.
 **Pilot result, 19 Aug 2026:** one failed `qwen3:8b` attempt took 114.2 s versus
-20.4 s for a Codex success and 25.6 s for a Claude Code success: 5.6× and 4.5×.
+20.4 s for a Codex success, 25.6 s for a Claude Code success and 47.0 s for a
+Cursor success: 5.6×, 4.5× and 2.4×.
 The pre-registered 2× reopening condition was observed, so ADR-0003 is reopened for
 investigation. This is n=1 on one trivial task and does not establish a population
 multiplier. EXP-07 is now the highest-priority replication experiment. [measured]
@@ -361,7 +363,7 @@ worth running as one.
 
 ## How to use this register in Claude Code
 
-1. Pick a `READY` experiment. EXP-01 and EXP-05 are the two that matter most.
+1. Pick a `READY` experiment. EXP-01 and EXP-07 are the two that matter most.
 2. Run it. Commit the code under `experiments/` and the result under `docs/10-research/`.
 3. **Apply the stopping rule honestly**, including when it kills a decision you like.
 4. Update the ADR it decides — supersede, do not silently edit (see

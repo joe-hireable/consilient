@@ -24,9 +24,8 @@ NEW BREAK, not seen in #1 or #2 — PLATFORM/NAMESPACE (call it A7, which adapte
 
 Other divergences:
   A2  Cursor uses --output-format json|text|stream-json (closest to #1's shape).
-  A3  no cost field; token accounting not exposed on the CLI surface at all —
-      third vendor, third accounting story (#1 last-call tokens, #2 cumulative
-      session tokens, #3 nothing).
+  A3  no cost field. The first live result did expose input, output and cache
+      token counts in its final JSON — third vendor, third accounting story.
   A5  permissions via --force (non-interactive approval), a third spelling of
       the same idea.
 """
@@ -47,6 +46,17 @@ def to_wsl_path(win_path):
     if len(p) > 1 and p[1] == ":":
         return f"/mnt/{p[0].lower()}{p[2:]}"
     return p
+
+
+def usage_fields(result):
+    """Extract the usage fields observed in Cursor's final JSON result."""
+    usage = result.get("usage") or {}
+    return {
+        "tokens_in": usage.get("inputTokens"),
+        "tokens_out": usage.get("outputTokens"),
+        "cache_read_tokens": usage.get("cacheReadTokens"),
+        "cache_write_tokens": usage.get("cacheWriteTokens"),
+    }
 
 
 def run(ticket):
@@ -73,6 +83,7 @@ def run(ticket):
         result = json.loads((proc.stdout or "").strip().splitlines()[-1])
     except (json.JSONDecodeError, IndexError):
         pass
+    usage = usage_fields(result)
 
     diff = subprocess.run(  # A4 holds — git is the common ground across all three
         [GIT, "diff"],
@@ -87,8 +98,7 @@ def run(ticket):
         "agent": "cursor",
         "ok": proc.returncode == 0 and not result.get("is_error", False),
         "diff": diff,
-        "tokens_in": None,  # A3 BREAK: not exposed
-        "tokens_out": None,
+        **usage,
         "cost_usd": None,
         "duration_s": round(duration, 1),
         "raw_tail": ((proc.stdout or "") + (proc.stderr or ""))[-500:],

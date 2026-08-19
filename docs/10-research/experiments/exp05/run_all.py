@@ -23,6 +23,20 @@ from run_exp05 import GOAL, make_repo, verify  # noqa: E402
 GIT = shutil.which("git")
 
 
+def merge_rows(existing, new):
+    """Replace rerun backends while preserving comparison rows not selected."""
+    merged = list(existing)
+    positions = {row["agent"]: index for index, row in enumerate(merged)}
+    for row in new:
+        index = positions.get(row["agent"])
+        if index is None:
+            positions[row["agent"]] = len(merged)
+            merged.append(row)
+        else:
+            merged[index] = row
+    return merged
+
+
 def available():
     have = []
     if shutil.which("claude"):
@@ -141,10 +155,13 @@ if __name__ == "__main__":
             f"{str(r['tokens_in']):>9} {str(r['cost_usd']):>8}"
         )
     out = Path(__file__).parent / "backend-comparison.json"
+    try:
+        existing = json.loads(out.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        existing = []
+    serialised = [{k: v for k, v in r.items() if k != "diff"} for r in rows]
     out.write_text(
-        json.dumps(
-            [{k: v for k, v in r.items() if k != "diff"} for r in rows], indent=1
-        ),
+        json.dumps(merge_rows(existing, serialised), indent=1),
         encoding="utf-8",
     )
-    print(f"\nwritten: {out.name}")
+    print(f"\nupdated: {out.name}")

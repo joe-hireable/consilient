@@ -20,36 +20,39 @@ python run_all.py ollama:qwen3:8b      # local provider
 |---|---|---|---|---|
 | **Claude Code** | `adapter_claude_code.py` | subscription login | reports cost and a narrow token field | Passed the comparison ticket. [measured] |
 | **Codex** | `adapter_codex.py` | ChatGPT subscription login | reports session-scale tokens, not cost | Passed the comparison ticket. [measured] |
-| **Cursor** | `adapter_cursor.py` | `cursor-agent login` inside WSL | no result accounting yet | Adapter and four path-seam tests pass; live run blocked on login. [measured] |
+| **Cursor** | `adapter_cursor.py` | `cursor-agent login` inside WSL | final JSON reports input/output/cache tokens, not cost | Passed the comparison ticket and four path-seam tests. [measured] |
 | **Ollama (local)** | `adapter_model_backed.py::run_local` | none | no provider charge reported; local resources still have a cost | Runner completed but the verifier failed the comparison ticket. [measured] |
 | **OpenRouter** | `adapter_model_backed.py::run_openrouter` | `OPENROUTER_API_KEY` | metered | Adapter written; live run blocked on a key. [measured] |
 
 ## First comparable run
 
-One synthetic Python ticket was run through the three ready backends. Cursor
-and OpenRouter were excluded because their authentication prerequisites were
-not available. [measured]
+One synthetic Python ticket was run through four ready backends. Cursor was
+added after WSL authentication; OpenRouter remains excluded because its
+credential prerequisite is unavailable. [measured]
 
 | backend | runner `ok` | verifier | elapsed | reported input tokens | reported cost |
 |---|---:|---:|---:|---:|---:|
 | Claude Code | true | pass | 25.6 s | 8 | $0.53987225 |
 | Codex | true | pass | 20.4 s | 87,356 | unavailable |
 | Ollama `qwen3:8b` | true | fail | 114.2 s | 559,095 | unavailable |
+| Cursor | true | pass | 47.0 s | 74,781 + 92,160 cache read | unavailable |
 
 The saved Ollama repository had no file change and the raw output had no final
 agent message. The adapter's process-level `ok=true` therefore did not mean
 that the artifact was acceptable; the verifier correctly rejected it.
 [measured]
 
-The failed local attempt took 5.6 times as long as the Codex success and 4.5
-times as long as the Claude success. [measured] This n=1 result crosses
+The failed local attempt took 5.6 times as long as the Codex success, 4.5
+times as long as the Claude success and 2.4 times as long as the Cursor
+success. [measured] This n=1 result crosses
 EXP-07's pre-registered 2× investigation threshold, but it does not estimate a
 population wasted-work multiplier. [asserted]
 
 The token fields are backend-native counters and were not comparable in this
-run. A cross-backend accounting design must use a defined harness measure or a
-provider billing measure, not treat these fields as interchangeable.
-[measured]
+run. Cursor's live JSON separated input/output/cache usage, correcting the
+pre-live assumption that it exposed no tokens, but still supplied no cost.
+A cross-backend accounting design must use a defined harness measure or a
+provider billing measure, not treat these fields as interchangeable. [measured]
 
 ## Setup notes worth keeping
 
@@ -78,5 +81,5 @@ open-model backend can use that seam remains untested. [asserted]
   Codex harness path constant. [asserted]
 - **EXP-17 / EXP-18** can use the local adapter once model-download hardware
   admission is specified. [asserted]
-- **EXP-16 Arm A′** can use Codex and, after login, Cursor to test whether the
-  earlier decision convergence survives a model-family change. [asserted]
+- **EXP-16 Arm A′** can use Codex and Cursor to test whether the earlier
+  decision convergence survives a model-family change. [asserted]

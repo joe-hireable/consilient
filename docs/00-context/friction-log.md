@@ -67,6 +67,8 @@ rented PM tools:**
 | 2026-08-19 | Re-read LLM Checker's current licence after ADR-0005 had called it open source; its NPDL terms prohibit paid distribution and monetised hosting | per candidate dependency | the ADR-0016 licence check at discovery time, before a tool can become a wrapper candidate |
 | 2026-08-19 | Compared local-fit tools by hand and found LM Studio's estimator starts only after the model is downloaded, too late for the requested download gate | per local backend/tool | a pre-download fit-provider capability probe, with post-download estimators treated only as a second gate |
 | 2026-08-19 | Found that an ordinary OpenRouter completion key is insufficient for provider-enforced per-task caps; creating capped task keys requires a separate management API key | once per OpenRouter account setup | guided management-key setup plus automatic task-key creation and deletion (ADR-0026) |
+| 2026-08-19 | Corrected the pre-live assumption that Cursor exposed no token accounting: its successful final JSON contained separate input, output, cache-read and cache-write fields, which the adapter had discarded | once on first live adapter run | parse and retain backend-native usage fields; never infer a missing field from help text alone |
+| 2026-08-19 | Running one selected backend overwrote the three earlier rows in `backend-comparison.json`; recovered them from git by hand | once per partial comparison before the fix | merge selected backend results by agent identity, with a regression check |
 
 ## What does not belong here
 
