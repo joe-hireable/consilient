@@ -83,6 +83,7 @@ rented PM tools:**
 | 2026-08-19 | `agy models` succeeded through a saved identity while Antigravity print mode failed before inference, so installation plus model discovery falsely appeared execution-ready | once on first Antigravity probe; risk per backend discovery | require a successful zero-tool structured probe and live plan/quota snapshot before admission |
 | 2026-08-19 | Antigravity's `--print` flag takes the prompt value; treating it as a boolean caused later flags to be consumed as the prompt | once during CLI probing | invoke the prompt as one structured argument (`--print=<value>`) and regression-test the emitted init/result stream |
 | 2026-08-19 | The ambient Windows `python` command resolved to an unset pyenv shim, so the verifier's regression suite appeared to fail because `pytest` was unavailable in a fallback runtime | once per machine without a selected pyenv version | run the experiment checks with the explicit installed 3.13 interpreter and report interpreter readiness separately from artefact failure |
+| 2026-08-19 | The Codex ClickUp connector advertised `clickup_create_task_comment` but rejected the operation as “tool not found”; the same evidence update posted to Slack successfully | once on the current connector build; risk per unattended status projection | treat external PM updates as non-authoritative projections, retain the committed trajectory as truth, and retry ClickUp only after connector readiness is re-established |
 
 ## What does not belong here
 
