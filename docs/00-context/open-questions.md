@@ -30,6 +30,7 @@ argument questions at all and have become entries in
 | Q21–Q22 feasibility & β composition | **EXP-11** |
 | Q24 β outside coding | **Open — Tier 0 for the expanded scope.** Added 19 Aug 2026 |
 | Q25 reasoning layer on reasoning models | Open — see `../20-design/reasoning-layer.md` |
+| Q26 agent identity, personality and real-time collaboration | Open — **EXP-24–26** separate accountable identity, persona effects and typed control |
 
 What genuinely remains for a human to decide: **Q14, Q15/Q23, Q19.** Everything else is
 either settled or scheduled.
@@ -210,6 +211,21 @@ non-duplication is the hard part, not the scaffolding itself. See
 `../20-design/reasoning-layer.md`, including why "scaffolding narrows Δ" did **not**
 survive scrutiny (it changes the competence curve's *slope*, not its position, and its
 β* effect flips sign with the task distribution).
+
+**Q26. Which parts of agent identity and team culture improve outcomes, and which are only
+presentation?**
+
+Stable logical identity, display persona, runtime identity, work role, authority and
+provenance are different dimensions. [asserted] Human-team evidence favours unique
+information, communication quality, expertise location, protected dissent and intermittent
+independent work more strongly than generic communication frequency or personality
+archetypes. [cited] LLM persona evidence does not justify treating an “expert” or warm
+persona as capability. [cited]
+
+EXP-24 tests attribution and handoff comprehension from stable logical identity; EXP-25
+separates personality complementarity from different evidence classes; EXP-26 tests native
+typed control against transcript injection. [asserted] See
+`../10-research/agent-identity-and-collaboration.md`.
 
 ## Method note for the brainstorm
 

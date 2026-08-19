@@ -11,8 +11,9 @@ Interface (minimum viable, per architecture-sketch: "spawn, feed a ticket,
 collect a diff"):
 
     ticket  = {"id": str, "goal": str, "repo_dir": str, "timeout_s": int}
-    outcome = {"ticket_id", "agent", "ok", "diff", "tokens_in", "tokens_out",
-               "cost_usd", "duration_s", "raw_tail"}
+    outcome = {"ticket_id", "agent", "domain", "harness", "provider", "model",
+               "ok", "diff", "tokens_in", "tokens_out", "cost_usd",
+               "duration_s", "raw_tail"}
 
 Assumptions baked in (candidate breakage points for adapter #2):
   A1  the agent is invoked once per ticket, non-interactively, and exits
@@ -74,6 +75,10 @@ def run(ticket):
     return {
         "ticket_id": ticket["id"],
         "agent": "claude-code",
+        "domain": "coding",
+        "harness": "claude-code",
+        "provider": "anthropic-first-party",
+        "model": "unknown:not-recorded-by-adapter",
         "ok": proc.returncode == 0 and not result.get("is_error", False),
         "diff": diff,
         "tokens_in": tok_in,

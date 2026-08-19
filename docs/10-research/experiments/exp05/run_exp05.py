@@ -64,7 +64,33 @@ def verify(repo):
         text=True,
         encoding="utf-8",
     )
-    return {"passed": p.returncode == 0, "tail": (p.stdout or "")[-300:]}
+    status = subprocess.run(
+        [GIT, "status", "--porcelain", "--untracked-files=all"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+    changed = []
+    for line in status.splitlines():
+        path = line[3:].replace("\\", "/")
+        if path.startswith("__pycache__/") or path.startswith(".pytest_cache/"):
+            continue
+        changed.append(path)
+    changed = sorted(changed)
+    unexpected = [path for path in changed if path != "util.py"]
+    scope_passed = changed == ["util.py"]
+    tail = (p.stdout or "")[-300:]
+    if not scope_passed:
+        tail += f"\nartifact scope failed: changed={changed}"
+    return {
+        "passed": p.returncode == 0 and scope_passed,
+        "tests_passed": p.returncode == 0,
+        "changed_files": changed,
+        "unexpected_files": unexpected,
+        "tail": tail[-500:],
+    }
 
 
 if __name__ == "__main__":

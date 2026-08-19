@@ -1,6 +1,6 @@
 # 0001. Build a meta-harness above existing coding agents, not a standalone harness
 
-- **Status:** ACCEPTED
+- **Status:** SUPERSEDED IN PART by 0027
 - **Date:** 2026-08-19
 - **Deciders:** Joe Brown
 - **Inquiry tier reached:** T1 ground

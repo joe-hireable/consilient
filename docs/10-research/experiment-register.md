@@ -67,14 +67,22 @@ more sweep.
 The minimum harness needed to unblock most of these: **adapter for one agent + ticket store
 + trajectory log + verdict prompt.** Nothing else.
 
-### EXP-05 · Adapter surface across five backends `DONE 19 Aug 2026 — see experiments/exp05/findings-exp05.md`
+### EXP-05 · Adapter surface plus composition/control-path follow-ups `DONE 19 Aug 2026 — see experiments/exp05/findings-exp05.md`
 **Result:** Claude Code, Codex and Cursor passed a live ticket. Adapter #2 (Codex) did not
 force an interface redesign. Adapter #3 (Cursor) exposed a genuine namespace-dependent
 path question, absorbed by a per-adapter translation seam with four passing tests; its
 first live result also exposed input/output/cache usage fields. Adapters #4 (Ollama) and
-#5 (OpenRouter) fit the model-backed seam; Ollama completed a live run but failed
-verification, while OpenRouter remains blocked on a key for live validation. The stopping
-rule does not fire. [measured]
+#5 (OpenRouter) fit the common result shape but exposed that provider and coding harness
+must be recorded separately; Ollama completed a live run but failed verification. The
+Codex × OpenRouter composition failed before artefact production; a sixth,
+follow-up OpenCode × OpenRouter composition reached inference and passed functional tests
+in 24.1 seconds but failed the strengthened artefact-scope verifier after creating an
+unrequested test file. A seventh control path then drove the existing Cursor composition
+through ACP v1 over stdio in 29.7 seconds and passed the strengthened verifier. [measured]
+Antigravity 1.1.15 model discovery authenticated through a saved Google business/GCP
+profile, but a structured print-mode probe failed before inference with zero tokens and an
+empty-location error; model discovery alone is now a tested insufficient readiness signal.
+[measured] The original stopping rule does not fire. [measured]
 **Decides:** Q5, and the viability of ADR-0001.
 **Procedure:** write an adapter for Claude Code. Then write a second for Codex **without
 refactoring the first**. Record what the second breaks.
@@ -330,6 +338,153 @@ context; capacity left idle; and task completion.
 **Acceptance rule:** no hard-rule violation and false refusals at or below 20% in each
 class promotes ADR-0026 from PROVISIONAL. Hardware acceptance additionally requires the
 real 16 GB validation; the 5090 profile replay alone is `[simulated]`.
+
+### EXP-22 · Calibrate public benchmark priors against local verifier-labelled outcomes `BLOCKED: trajectory log + prior reader`
+**Decides:** ADR-0027 — whether OpenRouter's public benchmark records and automatic router
+earn quantitative weight, or remain candidate-discovery inputs and a baseline only.
+**Precondition:** a versioned OpenRouter Models/Benchmarks snapshot retaining source and
+`as_of`; at least six pinned models covering two provider families; a paired local probe;
+and verifier-labelled tasks from at least three task families. Raw benchmark records are
+not redistributed unless their licence permits it.
+**Procedure:**
+1. Freeze model candidates and benchmark priors before observing the held-out local tasks.
+2. Compare a flat prior, the sourced benchmark prior and OpenRouter's automatic cross-model
+   router against the same admitted candidate set and local verifier.
+3. Use leave-one-model-out evaluation so a candidate's local outcomes cannot train its own
+   prior. Record benchmark source/age, probes required to a stable verdict, final route,
+   verifier false admits, cost and elapsed time.
+4. Stop at 10 models, 60 paid task runs or £30 metered spend, whichever comes first. Reuse
+   existing subscription/local trajectories where composition and model identity are known.
+**Stopping rules (fixed before the run):**
+- A benchmark prior gains quantitative weight only if it reduces the median local probes to
+  the same stable routing verdict by at least 25% versus the flat prior, with no additional
+  false admits in the held-out cells. [asserted]
+- If benchmark provenance or `as_of` is absent for more than 20% of records used, the feed
+  remains discovery-only regardless of predictive result. [asserted]
+- If OpenRouter's automatic router produces any unattended false admit that Consilience's
+  β-gated route rejects, it remains advisory; if it matches every verdict and uses at least
+  20% less cost or elapsed time, ADR-0027's prohibition reopens. [asserted]
+- Hitting the run or spend cap without satisfying a promotion condition is an honest
+  “insufficient evidence”; it does not relax the local-probe boundary. [asserted]
+
+### EXP-23 · Verified value from expiring subscription capacity `BLOCKED: headroom readers + authorised backlog + four reset windows`
+**Decides:** ADR-0028 — whether reset-aware scheduling creates more accepted value from
+already-paid subscriptions and whether its plan-level advice is calibrated.
+**Precondition:** authoritative Claude and Codex headroom readers; timestamped Cursor
+dashboard observations; task-value and verifier fields; a user-authorised backlog; no
+metered overage or automatic credit top-up; and at least 20 eligible tasks across four
+reset windows.
+**Procedure:**
+1. Run the first two windows in shadow mode: rank the backlog one to two hours before reset
+   but do not change execution order. Record what the proposed queue would have displaced.
+2. If no hard-rule violation appears, run two live windows using only pre-authorised task
+   classes. Match each selected task to a comparable ordinary-scheduling task by task class,
+   estimated duration and verifier.
+3. Record accepted artefacts, human acceptance/undo, review minutes, rework, elapsed time,
+   subscription headroom consumed, capacity expired, high-value tasks deferred and metered
+   spend avoided. Raw tokens are diagnostic, not the value measure.
+4. Replay the recorded periods against current, lower and higher plan allowances and prices;
+   issue advice without changing a subscription.
+**Stopping rules (fixed before the run):**
+- Any autonomous task outside the authorised backlog, any bypass of a verifier/resource/
+  authority gate, or any metered overage immediately disables live reset scheduling.
+  [asserted]
+- Promotion requires at least 80% of reset-selected tasks to produce an accepted,
+  verifier-passing artefact and at least 20% higher accepted value per human review hour
+  than the matched ordinary-scheduling tasks, with no higher-priority task delayed past its
+  deadline. Otherwise headroom remains admission/advice data only. [asserted]
+- Raw utilisation without positive accepted value never counts as success. [asserted]
+- Downgrade/cancel advice requires three complete periods below 40% authoritative
+  utilisation and incremental accepted value below the lower-plan price difference.
+  Upgrade advice requires three complete periods at or above 90% plus either at least three
+  high-value tasks deferred per period or verified metered overflow above the price
+  difference. Any false recommendation reopens these thresholds. [asserted]
+- A missing authoritative headroom series makes that provider advisory-only rather than an
+  imputed success. [asserted]
+
+### EXP-24 · Stable logical identity and provenance comprehension `BLOCKED: event-schema prototype + blind human sample`
+**Decides:** whether the identity structure in `agent-identity-and-collaboration.md` earns
+v0 scope, or whether runtime-session identity plus ordinary provenance is sufficient.
+**Precondition:** a read-only event/identity prototype; 24 seeded multi-harness trajectories
+containing model changes, restarts, handoffs, authority changes and two deliberately
+confusable display names; at least 12 blind human participants who did not author the
+traces; fixed questions and scoring before exposure.
+**Procedure:** within participant, counterbalance two presentations of matched traces:
+(A) provider/session/runtime labels only; (B) stable logical agent ID plus explicit runtime,
+role, authority and W3C-PROV-style activity/entity links. Ask who made each claim, which
+principal authorised it, which runtime produced the artefact, who currently holds the
+write lease and where the supporting evidence resides. Include one simulated recovery from
+a crashed runtime in each condition. Do not add personality or avatar cues.
+**Measures:** attribution error; authority error; evidence-location error; recovery error;
+answer time; confidence calibration; record bytes and rendered cognitive load.
+**Stopping rules (fixed before the run):**
+- Stable logical identity enters the draft v0 specification only if condition B cuts the
+  combined attribution/authority/evidence-location error rate by at least 40% across at
+  least 20 complete paired traces, with no credential/authority confusion introduced and
+  median answer time no more than 20% worse. [asserted]
+- Any condition in which a display name is mistaken for authority or credential ownership
+  in more than 5% of decisions requires the UI to place principal and authority adjacent
+  to the name; identity remains advisory until that variant is re-run. [asserted]
+- If the error reduction is below 15%, stable logical identity does not earn v0 complexity;
+  retain runtime IDs and provenance links and defer cross-runtime continuity. [asserted]
+- Results between 15% and 40%, or fewer than 20 complete paired traces, are “insufficient
+  evidence”; thresholds do not move. [asserted]
+
+### EXP-25 · Persona complementarity versus evidence diversity `BLOCKED: identity prompt fixtures + two model families`
+**Decides:** whether complementary display/behaviour personas improve work, or whether the
+effect attributed to personality is actually task/evidence diversity under ADR-0010.
+**Precondition:** 40 verifier-labelled tasks from at least four task families; two model
+families; fixed token budgets; source partitions that are genuinely non-overlapping; one
+frozen set of three personas selected before outcomes are observed.
+**Procedure:** factorial comparison, randomised within task: (A) one neutral agent with all
+evidence; (B) three “complementary” personas with the same evidence; (C) three neutral
+agents each receiving a distinct evidence class; (D) the same distinct evidence classes
+plus the personas. Merge all multi-agent conditions with the same structured evidence
+record and verifier. Blind the final judge to condition.
+**Measures:** verifier acceptance; false accepts on seeded traps; distinct relevant facts
+recovered; contradictions preserved; human edit/review time; tokens; elapsed time; persona
+adherence as a diagnostic only.
+**Stopping rules (fixed before the run):**
+- Personas earn any performance role only if B exceeds A and D exceeds C by at least 10
+  percentage points in verifier-accepted outcomes in each model family, with no additional
+  false accept, no loss of evidence-bearing dissent and at most 20% additional tokens.
+  [asserted]
+- If C exceeds B by at least 10 points while D does not exceed C, personality is removed
+  from the performance architecture and retained only as an optional UX layer. [asserted]
+- Any persona condition that increases false accepts by two or more cases, or suppresses
+  seeded dissent in more than 5% of tasks, fails immediately for unattended work.
+  [asserted]
+- Hitting 40 tasks without either promotion condition is an honest null/inconclusive
+  result; do not tune personas on the test set. [asserted]
+
+### EXP-26 · Typed native control versus transcript injection `BLOCKED: coordinator event prototype + three live adapters`
+**Decides:** the real-time control section of `agent-identity-and-collaboration.md` — whether
+Consilience needs typed `context_next`/`steer`/`interrupt` commands and staged ACKs in v0.
+**Precondition:** a coordinator inbox/outbox prototype; Codex app-server plus at least two
+of Cursor ACP, OpenCode server and a subscription-safe Claude Code control path; 30 fixture
+runs whose next invalid action is observable; no metered fallback.
+**Procedure:** at fixed execution milestones, send an evidence update that either augments
+the next step, redirects the active turn or requires interruption. Compare each adapter's
+strongest documented typed operation with a control that places equivalent prose into a
+chat/transcript for the next turn. Use command IDs, expected turn/session IDs and delivery/
+application ACKs. Seed duplicate delivery, stale turn IDs, adapter restart and late
+arrival. Never inject hidden model context as a substitute for a failed command.
+**Measures:** accepted/delivered/applied/completed ACK latency; update incorporated before
+the invalid action; duplicate execution; stale-command rejection; discarded work; tokens;
+elapsed time; recovery after restart.
+**Stopping rules (fixed before the run):**
+- Any critical typed update reported `applied` but not incorporated before the seeded
+  invalid action makes that adapter ineligible for unattended same-turn steering until the
+  ACK boundary is fixed and re-run. [asserted]
+- Typed control becomes a v0 invariant only if at least two adapters complete 10 paired
+  runs each with zero lost/duplicated critical updates and at least 25% less discarded work
+  than transcript injection; token change is recorded but is not a promotion substitute.
+  [asserted]
+- If transcript injection matches typed control within 5% on incorporation and discarded
+  work while using no more tokens in every tested adapter, typed same-turn steering is
+  deferred; retain interrupt and next-turn context only. [asserted]
+- Unsupported native semantics are recorded as `unsupported`, not scored as a failed
+  approximation. Fewer than two eligible adapters is “insufficient evidence”. [asserted]
 
 ### EXP-19 · Feedback-prompt completion rate over time `BLOCKED: feedback prompts (v1+)`
 **Decides:** whether the outcome-feedback friction budget

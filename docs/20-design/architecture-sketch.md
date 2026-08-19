@@ -15,23 +15,27 @@ from that measurement.
 
 ## Domain posture (added 19 Aug 2026)
 
-The harness is **domain-blind**. It orchestrates any agentic work — chats, projects,
-tasks, scheduled and background runs, parallel workflows (`work-modes.md`) — through two
-execution paths:
+The harness is **domain-blind**. It records every routable action as the explicit
+`(domain, execution harness, provider, model)` composition from ADR-0027. [asserted]
+The domain supplies the task and verifier contract; an existing execution harness supplies
+tools, permissions and artefact production; the provider supplies inference transport and
+accounting; the model is the measured capability target. [asserted]
 
-- **Delegated:** hand the task to whatever agent the user favours (Claude Code with their
-  own credentials, Codex, Antigravity, any other). Context discipline is inherited there
-  (Claude Code ships MCP tool search natively since v2.1.7 — `context-loading.md`).
-- **Native:** execute directly against open models via OpenRouter or locally, with the
-  harness supplying tools, skills, MCPs and context management (`capability-layer.md`,
-  `context-loading.md`).
+For coding, OpenCode is the fallback harness when no vendor-native frontier harness is
+authenticated. [asserted] Claude Code, Codex and Cursor are eligible only after an
+authentication check; Antigravity additionally requires a verified plan/quota snapshot
+and successful structured execution probe. [asserted] OpenRouter is a provider beneath
+OpenCode or another harness, and remains directly reusable for non-coding work; it is not
+itself labelled a coding agent. [asserted] Antigravity with Google-plan capacity, direct
+Gemini API access and OpenRouter-hosted Gemini remain separate compositions and ledgers.
+[asserted]
 
-**One loader, task-appropriate context, no per-domain variants.** There is no "code mode"
-and no "document mode"; a mode is a scheduling pattern, not an architecture
-(`work-modes.md`). Coding is v0 because it is the only domain with a cheap automated
-oracle — tests, typecheck, build — so it is where β can actually be measured. That is a
-measurement decision, not an architectural one. Whether β survives outside coding is
-**Q24**, and the architecture has no centre in oracle-free domains until it is answered.
+**One orchestration core, task-appropriate context, domain-owned verifier contracts.**
+[asserted] A mode is a scheduling pattern rather than an execution identity
+(`work-modes.md`). [asserted] Coding is v0 because it supplies cheap automated oracles —
+tests, typecheck and build — against which β can be measured. [asserted] Whether β survives
+outside coding is **Q24**, and the architecture has no measured centre in oracle-free
+domains until it is answered. [asserted]
 
 ## The five components, and nothing else
 
@@ -49,9 +53,13 @@ per check class (Q10); whether cheap proxy labels (reverted commits, follow-up f
 escaped bugs) can substitute for human verdicts.
 
 ### 2. The cascade
-Cheap → verify → mid → verify → frontier. Three tiers minimum (`findings.md` §3).
+Admit feasible resources → cheap → verify → mid → verify → frontier. Three capability
+tiers remain the starting hypothesis (`findings.md` §3). [asserted]
 Escalation on verifier failure, never on self-reported confidence (D12).
 No learned prior in v0 (D6) — revisit only if escalation wall-clock cost proves ≥2× (§4a).
+Included subscriptions and metered providers use separate ledgers: reset-aware allocation
+maximises incremental verified value, while metered calls retain hard monetary caps
+(ADR-0026, ADR-0028). [asserted]
 
 ### 3. The ticket store
 Native, agent-first, local-first. Git-backed or SQLite — **undecided (Q6)**.
@@ -79,7 +87,8 @@ measures both.
 
 Learned router · trajectory corpus as an asset · debate / model battling · RL ·
 multi-channel access · voice · on-device models · self-updating model catalogue ·
-autonomous spending · CASB / ToS scanning / compliance trails · the Inquiry tier (Q14).
+autonomous unbounded spending · CASB / ToS scanning / compliance trails · the Inquiry tier
+(Q14).
 
 Each of these was argued through and cut or deferred. See `decisions-so-far.md`.
 

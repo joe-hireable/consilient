@@ -2,6 +2,10 @@
  {
   "ticket_id": "smoke-claude",
   "agent": "claude-code",
+  "domain": "coding",
+  "harness": "claude-code",
+  "provider": "anthropic-first-party",
+  "model": "unknown:not-recorded-by-adapter",
   "ok": true,
   "tokens_in": 8,
   "tokens_out": 458,
@@ -17,6 +21,10 @@
  {
   "ticket_id": "smoke-codex",
   "agent": "codex",
+  "domain": "coding",
+  "harness": "codex",
+  "provider": "openai-subscription",
+  "model": "unknown:not-recorded-by-adapter",
   "ok": true,
   "tokens_in": 87356,
   "tokens_out": 335,
@@ -32,7 +40,11 @@
  },
  {
   "ticket_id": "smoke-ollama:qwen3:8b",
-  "agent": "ollama:qwen3:8b",
+  "agent": "codex+ollama:qwen3:8b",
+  "domain": "coding",
+  "harness": "codex",
+  "provider": "ollama",
+  "model": "qwen3:8b",
   "ok": true,
   "tokens_in": 559095,
   "tokens_out": 9005,
@@ -48,6 +60,10 @@
  {
   "ticket_id": "smoke-cursor",
   "agent": "cursor",
+  "domain": "coding",
+  "harness": "cursor",
+  "provider": "cursor-subscription",
+  "model": "unknown:not-recorded-by-adapter",
   "ok": true,
   "tokens_in": 74781,
   "tokens_out": 918,
@@ -61,5 +77,92 @@
    "tail": "..                                                                       [100%]\n2 passed in 0.01s\n"
   },
   "repo": "C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_voerm79w"
+ },
+ {
+  "ticket_id": "smoke-openrouter:qwen/qwen3-coder",
+  "agent": "codex+openrouter:qwen/qwen3-coder",
+  "domain": "coding",
+  "harness": "codex",
+  "provider": "openrouter",
+  "model": "qwen/qwen3-coder",
+  "ok": false,
+  "tokens_in": null,
+  "tokens_out": null,
+  "cost_usd": null,
+  "provider_usage_immediate_usd": 0,
+  "provider_usage_delayed_cumulative_usd": 0.045138255,
+  "provider_cost_attribution": "unresolved across earlier Codex attempts and the later OpenCode session",
+  "duration_s": 100.9,
+  "raw_tail": "{\"error\": {\"message\": \"Server tool request failed\"}, \"type\": \"turn.failed\"}",
+  "errors": [
+   "{\"message\": \"Server tool request failed\", \"type\": \"error\"}",
+   "{\"error\": {\"message\": \"Server tool request failed\"}, \"type\": \"turn.failed\"}"
+  ],
+  "return_code": 1,
+  "verifier": {
+   "passed": false,
+   "tail": "tError: cannot import name 'add' from 'util' (C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_u1yoi9n3\\util.py)\n=========================== short test summary info ===========================\nERROR test_util.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s\n"
+  },
+  "repo": "C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_u1yoi9n3"
+ },
+ {
+  "ticket_id": "smoke-opencode+openrouter:qwen/qwen3-coder",
+  "agent": "opencode+openrouter:qwen/qwen3-coder",
+  "domain": "coding",
+  "harness": "opencode",
+  "provider": "openrouter",
+  "model": "qwen/qwen3-coder",
+  "ok": true,
+  "tokens_in": 40918,
+  "tokens_out": 738,
+  "cache_read_tokens": 40138,
+  "cache_write_tokens": 0,
+  "cost_usd": 0.0170272,
+  "cost_source": "opencode-session-events",
+  "provider_usage_immediate_usd": 0,
+  "provider_usage_delayed_cumulative_usd": 0.045138255,
+  "provider_cost_attribution": "unresolved across earlier Codex attempts and this OpenCode session",
+  "duration_s": 24.1,
+  "raw_tail": " tests pass.\",\"time\":{\"start\":1787169639146,\"end\":1787169639624}}}\n{\"type\":\"step_finish\",\"timestamp\":1787169639675,\"sessionID\":\"ses_fe463cc0dffe3ENDv7uTrrxAbm\",\"part\":{\"id\":\"prt_01b9c8cf8001e3VaQh9BbG8TmT\",\"reason\":\"stop\",\"snapshot\":\"e33d58e7ca42cc4f8fe154f645dff66155b5a965\",\"messageID\":\"msg_01b9c8644001Bn80mjE5FTg3HB\",\"sessionID\":\"ses_fe463cc0dffe3ENDv7uTrrxAbm\",\"type\":\"step-finish\",\"tokens\":{\"total\":8717,\"input\":71,\"output\":102,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":8544}},\"cost\":0.0009777}}\n",
+  "errors": [],
+  "return_code": 0,
+  "verifier": {
+   "passed": false,
+   "tests_passed": true,
+   "changed_files": [
+    "test_runner.py",
+    "util.py"
+   ],
+   "unexpected_files": [
+    "test_runner.py"
+   ],
+   "tail": "....                                                                     [100%]\n4 passed in 0.01s\n\nartifact scope failed: changed=['test_runner.py', 'util.py']"
+  },
+  "repo": "C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_sc2nv2jc"
+ },
+ {
+  "ticket_id": "smoke-cursor-acp",
+  "agent": "cursor-acp",
+  "domain": "coding",
+  "harness": "cursor",
+  "provider": "cursor-subscription",
+  "model": "unknown:not-recorded-by-adapter",
+  "control_protocol": "acp-v1-stdio",
+  "ok": true,
+  "tokens_in": null,
+  "tokens_out": null,
+  "cost_usd": null,
+  "duration_s": 29.7,
+  "raw_tail": "\"Allow once\",\"kind\":\"allow_once\"},{\"optionId\":\"allow-always\",\"name\":\"Allow always\",\"kind\":\"allow_always\"},{\"optionId\":\"reject-once\",\"name\":\"Reject\",\"kind\":\"reject_once\"}]},{\"sessionId\":\"74a9142a-4e3f-4f0a-9387-507c2f0d80fd\",\"toolCall\":{\"toolCallId\":\"call-b75324a4-85d9-45cb-8a08-4a792d8e7a8e-5\\nfc_3cd0ee6a-e64b-972d-b95d-6e3b61f40aad_0\",\"title\":\"`python3 -c \\\"from test_util import test_multiply, test_add; test_multiply(); test_add(); print('ok')\\\"`\",\"kind\":\"execute\",\"status\":\"pending\",\"content\":[{\"type\":\"content\",\"content\":{\"type\":\"text\",\"text\":\"Not in allowlist: python3\"}}]},\"options\":[{\"optionId\":\"allow-once\",\"name\":\"Allow once\",\"kind\":\"allow_once\"},{\"optionId\":\"allow-always\",\"name\":\"Allow always\",\"kind\":\"allow_always\"},{\"optionId\":\"reject-once\",\"name\":\"Reject\",\"kind\":\"reject_once\"}]}],\"agent_text\":\"I'll inspect `test_util.py` and `util.py`, then add only `add(a, b)` so the tests pass.`add(a, b)` is now in `util.py` and returns `a + b`. Both tests in `test_util.py` pass.\",\"stderr\":\"\"}",
+  "verifier": {
+   "passed": true,
+   "tests_passed": true,
+   "changed_files": [
+    "util.py"
+   ],
+   "unexpected_files": [],
+   "tail": "..                                                                       [100%]\n2 passed in 0.01s\n"
+  },
+  "repo": "C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp05_a8yo1l4e"
  }
 ]

@@ -84,6 +84,10 @@ def run(ticket):
     return {
         "ticket_id": ticket["id"],
         "agent": "codex",
+        "domain": "coding",
+        "harness": "codex",
+        "provider": "openai-subscription",
+        "model": "unknown:not-recorded-by-adapter",
         "ok": proc.returncode == 0,
         "diff": diff,
         "tokens_in": tok_in,

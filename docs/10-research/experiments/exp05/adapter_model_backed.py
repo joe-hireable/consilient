@@ -1,27 +1,19 @@
 """
-EXP-05 adapters #4 and #5: local models (Ollama) and OpenRouter — both driven
-through the Codex harness rather than a loop of our own.
+EXP-05 coding compositions #4 and #5: the Codex execution harness over local
+Ollama and the OpenRouter provider.
 
-    run_local(ticket, model)       -> Ollama on this machine, £0
-    run_openrouter(ticket, model)  -> any OpenRouter model, metered
+    run_local(ticket, model)       -> Codex × Ollama × local model, £0
+    run_openrouter(ticket, model)  -> Codex × OpenRouter × model, metered
 
-THE FINDING THIS FILE EXISTS TO RECORD, and it is the most consequential one in
-EXP-05 so far:
+THE CORRECTION THIS FILE EXISTS TO RECORD:
 
-    The architecture sketch splits execution into "delegated" (hand the task to
-    someone's agent) and "native" (the harness runs its own loop against an open
-    model). Codex collapses that split: `codex exec --oss --local-provider
-    ollama` and a custom `model_providers` entry pointing at OpenRouter both give
-    a full agent loop — tools, file edits, sandboxing — over an arbitrary model,
-    for free.
+    Codex is the execution harness in both functions. Ollama and OpenRouter are
+    providers, not coding agents. These compositions are valid coding backends,
+    but they do not make OpenRouter itself a coding harness and they say nothing
+    about a standalone OpenRouter provider path for non-coding tasks. ADR-0027
+    records the domain × harness × provider × model split.
 
-    So the harness may never need to BUILD a native loop. It needs a *provider
-    seam* inside an adapter it already has. That is ADR-0005's "wrap, don't
-    build" arriving one layer higher than expected, and it is worth an explicit
-    architecture-sketch amendment: "native execution" is a PROVIDER CHOICE, not
-    a second execution path.
-
-    Honest caveat: this makes the cheap tier inherit Codex's harness quality,
+    Honest caveat: these runs make the cheap tier inherit Codex's harness quality,
     which is a confound for any cascade measurement — cheap-vs-frontier would
     then compare MODELS with the harness held constant (good for ADR-0025's
     probe, which wants exactly that) but would NOT tell us how a cheap model
@@ -41,45 +33,78 @@ CODEX = shutil.which("codex")
 GIT = shutil.which("git")
 
 
-def _run_codex(ticket, extra_args, agent_name):
+def codex_command(ticket, extra_args, last_msg):
+    """Build an isolated Codex command for a scratch experimental repository."""
+    return [
+        CODEX,
+        "exec",
+        ticket["goal"],
+        "--json",
+        "-C",
+        ticket["repo_dir"],
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--ephemeral",
+        "--ignore-user-config",
+        "-o",
+        str(last_msg),
+    ] + extra_args
+
+
+def composition(provider, model):
+    return {
+        "agent": f"codex+{provider}:{model}",
+        "domain": "coding",
+        "harness": "codex",
+        "provider": provider,
+        "model": model,
+    }
+
+
+def codex_run_options(ticket):
+    """Non-interactive execution must not inherit an open stdin pipe."""
+    return {
+        "stdin": subprocess.DEVNULL,
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+        "errors": "replace",
+        "timeout": ticket.get("timeout_s", 900),
+    }
+
+
+def parse_codex_events(stdout):
+    """Extract usage and structured failure events from Codex JSONL."""
+    tok_in = tok_out = None
+    errors = []
+    for line in (stdout or "").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        message = event.get("msg", event)
+        event_type = str(event.get("type", message.get("type", ""))).lower()
+        if "error" in event_type or "fail" in event_type:
+            errors.append(json.dumps(event, sort_keys=True)[-1000:])
+        info = message.get("info") or message.get("usage") or {}
+        if isinstance(info, dict):
+            total = info.get("total_token_usage") or info
+            tok_in = total.get("input_tokens", tok_in)
+            tok_out = total.get("output_tokens", tok_out)
+    return tok_in, tok_out, errors
+
+
+def _run_codex(ticket, extra_args, provider, model):
     if not CODEX:
         raise RuntimeError("codex CLI not found on PATH")
     last_msg = Path(tempfile.mkstemp(prefix="codex_last_", suffix=".txt")[1])
     t0 = time.time()
     proc = subprocess.run(
-        [
-            CODEX,
-            "exec",
-            ticket["goal"],
-            "--json",
-            "-C",
-            ticket["repo_dir"],
-            "--dangerously-bypass-approvals-and-sandbox",
-            "--ephemeral",
-            "-o",
-            str(last_msg),
-        ]
-        + extra_args,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=ticket.get("timeout_s", 900),
+        codex_command(ticket, extra_args, last_msg),
+        **codex_run_options(ticket),
     )
     duration = time.time() - t0
 
-    tok_in = tok_out = None
-    for line in (proc.stdout or "").splitlines():
-        try:
-            ev = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        msg = ev.get("msg", ev)
-        info = msg.get("info") or msg.get("usage") or {}
-        if isinstance(info, dict):
-            ti = info.get("total_token_usage") or info
-            tok_in = ti.get("input_tokens", tok_in)
-            tok_out = ti.get("output_tokens", tok_out)
+    tok_in, tok_out, errors = parse_codex_events(proc.stdout)
 
     diff = subprocess.run(
         [GIT, "diff"],
@@ -92,14 +117,18 @@ def _run_codex(ticket, extra_args, agent_name):
 
     return {
         "ticket_id": ticket["id"],
-        "agent": agent_name,
+        **composition(provider, model),
         "ok": proc.returncode == 0,
         "diff": diff,
         "tokens_in": tok_in,
         "tokens_out": tok_out,
         "cost_usd": None,
         "duration_s": round(duration, 1),
-        "raw_tail": (final or proc.stderr or "")[-500:],
+        "raw_tail": (final or (errors[-1] if errors else "") or proc.stderr or proc.stdout or "")[
+            -500:
+        ],
+        "errors": errors[:3],
+        "return_code": proc.returncode,
     }
 
 
@@ -108,7 +137,8 @@ def run_local(ticket, model="qwen3:8b"):
     return _run_codex(
         ticket,
         ["--oss", "--local-provider", "ollama", "-m", model],
-        f"ollama:{model}",
+        "ollama",
+        model,
     )
 
 
@@ -130,7 +160,8 @@ def run_openrouter(ticket, model="qwen/qwen3-coder"):
             "-m",
             model,
         ],
-        f"openrouter:{model}",
+        "openrouter",
+        model,
     )
 
 

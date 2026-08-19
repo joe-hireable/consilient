@@ -1,6 +1,6 @@
 # Decision index
 
-26 ADRs, 19 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+28 ADRs, 19 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED
@@ -13,7 +13,7 @@ Read these before anything else. Everything downstream depends on them.
 |---|---|---|
 | [0002](0002-organise-around-beta-verifier-false-accept-rate.md) | **Organise the system around β**, the verifier false-accept rate. Contains the closed form β\* = (1−α)·e^(−kΔ) and the distribution-free result. | 🟡 |
 | [0010](0010-name-the-different-class-of-facts.md) | **Every multi-agent structure must name its different class of facts.** The theorem. | ✅ |
-| [0001](0001-build-a-meta-harness-not-a-harness.md) | Build a **meta-harness**, not a harness. | ✅ |
+| [0027](0027-compose-domain-harness-provider-and-model.md) | **Compose domain, execution harness, provider and model separately**; public benchmarks are priors, local outcomes decide. | 🟡 |
 | [0018](0018-self-modification-gated-by-measured-verifier.md) | **Self-modification gated by measured verifier reliability.** The project's likely novel contribution. | 📋 |
 
 ## Architecture
@@ -21,6 +21,7 @@ Read these before anything else. Everything downstream depends on them.
 | # | Decision | Status |
 |---|---|---|
 | [0003](0003-no-learned-routing-policy-in-v0.md) | No learned routing policy in v0 | ✅ |
+| [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary) | ⛔ |
 | [0005](0005-local-model-library-with-hardware-gating.md) | Local model library with hardware gating (superseded by 0026) | ⛔ |
 | [0006](0006-ticket-store-sqlite-plus-git-log.md) | Ticket store: SQLite for coordination, append-only JSONL in git for the record | ✅ |
 | [0007](0007-cli-only-no-review-surface.md) | CLI only, and **build no review surface** | ✅ |
@@ -29,7 +30,9 @@ Read these before anything else. Everything downstream depends on them.
 | [0012](0012-composite-beta-with-per-check-diagnostics.md) | Measure composite β directly; per-check as diagnostics | ✅ |
 | [0020](0020-meetings-and-authority-matrix.md) | **Meetings + the Owner/Evidence authority matrix** | 📋 |
 | [0025](0025-model-discovery-and-capability-probing.md) | Model discovery + capability probing; GNNs considered and rejected with reopen conditions | 📋 |
-| [0026](0026-admit-only-budget-and-hardware-feasible-backends.md) | **Admit only budget- and hardware-feasible backends to routing**; subscription headroom, hard metered caps and pre-download local-fit vetoes | 🟡 |
+| [0026](0026-admit-only-budget-and-hardware-feasible-backends.md) | **Admit only budget- and hardware-feasible backends to routing**; superseded in part by 0028's subscription allocation | 🟡 |
+| [0027](0027-compose-domain-harness-provider-and-model.md) | **Compose domain, execution harness, provider and model separately**; OpenRouter is a standalone provider | 🟡 |
+| [0028](0028-optimise-expiring-subscription-capacity-for-verified-value.md) | **Allocate expiring included subscription capacity by incremental verified value**; never burn quota for its own sake | 🟡 |
 
 ## Behaviour and safety
 
@@ -70,4 +73,6 @@ to every ADR and every PR:
 - **0008** — trademark clearance on "Consilience" not yet run.
 - **0002, 0009** — PROVISIONAL pending EXP-01 and EXP-06.
 - **0026** — PROVISIONAL pending EXP-21.
+- **0027** — PROVISIONAL pending EXP-22.
+- **0028** — PROVISIONAL pending EXP-23.
 - **0018** — decision 2 conditional on EXP-12 *and* EXP-13.

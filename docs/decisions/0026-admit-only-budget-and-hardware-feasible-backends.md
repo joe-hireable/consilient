@@ -1,6 +1,6 @@
 # 0026. Admit only budget- and hardware-feasible backends to routing
 
-- **Status:** PROVISIONAL
+- **Status:** PROVISIONAL — superseded in part by ADR-0028's subscription-allocation rule
 - **Date:** 2026-08-19
 - **Deciders:** Joe Brown
 - **Supersedes:** ADR-0005
@@ -80,6 +80,7 @@ three vendors share one quota unit. [asserted]
 | Claude Code | Status-line JSON provides five-hour and seven-day `used_percentage` and `resets_at`. [cited] | Fields appear only for subscribers after a response and can be stale across concurrent sessions. [cited] | Persist the last observation, reserve the worst recent comparable percentage increment until reset, and exclude Claude from unattended routing when no conservative lower bound remains. [asserted] |
 | Codex | App-server `account/rateLimits/read` returns used percentage, reset time and window duration; a local authenticated query returned the structured windows. [measured] | The ordinary top-level CLI help has no quota command. [measured] | Read app-server headroom immediately before reservation and record the snapshot in the trajectory log. [asserted] |
 | Cursor | Installed CLI `status` reports authentication and `about` reports product information; neither exposed individual usage. [measured] | Official individual-plan material reviewed on 19 August exposes usage in the dashboard, while the documented Admin API is for teams. [cited] | Use the last user/dashboard snapshot plus trajectory-log accounting and the billing reset window; mark the estimate explicitly. Exclude Cursor from unattended routing when the lower bound is unknown. [asserted] |
+| Antigravity | CLI status-line JSON can expose `plan_tier` and per-bucket `remaining_fraction`, `reset_time` and `reset_in_seconds`; `/usage` refreshes the interactive quota view. [cited] | The installed 1.1.15 CLI authenticated a saved Google business/GCP profile and listed models, but its print-mode probe failed before inference; plan tier and usable headroom remain unverified. [measured] | Require a fresh live plan/quota snapshot, a successful structured execution probe and `useG1Credits=false`. Treat Plus, Pro, Ultra and unknown as reported tiers, not inferred entitlements; exclude the composition while any field is unknown. [asserted] |
 
 Local accounting never upgrades an estimate to provider truth because usage outside the
 harness can consume the same subscription. [asserted] The trajectory log stores source,
@@ -152,6 +153,12 @@ formats, and verify a published content hash when one is available. [asserted]
   `account/rateLimits/read`.
 - `[cited]` Cursor's CLI reference defines `status` as authentication status, while its
   individual pricing documentation directs usage management to the account surface.
+- `[cited]` Antigravity's status-line schema exposes plan tier and quota/reset fields;
+  its plan documentation gives Pro and Ultra five-hour baseline refreshes and other plans
+  weekly baseline limits, while the CLI credit-fallback setting defaults false.
+- `[measured]` Antigravity 1.1.15 listed eleven Gemini model choices through the saved
+  keyring identity, but a structured print probe selected the requested model and then
+  failed before inference with zero tokens and `invalid location: ""`.
 - `[cited]` OpenRouter's credits and management-key documentation exposes provider-side
   limits and reset periods.
 - `[cited]` Khan (2026), *Token Budgets: An Empirical Catalog of 63 LLM-Agent
@@ -171,6 +178,8 @@ formats, and verify a published content hash when one is available. [asserted]
 - `[measured]` Cursor supplied no machine-readable individual headroom in the surfaces
   inspected. A local ledger cannot observe usage from Cursor's desktop app or other
   machines.
+- `[measured]` Antigravity model discovery did not establish plan-backed execution
+  readiness on the measured Google business/GCP identity.
 - `[cited]` Provider-side caps are stronger than client estimates where available, which
   means the harness remains dependent on provider semantics and availability.
 - `[cited]` Khan's 63 incidents are a convenience, failure-confirming sample. They show

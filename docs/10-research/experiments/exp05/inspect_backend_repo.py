@@ -36,4 +36,6 @@ def main(agent):
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1] if len(sys.argv) > 1 else "ollama:qwen3:8b"))
+    raise SystemExit(
+        main(sys.argv[1] if len(sys.argv) > 1 else "codex+ollama:qwen3:8b")
+    )

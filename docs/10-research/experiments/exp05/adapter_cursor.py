@@ -96,6 +96,10 @@ def run(ticket):
     return {
         "ticket_id": ticket["id"],
         "agent": "cursor",
+        "domain": "coding",
+        "harness": "cursor",
+        "provider": "cursor-subscription",
+        "model": "unknown:not-recorded-by-adapter",
         "ok": proc.returncode == 0 and not result.get("is_error", False),
         "diff": diff,
         **usage,
