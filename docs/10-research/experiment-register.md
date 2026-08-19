@@ -60,7 +60,12 @@ more sweep.
 The minimum harness needed to unblock most of these: **adapter for one agent + ticket store
 + trajectory log + verdict prompt.** Nothing else.
 
-### EXP-05 · Adapter surface across four CLIs `BLOCKED: nothing — do this first`
+### EXP-05 · Adapter surface across four CLIs `PARTIALLY DONE 19 Aug 2026 — see experiments/exp05/findings-exp05.md`
+**Result so far:** adapter #2 (Codex) did **not** force an interface redesign — the
+stopping rule does not fire on this evidence — but 4 of 6 baked assumptions broke inside
+the adapter (result channel, cost accounting, permission model, working-root semantics).
+Cost/token fields are per-adapter-approximate; no common accounting contract exists.
+Remaining: live Codex run (blocked on interactive `codex login`), adapter #3.
 **Decides:** Q5, and the viability of ADR-0001.
 **Procedure:** write an adapter for Claude Code. Then write a second for Codex **without
 refactoring the first**. Record what the second breaks.
