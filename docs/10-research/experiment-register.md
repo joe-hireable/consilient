@@ -1829,6 +1829,75 @@ self-adjudicated corpus is echo (ADR-0010).
   see those; only P2's hand audit found any.
 
 
+### EXP-54 · Does a log-anchored view checker catch known-invalid projections, or is that just a missing test? `READY`
+**Pre-registered 20 August 2026, before any view-mutant was generated. Proposed in
+`interface-beta-2026-08-20.md`. Not run.**
+**Decides:** whether the decidable class that note names — a view that disagrees with the
+trajectory log — is large enough and weakly-enough guarded to be worth treating as a check
+with its own β, or whether it collapses to "write the tests V0-14 already claimed". It is
+registered because one fixture is an existence proof (human `consil beta` drops a quarantine
+that `--json` reports) and a rate needs a census, and because the tempting move is to name
+the rate "interface-β". **The stopping rules include the result that forbids that name.**
+**Precondition:** none. Fixture logs under a temp directory; `consil beta`, `consil replay`
+and `consil doctor` as they stand; no front end, no new dependency, no metered call. The
+operator catalogue is the ten named in `interface-beta-2026-08-20.md` §2 and is **closed
+when this entry is committed**. Adding an operator after the run starts is a different
+experiment.
+**Design — two arms over the same logs and the same operators:**
+
+| arm | view | what it isolates |
+|---|---|---|
+| **J** | `consil <cmd> --json` payload | the machine-readable contract V0-14 already tests, weakly |
+| **H** | a structured parse of human stdout for the same command | the form a person actually sees, which EXP-47 found the suite does not look at |
+
+A later arm D (DOM or accessibility tree of a graphical surface) is out of scope until
+ADR-0007 is superseded. It is not a third arm of this run.
+**Procedure (fixed):**
+1. Build a small bank of fixture logs that exercise the fields the operators touch:
+   insufficient β, measured β (synthetic rows, $n \ge 30$), a quarantined line, a
+   `HUMAN_ONLY` event with `via: slack` that `validate()` would refuse, a doctor run whose
+   gates are not all `pass`. The fixtures are written before any mutant is applied.
+2. Render the honest view on each arm.
+3. Apply each operator once per fixture, producing a known-invalid view. Record
+   equivalence when the surface cannot express the mutated field (the human `beta` line
+   cannot show a point it does not print; that is equivalent, not a survivor).
+4. Run a checker specified *before* step 3. The checker may read the view and the log. It
+   may not read renderer source, and it may not diff against the honest view as an expected
+   value — that would be state-anchoring. Its rule is: every field the view asserts must be
+   implied by the log, and every refusal the log recorded must appear where the view
+   reports the rate or the gate that depends on that log.
+5. Separately, run the existing pytest suite against the same invalid views, as a control:
+   if pytest already kills a live operator, the operator is a missing assertion in a test
+   that exists, not evidence of an unmeasured quantity.
+**Measures:** $\hat{\beta}_J$ and $\hat{\beta}_H$ with Wilson 95% intervals, over
+non-equivalent view-mutants only; live-operator count per arm; the fraction of live
+operators the existing suite already kills; whether tonight's quarantine hole is unique or
+modal.
+**Stopping rules (fixed before the run):**
+- If both arms' corrected β lie **below 0.05**, or arm H has **fewer than five live
+  operators** $\implies$ **there is no quantity to name.** The decidable class is a test
+  file. Write the checks, including the quarantine assertion on human `beta`. Do not call
+  anything interface-β. **This is the result that goes against treating the class as a
+  research object, and it is the expected one.** [asserted]
+- If arm J's interval lies entirely **below** 0.05 and arm H's lies entirely **above** 0.20
+  $\implies$ **V0-14 is a claim, not a check.** JSON is guarded, the human-visible form is
+  not. Any future surface must run the log-anchored checker against whatever a person sees,
+  not only against `--json`. [asserted]
+- If both arms' intervals lie entirely **above** 0.20 $\implies$ **even the easy class has
+  no oracle yet.** A front end cannot honestly claim projection QA until this checker
+  exists and this rule would no longer fire. [asserted]
+- If the existing pytest control kills **every** live operator on both arms $\implies$
+  **the suite already has the oracle and the tests do not call it on these fixtures.**
+  That is a coverage hole, not β. Patch the tests; do not register a quantity. [asserted]
+- If fewer than 30 non-equivalent view-mutants complete on either arm $\implies$
+  **insufficient evidence.** Do not report a β. [asserted]
+**What it cannot decide:** whether a front end should be built (ADR-0007); whether a surface
+reduces `T_effective_review` without raising artefact-β; whether a layout is confusing;
+whether simulated users find real-user defects; the rate of EXP-01's affordance-after-reload
+class; anything about a graphical surface, which this run does not have. Those limits are
+the load-bearing ones and are stated in the note before this experiment exists.
+
+
 ---
 
 ## Not experiments
