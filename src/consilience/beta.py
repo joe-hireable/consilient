@@ -40,6 +40,30 @@ class Beta:
         "not independent of the checks, and possibly non-stationary (Q30)"
     )
 
+    def __post_init__(self) -> None:
+        """A measured beta must carry its point and interval; insufficient_data must not.
+
+        Found by `mypy --strict`, not by the 24 tests: render() unpacked self.interval
+        unconditionally, so a payload with verdict=measured and interval=None crashed on
+        the JSON round-trip with `cannot unpack non-iterable NoneType`. The tests were
+        structurally blind to it because beta on the real trajectory is insufficient_data,
+        so the measured render path was never exercised.
+
+        Guarding render() would have left the bad state constructable and moved the crash
+        elsewhere. Principle 4: the fix is a constraint, so the state cannot exist.
+        """
+        if self.verdict == MEASURED and (self.point is None or self.interval is None):
+            raise ValueError(
+                "a measured beta must carry both a point estimate and an interval; got "
+                f"point={self.point!r} interval={self.interval!r}"
+            )
+        if self.verdict == INSUFFICIENT and (
+            self.point is not None or self.interval is not None
+        ):
+            raise ValueError(
+                "insufficient_data must not carry a point estimate or an interval"
+            )
+
     def as_dict(self) -> dict:
         d = asdict(self)
         d["interval"] = list(self.interval) if self.interval else None
@@ -57,6 +81,9 @@ class Beta:
                 f"beta [{scope}]: insufficient data "
                 f"({self.n_rejected} human rejections, need {MIN_REJECTIONS})"
             )
+        # __post_init__ guarantees both are present for a measured verdict. Restating it
+        # here is what lets the checker prove it rather than take our word for it.
+        assert self.point is not None and self.interval is not None
         low, high = self.interval
         return (
             f"beta [{scope}]: {self.point:.3f} [{low:.3f}, {high:.3f}] "

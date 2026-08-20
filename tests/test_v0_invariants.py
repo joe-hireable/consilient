@@ -379,3 +379,36 @@ def test_shared_options_survive_on_either_side_of_the_command(tmp_path, capsys):
 
     assert before["events"] == after["events"] == 1
     assert before["digest"] == after["digest"]
+
+
+# --------------------------------------------- found by strict typing, not by the tests
+def test_a_measured_beta_cannot_exist_without_its_interval():
+    """`mypy --strict` found this; 24 passing tests did not.
+
+    render() unpacked self.interval unconditionally, so a JSON round-trip carrying
+    verdict=measured with a null interval crashed. The state is now unconstructable.
+    """
+    with pytest.raises(ValueError, match="must carry both a point estimate"):
+        beta_mod.Beta(beta_mod.MEASURED, "repair", "v1", 40, 10, 0.25, None, None)
+
+
+def test_insufficient_data_cannot_smuggle_a_point_estimate():
+    with pytest.raises(ValueError, match="must not carry a point estimate"):
+        beta_mod.Beta(beta_mod.INSUFFICIENT, None, None, 3, 1, 0.33, (0.1, 0.9), None)
+
+
+def test_the_measured_render_path_is_exercised():
+    """The gap that let the defect through: no test rendered a measured beta."""
+    rows = [
+        {
+            "ts": "2026-08-20T01:00:00+01:00",
+            "task_family": "repair",
+            "verifier_version": "v1",
+            "verifier_accept": i < 10,
+            "human_verdict": "reject",
+        }
+        for i in range(40)
+    ]
+    line = beta_mod.compute(rows).render()
+    assert "0.250" in line and "10/40" in line
+    assert "lower bound on a joint" in line
