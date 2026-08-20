@@ -8,7 +8,7 @@ with amendments for English law (moral rights, third-party rights, successors).
 
 ---
 
-Thank you for your interest in the Consilience project (the "**Project**") maintained by
+Thank you for your interest in the Consilient project (the "**Project**") maintained by
 Joseph Brown of Hertford, England (the "**Maintainer**").
 
 This Individual Contributor Licence Agreement ("**Agreement**") sets out the terms on which

@@ -210,7 +210,7 @@ To establish whether defect-proxy failure is an inherent property of AI orchestr
 
 #### Rationale:
 1. **Pristine Pre-2022 Baseline:** 2017–2021 GitHub PR history represents the gold standard of disciplined human code review: mandatory review by Python core developers, strict branch protections, and explicit regression testing requirements. `[asserted]`
-2. **Standard Modern PR Workflow:** Unlike the Linux kernel or Git, CPython operates on GitHub PRs with status check rollups, matching the exact target architecture of modern coding agents and the Consilience harness. `[asserted]`
+2. **Standard Modern PR Workflow:** Unlike the Linux kernel or Git, CPython operates on GitHub PRs with status check rollups, matching the exact target architecture of modern coding agents and the Consilient harness. `[asserted]`
 3. **Structured Issue & News Metadata:** Every bug fix requires a `Misc/NEWS.d` blurb and a linked GitHub issue / BPO ticket, providing an independent, developer-verified ground truth oracle without researcher guessing. `[asserted]`
 4. **Contrast Validity:** CPython has seen measured adoption of AI tooling in 2024–2026 while maintaining human core-developer sign-off gates, making it the ideal longitudinal anchor. `[asserted]`
 

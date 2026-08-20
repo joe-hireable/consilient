@@ -41,7 +41,7 @@ REQUIREMENTS = {
     "B1": "EXP-05 complete and adapter two required no shared-interface redesign",
     "B2": "EXP-08 measured critic throughput gain is at least 20%",
     "B3": "A one-command bare-Claude-Code fallback is exercised weekly",
-    "B4": "Twenty non-Consilience tickets complete without harness intervention",
+    "B4": "Twenty non-Consilient tickets complete without harness intervention",
 }
 
 
@@ -315,7 +315,7 @@ def _structural_condition() -> dict:
         "B4",
         "structurally_unsatisfiable" if established else "unknown",
         (
-            "Gate B forbids the non-Consilience orchestration required to produce its "
+            "Gate B forbids the non-Consilient orchestration required to produce its "
             "own condition-four evidence."
             if established
             else "The structural analysis does not establish the recorded circularity."

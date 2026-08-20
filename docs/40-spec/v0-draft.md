@@ -1,4 +1,4 @@
-# Consilience v0 implementation specification — draft for review
+# Consilient v0 implementation specification — draft for review
 
 > **APPROVED FOR THE OBSERVE-ONLY INCREMENT — 20 August 2026, 01:22.** Joe sent the exact
 > sentence §13.1 requires; it is recorded in the trajectory as `spec.approval_observed`.
@@ -22,7 +22,7 @@ authoritative EXP-16 scope event in `.harness/log/2026-08-19.jsonl`. [measured]
 
 ## 1. Outcome and boundary
 
-Consilience v0 is a local-first, CLI-only instrument for coding work that measures how
+Consilient v0 is a local-first, CLI-only instrument for coding work that measures how
 often a repository's automated checks accept a human-rejected artefact, then uses that
 measurement to admit and route bounded agent attempts only after the dogfooding gates
 permit control. [asserted]
@@ -147,7 +147,7 @@ Control begins on a project other than Consilience only after Gate B. [asserted]
    than one. [asserted]
 3. A one-command bare-agent fallback exists and a scheduled check exercises it weekly.
    [asserted]
-4. Twenty non-Consilience tickets complete without intervention in the harness itself.
+4. Twenty non-Consilient tickets complete without intervention in the harness itself.
    [asserted]
 
 The bare-agent fallback remains permanent; Consilience must never become the only way to

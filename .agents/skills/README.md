@@ -5,10 +5,10 @@
 
 ## Why here and not `.claude/`
 
-Skills written today must survive the migration to Consilience (`0015`) without a rewrite.
+Skills written today must survive the migration to Consilient (`0015`) without a rewrite.
 The `SKILL.md` convention is already read by Claude Code, OpenHarness and DeepSeek Harness,
 and `.agents/` is the emerging vendor-neutral location. So portability comes from **adopting
-a standard, not inventing one** — and Consilience is obliged to read this directory
+a standard, not inventing one** — and Consilient is obliged to read this directory
 natively.
 
 ## Format

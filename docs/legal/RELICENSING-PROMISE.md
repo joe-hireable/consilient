@@ -2,7 +2,7 @@
 
 **Version 1.0 — DRAFT, pending legal review.**
 
-For the Consilience project (`joe-hireable/consilient`).
+For the Consilient project (`joe-hireable/consilient`).
 
 This document is incorporated by reference into the Individual and Corporate Contributor
 Licence Agreements. It is a **binding commitment**, not a statement of intent.

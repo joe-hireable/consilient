@@ -58,7 +58,7 @@ For *"we measure β"* to be a contribution, three things must hold: **(a)** nobo
 
 ## Where this leaves the positioning
 
-**Consilience is Meta-Harness's missing precondition, not its rival.** Meta-Harness optimises
+**Consilient is Meta-Harness's missing precondition, not its rival.** Meta-Harness optimises
 harness code against an objective signal and already knows that signal is gameable — it audits for
 regex leakage — but it mitigates leakage while ignoring *weakness*. β is the other half of that
 mitigation. `[cited-web]`

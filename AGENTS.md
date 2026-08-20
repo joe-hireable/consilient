@@ -32,7 +32,7 @@ anything, and a test asserts the CLI exposes no surface that could.
 Research, experiments, ADRs, invariant checks, specification work and observe-only
 implementation are all permitted. **Routing, blocking and orchestration remain gated** —
 ADR-0015 Gate A before anything routes or blocks, Gate B before orchestration on a
-non-Consilience repository. Neither gate has been passed.
+non-Consilient repository. Neither gate has been passed.
 
 ## Working principles for this repo
 
