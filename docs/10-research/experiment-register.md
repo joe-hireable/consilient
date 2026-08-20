@@ -1062,7 +1062,25 @@ not measured here; whether it helps on tasks unlike the fixtures; and whether an
 survives the specific model and harness tested, since ADR-0027 keeps compositions separate.
 [asserted]
 
-### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `IN PROGRESS 20 Aug 2026 — EXP-07 exited and released the GPU; results-exp31.json records complete: false`
+### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `COMPROMISED 20 Aug 2026 — two concurrent runners interleaved into one results file; a complete: true from this run must not be believed`
+
+> **⚠️ Read `../00-context/exp31-interleaving-2026-08-20.md` before using any figure from this
+> experiment.** Two runners have been executing concurrently since before 01:00, each holding its
+> results in memory and rewriting the whole file per checkpoint, last write wins. The probe
+> fingerprint `free_mib_before` alternates 19126/29126 across seven commits, which is how it was
+> caught. [measured]
+>
+> **Each runner will reach 50 and write `complete: true`, producing a file that looks finished,
+> clean and single-sourced with no trace the other existed.** That is why this heading says
+> COMPROMISED rather than IN PROGRESS: the artefact will shortly stop advertising the problem.
+>
+> The accident bought one thing the experiment never registered: 22 cells executed independently
+> twice, of which 5 disagree — **22.7%**, every one involving `agent_timeout`. And the contention
+> is worsening: `gemma4:31b`'s timeout rate has risen from ~17% to **41%**, censoring runs that
+> would have passed, against the model the experiment exists to qualify. [measured]
+>
+> Both partial datasets are preserved outside the evidence base. **The run must be repeated** once
+> the runner is append-only, carries a `run_id`, and takes a lock naming its PID.
 **Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
 specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a
 free capability floor for the local tier and a zero-cost prior for EXP-29's scope question.
