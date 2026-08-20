@@ -327,3 +327,65 @@ and it has not been run.**
 A second falsifier: if `_ci` conflates non-blocking or lint-only checks with correctness
 checks, then "red" overcounts genuine rejections and α is inflated for a mechanical reason.
 This is the same question the bad-and-red audit asks, applied to the other row.
+
+---
+
+## 9. β on the corrected labels — and why the two families' agreement is weaker than it looks
+
+The bad-and-red cell was adjudicated **twice, blind, by different model families**, over all 75
+PRs, from metadata only. [measured]
+
+| | `gpt-5.6` | `gemini-3.7` |
+|---|---|---|
+| bad label confirmed | 29 | 45 |
+| bad label refuted | 36 | 25 |
+| bad unclear | 10 | 5 |
+| red meaningful | 39 | 37 |
+| red **not** meaningful | 33 | 38 |
+| **corrected β** | **144/167 = 0.8623** | **155/178 = 0.8708** |
+
+The corrected form moves confirmed-bad PRs whose red was *not* a rejection into the numerator,
+and drops refuted-bad PRs from the denominator:
+`β = (128 + promoted) / (203 − refuted)`.
+
+**Both families report β within 0.0085 of each other while disagreeing by 16 PRs on how many
+bad labels are genuine. That should not be taken at face value, and it does not survive the
+obvious test.** [algebra]
+
+`beta_convergence.py` recomputes β under every cross combination of the two adjudications'
+inputs:
+
+| promoted from | refuted from | β |
+|---|---|---|
+| `gpt-5.6` | `gpt-5.6` | 0.8623 *(as reported)* |
+| `gpt-5.6` | `gemini-3.7` | **0.8090** |
+| `gemini-3.7` | `gpt-5.6` | **0.9281** |
+| `gemini-3.7` | `gemini-3.7` | 0.8708 *(as reported)* |
+
+**Reported spread 0.0085. Cross spread 0.1192. The agreement is 14× narrower than the
+disagreement in its inputs warrants.** An adjudicator that refutes more labels also promotes
+fewer, so a larger numerator trades against a smaller denominator in roughly compensating
+amounts and β is stable while the labels underneath are not.
+
+**So the honest reading is the sign, not the point.** Under every combination β lies far above
+the recorded 0.6305, and the two families agree on that without qualification. **The interval
+to quote is [0.81, 0.93], not [0.862, 0.871].**
+
+This is the project's own rule applied to its own most important number: two agents agreeing is
+not evidence, and here the agreement was partly arithmetic. Had only one family run, or had the
+two been compared on β alone, this would have been published as a tight cross-validated
+estimate. It is not one.
+
+**What it still says, and it is the largest result the project has.** On this corpus, once
+spurious labels and non-rejections are removed, the verifier accepts roughly **four in five to
+nine in ten** of the bad artefacts it actually rules on — against a recorded 0.63 and a
+design-time β\* threshold of ~0.11. [measured, proxy labels, metadata-only adjudication, n=75,
+one repository]
+
+**What it is not.** Not a diff-level audit — no adjudicator read a patch. Not β for the
+project — it is β for one repository's CI on merged PRs. Not independent of §7's proxy
+problems; it inherits every one of them. The 10 and 5 `unclear` verdicts are unresolved.
+
+**Falsifier:** a diff-level audit of any 20 of the 75 that disagrees materially with both
+metadata adjudications would show the method cannot be run from metadata at all, which would
+retire this estimate rather than adjust it.
