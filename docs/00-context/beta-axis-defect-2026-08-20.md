@@ -458,3 +458,68 @@ data is the data agents will always report as missing.** Any audit of EXP-01 con
 agent will produce this false negative, every time, and the finding will look identical to a real
 one. The mitigation is not to relax the privacy rule; it is to state in the dispatch that the
 corpus excludes gitignored data, and to treat any absence claim about it as unevaluable.
+
+
+---
+
+# DECIDED — 20 August 2026
+
+Joe delegated this: *"I DON'T KNOW I WILL TAKE YOUR RECOMMENDATION. DECIDE FOR ME."* Under
+ADR-0033 as updated the same day, a technical question with a defensible answer is the harness's,
+and it carries the reasoning, the reversal and the falsifier rather than an ask.
+
+## 1. β stays `P(checks accept | artefact is bad)`
+
+**Not because it is the better quantity, but because it is the one everything else is already
+built on.** ADR-0002's closed form `β* = (1 − α)·e^(−kΔ)` is derived on this axis; `beta.py`
+implements it; the α relationship — the two off-diagonal cells of one 2×2 — only holds on it.
+Redefining β would invalidate the algebra and gain nothing the second quantity cannot supply
+under its own name.
+
+## 2. `P(bad | accepted)` is kept, named, and reported alongside
+
+It is not an error to be deleted. **It is the more decision-relevant number for a human looking
+at a green build** — "given the checks passed, how likely is this bad?" — and it is what EXP-01
+actually computed. It gets a name of its own rather than being conflated with β or thrown away.
+
+The two are related by base rates and coincide only by accident. On `jobboard-v2` they agree to
+0.5% because the marginals happen to nearly match (202 green against 203 bad); on
+`hireable-platform` they differ by 1.91×. **Reporting both makes that visible instead of leaving
+it as a trap.**
+
+## 3. `mine_beta.py` is corrected to report both, on the full 2×2
+
+The table is already computable from labels on disk, and building it is what caught two separate
+conditional errors — one in EXP-01, one of mine. **The instrument should emit the table, not a
+single ratio.** A quantity read off a printed 2×2 cannot silently be the wrong conditional.
+
+## 4. The ~146-pair audit is cancelled
+
+It exists to narrow the interval on `P(bad | accepted)` — the axis the architecture does not
+route on. **Replaced by an audit of the bad-and-red cell: 75 pairs on `jobboard-v2`, 3 on
+`hireable-platform`.** Smaller, cheaper, and on the axis β actually needs, because that cell is
+37% of all bad artefacts and has never been examined.
+
+## Why this ordering and not the obvious one
+
+The obvious move is to fix the estimator and re-run the big audit. That spends the largest block
+of queued agent-hours sharpening a number the architecture does not consume. The cheap move —
+build the table, audit the unexamined cell — answers the question that was actually open.
+
+## Reversal
+
+`git revert` of this commit and the register entry. **No recorded result is changed by this
+decision**, and no raw data is touched; `findings-exp01.md`'s published aggregates stand exactly
+as measured.
+
+## Falsifier
+
+**If the bad-and-red cell's label precision differs materially from the bad-and-green cell's
+audited 1/15, the two cannot share a correction factor** — and every corrected β on the new axis
+would need its own audit rather than inheriting one. That is checkable by the 75-pair audit this
+decision schedules, and it is the specific way this decision could be wrong.
+
+A second, cheaper falsifier: if `P(bad | accepted)` turns out to be the quantity every downstream
+consumer actually wants, then keeping β as the primary was the wrong call and the two should swap
+billing. That would show up as documents reaching for the secondary quantity — which is a
+grep, not a study.

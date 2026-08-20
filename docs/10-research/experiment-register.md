@@ -29,6 +29,20 @@ is what produced all three collisions — it is the step that feels sufficient a
 
 ## Runnable today — no harness required
 
+> **Axis decided 20 August 2026** (`../00-context/beta-axis-defect-2026-08-20.md`). β remains
+> `P(accept | bad)`, the axis the closed form and `beta.py` are built on. `P(bad | accepted)` is
+> retained as a separately named quantity and reported alongside rather than discarded — it is
+> what this experiment actually computed and it is the more useful number for a human reading a
+> green build. `mine_beta.py` is to emit the full 2×2 rather than a single ratio, because a
+> quantity read off a printed table cannot silently be the wrong conditional.
+>
+> **The ~146-pair audit in *Next steps* is cancelled.** It narrows the interval on the axis the
+> architecture does not route on. It is replaced by an audit of the **bad-and-red cell** — 75
+> pairs on `jobboard-v2`, 3 on `hireable-platform` — which is smaller, cheaper, and 37% of all
+> bad artefacts that has never been examined. **Falsifier:** if that cell's label precision
+> differs materially from the bad-and-green cell's audited 1/15, the two cannot share a
+> correction factor and every corrected β needs its own audit.
+
 ### EXP-01 · Measure β on repository history `IN PROGRESS 19 Aug 2026 — see experiments/exp01/findings-exp01.md`
 **First pass run on both repos** (recorded-CI-verdict mining, no replay). Raw proxy
 labels proved ~93% noise (audited precision 1/15 on both repos); corrected β̂ ≈ 0.12
