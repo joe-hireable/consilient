@@ -1636,8 +1636,42 @@ Long-horizon planning, open-ended design and multi-file refactoring are exactly 
 usually claimed to matter, and this corpus says nothing about them. **State that before the
 numbers.**
 
-### EXP-57 · The marginal value of context — does more context buy accuracy, or cost? `READY`
-**Pre-registered 20 Aug 2026. Not run.**
+### EXP-57 · The marginal value of context — does more context buy accuracy, or cost? `DONE 20 Aug 2026 — see experiments/exp57/findings-exp57.md`
+**Pre-registered 20 Aug 2026 and run unaltered the same day. 640 `claude -p` calls
+(512 census + 128 determinism control) over 128 items from EXP-47's corpus — 64 defect-introducing
+and 64 defect-removing changes, disjoint mutants, seed 57. One model (`claude-sonnet-5`), context
+volume the only variable.**
+**Headline:**
+- $\hat\beta$: minimal **0.0469** [0.0161, 0.1290]; relevant **0.0469** [0.0161, 0.1290]; full
+  **0.0313** [0.0086, 0.1070]; padded **0.0313** [0.0086, 0.1070]. $\hat\alpha$: 0.0313, 0.0469,
+  0.0469, 0.0156. All at $n = 64$ per class per arm, 0 unparsable replies in 640 calls.
+- Input tokens per call: **921 → 1,601 → 21,479 → 41,686**, a **45.3×** range (67.7× counting the
+  auxiliary model the CLI bills alongside the answering one). Latency 3.8 s → 5.2 s.
+- **All eighteen pairwise difference intervals span zero** (Newcombe, 95%). Item-level: minimal and
+  full give different verdicts on 8 of 128 items, **4 wrong each way**, exact McNemar $p = 1.000$.
+- **Stopping rule 4 FIRED — `insufficient power`.** Reported as pre-registered: the intervals, and
+  no trend narrated across them.
+- **The padding rule did not fire.** `padded` has the *lowest* error rate (0.0234 vs full's 0.0391),
+  difference interval [−0.0330, +0.0671]. **No measured context poisoning** at 41,686 tokens of
+  plausible irrelevant code, at this $n$.
+- **The adverse rule did not fire and did not come close.** Full's $\beta$ is below minimal's by one
+  item in 64 on an interval six times wider than the gap. No evidence for "send everything, build
+  nothing"; equally, no evidence against it finer than ~10 percentage points.
+- **Determinism control: 4 of 128 re-run verdicts flipped — 96.88% agreement, 3.1%
+  irreproducible.** The largest between-arm gap is 1.6 points. **The noise floor is larger than
+  every difference measured**, which is why no trend may be read off these arms.
+- Measurement facts the registration did not anticipate: the default CLI invocation carries
+  **75,285 input tokens** before the prompt (stripped to ~600 here); the CLI bills a **second
+  model** on the same prompt (20,697 tokens/call on `padded`); and under 6-way concurrency **125 of
+  512 calls returned a verdict with no usage block**, which recorded as zeros would have understated
+  `padded` sixfold.
+- Corrections to the pre-registration, none of them applied to the design: it fixes **no sample
+  size** while offering "insufficient power" as a verdict; **"materially beats" and "≈" are
+  undefined**; it has **no floor-effect guard** and the run hit the floor (~2,400 items per class per
+  arm would be needed to resolve the gap observed); "the interval on each pairwise difference" does
+  not say **paired or unpaired** though all arms share items; and the **`relevant` arm is
+  half-degenerate** — 65 of 128 items have no test naming the changed code, because the corpus is
+  made of mutants that survived pytest. See findings §6.
 **Decides:** whether just-in-time context engineering is worth building. Joe asked for
 "dynamic/just-in-time prompting/context engineering"; this asks first whether context volume
 changes the answer at all.
@@ -1672,6 +1706,173 @@ pairwise difference, because a difference whose interval spans zero is not a dif
 which is most real work, and the honest reason this experiment is a first step rather than an
 answer.
 
+### EXP-58 · β for SWE-bench Verified's own oracle — how often does a *resolved* patch break something the oracle never ran? `PHASE 1 RUNNING`
+**Pre-registered 20 Aug 2026, 23:20 UTC+1, before any β-relevant run.** The dispatching brief
+(`brief-swebench.md`) stated that this entry already existed and that "its stopping rules were fixed
+before any data". **It did not exist.** `rg -n "EXP-5[89]" docs/` returned only the brief itself.
+The number was free, so the identifier stands, but the pre-registration is this text and its
+provenance is the commit that introduced it — not an earlier decision it can be attributed to.
+Everything below was written after artefact reconnaissance (availability, licence, file layout,
+runtime calibration) and before a single β-relevant test run.
+
+**Decides:** whether the oracle that the entire coding-agent field grades itself against admits
+patches that break the repository outside the tests it chose to run — and at what rate. If it does,
+β is not a property this project invented to justify itself; it is a measurable property of the
+field's most trusted verifier, and `docs/decisions/0002` gets external support from the one place
+that would be hardest to dismiss.
+
+**Why this is not the same finding as SWE-Bench+ or METR, and the brief overclaimed it.** The brief
+asserted "every system on that leaderboard reports pass@1; none reports how many of its passes are
+wrong". That is false, and this repository's own bibliography is what falsifies it. **SWE-Bench+**
+(arXiv:2410.06992) found 32.67% of successful patches involved solution leakage and 31.08% were
+suspicious through weak tests, dropping SWE-Agent+GPT-4 from 12.47% to 3.97% [cited]; **METR**
+(*Many SWE-bench-Passing PRs Would Not Be Merged*, Mar 2026) measured automated pass rates roughly
+24 pp above maintainer merge rates [cited]. Both are false-accept measurements on this benchmark and
+both predate this entry.
+
+What is left, and it is narrower than the brief's framing:
+
+| prior work | failure mode measured | how |
+|---|---|---|
+| SWE-Bench+ | the selected tests were **too weak** to distinguish a wrong fix; the answer **leaked** into the issue text | manual inspection of a sample, on SWE-bench (original / Lite) |
+| METR | the patch would not be **accepted by a maintainer** | human judgement |
+| **EXP-58** | the patch **breaks a test the oracle never ran** | mechanical execution, on SWE-bench **Verified** |
+
+Those are three different things. A patch can be specific, unleaked, and mergeable-looking, and still
+regress a module the selected tests do not touch. SWE-bench Verified exists *because* OpenAI filtered
+the under-specification SWE-Bench+ found, so a Verified-era measurement is not a re-run of it.
+**Unselected regression is the oracle's structural blind spot rather than a defect in any instance's
+test choice**, and no source in `bibliography.md` measures it. If a source does, this experiment's
+value is to replicate it and that is still a win. [asserted]
+
+**Why the blind spot is structural, and this is the finding that made the design.** `eval.sh` for
+`astropy__astropy-12907` runs `pytest -rA astropy/modeling/tests/test_separable.py` — one file — and
+`FAIL_TO_PASS` ∪ `PASS_TO_PASS` for that instance is exactly the 15 tests that file contains
+[measured, 20 Aug 2026]. The selected set equals the observed set. So **mining the published logs
+cannot find a single unselected failure**: the oracle's selection *is* its execution. The only way to
+observe the blind spot is to run tests the benchmark never ran, which is why this phase needs Docker
+even though it needs no model. That killed the cheaper design the brief proposed and it is better
+known now.
+
+**Artefact and licence position, recorded 20 Aug 2026.**
+- Predictions and evaluation artefacts are **not** in `github.com/SWE-bench/experiments` any more —
+  submission folders hold only `README.md`, `metadata.yaml`, `results/`. The brief's premise was out
+  of date. They are in the S3 bucket `swe-bench-submissions`
+  (`analysis/download_logs.py`, `S3_BUCKET`), as
+  `verified/<system>/logs/<instance_id>/{patch.diff,report.json,test_output.txt,eval.sh}`.
+- The repository README says an AWS account is required. **It is not** — the bucket is readable with
+  `Config(signature_version=UNSIGNED)`, and a plain unauthenticated
+  `GET https://swe-bench-submissions.s3.amazonaws.com/?list-type=2&prefix=verified/...` returns 200
+  [measured]. **No credential is created, held or used**, which is what makes this phase compatible
+  with the 20 Aug credential-containment rule rather than an exception to it.
+- **Licence: none.** `GET /repos/SWE-bench/experiments` returns `"license": null` and the tree has no
+  `LICENSE` file [measured]. The README states the logs "are publicly accessible and meant to enable
+  greater reproducibility and transparency of the experiments conducted on the SWE-bench task" — a
+  statement of purpose that covers reading them for exactly this, and **not** a redistribution grant.
+  **Consequence, and it is a hard rule for this experiment: no patch, log, diff or excerpt from those
+  artefacts is written into this repository.** Only derived measurements, instance identifiers and
+  test identifiers are recorded. Test identifiers are facts about the upstream open-source projects,
+  not content from the submissions.
+
+**Design — three arms per instance, one variable: what was applied, and what was run.**
+
+| arm | model patch applied | tests run |
+|---|---|---|
+| **baseline** | no | full suite |
+| **patched** | yes, one arm per resolved system | full suite |
+| **oracle** | yes | the selected tests — *taken from the published `report.json`*, not re-run |
+
+The oracle arm is not re-executed. The published `report.json` **is** the official harness's verdict,
+accepted onto the leaderboard; re-running it locally would produce a weaker artefact than the one the
+benchmark already stands behind. The brief asked for the official harness for that half and this
+satisfies the intent more strongly than complying literally would. [asserted]
+
+**The full-suite command is derived mechanically, never hand-written.** Take the instance's own
+`eval.sh`, and replace its test-selection arguments with the first path component of the first
+selected test path (`astropy/modeling/tests/test_separable.py` → `astropy`), or delete them where
+there are none (Django already passes module labels only). Everything else — the conda environment,
+the editable install, the `git checkout <base_commit> <test files>` reset, the gold test patch — is
+byte-identical to the official script. A hand-written per-repo table would be twelve judgement calls
+with no audit trail; this is one rule with twelve outputs, and the rule is in the results JSON.
+
+**Classification, fixed before the run.** For system *s* on instance *i*, over the full-suite runs:
+- `regressed(s,i)` = tests **PASSED in baseline** and **FAILED or ERRORED in patched**. Requiring a
+  baseline pass is what excludes pre-existing failures, and the baseline run is mandatory: **without
+  it the headline is meaningless** and it is the most likely way this goes wrong.
+- `unselected(s,i)` = `regressed(s,i)` minus (`FAIL_TO_PASS` ∪ `PASS_TO_PASS`). A selected-test
+  failure is not a blind spot — the oracle would have caught it, and by the definition of *resolved*
+  there are none.
+- **false accept** ⟺ `unselected(s,i)` is non-empty **after flake confirmation**.
+- **Flake confirmation is not optional and every candidate gets it.** Each candidate false accept is
+  re-run — baseline and patched arm both, fresh containers — and a candidate whose unselected
+  regression does not reproduce is reclassified **flaky** and excluded from the numerator, staying in
+  the denominator. A test that fails intermittently is noise about the harness, not evidence about
+  the patch.
+- Excluded as **noise**, with the count and reason reported: runs that time out, containers that fail
+  to start, patches that fail to apply, and any instance whose baseline run does not produce a
+  parseable test segment. An instance excluded for any of these reasons is excluded for **all** its
+  systems, so exclusion cannot correlate with a system's quality.
+- Statuses are read with **SWE-bench's own parsers** (`MAP_REPO_TO_PARSER_PY`, `swebench` 5.0.2,
+  installed in an experiment-local venv outside this repository — **no dependency is added here**).
+  Writing twelve parsers would put the measurement's most disputable step in our own hands.
+
+**Sample, frozen before the run — see `experiments/exp58/sample-exp58.json`.** Frame: SWE-bench
+Verified instances resolved by **at least one** of three submitted systems, because β is defined only
+over accepted patches. The three systems, chosen for architectural spread rather than score:
+`20250807_openhands_gpt5` (agentic scaffold, frontier model, 359 resolved),
+`20250522_tools_claude-4-sonnet` (minimal tool loop, frontier model, 362),
+`20241028_agentless-1.5_gpt4o` (non-agentic pipeline, weaker model, 194). Stratified by repository in
+proportion to the frame, `random.Random(20260820)`, **instance identifiers and seed committed before
+the first run**.
+**Power, stated in advance.** The unit of β is a *patch*, not an instance, so 30 instances yields
+roughly 65 patches; at β ≈ 0.1 that is a Wilson half-width near **±0.07** — wider than the ±0.06 the
+brief asked for, and the honest cost of the baseline and flake-confirmation runs the brief also asked
+for. Patches on the same instance are **not independent**; the patch-level Wilson interval is
+therefore reported **alongside** per-system intervals and an instance-clustered interval, and the
+patch-level figure is never quoted alone.
+
+**Measures:** β for the oracle, pooled and per-system, with Wilson 95% intervals; the pre-existing
+failure count per instance (the baseline, reported before the headline); exclusions with reasons; the
+number of distinct unselected tests broken per false accept; and the flake rate from confirmation
+re-runs.
+
+**Stopping rules (fixed before the run):**
+- If pooled β's interval **excludes 0** ⟹ **the benchmark's oracle admits regressions it never looked
+  for**, at a measured rate. ADR-0002's premise holds on the field's own instrument, and the correct
+  reading is about the oracle, not about anyone's system. [asserted]
+- If pooled β's interval **includes 0** ⟹ **on this sample the oracle's blind spot is not detectably
+  populated.** That is evidence *against* the project's rhetoric about test suites and it must be
+  reported first if it occurs. The honest conclusion is then that SWE-bench Verified's selected tests
+  are a better proxy for the full suite than this project has been assuming. [asserted]
+- If per-system β intervals are **mutually non-overlapping** ⟹ the finding is about those systems,
+  not the benchmark, and must be written that way. [asserted]
+- If per-system β intervals **all overlap** ⟹ the finding is about the benchmark. Those are different
+  papers and the choice between them is made by this rule, not after seeing which is more
+  interesting. [asserted]
+- If **more than 40%** of sampled instances are excluded as noise ⟹ **the instrument is the finding**
+  and no β is reported from this phase. A β computed on the survivors of a 40% attrition is a
+  measurement of which repositories have stable test suites. [asserted]
+- If the flake-confirmation step reclassifies **more than half** of candidates ⟹ report the flake
+  rate as the primary result and β as provisional. [asserted]
+
+**What it cannot decide.**
+- **It is a lower bound, and the direction matters.** The full suite is still a test suite. A patch
+  that is wrong in a way no test in the repository exercises is invisible here and is counted as a
+  correct accept. Every number this produces understates β.
+- Nothing about **why** a patch regressed, and nothing about severity: one broken test and forty
+  broken tests are both one false accept.
+- Nothing about the leaderboard's *ranking*. β is measured over each system's own accepted patches,
+  so a system that resolves fewer instances is not thereby better.
+- Nothing about **this project's** β, which is separately measured at 0.3132 and is not comparable —
+  different artefacts, different oracle, different task.
+- **It does not license benchmark scores as an evaluation target.** ADR-0013 chose repository history
+  over benchmarks and this does not reopen it: the benchmark is the *object of measurement* here, not
+  the yardstick. If this entry is ever cited to justify grading the harness on SWE-bench, it is being
+  misused.
+
+**Phases.** *Phase 1* (this entry, running): three systems, the frozen sample, the full pipeline
+end-to-end. *Phase 2* (not authorised by this entry): more systems and a larger sample, and a second
+oracle-blind-spot probe using mutation of the patched source rather than the patch itself.
 
 ### EXP-52 · Does agent consensus reduce error, or reproduce it? `READY`
 **Pre-registered 20 Aug 2026, before any arm was run. Registered because a refusal was made on
