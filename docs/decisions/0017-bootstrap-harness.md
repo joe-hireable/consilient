@@ -66,11 +66,26 @@ it helps, we use the manual version daily and let the pain define the spec.
   one analysis. The repository now claims reproducible benchmarks with committed result
   files. **Verify before relying on any recall figure** — do not cite their numbers in our
   own materials without re-running them.
-- `[cited]` **Graphiti** scores 63.8% vs mem0's 49% on the temporal subset of LongMemEval
-  and uses genuine bi-temporal reasoning. If temporal correctness matters more than the
-  conversation-mining and hooks, Graphiti may be the better layer-1 choice. **Not evaluated
-  here.** MemPalace is chosen for its Claude Code integration, not because it won a
-  benchmark we ran.
+- `[asserted]` **Graphiti** uses genuine bi-temporal reasoning. If temporal correctness
+  matters more than the conversation-mining and hooks, it may be the better layer-1 choice.
+  **Not evaluated here.** MemPalace is chosen for its Claude Code integration, not because it
+  won a benchmark we ran.
+
+  > **Correction, 2026-08-20.** This bullet read: *"Graphiti scores 63.8% vs mem0's 49% on the
+  > temporal subset of LongMemEval"*, tagged `[cited]`. **That comparison does not exist**, and
+  > this repository's own bibliography recorded the retraction on 19 August — a day before this
+  > ADR was last touched — while the ADR kept quoting it. [measured]
+  >
+  > The figure was a mashup of two unrelated numbers: **63.8% is Zep's *overall* score**
+  > (gpt-4o-mini) from its own **vendor-authored** paper (arXiv:2501.13956), and **49.0% is
+  > mem0's *overall* score** from an unrelated third party (arXiv:2603.04814). Neither is a
+  > temporal-subset figure and **no head-to-head temporal comparison has been published.**
+  >
+  > The bi-temporal claim survives as an architectural description of what Graphiti does. The
+  > quantitative comparison is withdrawn entirely rather than restated more carefully, because
+  > there is no correct version of it to restate. The bullet immediately above this one already
+  > said *"do not cite their numbers in our own materials without re-running them"* — and this
+  > bullet then did exactly that, two lines later.
 - **Obsidian is not open source.** It is proprietary freeware. Its licence terms for
   commercial use must be checked before it becomes load-bearing in a project with the
   commercial intent in `0004`. The vault is plain markdown, so the lock-in is low — but this
@@ -120,6 +135,9 @@ reimplement them. That is a constraint on its architecture and it is the right o
 ## What would overturn this
 
 - Graphiti's temporal advantage proves to matter for our use, replacing MemPalace at layer 1.
+  *(Note 2026-08-20: this condition rested partly on a retracted comparison — see the correction
+  in Evidence against. There is no published head-to-head, so "proves to matter" now means a
+  measurement this project would have to make, not a figure it can look up.)*
 - The Obsidian licence turns out to be incompatible with the commercial intent in `0004`.
 - The friction log stays short for a month, which would suggest either that Claude Code is
   already sufficient — a serious finding for `0004` — or that the log is not being kept
