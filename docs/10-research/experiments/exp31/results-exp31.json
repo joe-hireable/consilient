@@ -1,5 +1,28 @@
 {
- "complete": false,
+ "protocol": {
+  "models": [
+   "qwen3:8b",
+   "gemma4:31b"
+  ],
+  "attempts_per_cell": 5,
+  "attempt_timeout_s": 240,
+  "wall_clock_cap_s": 10800,
+  "fixtures": [
+   "duration-parser",
+   "event-replay",
+   "windows-wsl-path",
+   "wilson-verdict",
+   "headroom-admission"
+  ],
+  "estimand": "model substitution in a fixed composition, NOT a size effect"
+ },
+ "limitations": [
+  "The estimand is substitution of one installed model for another in a fixed composition. It is NOT a size effect: family, training data, tokeniser, instruction tuning and quantisation all differ, and no same-family sibling pair is installed.",
+  "Reasoning modes are not matched; each model runs at its own Ollama default, inherited from EXP-07's limitation.",
+  "The frontier side is a historical control reused from EXP-07 and carries unmeasured version drift. No new frontier or metered call is made here.",
+  "beta is not measured: the fixture oracle's own false-accept rate is unknown, so a pass is verifier-accepted, not correct.",
+  "Five synthetic fixtures cannot generalise to real repositories."
+ ],
  "probe": {
   "free_mib_before": 19132,
   "models": {
@@ -26,13 +49,9 @@
   },
   "free_mib_after": 29131
  },
- "limitations": [
-  "The estimand is substitution of one installed model for another in a fixed composition. It is NOT a size effect: family, training data, tokeniser, instruction tuning and quantisation all differ, and no same-family sibling pair is installed.",
-  "Reasoning modes are not matched; each model runs at its own Ollama default, inherited from EXP-07's limitation.",
-  "The frontier side is a historical control reused from EXP-07 and carries unmeasured version drift. No new frontier or metered call is made here.",
-  "beta is not measured: the fixture oracle's own false-accept rate is unknown, so a pass is verifier-accepted, not correct.",
-  "Five synthetic fixtures cannot generalise to real repositories."
- ],
+ "complete": true,
+ "stop_reason": null,
+ "elapsed_s": 6056.589,
  "runs": [
   {
    "fixture": "duration-parser",
@@ -704,6 +723,970 @@
     "output_tokens": 25214,
     "reasoning_output_tokens": 0
    }
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "qwen3:8b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 225.096,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.064,
+    "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-oa3sndva\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 861612,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 20110,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "qwen3:8b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 104.703,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.057,
+    "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-7r69g68x\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 11019,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 10916,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "qwen3:8b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 68.37,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.076,
+    "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-xakd602p\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 28490,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 7033,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "qwen3:8b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 67.423,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.064,
+    "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-v02qjh42\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 27908,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 6678,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "gemma4:31b",
+   "attempt": 1,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 171.632,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.055,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 348700,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 6735,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "gemma4:31b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 228.525,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py",
+     "writer.py"
+    ],
+    "duration_s": 0.058,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 728029,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 10135,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "gemma4:31b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 240.251,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.251,
+   "censored": true,
+   "outcome": "agent_timeout",
+   "return_code": null,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": true,
+    "scope_valid": false,
+    "scope_error": "agent timed out",
+    "changed_files": [],
+    "duration_s": 0,
+    "test_tail": "agent timeout"
+   },
+   "usage": {}
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "gemma4:31b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 240.178,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.178,
+   "censored": true,
+   "outcome": "agent_timeout",
+   "return_code": null,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": true,
+    "scope_valid": false,
+    "scope_error": "agent timed out",
+    "changed_files": [],
+    "duration_s": 0,
+    "test_tail": "agent timeout"
+   },
+   "usage": {}
+  },
+  {
+   "fixture": "windows-wsl-path",
+   "model": "gemma4:31b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 240.269,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.269,
+   "censored": true,
+   "outcome": "agent_timeout",
+   "return_code": null,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": true,
+    "scope_valid": false,
+    "scope_error": "agent timed out",
+    "changed_files": [],
+    "duration_s": 0,
+    "test_tail": "agent timeout"
+   },
+   "usage": {}
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "gemma4:31b",
+   "attempt": 1,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 124.898,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.058,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 185454,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 5608,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "gemma4:31b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 150.228,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.056,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 308066,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 6460,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "gemma4:31b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 105.48,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.055,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 180019,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 4386,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "gemma4:31b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 79.742,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.054,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 132686,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3190,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "gemma4:31b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 102.959,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.053,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 160832,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 4329,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "qwen3:8b",
+   "attempt": 1,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 72.181,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.066,
+    "test_tail": "-verdict-mt_zvfsm\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-mt_zvfsm\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 129481,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 8621,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "qwen3:8b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 209.37,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.063,
+    "test_tail": "-verdict-26f79zk6\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-26f79zk6\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 611642,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 23293,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "qwen3:8b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 79.971,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.061,
+    "test_tail": "-verdict-9anza3ji\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-9anza3ji\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 79706,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 7772,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "qwen3:8b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 59.004,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.061,
+    "test_tail": "-verdict-5nyhu9cd\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-5nyhu9cd\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 55750,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 5757,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "wilson-verdict",
+   "model": "qwen3:8b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 104.857,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.064,
+    "test_tail": "-verdict-8fsx8mfe\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-8fsx8mfe\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 184369,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 9999,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "qwen3:8b",
+   "attempt": 1,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 70.143,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.061,
+    "test_tail": "\\exp07-headroom-admission-bkum0_ql\\test_runner.py\", line 5, in <module>\n    ok = admit(snapshot, [{\"amount\": 25, \"resets_at\": 2000}], request)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-headroom-admission-bkum0_ql\\solution.py\", line 2, in admit\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 48601,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 9166,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "qwen3:8b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 240.18,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.18,
+   "censored": true,
+   "outcome": "agent_timeout",
+   "return_code": null,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": true,
+    "scope_valid": false,
+    "scope_error": "agent timed out",
+    "changed_files": [],
+    "duration_s": 0,
+    "test_tail": "agent timeout"
+   },
+   "usage": {}
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "qwen3:8b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 232.219,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.061,
+    "test_tail": "\\exp07-headroom-admission-wp6499x8\\test_runner.py\", line 5, in <module>\n    ok = admit(snapshot, [{\"amount\": 25, \"resets_at\": 2000}], request)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-headroom-admission-wp6499x8\\solution.py\", line 2, in admit\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 695055,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 21328,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "qwen3:8b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 240.221,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.221,
+   "censored": true,
+   "outcome": "agent_timeout",
+   "return_code": null,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": true,
+    "scope_valid": false,
+    "scope_error": "agent timed out",
+    "changed_files": [],
+    "duration_s": 0,
+    "test_tail": "agent timeout"
+   },
+   "usage": {}
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "qwen3:8b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 76.384,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.061,
+    "test_tail": "\\exp07-headroom-admission-2bhks4pm\\test_runner.py\", line 5, in <module>\n    ok = admit(snapshot, [{\"amount\": 25, \"resets_at\": 2000}], request)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-headroom-admission-2bhks4pm\\solution.py\", line 2, in admit\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 81042,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 8050,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "gemma4:31b",
+   "attempt": 1,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 92.457,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.059,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 178162,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3526,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "gemma4:31b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 208.5,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.062,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 432496,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 8740,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "gemma4:31b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 103.254,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.063,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 134295,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 4281,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "gemma4:31b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 90.587,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.061,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 176963,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3764,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "headroom-admission",
+   "model": "gemma4:31b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 100.048,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.054,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 178301,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 4277,
+    "reasoning_output_tokens": 0
+   }
   }
- ]
+ ],
+ "summary": {
+  "per_model": {
+   "qwen3:8b": {
+    "attempts": 25,
+    "passes": 0,
+    "first_attempt_passes": 0,
+    "censored": 2,
+    "produced_an_edit": 0,
+    "tests_pass_scope_fail": 0,
+    "median_first_attempt_s": 79.861
+   },
+   "gemma4:31b": {
+    "attempts": 25,
+    "passes": 21,
+    "first_attempt_passes": 5,
+    "censored": 3,
+    "produced_an_edit": 22,
+    "tests_pass_scope_fail": 1,
+    "median_first_attempt_s": 92.457
+   }
+  },
+  "paired_first_attempt": [
+   {
+    "fixture": "duration-parser",
+    "ratio_gemma_over_qwen": 0.742,
+    "is_lower_bound": false,
+    "qwen_passed": false,
+    "gemma_passed": true
+   },
+   {
+    "fixture": "event-replay",
+    "ratio_gemma_over_qwen": 1.058,
+    "is_lower_bound": false,
+    "qwen_passed": false,
+    "gemma_passed": true
+   },
+   {
+    "fixture": "windows-wsl-path",
+    "ratio_gemma_over_qwen": 0.777,
+    "is_lower_bound": false,
+    "qwen_passed": false,
+    "gemma_passed": true
+   },
+   {
+    "fixture": "wilson-verdict",
+    "ratio_gemma_over_qwen": 1.73,
+    "is_lower_bound": false,
+    "qwen_passed": false,
+    "gemma_passed": true
+   },
+   {
+    "fixture": "headroom-admission",
+    "ratio_gemma_over_qwen": 1.318,
+    "is_lower_bound": false,
+    "qwen_passed": false,
+    "gemma_passed": true
+   }
+  ],
+  "verdicts": {
+   "pass_rate": "difference_claimed",
+   "pass_rate_detail": "qwen 0/5 vs gemma 5/5",
+   "latency": "insufficient_evidence",
+   "latency_detail": {
+    "median_ratio": 1.058,
+    "all_same_sign": false,
+    "censored_pairs": 0
+   }
+  }
+ },
+ "run_id": "exp31-20260820T085909-21636"
 }
