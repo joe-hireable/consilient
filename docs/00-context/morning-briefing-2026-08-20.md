@@ -105,7 +105,19 @@ the repo. That experiment was one housekeeping sweep from being unreproducible.
 `runner-concurrency-exposure-2026-08-20.md`
 
 **EXP-31 ran twice, into one file, all night.** Two runners, each rewriting the whole file from
-memory, last write wins. Caught because the run count went *backwards*.
+memory, last write wins. Caught because the run count went *backwards*. **I started the second
+one** — a background task in this session's own directory, labelled "Relaunch EXP-31".
+
+**And it produced a result worth reading.** The runner hit its pre-registered 3-hour wall-clock
+cap at 38 of 50 cells and wrote `complete: false`, `stop_reason: "wall_clock_cap"`, with both
+registered verdicts at `insufficient_evidence`. Underneath that: **`qwen3:8b` produced 0 edits in
+18 attempts across four *new* fixtures; `gemma4:31b` produced 10 in 20** on the same rig, harness
+and timeout. EXP-07 asked whether the capability floor was the model or the tier — **this points
+at the model.** Not a registered result: capped, and contaminated by my own second runner. Re-run
+clean before citing.
+
+**`gemma4` is bimodal by fixture** — 5/5 passes on two fixtures, 5/5 timeouts on the other two,
+not one mixed result. A boundary a median multiplier would hide entirely.
 
 All four runners that write a results file have the same exposure. **EXP-07 cannot be cleared** —
 it has no run id, no PID, no per-attempt timestamp, so an interleaved run would look identical to
@@ -272,6 +284,12 @@ them.
   `psutil` is not installed — and `tasklist /v` shows twelve unnamed `python.exe`, some of them
   my own. A blind kill risked taking down the monitor watching the experiment. The finding is
   better than the stop would have been: **detection without identification is half a control.**
+- **I got EXP-31 wrong twice, in the document about EXP-31 being wrong.** I predicted each
+  runner would write `complete: true` and look finished — it hit a pre-registered wall-clock cap
+  and reported honestly. And I read `gemma4`'s rising timeout rate as contention degrading the
+  run when it was fixture composition: 5/5 or 0/5 per fixture, never mixed. **I predicted a
+  failure mode from code shape without checking for a cap, and read a trend into a composition
+  change.** Both corrected in `exp31-interleaving-2026-08-20.md`.
 - **ClickUp is rate-limited to me for ~13 hours**, so the board stops partway. Worth noting
   against the record: EXP-16 concluded rate limits did *not* bite, and sustained low-concurrency
   use overnight contradicted that.
@@ -285,7 +303,7 @@ them.
 | Claude Code | 14-agent β attack; 9-agent documentation-debt batch with review; same-family control; every fix and commit | idle, awaiting you |
 | Cursor (Gemini) | ADR contradictions; the invariant audit that found the V0-18 hole; an independent β attack; runner exposure; three claim verifications; triage of nine audit findings | triaging the remaining twenty |
 | Codex (GPT) | numbers-traceability audit — 382 claim bundles, 336 adjudicated, **184 reproduce, 13 do not, 139 untraceable** | complete, preserved in the repo |
-| Ollama / local | EXP-31 | **compromised and degrading** — `gemma4` timeouts up from ~17% to 41%; results not to be believed |
+| Ollama / local | EXP-31 | **compromised** — two writers, one of them mine. One hit its 3-hour cap honestly at 38/50 and reported `insufficient_evidence`; the other is still running. Re-run clean before citing |
 
 Codex's report is preserved complete at `codex-numbers-audit-2026-08-20.md` — all 33 findings.
 Six were briefly lost to an output cap I set and were recovered by resuming the session, which is
