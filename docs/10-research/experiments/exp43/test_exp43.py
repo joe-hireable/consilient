@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, patch
 
 from run_exp43 import (
     acquire_lock,
+    get_merge_commits,
+    kill_tree,
     release_lock,
     run_pair,
     summarise,
@@ -51,6 +53,27 @@ class TestExp43(unittest.TestCase):
         release_lock()
         self.assertFalse(LOCK.exists())
 
+    def test_stale_lock_takeover(self):
+        stale_payload = json.dumps({"pid": 99998, "run_id": "stale-run", "started_epoch": time.time() - 500})
+        LOCK.write_text(stale_payload, encoding="utf-8")
+        self.assertTrue(acquire_lock("new-run", cap_s=300))
+        held = json.loads(LOCK.read_text(encoding="utf-8"))
+        self.assertEqual(held["run_id"], "new-run")
+        release_lock()
+
+    def test_kill_tree_handles_nonexistent_pid(self):
+        # Should not raise exception
+        kill_tree(9999999)
+
+    def test_get_merge_commits_parser(self):
+        mock_output = "c1 p1 p2\nc2 p3\n"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=mock_output, returncode=0)
+            pairs = get_merge_commits(Path("/fake"), limit=2)
+            self.assertEqual(len(pairs), 2)
+            self.assertEqual(pairs[0], {"child": "c1", "parent": "p1"})
+            self.assertEqual(pairs[1], {"child": "c2", "parent": "p3"})
+
     def test_classification_defect(self):
         with patch("run_exp43.run_commit_test") as mock_test:
             mock_test.side_effect = [
@@ -87,6 +110,15 @@ class TestExp43(unittest.TestCase):
             res = run_pair(Path("/fake"), "c1", "p1", "HEAD", "tests", 10)
             self.assertEqual(res["outcome"], "enhancement")
 
+    def test_classification_timeout(self):
+        with patch("run_exp43.run_commit_test") as mock_test:
+            mock_test.side_effect = [
+                {"passed": False, "timed_out": True, "error": "timeout", "total_tests": 0, "passed_tests": 0, "failed_tests": 0},
+                {"passed": True, "timed_out": False, "error": None, "total_tests": 10, "passed_tests": 10, "failed_tests": 0},
+            ]
+            res = run_pair(Path("/fake"), "c1", "p1", "HEAD", "tests", 10)
+            self.assertEqual(res["outcome"], "timeout")
+
     def test_summarise_stopping_rule_high_drift(self):
         records = [
             {"outcome": "drift", "pair_duration_s": 2.0},
@@ -97,7 +129,7 @@ class TestExp43(unittest.TestCase):
         ]
         s = summarise(records)
         self.assertEqual(s["drift_rate"], 0.8)
-        self.assertEqual(s["stopping_verdict"] if "stopping_verdict" in s else s["stopping_rule_verdict"], "insufficient_evidence")
+        self.assertEqual(s["stopping_rule_verdict"], "insufficient_evidence")
 
         # 5 out of 5 drift -> > 80% drift
         records_all_drift = [{"outcome": "drift", "pair_duration_s": 2.0}] * 5
