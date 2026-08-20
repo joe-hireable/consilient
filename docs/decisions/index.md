@@ -48,6 +48,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0045](0045-give-gate-b2-and-b3-success-criteria-they-never-had.md) | **Gate B2 and B3 get success criteria they never had** — B2 measures the critic's own β; B3 needs a dated, machine-readable fallback result | ✅ |
 | [0046](0046-gate-b3-is-evidenced-by-a-dated-result-not-by-a-schedule-trigger.md) | **Gate B3 is evidenced by a dated result, not a schedule trigger** — no secret may reach a public repository, so the exercise runs locally | ✅ |
 | [0047](0047-promote-the-adapter-contract-and-retire-adapter-count-as-evidence.md) | **Promote the adapter contract; retire adapter count as evidence** — seven backends fit unchanged, but the newest adapter is 3.8× the smallest | ✅ |
+| [0048](0048-open-source-first-and-facilitation-is-prepaid-never-in-arrears.md) | **Open source first; paid facilitation is prepaid, never in arrears** — every capability usable by someone who pays nothing and contacts no server | ✅ |
 
 ## Behaviour and safety
 
