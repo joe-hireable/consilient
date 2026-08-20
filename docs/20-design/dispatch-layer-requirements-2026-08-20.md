@@ -220,21 +220,64 @@ orchestrator would have waited on it indefinitely.
 
 ---
 
+## R14 — The orchestrator's own working directory is shared mutable state
+
+**Incident.** A block of product changes — an ADR's enforcement checks, `cli.py` amendments, seven
+new tests, a register entry — was committed into `consilient-clone-strict`, the clone a dispatched
+Codex agent was working in at that moment. Nothing about the commands looked wrong. They used no
+relative paths. Every check passed. `git add -A` additionally swept up four untracked dispatch
+briefs. [measured]
+
+The cause was a `cd` issued several commands earlier to run one verification, whose effect persisted
+across every command after it. **The clone is a valid checkout of the same base commit**, so
+`pytest`, `mypy --strict` and `ruff` all reported clean — they were clean, in the wrong repository.
+The only symptom was the push failing, and it failed for the right reason by luck: the clone's
+`origin` is the local repository rather than the forge, so the non-fast-forward was refused.
+
+This is R9 (*never use a relative path after a directory change*) in a form R9 does not cover.
+**R9 protects the path; nothing protected the repository.** The two failures share a cause — the
+shell's working directory is state that persists between commands and belongs to no one — and the
+existing requirement addresses only the half that produces visible symptoms.
+
+Worse, it is a *concurrency* fault. A dispatched agent held that working tree. Had it written a file
+before the `git add -A`, its half-finished work would have been committed under an unrelated message,
+and the eventual harvest would have carried both.
+
+**Requirement.** Every git operation the layer performs names its repository explicitly — `git -C
+<absolute path>` — and never relies on the ambient working directory. A repository under dispatch is
+**owned by that dispatch** for its lifetime: the layer records which clone each running dispatch
+holds and refuses its own writes there until the dispatch returns. Staging is explicit; `git add -A`
+in a workspace the layer does not exclusively own is banned outright, because its blast radius is
+whatever anyone else happened to leave lying around.
+
+**Check.** Two:
+
+1. Every git invocation carries `-C` with an absolute path. This is greppable and therefore
+   enforceable in a way "remember to check the CWD" is not.
+2. A commit whose worktree is a dispatch-owned clone is refused before it is written. The layer
+   already knows which clone each dispatch holds — it created them.
+
+**Cost of not having it, measured today:** one misplaced commit, four briefs nearly committed, and a
+near miss on entangling a running agent's work. Recovered in full only because the agent had not yet
+written its first file.
+
+---
+
 ---
 
 ## What this adds up to
 
-Thirteen requirements, all measured in two days, and **not one is about model capability.** Every
+Fourteen requirements, all measured in two days, and **not one is about model capability.** Every
 failure was in the plumbing: permissions, workspaces, encodings, paths, process identity,
 delivery. The models did their work; the harness around them is what failed, repeatedly.
 
 That is the meta-harness thesis stated as an incident log rather than an argument, and it is the
 strongest evidence this project has produced for its own existence. It also sets the honest
 expectation for scaling: **increased AI workload is not gated on the agents. It is gated on
-thirteen boring things, each of which now has a check.**
+fourteen boring things, each of which now has a check.**
 
 ## Falsifier
 
-If a dispatch layer implementing all thirteen still shows the same rate of lost work over the next
+If a dispatch layer implementing all fourteen still shows the same rate of lost work over the next
 fifty dispatches, then the failures were not the plumbing and this analysis is wrong. The
 measurement is cheap: lost-work rate per dispatch, before and after, on the same task mix.
