@@ -876,6 +876,39 @@ latency floor is set correctly, since the floor is preferential and the experime
 against it rather than validating it; and anything about users other than this maintainer,
 because n=1. [asserted]
 
+### EXP-34 · What catches the errors — an enforced check, or someone noticing? `BLOCKED: Gate A trajectory capture`
+**Decides:** the second clause of the product success condition in
+`../20-design/autonomous-execution-from-intent.md` — whether failures are caught by the
+harness or by an attentive operator. An unattended system whose errors are caught by a human
+watching is not autonomous; it is quality control at a higher level of abstraction.
+[asserted]
+**Baseline, this session:** nine errors occurred; two were caught by an enforced mechanism and
+seven only because the agent happened to look. **2/9.** [measured] The table is in the design
+document and is the pre-registered starting point.
+**Precondition:** Stage 2 trajectory capture live. Errors are recorded when found, with the
+mechanism that found them classified as `enforced_check`, `agent_noticed` or `human_noticed`
+before the fix is written — classification after a fix is written is retrospective
+justification. [asserted]
+**Procedure:** over a fixed window of rambled-intent sessions, record every error found, the
+mechanism that caught it, and how long it survived. Do not add checks specifically to raise
+the ratio during the window; add them because they are needed, and record when they were
+added so the series can be read against the additions. [asserted]
+**Measures:** enforced fraction; errors per session; survival time from introduction to
+detection; and separately the count of errors found by an independent late audit, which
+estimates what all three mechanisms missed.
+**Stopping rules (fixed before the run):**
+- The harness is doing the job the vision requires only if the enforced fraction rises above
+  0.5 across at least 20 recorded errors, **and** the independent-audit count does not rise in
+  step. [asserted]
+- A rising enforced fraction with a rising audit count means errors are being reclassified
+  rather than caught, and the result is rejected. [asserted]
+- Fewer than 20 errors in the window is `insufficient evidence`, not success. An absence of
+  recorded errors most likely means they are not being recorded. [asserted]
+**What it cannot decide:** whether the errors recorded are the errors that matter, since
+severity is not measured here; and it inherits Q30's correlated-oracle problem directly — the
+denominator must come from somewhere independent of the mechanism being credited, and the
+independent audit is only a partial answer to that. [asserted]
+
 ### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `READY: blocked only while EXP-07 holds the GPU`
 **Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
 specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a

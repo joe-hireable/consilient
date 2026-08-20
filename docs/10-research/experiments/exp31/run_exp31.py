@@ -1,0 +1,391 @@
+"""EXP-31: does substituting the installed gemma4:31b for qwen3:8b change the local verdict?
+
+Protocol frozen in experiment-register.md § EXP-31 before this ran. The estimand is model
+SUBSTITUTION in one fixed composition, not a size effect: the two models differ in family,
+training data, tokeniser, instruction tuning and quantisation, and no same-family sibling
+pair is installed.
+
+Reuses EXP-07's frozen fixtures, verifier and repository setup by import. run_exp07.py is
+not modified: it is frozen, and its result has been published.
+
+Hard gate from the registration: the GPU must be free. EXP-07 timed qwen3:8b on the same
+card, and a concurrent load would have corrupted the durations that were its measurement.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import statistics
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE.parent / "exp07"))
+
+from run_exp07 import (  # noqa: E402
+    FIXTURES,
+    attempt_timeout,
+    make_repo,
+    usage_from_events,
+    verify,
+)
+
+CODEX = shutil.which("codex")
+RESULTS = HERE / "results-exp31.json"
+
+MODELS = ("qwen3:8b", "gemma4:31b")
+ATTEMPTS = 5
+ATTEMPT_TIMEOUT_S = 240
+MAX_ELAPSED_S = 3 * 60 * 60  # registration: overall cap three hours
+MIN_FREE_VRAM_MIB = 2048  # registration: >= 2 GB spare
+OOM_STOP = 2  # registration: OOM in two attempts of one model stops
+
+LIMITATIONS = [
+    "The estimand is substitution of one installed model for another in a fixed "
+    "composition. It is NOT a size effect: family, training data, tokeniser, instruction "
+    "tuning and quantisation all differ, and no same-family sibling pair is installed.",
+    "Reasoning modes are not matched; each model runs at its own Ollama default, inherited "
+    "from EXP-07's limitation.",
+    "The frontier side is a historical control reused from EXP-07 and carries unmeasured "
+    "version drift. No new frontier or metered call is made here.",
+    "beta is not measured: the fixture oracle's own false-accept rate is unknown, so a pass "
+    "is verifier-accepted, not correct.",
+    "Five synthetic fixtures cannot generalise to real repositories.",
+]
+
+
+def gpu_free_mib() -> int | None:
+    try:
+        out = (
+            subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=memory.total,memory.used",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                check=True,
+            )
+            .stdout.strip()
+            .splitlines()[0]
+        )
+        total, used = (int(x.strip()) for x in out.split(","))
+        return total - used
+    except Exception:
+        return None
+
+
+def served_identity(model: str) -> dict:
+    """Read the served model back rather than trusting the request flag (EXP-05's lesson)."""
+    try:
+        out = subprocess.run(
+            ["ollama", "show", model],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            check=True,
+        ).stdout
+        return {"requested": model, "show": out[:400]}
+    except Exception as exc:
+        return {"requested": model, "error": f"{type(exc).__name__}: {exc}"}
+
+
+def feasibility_probe() -> dict:
+    """Not scored. Establishes VRAM headroom and load behaviour before any attempt."""
+    probe = {"free_mib_before": gpu_free_mib(), "models": {}}
+    for model in MODELS:
+        started = time.monotonic()
+        try:
+            r = subprocess.run(
+                ["ollama", "run", model, "Reply with the single word: ready"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=600,
+            )
+            probe["models"][model] = {
+                "load_and_reply_s": round(time.monotonic() - started, 2),
+                "returncode": r.returncode,
+                "reply_head": (r.stdout or r.stderr)[:120].strip(),
+                "free_mib_while_loaded": gpu_free_mib(),
+                "identity": served_identity(model),
+            }
+        except Exception as exc:
+            probe["models"][model] = {"error": f"{type(exc).__name__}: {exc}"}
+        subprocess.run(["ollama", "stop", model], capture_output=True, timeout=120)
+    probe["free_mib_after"] = gpu_free_mib()
+    return probe
+
+
+def run_attempt(fixture: dict, model: str, attempt: int, timeout_s: int) -> dict:
+    repo, baseline = make_repo(fixture)
+    command = [
+        CODEX,
+        "exec",
+        fixture["goal"],
+        "--json",
+        "-C",
+        str(repo),
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--oss",
+        "--local-provider",
+        "ollama",
+        "-m",
+        model,
+    ]
+    started = time.monotonic()
+    try:
+        proc = subprocess.run(
+            command,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_s,
+        )
+        verifier = verify(repo, baseline)
+        duration = time.monotonic() - started
+        usage = usage_from_events(proc.stdout)
+        rc = proc.returncode
+        oom = "out of memory" in (proc.stderr or "").lower()
+        if verifier["timeout"]:
+            outcome = "verifier_timeout"
+        elif not verifier["scope_valid"]:
+            outcome = "verifier_error"
+        elif verifier["passed"]:
+            outcome = "passed"
+        else:
+            outcome = "rejected"
+    except subprocess.TimeoutExpired:
+        duration, rc, usage, oom = time.monotonic() - started, None, {}, False
+        verifier = {
+            "passed": False,
+            "tests_passed": False,
+            "timeout": True,
+            "scope_valid": False,
+            "scope_error": "agent timed out",
+            "changed_files": [],
+            "duration_s": 0,
+            "test_tail": "agent timeout",
+        }
+        outcome = "agent_timeout"
+    return {
+        "fixture": fixture["id"],
+        "model": model,
+        "attempt": attempt,
+        "provider": "ollama",
+        "reasoning_mode": "ollama-default",
+        "duration_s_including_verifier": round(duration, 3),
+        # EXP-07 measured the agent timeout overrunning by 10-269 s because descendants hold
+        # the pipes. Recorded here so the same inflation is visible rather than assumed away.
+        "timeout_s_applied": timeout_s,
+        "timeout_overrun_s": round(max(0.0, duration - timeout_s), 3),
+        "censored": outcome in ("agent_timeout", "verifier_timeout"),
+        "outcome": outcome,
+        "return_code": rc,
+        "oom_suspected": oom,
+        "verifier": verifier,
+        "usage": usage,
+    }
+
+
+def summarise(runs: list[dict]) -> dict:
+    out: dict = {"per_model": {}, "paired_first_attempt": [], "verdicts": {}}
+    for model in MODELS:
+        rows = [r for r in runs if r["model"] == model]
+        first = [r for r in rows if r["attempt"] == 1]
+        out["per_model"][model] = {
+            "attempts": len(rows),
+            "passes": sum(r["verifier"]["passed"] for r in rows),
+            "first_attempt_passes": sum(r["verifier"]["passed"] for r in first),
+            "censored": sum(bool(r["censored"]) for r in rows),
+            "produced_an_edit": sum(bool(r["verifier"]["changed_files"]) for r in rows),
+            "tests_pass_scope_fail": sum(
+                1
+                for r in rows
+                if r["verifier"].get("tests_passed") and not r["verifier"]["passed"]
+            ),
+            "median_first_attempt_s": (
+                statistics.median(r["duration_s_including_verifier"] for r in first)
+                if first
+                else None
+            ),
+        }
+
+    ratios = []
+    for fx in FIXTURES:
+        a = next(
+            (
+                r
+                for r in runs
+                if r["fixture"] == fx["id"]
+                and r["model"] == MODELS[0]
+                and r["attempt"] == 1
+            ),
+            None,
+        )
+        b = next(
+            (
+                r
+                for r in runs
+                if r["fixture"] == fx["id"]
+                and r["model"] == MODELS[1]
+                and r["attempt"] == 1
+            ),
+            None,
+        )
+        if not a or not b:
+            continue
+        ratio = b["duration_s_including_verifier"] / a["duration_s_including_verifier"]
+        censored = bool(a["censored"] or b["censored"])
+        ratios.append((ratio, censored))
+        out["paired_first_attempt"].append(
+            {
+                "fixture": fx["id"],
+                "ratio_gemma_over_qwen": round(ratio, 3),
+                "is_lower_bound": censored,
+                "qwen_passed": a["verifier"]["passed"],
+                "gemma_passed": b["verifier"]["passed"],
+            }
+        )
+
+    # Registration: a pass-rate difference is claimed only at 5-0 or 4-1 in matched pairs.
+    q = out["per_model"][MODELS[0]]["first_attempt_passes"]
+    g = out["per_model"][MODELS[1]]["first_attempt_passes"]
+    diff = abs(g - q)
+    out["verdicts"]["pass_rate"] = (
+        "difference_claimed" if diff >= 4 else "insufficient_evidence"
+    )
+    out["verdicts"]["pass_rate_detail"] = f"qwen {q}/5 vs gemma {g}/5"
+
+    if ratios:
+        signs = {r > 1 for r, _ in ratios}
+        median = statistics.median(r for r, _ in ratios)
+        out["verdicts"]["latency"] = (
+            "materially_slower"
+            if median >= 1.5 and len(signs) == 1
+            else "insufficient_evidence"
+        )
+        out["verdicts"]["latency_detail"] = {
+            "median_ratio": round(median, 3),
+            "all_same_sign": len(signs) == 1,
+            "censored_pairs": sum(1 for _, c in ratios if c),
+        }
+    return out
+
+
+def main() -> int:
+    if CODEX is None:
+        print("codex not found", file=sys.stderr)
+        return 2
+
+    free = gpu_free_mib()
+    print(f"GPU free before probe: {free} MiB")
+    probe = feasibility_probe()
+    print(json.dumps(probe, indent=1)[:1200])
+
+    worst = (
+        min(
+            (m.get("free_mib_while_loaded") or 0)
+            for m in probe["models"].values()
+            if "error" not in m
+        )
+        if probe["models"]
+        else 0
+    )
+    if worst < MIN_FREE_VRAM_MIB:
+        payload = {
+            "complete": False,
+            "stop_reason": "infeasible_vram",
+            "probe": probe,
+            "limitations": LIMITATIONS,
+            "runs": [],
+        }
+        RESULTS.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+        print(f"INFEASIBLE: only {worst} MiB spare while loaded")
+        return 1
+
+    started = time.monotonic()
+    runs: list[dict] = []
+    stop_reason = None
+    oom = {m: 0 for m in MODELS}
+
+    # Counterbalanced order fixed before the run: alternate which model goes first per fixture.
+    for index, fixture in enumerate(FIXTURES):
+        order = MODELS if index % 2 == 0 else tuple(reversed(MODELS))
+        for model in order:
+            for attempt in range(1, ATTEMPTS + 1):
+                remaining = MAX_ELAPSED_S - (time.monotonic() - started)
+                budget = attempt_timeout(remaining, ATTEMPT_TIMEOUT_S)
+                if budget is None:
+                    stop_reason = "wall_clock_cap"
+                    break
+                row = run_attempt(fixture, model, attempt, budget)
+                runs.append(row)
+                if row["oom_suspected"]:
+                    oom[model] += 1
+                print(
+                    f"  {fixture['id']:<20} {model:<12} att{attempt} "
+                    f"{row['outcome']:<14} {row['duration_s_including_verifier']:7.1f}s "
+                    f"edit={bool(row['verifier']['changed_files'])}",
+                    flush=True,
+                )
+                RESULTS.write_text(
+                    json.dumps(
+                        {
+                            "complete": False,
+                            "probe": probe,
+                            "limitations": LIMITATIONS,
+                            "runs": runs,
+                        },
+                        indent=1,
+                    ),
+                    encoding="utf-8",
+                )
+                if oom[model] >= OOM_STOP:
+                    stop_reason = f"oom_{model}"
+                    break
+            if stop_reason:
+                break
+        if stop_reason:
+            break
+        subprocess.run(["ollama", "stop", MODELS[0]], capture_output=True, timeout=120)
+        subprocess.run(["ollama", "stop", MODELS[1]], capture_output=True, timeout=120)
+
+    payload = {
+        "protocol": {
+            "models": list(MODELS),
+            "attempts_per_cell": ATTEMPTS,
+            "attempt_timeout_s": ATTEMPT_TIMEOUT_S,
+            "wall_clock_cap_s": MAX_ELAPSED_S,
+            "fixtures": [f["id"] for f in FIXTURES],
+            "estimand": "model substitution in a fixed composition, NOT a size effect",
+        },
+        "limitations": LIMITATIONS,
+        "probe": probe,
+        "complete": stop_reason is None,
+        "stop_reason": stop_reason,
+        "elapsed_s": round(time.monotonic() - started, 3),
+        "runs": runs,
+        "summary": summarise(runs),
+    }
+    RESULTS.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    print(json.dumps(payload["summary"], indent=1))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
