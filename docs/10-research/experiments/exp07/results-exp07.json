@@ -1,0 +1,1079 @@
+{
+  "protocol": {
+    "fixtures": [
+      "duration-parser",
+      "event-replay",
+      "windows-wsl-path",
+      "wilson-verdict",
+      "headroom-admission"
+    ],
+    "frontier": "gpt-5.6-sol, low reasoning, Codex Pro subscription",
+    "local": "qwen3:8b via Ollama, five serial attempts",
+    "maximum_frontier_used_percent": 90,
+    "frontier_used_percent_boundary": "strictly below",
+    "attempt_cap": 30,
+    "wall_clock_cap_s": 5400,
+    "minimum_attempt_s": 30,
+    "verifier_timeout_s": 20
+  },
+  "limitations": [
+    "Reasoning modes are not matched: gpt-5.6-sol runs at explicit low reasoning effort while qwen3:8b runs at its Ollama default. Every multiplier compares two harness configurations as configured, not two models at matched reasoning effort.",
+    "Timed-out attempts are right-censored: their durations are lower bounds, so a multiplier derived from one is a lower bound and can prove a crossing but can never prove a non-crossing.",
+    "Synthetic fixtures can replicate the latency mechanism but cannot establish that a learned router improves real work."
+  ],
+  "headroom_snapshots": [
+    {
+      "observed_at_unix": 1787181552,
+      "plan_type": "pro",
+      "used_percent": 5,
+      "resets_at": 1787767120,
+      "window_duration_mins": 10080,
+      "rate_limit_reached_type": null,
+      "spend_control_reached": false
+    },
+    {
+      "observed_at_unix": 1787181600,
+      "plan_type": "pro",
+      "used_percent": 5,
+      "resets_at": 1787767120,
+      "window_duration_mins": 10080,
+      "rate_limit_reached_type": null,
+      "spend_control_reached": false
+    },
+    {
+      "observed_at_unix": 1787181642,
+      "plan_type": "pro",
+      "used_percent": 5,
+      "resets_at": 1787767120,
+      "window_duration_mins": 10080,
+      "rate_limit_reached_type": null,
+      "spend_control_reached": false
+    },
+    {
+      "observed_at_unix": 1787181706,
+      "plan_type": "pro",
+      "used_percent": 5,
+      "resets_at": 1787767120,
+      "window_duration_mins": 10080,
+      "rate_limit_reached_type": null,
+      "spend_control_reached": false
+    },
+    {
+      "observed_at_unix": 1787181746,
+      "plan_type": "pro",
+      "used_percent": 5,
+      "resets_at": 1787767120,
+      "window_duration_mins": 10080,
+      "rate_limit_reached_type": null,
+      "spend_control_reached": false
+    }
+  ],
+  "complete": true,
+  "stop_reason": null,
+  "elapsed_s": 4106.406,
+  "runs": [
+    {
+      "fixture": "duration-parser",
+      "condition": "frontier",
+      "attempt": 1,
+      "model": "gpt-5.6-sol",
+      "provider": "openai-subscription",
+      "reasoning_mode": "low",
+      "duration_s_including_verifier": 44.19,
+      "censored": false,
+      "outcome": "passed",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": true,
+        "tests_passed": true,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [
+          "solution.py"
+        ],
+        "duration_s": 0.076,
+        "test_tail": ""
+      },
+      "usage": {
+        "input_tokens": 124402,
+        "cached_input_tokens": 109056,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1139,
+        "reasoning_output_tokens": 110
+      },
+      "error": null
+    },
+    {
+      "fixture": "event-replay",
+      "condition": "frontier",
+      "attempt": 1,
+      "model": "gpt-5.6-sol",
+      "provider": "openai-subscription",
+      "reasoning_mode": "low",
+      "duration_s_including_verifier": 40.755,
+      "censored": false,
+      "outcome": "passed",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": true,
+        "tests_passed": true,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [
+          "solution.py"
+        ],
+        "duration_s": 0.071,
+        "test_tail": ""
+      },
+      "usage": {
+        "input_tokens": 127005,
+        "cached_input_tokens": 110080,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1389,
+        "reasoning_output_tokens": 149
+      },
+      "error": null
+    },
+    {
+      "fixture": "windows-wsl-path",
+      "condition": "frontier",
+      "attempt": 1,
+      "model": "gpt-5.6-sol",
+      "provider": "openai-subscription",
+      "reasoning_mode": "low",
+      "duration_s_including_verifier": 63.166,
+      "censored": false,
+      "outcome": "passed",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": true,
+        "tests_passed": true,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [
+          "solution.py"
+        ],
+        "duration_s": 0.077,
+        "test_tail": ""
+      },
+      "usage": {
+        "input_tokens": 190344,
+        "cached_input_tokens": 172800,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2107,
+        "reasoning_output_tokens": 222
+      },
+      "error": null
+    },
+    {
+      "fixture": "wilson-verdict",
+      "condition": "frontier",
+      "attempt": 1,
+      "model": "gpt-5.6-sol",
+      "provider": "openai-subscription",
+      "reasoning_mode": "low",
+      "duration_s_including_verifier": 39.688,
+      "censored": false,
+      "outcome": "passed",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": true,
+        "tests_passed": true,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [
+          "solution.py"
+        ],
+        "duration_s": 0.074,
+        "test_tail": ""
+      },
+      "usage": {
+        "input_tokens": 122995,
+        "cached_input_tokens": 97792,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1315,
+        "reasoning_output_tokens": 214
+      },
+      "error": null
+    },
+    {
+      "fixture": "headroom-admission",
+      "condition": "frontier",
+      "attempt": 1,
+      "model": "gpt-5.6-sol",
+      "provider": "openai-subscription",
+      "reasoning_mode": "low",
+      "duration_s_including_verifier": 81.152,
+      "censored": false,
+      "outcome": "passed",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": true,
+        "tests_passed": true,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [
+          "solution.py"
+        ],
+        "duration_s": 0.068,
+        "test_tail": ""
+      },
+      "usage": {
+        "input_tokens": 224923,
+        "cached_input_tokens": 194304,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3278,
+        "reasoning_output_tokens": 755
+      },
+      "error": null
+    },
+    {
+      "fixture": "duration-parser",
+      "condition": "local",
+      "attempt": 1,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 74.815,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.08,
+        "test_tail": "exp07-duration-parser-_e_zhnja\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-_e_zhnja\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 30243,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 10664,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "duration-parser",
+      "condition": "local",
+      "attempt": 2,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 85.894,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.081,
+        "test_tail": "exp07-duration-parser-f9ebknpd\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-f9ebknpd\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 166295,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 12435,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "duration-parser",
+      "condition": "local",
+      "attempt": 3,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 235.65,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.084,
+        "test_tail": "exp07-duration-parser-fdbq_9bo\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-fdbq_9bo\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 974302,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 27594,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "duration-parser",
+      "condition": "local",
+      "attempt": 4,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 293.166,
+      "censored": true,
+      "outcome": "agent_timeout",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": null,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": true,
+        "scope_valid": false,
+        "scope_error": "agent timed out before scope verification",
+        "changed_files": [],
+        "duration_s": 0,
+        "test_tail": "agent timeout"
+      },
+      "usage": {},
+      "error": "agent timeout"
+    },
+    {
+      "fixture": "duration-parser",
+      "condition": "local",
+      "attempt": 5,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 103.836,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.079,
+        "test_tail": "exp07-duration-parser-msmb7vyq\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-msmb7vyq\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 87919,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 11367,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "event-replay",
+      "condition": "local",
+      "attempt": 1,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 509.257,
+      "censored": true,
+      "outcome": "agent_timeout",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": null,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": true,
+        "scope_valid": false,
+        "scope_error": "agent timed out before scope verification",
+        "changed_files": [],
+        "duration_s": 0,
+        "test_tail": "agent timeout"
+      },
+      "usage": {},
+      "error": "agent timeout"
+    },
+    {
+      "fixture": "event-replay",
+      "condition": "local",
+      "attempt": 2,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 64.703,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.078,
+        "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-d4s_9p9j\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-d4s_9p9j\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 84051,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 7063,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "event-replay",
+      "condition": "local",
+      "attempt": 3,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 260.597,
+      "censored": true,
+      "outcome": "agent_timeout",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": null,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": true,
+        "scope_valid": false,
+        "scope_error": "agent timed out before scope verification",
+        "changed_files": [],
+        "duration_s": 0,
+        "test_tail": "agent timeout"
+      },
+      "usage": {},
+      "error": "agent timeout"
+    },
+    {
+      "fixture": "event-replay",
+      "condition": "local",
+      "attempt": 4,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 162.42,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.075,
+        "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-2ttbwbbe\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-2ttbwbbe\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 694599,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 16145,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "event-replay",
+      "condition": "local",
+      "attempt": 5,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 50.307,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.089,
+        "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-e0vuq7bv\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-e0vuq7bv\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 62614,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5534,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "windows-wsl-path",
+      "condition": "local",
+      "attempt": 1,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 78.368,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.08,
+        "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-dd53cu2l\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 64746,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 8760,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "windows-wsl-path",
+      "condition": "local",
+      "attempt": 2,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 57.654,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.071,
+        "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-f22xc2rc\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 10202,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 6634,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "windows-wsl-path",
+      "condition": "local",
+      "attempt": 3,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 57.17,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.076,
+        "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-azr6pwqj\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 25654,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 6452,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "windows-wsl-path",
+      "condition": "local",
+      "attempt": 4,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 87.19,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.08,
+        "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-9ycwg1pw\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 29531,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 9788,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "windows-wsl-path",
+      "condition": "local",
+      "attempt": 5,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 58.1,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.078,
+        "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-51lgy6b2\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 10206,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 6681,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "wilson-verdict",
+      "condition": "local",
+      "attempt": 1,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 290.483,
+      "censored": true,
+      "outcome": "agent_timeout",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": null,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": true,
+        "scope_valid": false,
+        "scope_error": "agent timed out before scope verification",
+        "changed_files": [],
+        "duration_s": 0,
+        "test_tail": "agent timeout"
+      },
+      "usage": {},
+      "error": "agent timeout"
+    },
+    {
+      "fixture": "wilson-verdict",
+      "condition": "local",
+      "attempt": 2,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 221.081,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.076,
+        "test_tail": "-verdict-fgzrmpsf\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-fgzrmpsf\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 526169,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 22699,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "wilson-verdict",
+      "condition": "local",
+      "attempt": 3,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 98.166,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.078,
+        "test_tail": "-verdict-o7q2g2yc\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-o7q2g2yc\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 141634,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 10347,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "wilson-verdict",
+      "condition": "local",
+      "attempt": 4,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 261.565,
+      "censored": true,
+      "outcome": "agent_timeout",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": null,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": true,
+        "scope_valid": false,
+        "scope_error": "agent timed out before scope verification",
+        "changed_files": [],
+        "duration_s": 0,
+        "test_tail": "agent timeout"
+      },
+      "usage": {},
+      "error": "agent timeout"
+    },
+    {
+      "fixture": "wilson-verdict",
+      "condition": "local",
+      "attempt": 5,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 97.398,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.153,
+        "test_tail": "-verdict-pf5vxwrz\\test_runner.py\", line 4, in <module>\n    low, high = wilson_interval(12, 100)\n                ~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-wilson-verdict-pf5vxwrz\\solution.py\", line 2, in wilson_interval\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 161117,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 10418,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "headroom-admission",
+      "condition": "local",
+      "attempt": 1,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 97.658,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.074,
+        "test_tail": "\\exp07-headroom-admission-vxs4yvfg\\test_runner.py\", line 5, in <module>\n    ok = admit(snapshot, [{\"amount\": 25, \"resets_at\": 2000}], request)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-headroom-admission-vxs4yvfg\\solution.py\", line 2, in admit\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 93736,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 10844,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "headroom-admission",
+      "condition": "local",
+      "attempt": 2,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 77.704,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.074,
+        "test_tail": "\\exp07-headroom-admission-xa9y1ef9\\test_runner.py\", line 5, in <module>\n    ok = admit(snapshot, [{\"amount\": 25, \"resets_at\": 2000}], request)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-headroom-admission-xa9y1ef9\\solution.py\", line 2, in admit\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 43999,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 8797,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "headroom-admission",
+      "condition": "local",
+      "attempt": 3,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 207.374,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.073,
+        "test_tail": "\\exp07-headroom-admission-jza6ymo2\\test_runner.py\", line 5, in <module>\n    ok = admit(snapshot, [{\"amount\": 25, \"resets_at\": 2000}], request)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-headroom-admission-jza6ymo2\\solution.py\", line 2, in admit\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 660158,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 21050,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "headroom-admission",
+      "condition": "local",
+      "attempt": 4,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 44.436,
+      "censored": false,
+      "outcome": "rejected",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": 0,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": false,
+        "scope_valid": true,
+        "scope_error": null,
+        "changed_files": [],
+        "duration_s": 0.074,
+        "test_tail": "\\exp07-headroom-admission-8vp_cllk\\test_runner.py\", line 5, in <module>\n    ok = admit(snapshot, [{\"amount\": 25, \"resets_at\": 2000}], request)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-headroom-admission-8vp_cllk\\solution.py\", line 2, in admit\n    raise NotImplementedError\nNotImplementedError\n"
+      },
+      "usage": {
+        "input_tokens": 24035,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 5019,
+        "reasoning_output_tokens": 0
+      },
+      "error": null
+    },
+    {
+      "fixture": "headroom-admission",
+      "condition": "local",
+      "attempt": 5,
+      "model": "qwen3:8b",
+      "provider": "ollama",
+      "reasoning_mode": "ollama-default",
+      "duration_s_including_verifier": 249.781,
+      "censored": true,
+      "outcome": "agent_timeout",
+      "timeout_s_applied": 240,
+      "timeout_s_configured": 240,
+      "return_code": null,
+      "verifier": {
+        "passed": false,
+        "tests_passed": false,
+        "timeout": true,
+        "scope_valid": false,
+        "scope_error": "agent timed out before scope verification",
+        "changed_files": [],
+        "duration_s": 0,
+        "test_tail": "agent timeout"
+      },
+      "usage": {},
+      "error": "agent timeout"
+    }
+  ],
+  "summary": {
+    "pairs": [
+      {
+        "fixture": "duration-parser",
+        "frontier_passed": true,
+        "local_passes": 0,
+        "local_censored": 1,
+        "single_failed_multiplier": 1.693,
+        "single_multiplier_is_lower_bound": false,
+        "five_failed_multiplier": 17.953,
+        "five_multiplier_is_lower_bound": true
+      },
+      {
+        "fixture": "event-replay",
+        "frontier_passed": true,
+        "local_passes": 0,
+        "local_censored": 2,
+        "single_failed_multiplier": 12.496,
+        "single_multiplier_is_lower_bound": true,
+        "five_failed_multiplier": 25.697,
+        "five_multiplier_is_lower_bound": true
+      },
+      {
+        "fixture": "windows-wsl-path",
+        "frontier_passed": true,
+        "local_passes": 0,
+        "local_censored": 0,
+        "single_failed_multiplier": 1.241,
+        "single_multiplier_is_lower_bound": false,
+        "five_failed_multiplier": 5.359,
+        "five_multiplier_is_lower_bound": false
+      },
+      {
+        "fixture": "wilson-verdict",
+        "frontier_passed": true,
+        "local_passes": 0,
+        "local_censored": 2,
+        "single_failed_multiplier": 7.319,
+        "single_multiplier_is_lower_bound": true,
+        "five_failed_multiplier": 24.408,
+        "five_multiplier_is_lower_bound": true
+      },
+      {
+        "fixture": "headroom-admission",
+        "frontier_passed": true,
+        "local_passes": 0,
+        "local_censored": 1,
+        "single_failed_multiplier": 1.203,
+        "single_multiplier_is_lower_bound": false,
+        "five_failed_multiplier": 8.342,
+        "five_multiplier_is_lower_bound": true
+      }
+    ],
+    "single_attempt": {
+      "eligible_pairs": 5,
+      "censored_pairs": 2,
+      "median": 1.693,
+      "median_is_lower_bound": true,
+      "verdict": "insufficient_evidence"
+    },
+    "best_of_five": {
+      "eligible_pairs": 5,
+      "censored_pairs": 4,
+      "median": 17.953,
+      "median_is_lower_bound": true,
+      "verdict": "replicates_2x_trigger"
+    },
+    "interpretation": "only best-of-five crosses; reasoning-layer cost causes the trigger"
+  }
+}

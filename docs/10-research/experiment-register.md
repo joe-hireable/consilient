@@ -98,7 +98,7 @@ including the OpenHarness-plugin alternative recorded there.
 **Stopping rule:** heavily front-loaded → consider a step-level *abort* (not step-level
 routing, which the β-label argument still blocks).
 
-### EXP-07 · Wasted-work multiplier `IN PROGRESS: n=1 pilot crossed the threshold`
+### EXP-07 · Wasted-work multiplier `DONE 20 Aug 2026 — see experiments/exp07/findings-exp07.md`
 **Decides:** whether ADR-0003 (no learned router) reopens.
 **Procedure:** time a failed local cheap attempt end-to-end *including verifier* against a
 frontier call, on the 5090. **Amended 19 Aug 2026: run each condition WITH and WITHOUT the
@@ -148,7 +148,25 @@ fixtures are required: fewer is `insufficient evidence`; otherwise a median mult
 at least 2× replicates the reopening trigger and a median below 2× fails to replicate it.
 [asserted] If only best-of-five crosses 2×, the reasoning layer caused the crossing; if the
 single attempt already crosses, best-of-five is amplification rather than the cause.
-[asserted] Synthetic fixtures can replicate the latency mechanism but cannot establish
+[asserted]
+
+**Result, 20 August 2026 — stopping rule applied as written.** [measured] Frontier 5/5 passed;
+local 0/25 passed. Single-attempt median multiplier **1.69×**, which does **not** cross and is
+recorded `insufficient_evidence` because two of five pairs are censored and a censored duration
+cannot prove a non-crossing. Best-of-five median **17.95×**, and **16.75×** when every censored
+duration is clamped to its applied timeout, so the crossing is robust to the instrument defect
+found in this run. Therefore **only best-of-five crosses, and ADR-0003 is not blanket-reopened**:
+the registered finding is that scaffolding, not the raw local attempt, creates the wasted work.
+The 19 August n=1 pilot's 5.6× single-attempt reading did **not** replicate.
+
+Two findings the multiplier concealed. First, `qwen3:8b` produced **no file edit in any of the
+25 attempts** — every run recorded `changed_files: []` while consuming real tokens, so the
+local tier is below the capability floor rather than merely slow, and no routing policy can
+rescue a tier that never emits a diff. [measured] Second, the agent timeout **overruns by 10 to
+269 seconds** because the subprocess timeout kills the direct child while Codex descendants hold
+the pipes open; the fix is a process-tree kill and it is deliberately **not** applied after
+seeing the result. [measured] EXP-31 substitutes `gemma4:31b` into the identical composition and
+is the registered next step. Synthetic fixtures can replicate the latency mechanism but cannot establish
 that a learned router improves real work; that requires a separate policy comparison on
 real trajectories. [asserted]
 
