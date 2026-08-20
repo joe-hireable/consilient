@@ -2191,3 +2191,78 @@ def test_a_new_adapter_may_not_silently_exceed_the_largest_one():
         f"an adapter now exceeds the recorded maximum: {max(lines, key=lines.get)} at {worst} "
         "lines. Say in the commit what forced it — contract, vendor, platform or policy."
     )
+
+
+# --------------------------------------------- credentials, after Joe's 20 Aug 2026 request
+def _secret_checker_source() -> str:
+    return Path(".github/scripts/check_secrets.py").read_text(encoding="utf-8")
+
+
+def test_every_adapter_has_a_declared_credential_shape():
+    """Adding a runtime must force adding its credential pattern, or the gap recurs.
+
+    Grok Build was installed and authenticated on 20 Aug 2026 and the secret checker had **no
+    xAI pattern at all** for the first hours of that runtime's life. Nothing failed, because
+    nothing was checking that the pattern list kept pace with the runtimes.
+
+    The fix goes in code rather than in a memory (working principle 4). Each adapter declares
+    the credential shape its vendor issues; a vendor that issues none — subscription-only
+    sign-in with a token the CLI keeps outside the repository — declares that explicitly, so
+    the absence is a statement rather than an oversight.
+    """
+    # adapter stem -> the token prefix its vendor issues, or None for subscription-only.
+    DECLARED = {
+        "claude_code": "sk-ant-",
+        "codex": "sk-",
+        "cursor": None,          # editor sign-in; no user-visible key format
+        "cursor_acp": None,      # same credential as cursor
+        "antigravity": None,     # editor sign-in
+        "opencode": None,        # brings its own provider key, covered by that provider
+        "model_backed": None,    # local weights, no credential
+        "grok": "xai-",
+    }
+    present = {
+        path.stem.replace("adapter_", "")
+        for path in Path("docs/10-research/experiments/exp05").glob("adapter_*.py")
+    }
+    undeclared = present - set(DECLARED)
+    assert not undeclared, (
+        f"adapter(s) {sorted(undeclared)} have no declared credential shape. Add the vendor's "
+        "token prefix here and to .github/scripts/check_secrets.py, or declare None and say "
+        "why in the commit."
+    )
+
+    source = _secret_checker_source()
+    for stem, prefix in sorted(DECLARED.items()):
+        if prefix is None or stem not in present:
+            continue
+        # The checker splits its literals so it does not match itself; match the same way.
+        head, tail = prefix[:2], prefix[2:]
+        assert f'"{head}" + r"{tail}' in source or f'"{head}" + r"-{tail}' in source, (
+            f"{stem}'s vendor issues {prefix!r}-shaped tokens and check_secrets.py has no "
+            f"pattern for it. This is the exact gap xAI sat in on 20 August 2026."
+        )
+
+
+def test_ci_secret_scan_also_reads_untracked_files():
+    """`git grep` sees only tracked content, and agents leave files in the tree.
+
+    A dispatched agent's transcript sitting untracked in the working directory was invisible to
+    this check until someone staged it — the moment it is already too late. `--untracked` is
+    what closes that, and it must not quietly disappear from the workflow.
+    """
+    workflow = Path(".github/workflows/secret-scan.yml").read_text(encoding="utf-8")
+    assert "--untracked" in workflow, "the CI secret scan stopped reading untracked files"
+    assert "--history" in workflow, "the CI secret scan stopped reading history"
+    assert "--self-test" in workflow, "the CI secret scan stopped proving it can still detect"
+
+
+def test_agent_transcripts_and_briefs_cannot_be_committed():
+    """Dispatch transcripts are multi-megabyte verbatim records and belong nowhere near a commit.
+
+    They carry whatever an agent read, printed, or was told. `git add -A` swept four brief files
+    into a commit on 20 August 2026, so this is not hypothetical.
+    """
+    ignored = Path(".gitignore").read_text(encoding="utf-8")
+    assert ".harness/dispatch/" in ignored, "agent transcripts became committable again"
+    assert "brief-*.md" in ignored, "dispatch briefs became committable again"

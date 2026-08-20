@@ -22,6 +22,13 @@ PATTERNS = (
     "xox" + r"[baprs]-[0-9A-Za-z-]{10,}",
     "pypi-" + r"AgEIcH[A-Za-z0-9_-]{20,}",
     "AK" + r"IA[0-9A-Z]{16}",
+    # xAI / Grok, added 20 Aug 2026 when SuperGrok Heavy became the fourth runtime. The
+    # absence of this pattern for the first hours of that runtime's life is the reason this
+    # list is now checked against the installed runtimes rather than maintained by memory.
+    "xa" + r"i-[A-Za-z0-9]{20,}",
+    # Bearer tokens and signed blobs, which carry credentials without matching a vendor prefix.
+    r"-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----",
+    r"ey" + r"J[A-Za-z0-9_-]{10,}\.ey" + r"J[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
 )
 COMBINED = "(" + ")|(".join(PATTERNS) + ")"
 SECRET_RE = re.compile(COMBINED)
@@ -57,6 +64,36 @@ def tracked_paths(revision: str | None) -> list[str]:
     return [line for line in completed.stdout.splitlines() if line]
 
 
+def _scan_paths(paths: list[str]) -> list[str]:
+    """Read each path and report the ones matching, never the matched text."""
+    hits = []
+    for relative in paths:
+        path = Path(relative)
+        try:
+            if not path.is_file() or path.stat().st_size > 40_000_000:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if SECRET_RE.search(text) or is_private_env_file(relative):
+            hits.append(relative)
+    return hits
+
+
+def scan_untracked() -> list[str]:
+    completed = git("ls-files", "--others", "--exclude-standard")
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or "cannot enumerate untracked files")
+    return _scan_paths([line for line in completed.stdout.splitlines() if line])
+
+
+def scan_staged() -> list[str]:
+    completed = git("diff", "--cached", "--name-only", "--diff-filter=ACMR")
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or "cannot enumerate staged files")
+    return _scan_paths([line for line in completed.stdout.splitlines() if line])
+
+
 def is_private_env_file(path: str) -> bool:
     name = Path(path).name.lower()
     if name == ".env":
@@ -73,10 +110,18 @@ def self_test() -> None:
         "AI" + "za" + "C" * 35,
         "gh" + "p_" + "D" * 36,
         "AK" + "IA" + "E" * 16,
+        "xa" + "i-" + "F" * 40,
+        "ey" + "J" + "a" * 20 + ".ey" + "J" + "b" * 20 + "." + "c" * 30,
+        # Split so this file does not match its own checker. Every sample above follows the
+        # same convention for the same reason.
+        "-----BEGIN " + "PRIVATE" + " KEY-----",
     )
     assert all(SECRET_RE.search(sample) for sample in samples)
     assert not SECRET_RE.search("OPENROUTER_API_KEY")
     assert not SECRET_RE.search("sk-or-v1-REDACTED")
+    assert not SECRET_RE.search("XAI_API_KEY"), "the env var NAME is not a secret"
+    assert not SECRET_RE.search("@xai-official/grok"), "the npm package name is not a secret"
+    assert not SECRET_RE.search("xai-org/grok-build"), "the GitHub org is not a secret"
     assert is_private_env_file("service/.env.local")
     assert not is_private_env_file("service/.env.example")
 
@@ -85,12 +130,31 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--history", action="store_true")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument(
+        "--untracked",
+        action="store_true",
+        help=(
+            "also scan untracked-but-not-ignored files. `git grep` sees only tracked content, "
+            "so a transcript an agent left in the tree is invisible to this check until "
+            "someone stages it -- which is the moment it is already too late."
+        ),
+    )
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="scan what is staged right now. This is the pre-commit mode: it refuses before a "
+        "commit exists, where CI can only report after one has been pushed.",
+    )
     args = parser.parse_args()
 
     if args.self_test:
         self_test()
 
     findings = [("working-tree", path) for path in matching_files(None)]
+    if args.untracked:
+        findings.extend(("untracked", path) for path in scan_untracked())
+    if args.staged:
+        findings.extend(("staged", path) for path in scan_staged())
     findings.extend(
         ("working-tree", path) for path in tracked_paths(None) if is_private_env_file(path)
     )

@@ -39,3 +39,11 @@ docs/10-research/experiments/*/run.lock
 
 # EXP-27 collector runtime state: rebuilt by running the collector; not evidence.
 docs/10-research/experiments/exp27/collector-state.json
+
+# Agent transcripts. These are multi-megabyte verbatim records of dispatched runs: they carry
+# whatever an agent read, printed or was told, and they sit inside the repository. Nothing in
+# them belongs in the record, and a single `git add -A` would commit all of them — which is not
+# hypothetical, because `git add -A` swept four brief files into a commit on 20 August 2026.
+.harness/dispatch/
+# Briefs written for a dispatched agent, which live in a clone's root by convention.
+brief-*.md

@@ -37,9 +37,16 @@ def test_composition_mapping_grok():
 
 
 def test_grok_auth_ready_helper():
-    assert grok_auth_ready("Default model: grok-4.6\n\nAvailable models:\n  * grok-4.6", 0)
-    assert not grok_auth_ready("You are not authenticated.\n\nDefault model: grok-4.6", 0)
-    assert not grok_auth_ready("Not signed in. To authenticate without a browser, run: grok login --device-code", 0)
+    assert grok_auth_ready(
+        "Default model: grok-4.6\n\nAvailable models:\n  * grok-4.6", 0
+    )
+    assert not grok_auth_ready(
+        "You are not authenticated.\n\nDefault model: grok-4.6", 0
+    )
+    assert not grok_auth_ready(
+        "Not signed in. To authenticate without a browser, run: grok login --device-code",
+        0,
+    )
     assert not grok_auth_ready("", 1)
     assert not grok_auth_ready(None, 0)
 
@@ -139,8 +146,31 @@ def test_unauthenticated_detection():
 
 
 def test_unauthenticated_run_reports_not_ready():
-    """Live unauthenticated run must detect not signed in and return status='not_ready'."""
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    """Unauthenticated detection must return status='not_ready', not a failure.
+
+    This asserted against the LIVE machine and was green only because nobody had signed in
+    yet. It broke the moment Joe authenticated on 20 Aug 2026 — the same defect as
+    `test_doctor_fails_the_unbuilt_weekly_fallback`, which was green only because a file did
+    not exist. A test that passes because of the environment's current state is measuring the
+    environment.
+
+    Now stubbed: the adapter is shown the exact stdout the CLI emits when signed out, so the
+    assertion holds whether or not this machine has a session. It also stops the suite making
+    a live model call, which cost 17 seconds and real subscription usage per run.
+    """
+    from unittest import mock
+
+    # Substitute the command rather than the subprocess module. Patching `subprocess.run`
+    # globally intercepts the adapter's other calls too and left the temporary directory
+    # locked; swapping the command keeps the real Popen path, the real timeout handling and
+    # the real parsing under test, and only replaces what is executed.
+    signed_out = "Not signed in. To authenticate without a browser, run:\n  grok login --device-code"
+    fake = [sys.executable, "-c", f"print({signed_out!r})"]
+
+    with (
+        tempfile.TemporaryDirectory() as tmp_dir,
+        mock.patch.object(A, "grok_command", return_value=fake),
+    ):
         ticket = {
             "id": "unauth-test",
             "goal": "Verify unauthenticated detection",
