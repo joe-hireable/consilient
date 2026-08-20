@@ -185,6 +185,18 @@ Each attempt has exactly one recorded route decision before dispatch. [asserted]
 are new attempts linked to the originating task and charge that task's resource cap.
 [asserted]
 
+An attempt receives a stable, opaque `attempt_id` when it is created; the identifier is
+unique in the trajectory and is not derived from `task`, because one task may have several
+attempts. [asserted] The `attempt.outcome` records the verifier result without a human
+verdict. [asserted] A later human-authored `attempt.verdict` references the
+`attempt_id`, and replay resolves the pair into one outcome row; an unknown attempt or a
+second ordinary verdict fails closed. [asserted]
+
+A changed human judgement is an explicit `attempt.verdict.correction` carrying the expected
+prior verdict and a non-empty reason. [asserted] Replay refuses a correction with no prior
+verdict or a mismatched expected value, so β never silently takes whichever verdict happens
+to occur last. [asserted]
+
 Mutable work has exactly one active owner and monotonically increasing lease epoch.
 [asserted] Delegation creates a bounded child task while the parent retains responsibility;
 handoff changes the unique owner and fences the old epoch; consultation exchanges evidence
@@ -230,6 +242,10 @@ and verdict such as `insufficient_data`. [asserted]
 No proxy label may be silently treated as a human verdict. [asserted] EXP-01's first pass
 found hotfix-label precision of 1/15 in each audited private corpus and therefore remains
 audit-limited with an honest `insufficient data` result. [measured]
+
+An unlabelled attempt remains one projected row and is excluded from β until its referenced
+human verdict arrives; recording that verdict amends the projection rather than adding a
+second attempt to the observation set. [asserted]
 
 Verifier acceptance covers both functional checks and the permitted artefact boundary.
 [asserted] The first OpenCode smoke run passed tests while creating an unrequested file,
@@ -401,7 +417,7 @@ not satisfy the invariant. [asserted]
 | V0-15 | Dogfooding gates and bare fallback cannot be bypassed. [asserted] | Gate matrix plus weekly fallback job fail closed. [asserted] | ADR-0015 |
 | V0-16 | Secrets never enter chat, git or trajectory. [asserted] | Secret scan plus credential-provider contract test; raw values are rejected before event append. [asserted] | working boundary, ADR-0019 |
 | V0-17 | Change intelligence cannot create resource state or replace dispatch-time capability probes. [asserted] | Source-authority fixtures reject headroom/reset mutations and prove relevant events force a probe while missing feeds still fail closed. [asserted] | ADR-0029 |
-| V0-18 | A human approval, gate lift, spend authorisation or verdict is valid only when the human principal authored it. [asserted] | Fixtures reject an agent-authored event carrying a human decision, and reject a human decision inferred from the principal field. [asserted] | ADR-0020 proposal, EXP-16 |
+| V0-18 | A human approval, gate lift, spend authorisation or verdict is valid only when the human principal authored it. [asserted] | `test_an_agent_cannot_author_a_deferred_human_verdict` and `test_an_agent_cannot_author_a_verdict_correction` reject both attempt-verdict paths; fixtures also reject authority inferred from the principal field. [asserted] | ADR-0020 proposal, EXP-16 |
 | V0-19 | Display name, title and persona are never an authority, capability, admission or routing input. [asserted] | Routing, admission and acceptance tests reject persona-derived inputs; a property test asserts that changing a display name changes no decision. [asserted] | ADR-0010, ADR-0025 |
 | V0-20 | Every convened or fanned-out structure carries hard budget, turn and depth caps, and exhaustion escalates. [asserted] | Loop test asserts an over-budget structure terminates and escalates rather than continuing; a recursion-depth assert fails closed. [asserted] | ADR-0020 proposal |
 | V0-21 | Outcome dimensions are reported separately and never composited; no self-report, human or model, is an acceptance or routing input. [asserted] | Contract test rejects any composite outcome score; routing and acceptance tests reject satisfaction, thumbs-up and confidence fields as inputs. [asserted] | Q30, working principle 5 |
@@ -409,6 +425,7 @@ not satisfy the invariant. [asserted]
 | V0-23 | The harness asks only in the classes ADR-0033 names, and an approval returned below the affordability floor is stored unread and cannot satisfy a human decision. [asserted] | Configuration-load test rejects an unlisted ask class; fixture proves a below-floor approval fails V0-18. [asserted] | ADR-0033 |
 | V0-24 | A recorded reversal is executable, and reversibility is measured rather than declared. [asserted] | Schema test rejects a reversal that is not a revert reference, a command or a named inverse; a sampler executes recorded reversals in a scratch worktree and publishes the misclassification rate. [asserted] | ADR-0033 |
 | V0-25 | Liveness is never resolved from a process identity, a terminal artefact record outranks a stale liveness signal, and detection escalates rather than terminating. [asserted] | Fixtures reject PID-only liveness, reproduce the Airflow completed-task-marked-failed regression, fail a configured-but-unfed progress channel at load, and reject termination without a standing authority. [asserted] | ADR-0034 |
+| V0-26 | Every outcome has one stable attempt identity, and deferred human verdicts resolve to that attempt without duplicating it. Unknown attempts and duplicate ordinary verdicts fail closed; corrections name the expected prior verdict. [asserted] | `test_a_deferred_human_verdict_amends_one_attempt_for_beta`, `test_a_verdict_for_an_unknown_attempt_fails_closed`, `test_two_verdicts_for_one_attempt_fail_closed` and `test_a_correction_against_the_wrong_prior_verdict_fails_closed`. [measured] | ADR-0002, ADR-0006 |
 
 ## 12. Acceptance evidence and release decision
 

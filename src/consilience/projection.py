@@ -3,6 +3,8 @@
 V0-02: SQLite is only a projection of the JSONL. Delete it, replay, and the state is
 identical. Nothing may write to the database except a replay of events.
 
+V0-26: an outcome and its deferred human verdict project to one row keyed by attempt_id.
+
 "Byte-identical state" is checked as a digest over a canonical dump of every row, not over
 the database file. SQLite files are not byte-stable across writes — page ordering, freelists
 and the header's change counter all move — so a file-level comparison would fail for reasons
@@ -16,7 +18,14 @@ import json
 import sqlite3
 from pathlib import Path
 
-from .events import Event, Rejection, read_all
+from .events import (
+    Event,
+    OUTCOME_KIND,
+    Rejection,
+    VERDICT_CORRECTION_KIND,
+    VERDICT_KIND,
+    read_all,
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -30,6 +39,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE TABLE IF NOT EXISTS outcomes (
     position        INTEGER PRIMARY KEY,
+    attempt_id      TEXT NOT NULL UNIQUE,
     ts              TEXT NOT NULL,
     task            TEXT NOT NULL,
     task_family     TEXT,
@@ -45,10 +55,6 @@ CREATE TABLE IF NOT EXISTS rejections (
     reason TEXT NOT NULL
 );
 """
-
-# The one event kind that carries an acceptance observation. Anything else is context.
-OUTCOME_KIND = "attempt.outcome"
-
 
 class ProjectionError(RuntimeError):
     pass
@@ -108,37 +114,113 @@ def _apply(conn: sqlite3.Connection, events: list[Event]) -> None:
         )
         if event.kind == OUTCOME_KIND:
             _apply_outcome(conn, position, event)
+        elif event.kind == VERDICT_KIND:
+            _apply_verdict(conn, position, event)
+        elif event.kind == VERDICT_CORRECTION_KIND:
+            _apply_verdict_correction(conn, position, event)
 
 
 def _apply_outcome(conn: sqlite3.Connection, position: int, event: Event) -> None:
     data = event.data
-    for field in ("task", "verifier_accept"):
+    for field in ("attempt_id", "task", "verifier_accept"):
         if field not in data:
             raise ProjectionError(
                 f"{OUTCOME_KIND} at position {position} is missing {field!r}"
             )
+    attempt_id = data["attempt_id"]
+    if not isinstance(attempt_id, str) or not attempt_id.strip():
+        raise ProjectionError(
+            f"attempt_id must be a non-empty string at position {position}"
+        )
+    if conn.execute(
+        "SELECT 1 FROM outcomes WHERE attempt_id = ?", (attempt_id,)
+    ).fetchone():
+        raise ProjectionError(
+            f"duplicate attempt_id {attempt_id!r} at position {position}"
+        )
+    if "human_verdict" in data:
+        raise ProjectionError(
+            f"{OUTCOME_KIND} cannot carry human_verdict; append a separate "
+            f"{VERDICT_KIND} event"
+        )
     accept = data["verifier_accept"]
     if not isinstance(accept, bool):
         raise ProjectionError(
             f"verifier_accept must be a boolean, got {type(accept).__name__} at {position}"
         )
-    verdict = data.get("human_verdict")
-    if verdict not in (None, "accept", "reject"):
-        raise ProjectionError(
-            f"human_verdict must be 'accept', 'reject' or absent, got {verdict!r}"
-        )
     conn.execute(
-        "INSERT INTO outcomes (position, ts, task, task_family, verifier_version,"
-        " verifier_accept, human_verdict) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO outcomes (position, attempt_id, ts, task, task_family,"
+        " verifier_version, verifier_accept, human_verdict)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             position,
+            attempt_id,
             event.raw["ts"],
             data["task"],
             data.get("task_family"),
             data.get("verifier_version"),
             int(accept),
-            verdict,
+            None,
         ),
+    )
+
+
+def _apply_verdict(conn: sqlite3.Connection, position: int, event: Event) -> None:
+    data = event.data
+    attempt_id = data.get("attempt_id")
+    verdict = data.get("human_verdict")
+    if verdict not in ("accept", "reject"):
+        raise ProjectionError(
+            f"{VERDICT_KIND} at position {position} must carry human_verdict "
+            "'accept' or 'reject'"
+        )
+    row = conn.execute(
+        "SELECT human_verdict FROM outcomes WHERE attempt_id = ?", (attempt_id,)
+    ).fetchone()
+    if row is None:
+        raise ProjectionError(
+            f"{VERDICT_KIND} at position {position} references unknown attempt "
+            f"{attempt_id!r}"
+        )
+    if row[0] is not None:
+        raise ProjectionError(
+            f"attempt {attempt_id!r} already has a verdict; a second verdict at "
+            f"position {position} is ambiguous"
+        )
+    conn.execute(
+        "UPDATE outcomes SET human_verdict = ? WHERE attempt_id = ?",
+        (verdict, attempt_id),
+    )
+
+
+def _apply_verdict_correction(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
+    data = event.data
+    attempt_id = data.get("attempt_id")
+    previous = data.get("previous_verdict")
+    verdict = data.get("human_verdict")
+    row = conn.execute(
+        "SELECT human_verdict FROM outcomes WHERE attempt_id = ?", (attempt_id,)
+    ).fetchone()
+    if row is None:
+        raise ProjectionError(
+            f"{VERDICT_CORRECTION_KIND} at position {position} references unknown "
+            f"attempt {attempt_id!r}"
+        )
+    current = row[0]
+    if current is None:
+        raise ProjectionError(
+            f"attempt {attempt_id!r} has no verdict to correct at position {position}"
+        )
+    if current != previous:
+        raise ProjectionError(
+            f"{VERDICT_CORRECTION_KIND} at position {position} expected prior verdict "
+            f"{previous!r}, found {current!r}"
+        )
+    conn.execute(
+        "UPDATE outcomes SET human_verdict = ? WHERE attempt_id = ?",
+        (verdict, attempt_id),
     )
 
 

@@ -5,6 +5,7 @@ The append-only JSONL log is the record; everything else is a projection of it (
 Invariants enforced here, each with a test in the same commit:
   V0-01  every event is schema-versioned and append-only.
   V0-18  a human decision is valid only when the human principal authored it.
+  V0-26  attempt outcomes and their later human verdicts share one stable identity.
 """
 
 from __future__ import annotations
@@ -19,6 +20,10 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 
 REQUIRED = ("v", "ts", "event", "actor", "data")
+
+OUTCOME_KIND = "attempt.outcome"
+VERDICT_KIND = "attempt.verdict"
+VERDICT_CORRECTION_KIND = "attempt.verdict.correction"
 
 # RFC3339 with an explicit offset or Z. A naive timestamp is rejected: replay across machines
 # must not depend on the reader's timezone.
@@ -109,8 +114,60 @@ def validate(event: dict) -> dict:
     if not isinstance(event["data"], dict):
         raise EventError("data must be an object")
 
+    _check_attempt_identity(event)
     _check_human_authority(event)
+    _check_attempt_contract(event)
     return event
+
+
+def _check_attempt_identity(event: dict) -> None:
+    """Attempt records carry the stable identity that later records reference."""
+    if event["event"] not in (
+        OUTCOME_KIND,
+        VERDICT_KIND,
+        VERDICT_CORRECTION_KIND,
+    ):
+        return
+    attempt_id = event["data"].get("attempt_id")
+    if not isinstance(attempt_id, str) or not attempt_id.strip():
+        raise EventError(
+            f"{event['event']} must carry a non-empty string attempt_id"
+        )
+
+
+def _check_attempt_contract(event: dict) -> None:
+    """Keep verifier outcomes and human judgements on distinct event paths."""
+    kind = event["event"]
+    data = event["data"]
+    if kind == OUTCOME_KIND and "human_verdict" in data:
+        raise EventError(
+            f"{OUTCOME_KIND} cannot carry human_verdict; append a separate "
+            f"{VERDICT_KIND} event"
+        )
+    if "human_verdict" in data and kind not in (
+        VERDICT_KIND,
+        VERDICT_CORRECTION_KIND,
+    ):
+        raise EventError(
+            f"human_verdict is valid only on {VERDICT_KIND} or "
+            f"{VERDICT_CORRECTION_KIND}"
+        )
+    if kind in (VERDICT_KIND, VERDICT_CORRECTION_KIND) and "human_verdict" not in data:
+        raise EventError(f"{kind} must carry human_verdict")
+    if kind != VERDICT_CORRECTION_KIND:
+        return
+
+    previous = data.get("previous_verdict")
+    if previous not in ("accept", "reject"):
+        raise EventError(
+            f"{VERDICT_CORRECTION_KIND} must carry previous_verdict 'accept' or "
+            f"'reject', got {previous!r}"
+        )
+    if data["human_verdict"] == previous:
+        raise EventError("a verdict correction must change the previous verdict")
+    reason = data.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise EventError(f"{VERDICT_CORRECTION_KIND} must carry a non-empty reason")
 
 
 def _check_human_authority(event: dict) -> None:
@@ -120,6 +177,7 @@ def _check_human_authority(event: dict) -> None:
     grant, so it can never convert an agent-authored event into the human's decision.
     """
     decision = event["data"].get("human_decision")
+    has_verdict = "human_verdict" in event["data"]
     verdict = event["data"].get("human_verdict")
 
     # A human verdict IS a human decision, and until 20 Aug 2026 it was the way round this
@@ -130,7 +188,7 @@ def _check_human_authority(event: dict) -> None:
     # invariant that exists to prevent exactly that — never fired. Found by Cursor
     # (Gemini 3.7 Flash) auditing code Claude wrote; a second path to a guarded state is
     # the `jobboard-v2` failure this project was founded on.
-    if verdict is not None:
+    if has_verdict:
         if verdict not in ("accept", "reject"):
             raise EventError(
                 f"human_verdict must be 'accept' or 'reject', got {verdict!r}"
