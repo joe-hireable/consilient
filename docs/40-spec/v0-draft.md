@@ -37,6 +37,14 @@ through a measured mechanism — sycophantic output was rated 9% higher in quali
 likely to be reused while cutting the behaviour it was meant to support — so any composite
 would be pushed up by exactly what pushes β up. [cited] V0-21 carries the check.
 
+The harness is **decisive by default**: it decides reversible questions itself, records how
+to reverse them, and reserves the user's attention for the classes ADR-0033 names — money,
+credentials, preferential questions, the safety floor, the β verdict, anything leaving the
+machine, and lifting a gate. [asserted] Asking is not free and not neutral: the interventions
+that most reduce over-reliance are the ones users find harder, prefer less and trust less, and
+their benefit falls unevenly. [cited] An ask the user cannot afford to answer does not transfer
+a decision; it launders an agent decision as a human one. [asserted]
+
 Agency is treated as a mechanism rather than a courtesy: the best-measured protective factor
 against developer burnout under generative AI was autonomy, and mandated adoption sat on the
 demands side of the same model. [cited] An orchestrator that mandates a workflow, or that
@@ -380,6 +388,8 @@ not satisfy the invariant. [asserted]
 | V0-19 | Display name, title and persona are never an authority, capability, admission or routing input. [asserted] | Routing, admission and acceptance tests reject persona-derived inputs; a property test asserts that changing a display name changes no decision. [asserted] | ADR-0010, ADR-0025 |
 | V0-20 | Every convened or fanned-out structure carries hard budget, turn and depth caps, and exhaustion escalates. [asserted] | Loop test asserts an over-budget structure terminates and escalates rather than continuing; a recursion-depth assert fails closed. [asserted] | ADR-0020 proposal |
 | V0-21 | Outcome dimensions are reported separately and never composited; no self-report, human or model, is an acceptance or routing input. [asserted] | Contract test rejects any composite outcome score; routing and acceptance tests reject satisfaction, thumbs-up and confidence fields as inputs. [asserted] | Q30, working principle 5 |
+| V0-22 | Every autonomous decision records a reversal path; one without it is an ask, not a decision. [asserted] | Schema test rejects an autonomous decision event lacking a reversal field. [asserted] | ADR-0033 |
+| V0-23 | The harness asks only in the classes ADR-0033 names, and an approval returned below the affordability floor is stored unread and cannot satisfy a human decision. [asserted] | Configuration-load test rejects an unlisted ask class; fixture proves a below-floor approval fails V0-18. [asserted] | ADR-0033 |
 
 ## 12. Acceptance evidence and release decision
 

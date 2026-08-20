@@ -819,6 +819,45 @@ et al. found no retention harm when assistance was confined to authoring with ma
 modification following, so a null here may reflect a protective workflow rather than an absent
 effect. [asserted]
 
+### EXP-33 · Is the ask budget real, and are approvals affordable? `BLOCKED: Gate A trajectory capture`
+**Decides:** ADR-0033 — whether the decide-by-default machinery earns its complexity, or
+whether asks are already rare enough and considered enough that the affordability test,
+latency floor and ask budget are ceremony.
+**Precondition:** Stage 2 trajectory capture live, recording every user interrupt with its
+declared class, the elapsed time to answer, the size of what was being approved, and whether
+a default action was stated in the ask. No new prompts are added for this experiment; it
+instruments what the harness already does. [asserted]
+**Procedure:** observe ordinary working for 30 consecutive days without changing the ask
+behaviour. Classify every interrupt against ADR-0033 §2. Record approval latency against the
+size of the artefact or the materiality of the decision. Do not tell the user which asks are
+being timed — not to deceive, but because an announced latency measure is a cognitive forcing
+function and would change the quantity being measured. Disclose the instrument before the
+window opens and the per-ask timing after it closes. [asserted]
+**Measures:** interrupts per working day; distribution across the seven classes; the count of
+interrupts fitting **no** class, which is the defect rate of the class list itself; approval
+latency; the fraction of approvals below a pre-registered floor; the fraction of asks stating
+a default action; and reversals actually exercised on autonomous decisions.
+**Stopping rules (fixed before the run):**
+- Run the full 30 days without adjusting ask behaviour. Stop early only for a safety-floor
+  event or the user withdrawing. Report a truncated window as truncated. [asserted]
+- **The machinery earns its place** only if at least 15% of approvals fall below the
+  pre-registered affordability floor, or at least three interrupts in the window fit no class
+  in §2. Either shows a real failure the mechanism addresses. [asserted]
+- **The machinery is ceremony** if fewer than 5% of approvals are below the floor, every
+  interrupt fits a class, and the user reports no loss of agency. In that case cut the
+  latency floor and the ask budget from the design and keep only the class list. [asserted]
+- Between 5% and 15%, or fewer than 20 recorded interrupts, is `insufficient evidence`. Do
+  not lower the floor after seeing the distribution — that is fitting the threshold to the
+  result. [asserted]
+- **A high rubber-stamp rate is a finding about the harness, never about the user.** If it
+  fires, the required response is to make the ask cheaper or stop asking, not to add a
+  confirmation step. [asserted]
+**What it cannot decide:** whether the seven classes are the right seven, since it can only
+find classes that are missing and never one that is present but unnecessary; whether the
+latency floor is set correctly, since the floor is preferential and the experiment measures
+against it rather than validating it; and anything about users other than this maintainer,
+because n=1. [asserted]
+
 ### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `READY: blocked only while EXP-07 holds the GPU`
 **Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
 specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a
