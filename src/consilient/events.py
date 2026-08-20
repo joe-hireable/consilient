@@ -15,8 +15,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
@@ -31,6 +35,16 @@ REQUIRED = ("v", "ts", "event", "actor", "data")
 OUTCOME_KIND = "attempt.outcome"
 VERDICT_KIND = "attempt.verdict"
 VERDICT_CORRECTION_KIND = "attempt.verdict.correction"
+BUDGET_STATE_KIND = "budget.state"
+SPEND_RESERVED_KIND = "spend.reserved"
+METERED_PROVIDER = "openrouter"
+METERED_CURRENCY = "USD"
+BUDGET_STATE_ACTOR = "openrouter-probe"
+BUDGET_RESERVATION_ACTOR = "consilient.budget"
+BUDGET_LOCK = ".budget.lock"
+_BUDGET_LOCK_HELD: ContextVar[Path | None] = ContextVar(
+    "consilient_budget_lock", default=None
+)
 
 # RFC3339 with an explicit offset or Z. A naive timestamp is rejected: replay across machines
 # must not depend on the reader's timezone.
@@ -76,11 +90,14 @@ class Rejection:
     path: str
     line: int
     reason: str
+    content_digest: str = ""
 
 
 @dataclass(frozen=True)
 class Event:
     raw: EventPayload
+    path: str | None = None
+    line: int | None = None
 
     @property
     def kind(self) -> str:
@@ -113,6 +130,16 @@ def validate(event: object) -> EventPayload:
         raise EventError(
             f"ts must be RFC3339 with an explicit offset, got {event['ts']!r}"
         )
+    try:
+        stamped = datetime.fromisoformat(event["ts"])
+    except ValueError as exc:
+        raise EventError(f"ts is not a valid calendar timestamp: {event['ts']!r}") from exc
+    if stamped.tzinfo is None or stamped.utcoffset() is None:
+        raise EventError(f"ts must carry an explicit offset, got {event['ts']!r}")
+    try:
+        stamped.astimezone(timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise EventError(f"ts cannot be normalised to UTC: {event['ts']!r}") from exc
 
     for field in ("event", "actor"):
         if not isinstance(event[field], str) or not event[field].strip():
@@ -121,11 +148,101 @@ def validate(event: object) -> EventPayload:
     if not isinstance(event["data"], dict):
         raise EventError("data must be an object")
 
+    _check_budget_contract(event)
     _check_attempt_identity(event)
     _check_attempt_contract(event)
     _check_human_authority(event)
     _check_evidence_class(event)
     return event
+
+
+def _decimal_field(
+    kind: str, data: EventPayload, field: str, *, positive: bool
+) -> None:
+    value = data.get(field)
+    if not isinstance(value, str):
+        qualifier = "positive" if positive else "non-negative"
+        raise EventError(f"{kind} must carry {field} as a finite {qualifier} Decimal string")
+    try:
+        amount = Decimal(value)
+    except InvalidOperation as exc:
+        raise EventError(f"{kind} carries invalid {field} {value!r}") from exc
+    if not amount.is_finite():
+        qualifier = "positive" if positive else "non-negative"
+        raise EventError(f"{kind} must carry {field} as a finite {qualifier} Decimal string")
+    valid_sign = amount > 0 if positive else amount >= 0
+    if not valid_sign:
+        qualifier = "positive" if positive else "non-negative"
+        raise EventError(f"{kind} must carry {field} as a finite {qualifier} Decimal string")
+
+
+def _check_budget_contract(event: EventPayload) -> None:
+    """Budget state and reservations are valid before they reach the trajectory."""
+    kind = event["event"]
+    if kind not in (BUDGET_STATE_KIND, SPEND_RESERVED_KIND):
+        return
+    data = event["data"]
+    if data.get("provider") != METERED_PROVIDER:
+        raise EventError(f"{kind} must carry provider {METERED_PROVIDER!r}")
+    if data.get("currency") != METERED_CURRENCY:
+        raise EventError(f"{kind} must carry currency {METERED_CURRENCY!r}")
+
+    if kind == BUDGET_STATE_KIND:
+        if event["actor"] != BUDGET_STATE_ACTOR:
+            raise EventError(
+                f"{kind} must be attributed to declared writer {BUDGET_STATE_ACTOR!r}"
+            )
+        if datetime.fromisoformat(event["ts"]).utcoffset() != timedelta(0):
+            raise EventError(f"{kind} ts must use UTC so trajectory order is unambiguous")
+        _decimal_field(kind, data, "weekly_spent", positive=False)
+        _decimal_field(kind, data, "monthly_spent", positive=False)
+        observed_at = data.get("observed_at")
+        if not isinstance(observed_at, str) or not TS.match(observed_at):
+            raise EventError(
+                f"{kind} must carry observed_at as RFC3339 with an explicit offset"
+            )
+        try:
+            observed = datetime.fromisoformat(observed_at)
+        except ValueError as exc:
+            raise EventError(f"{kind} carries an invalid observed_at") from exc
+        if observed.tzinfo is None or observed.utcoffset() is None:
+            raise EventError(f"{kind} observed_at must carry an explicit offset")
+        try:
+            observed.astimezone(timezone.utc)
+        except (OverflowError, ValueError) as exc:
+            raise EventError(f"{kind} observed_at cannot be normalised to UTC") from exc
+        digest = data.get("rejection_digest")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise EventError(
+                f"{kind} must carry rejection_digest as a lowercase SHA-256 digest"
+            )
+        return
+
+    if event["actor"] != BUDGET_RESERVATION_ACTOR:
+        raise EventError(
+            f"{kind} must be attributed to declared writer {BUDGET_RESERVATION_ACTOR!r}"
+        )
+    if datetime.fromisoformat(event["ts"]).utcoffset() != timedelta(0):
+        raise EventError(f"{kind} ts must use UTC so trajectory order is unambiguous")
+    state_observed_at = data.get("state_observed_at")
+    if not isinstance(state_observed_at, str) or not TS.match(state_observed_at):
+        raise EventError(
+            f"{kind} must carry state_observed_at as RFC3339 with an explicit offset"
+        )
+    try:
+        state_observed = datetime.fromisoformat(state_observed_at)
+    except ValueError as exc:
+        raise EventError(f"{kind} carries an invalid state_observed_at") from exc
+    if state_observed.tzinfo is None or state_observed.utcoffset() is None:
+        raise EventError(f"{kind} state_observed_at must carry an explicit offset")
+    try:
+        state_observed.astimezone(timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise EventError(f"{kind} state_observed_at cannot be normalised to UTC") from exc
+    run_id = data.get("run_id")
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise EventError(f"{kind} must carry a non-empty string run_id")
+    _decimal_field(kind, data, "amount", positive=True)
 
 
 def _check_evidence_class(event: EventPayload) -> None:
@@ -319,14 +436,48 @@ def _check_clock(event: EventPayload) -> None:
         )
 
 
-def append(path: Path, event: EventPayload) -> EventPayload:
-    """Validate and append. The only writer of the log."""
-    validate(event)
+@contextmanager
+def _budget_transaction(directory: Path) -> Iterator[None]:
+    """Serialise every budget-state and reservation write in one directory."""
+    directory.mkdir(parents=True, exist_ok=True)
+    lock = directory / BUDGET_LOCK
+    lock.touch(exist_ok=False)
+    token = _BUDGET_LOCK_HELD.set(lock.resolve())
+    try:
+        yield
+    finally:
+        _BUDGET_LOCK_HELD.reset(token)
+        lock.unlink(missing_ok=True)
+
+
+def _write_validated(path: Path, event: EventPayload) -> EventPayload:
+    if event["event"] in (BUDGET_STATE_KIND, SPEND_RESERVED_KIND):
+        expected = f"{event['ts'][:10]}.jsonl"
+        if path.name != expected:
+            raise EventError(
+                f"{event['event']} must be written to its timestamped daily file "
+                f"{expected!r}, not {path.name!r}"
+            )
     _check_clock(event)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="\n") as fh:
         fh.write(canonical(event) + "\n")
     return event
+
+
+def append(path: Path, event: EventPayload) -> EventPayload:
+    """Validate and append. The only writer of the log."""
+    validate(event)
+    if event["event"] in (BUDGET_STATE_KIND, SPEND_RESERVED_KIND):
+        lock = (path.parent / BUDGET_LOCK).resolve()
+        if _BUDGET_LOCK_HELD.get() == lock:
+            return _write_validated(path, event)
+        try:
+            with _budget_transaction(path.parent):
+                return _write_validated(path, event)
+        except FileExistsError as exc:
+            raise EventError("the budget trajectory is busy") from exc
+    return _write_validated(path, event)
 
 
 def read(path: Path) -> tuple[list[Event], list[Rejection]]:
@@ -342,20 +493,25 @@ def read(path: Path) -> tuple[list[Event], list[Rejection]]:
     rejected: list[Rejection] = []
     with path.open(encoding="utf-8") as fh:
         for number, line in enumerate(fh, start=1):
+            content_digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
             line = line.strip()
             if not line:
                 continue
             try:
                 raw = json.loads(line)
             except json.JSONDecodeError as exc:
-                rejected.append(Rejection(str(path), number, f"not valid JSON: {exc}"))
+                rejected.append(
+                    Rejection(
+                        str(path), number, f"not valid JSON: {exc}", content_digest
+                    )
+                )
                 continue
             try:
                 validate(raw)
             except EventError as exc:
-                rejected.append(Rejection(str(path), number, str(exc)))
+                rejected.append(Rejection(str(path), number, str(exc), content_digest))
                 continue
-            events.append(Event(raw))
+            events.append(Event(raw, str(path), number))
     return events, rejected
 
 
@@ -368,6 +524,19 @@ def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
         events.extend(file_events)
         rejected.extend(file_rejected)
     return events, rejected
+
+
+def rejection_digest(rejected: list[Rejection]) -> str:
+    """Fingerprint the exact quarantined lines without binding to an absolute clone path."""
+    rows = (
+        json.dumps(
+            (Path(item.path).name, item.line, item.reason, item.content_digest),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        for item in rejected
+    )
+    return hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
 
 
 def bypassed(directory: Path) -> list[tuple[str, int]]:
