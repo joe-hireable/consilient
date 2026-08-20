@@ -69,6 +69,23 @@ a clean one. It is not condemned; it is *unverifiable*, and it decided ADR-0003.
 A single-instance guard alone would have prevented this. A `run_id` per record would have made it
 visible.
 
+### 🔴 D2. Gate B2 cannot fail, and it is the only gate β can move
+`gate-b2-and-the-unconnected-meter-2026-08-20.md`
+
+Gate B2 asks whether the derived parallelism ceiling exceeds 1. Under the project's own model,
+`frac_seen ≤ 1` so `T_eff ≤ T_r`, giving `n_max ≥ 25/8 = 3.125` **for every critic recall and
+therefore every β, including β = 1.0** — a critic that catches nothing. A threshold below the
+minimum possible value of the quantity it gates passes by tautology. [measured]
+
+ADR-0015 states the false belief plainly: *"If measured critic recall yields a ceiling of 1…"* —
+recall cannot lower the ceiling, only raise it.
+
+**Gate B2 is the only gate condition whose value depends on β.** Every other asks whether
+something exists, ran, or completed. As things stand, **β gates nothing.**
+
+Verified independently after being raised by an attack run; the ceiling table is also tagged
+`[algebra]` while being that formula evaluated on three unmeasured point estimates.
+
 ### 🟠 E. Two Ollama upstream reports, drafted not sent
 Outward-facing, carries your name. ADR-0036 § 3 holds our outbound work to the standard we ask of
 inbound.
@@ -182,9 +199,33 @@ needs.
 | Codex (GPT) | numbers-traceability audit — 382 claim bundles, 336 adjudicated, **184 reproduce, 13 do not, 139 untraceable** | report being emitted |
 | Ollama / local | EXP-31, compromised | running, results not to be believed |
 
-Codex's headline non-reproducing items, pending its full report: ADR-0002's non-zero false-safe
-probability, ADR-0012's invalid dependence bound, EXP-01's 32/40/30 sample contradiction, and
-EXP-27's 1.3-second claim having no timing field.
+Codex's report is preserved at `codex-numbers-audit-2026-08-20.md` — 26 of its 33 findings; six
+were lost to an output cap I set, which is recorded there rather than papered over.
+
+**The one already acted on, because it is a safety claim.** ADR-0002 said *"the false-safe rate
+is **0** at every sample size tested"*. Running the script the ADR names as its own executable
+model prints **0.003 at n = 50** and **0.001 at n = 100** for a genuinely unsafe repository at
+β = 0.15. The script's own note says the rate *"must be ~0"* — true, and a different claim from
+*"is 0"*. **A tilde was dropped in transcription and an approximation became a guarantee.**
+[measured]
+
+The exact binomial agrees with the script rather than the prose: 0.0029055 and 0.0015527,
+predicting 23.2 and 12.4 false-safes across the 8,000 draws used; observing none at n = 50 has
+probability 8 × 10⁻¹¹. **Worse where it matters** — at true β = 0.12, barely above β\* = 0.1119,
+the rate at n = 50 is **0.0131**, about 105 in 8,000. The rule is weakest exactly where a
+repository is marginally unsafe.
+
+Verified three ways before touching anything: Codex's arithmetic, an independent exact-binomial
+computation, and running the script unchanged. The decision rule survives; the zero-error claim
+does not. This project's thesis is that tests have error rates — advertising its own rule as
+having none is the error it exists to catch, in its founding ADR.
+
+**Not yet verified, and not to be quoted until they are:** EXP-01 carrying three incompatible
+audit denominators (32, 40 and 30); ADR-0012's dependence bound; a 69%→28% figure that ADR-0033
+and ADR-0035 both lean on while conflicting with the repository's own later full-read
+bibliography entry; ADR-0011 and ADR-0019 sharing a corrupted "21 frameworks" denominator; and
+EXP-01's β estimates having no retained raw labels, which Codex ranks as the single most
+consequential untraceable claim in the repository.
 
 ---
 
@@ -193,3 +234,7 @@ EXP-27's 1.3-second claim having no timing field.
 1. **Answer the β axis question** (§ A) and say whether the ~146-pair audit waits.
 2. **Grade the pack** (§ C) — it is built, blind, and blocks the largest open decision.
 3. **Say one sentence about EXP-27's collector** (§ F) — it costs a month per day of delay.
+
+And if you have appetite for a fourth: **Gate B2** (§ D2). A gate that cannot fail is worse than
+no gate, because it manufactures the appearance of a check — and it is the only place β touches a
+decision at all.
