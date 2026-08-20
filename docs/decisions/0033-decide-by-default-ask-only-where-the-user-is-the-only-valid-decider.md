@@ -58,6 +58,67 @@ evidence classes. [asserted] V0-24 closes it: a recorded reversal must be *execu
 sampler periodically executes recorded reversals in a scratch worktree and publishes the
 misclassification rate as a measured number. A reversal path nobody has ever run is a claim.
 
+## Update: 2026-08-20 — granular technical decisions are the harness's, and this is a product requirement
+
+Joe, 20 August 2026:
+
+> *"I don't have any appetite for granular technical decisions — these need to be made by agents.
+> **Many users will prefer it this way.**"*
+
+Said after he was handed three blocking questions and answered two of them with *"decide for me"*.
+[measured]
+
+**The second sentence is the load-bearing one.** This is not a note about one maintainer's
+preference on one morning. It is a statement about who the product is for, and it belongs in the
+decision record rather than in a chat log.
+
+### What changes
+
+The original ADR reserved the user for *money leaving an account, credentials, anything published
+or exposed outside the machine, deleting or overwriting something irrecoverable, and genuine
+preference questions no fact settles.* That list stands unchanged.
+
+What is now explicit is the **converse**, which the ADR implied and did not say: **a technical
+question with a defensible answer is not a preference question, and must not be escalated as
+one.** Specifically, the harness decides — and records — without asking:
+
+- which of two conditionals a quantity is defined on, where one is already implied by the code and
+  the algebra;
+- which of several defensible estimators, thresholds or samples to use;
+- whether an experiment is re-run, and in what order work is done;
+- how an instrument is repaired, and what its tests must cover;
+- any change reversible by one `git revert`, whatever its blast radius on paper.
+
+**Escalating one of these is now a defect, not caution.** [asserted] The failure it produces is
+specific and was observed: an ask the user cannot cheaply answer gets approved to keep things
+moving, and a rubber-stamped approval launders the agent's decision into a human one. That is
+worse than deciding, because it destroys the record of who actually chose.
+
+### The obligation that replaces asking
+
+Deciding is not licence to decide quietly. Every autonomous decision of this class carries, in the
+same commit:
+
+1. **the reasoning**, including the option not taken and why;
+2. **the reversal path** — the command, not the assurance;
+3. **the falsifier** — what observation would show the decision wrong.
+
+A decision recorded without (3) is a preference wearing a technical costume, and should have been
+escalated after all.
+
+### What it means for the product
+
+Every user is one person with finite attention, and most will have less appetite for this than a
+maintainer who built the thing. So the default posture is: **the harness decides technical
+questions and reports; the human decides irreversible and preferential ones and is asked.** The
+visibility dial in ADR-0035 is how a user who wants more say gets it — by *turning it up*, not by
+the harness asking more.
+
+**What would overturn this.** A user who wanted to be asked, was not, and lost something they
+cared about — which is a measurable event, and EXP-33 is where it would show up. The
+`unread`-approval floor already recorded in this ADR is the same signal from the other direction:
+if approvals come back faster than they could have been read, the asks were not wanted either.
+
 ## Context
 
 Joe, 20 August 2026: *"We don't want to make users impotent by removing decision making
