@@ -1526,6 +1526,91 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
 - Higher-order multi-point semantic failures not captured by single-mutant operators.
 
+### EXP-52 · Does agent consensus reduce error, or reproduce it? `READY`
+**Pre-registered 20 Aug 2026, before any arm was run. Registered because a refusal was made on
+theory and Joe was right that theory is not measurement.**
+**Decides:** whether swarm consensus — the largest single mechanism in `ruvnet/ruflo`, and the one
+this project refused in `ruflo-assessment-2026-08-20.md` — reduces the false-accept rate, or merely
+reproduces a single agent's error at N times the cost. **It also tests ADR-0010 against itself**,
+which is why it is worth running rather than arguing: if voting over shared evidence materially
+beats a single agent, ADR-0010 is too strong and Ruflo is right.
+**Precondition:** EXP-47's mutant corpus, already committed. Each non-equivalent mutant is a
+known-bad artefact with mechanical ground truth and no human labelling — the same property that made
+EXP-47 possible.
+**Design — four arms over the same items:**
+
+| arm | agents | evidence each sees | what it isolates |
+|---|---|---|---|
+| **1 Single** | 1 | the mutated file and the task | the baseline |
+| **2 Consensus, same family** | N, one family | *identical* context | voting alone |
+| **3 Consensus, cross-family** | N, different families | *identical* context | family diversity without evidence diversity |
+| **4 Cross-family, different evidence** | N, different families | **different views** — one the diff, one the tests, one the specification | ADR-0010's compliant configuration |
+
+All four use the same majority rule and the same items. **Arm 2 versus arm 4 is the decisive
+comparison**: identical voting machinery, different evidence bases.
+**Measures:** β and α per arm with Wilson 95% intervals; pairwise agreement between agents within
+each arm; cost per decision in wall-clock and tokens; and the fraction of items where the arm
+differs from arm 1 at all — a consensus that never overturns the single agent is decorative
+regardless of its β.
+**Stopping rules (fixed before the run):**
+- If arm 2's β interval overlaps arm 1's $\implies$ **voting over shared evidence adds nothing.**
+  Consensus is echo at N times the cost, the refusal in the Ruflo assessment stands on measurement
+  rather than on the theorem alone, and this becomes the empirical support ADR-0010 currently
+  lacks. [asserted]
+- If arm 2's β is materially **below** arm 1's $\implies$ **ADR-0010 is too strong.** Agreement
+  between agents sharing evidence does carry information, the theorem's assumptions do not transfer
+  to this setting, and the refusal must be withdrawn and Ruflo's mechanism reconsidered for
+  adoption. **This outcome goes against the project and must be reported as loudly as the other.**
+  [asserted]
+- If arm 4 beats arms 2 and 3 with non-overlapping intervals $\implies$ **the different class of
+  facts is what helps, not the voting.** That is the strongest available support for the project's
+  central constraint and the clearest argument against buying consensus machinery. [asserted]
+- If arm 3 ≈ arm 2 $\implies$ **family diversity without evidence diversity is not diversity.**
+  Directly relevant to the Cursor/xAI finding, which asks whether a four-family panel is really
+  four. [asserted]
+- If fewer than 60 adjudicable items complete in any arm, the verdict is **insufficient evidence**
+  and no arm is compared. [asserted]
+**What it cannot decide:** whether consensus helps on tasks *unlike* mutation detection —
+open-ended design, long-horizon planning, or work with no mechanical oracle. Mutants are the corpus
+that makes ground truth free, and that is exactly the population where a single agent is already
+strong. **This is the honest limitation and it should be stated in any write-up before the result
+is.**
+
+### EXP-53 · What does signing the trajectory cost, and what does it fail to cover? `READY`
+**Pre-registered 20 Aug 2026. Not run.**
+**Decides:** whether ed25519 signatures at the `append()` chokepoint — the one mechanism worth
+taking from `ruvnet/ruflo` — close the gap that V0-18, V0-28 and the budget-state ingress all share.
+Each protects **declared** provenance: `actor`, `via` and `openrouter-probe` are strings in a JSON
+field, and a hand-written line defeats all three.
+**Precondition:** none beyond the current log. No new dependency: `cryptography` is not installed
+and `AGENTS.md` requires asking first, so the experiment must first establish whether the standard
+library suffices or a dependency is genuinely needed — **that question is part of the experiment,
+not a prerequisite waived before it.**
+**Measures:**
+- Append throughput with and without signing, events per second, on this machine.
+- **Retroactive coverage**, which is expected to be zero and must be reported as such: the existing
+  105 events are unsigned and cannot be signed after the fact without rewriting an append-only log.
+  Signing is forward-only and **the historical record stays unauthenticated permanently.**
+- Whether a signed log still replays to an identical canonical digest (Gate A2 must not break).
+- Whether a reader **without** the key can still read, project and audit the log. If it cannot, the
+  cure is worse than the disease: an unreadable record fails provenance, which is rule one.
+- Key custody. No secret may reach the public repository (Joe, 20 Aug 2026), so the private key is
+  local. **A locally-held key means only this machine can sign**, which bounds the cross-machine
+  federation the mechanism was borrowed to enable — that tension is a result, not an obstacle.
+**Stopping rules (fixed before the run):**
+- If a reader without the key cannot fully audit the log $\implies$ **do not adopt.** Provenance is
+  the first of the three rules derived from `CONSILIENCE.md` and a record only its author can check
+  is not a record. [asserted]
+- If throughput cost exceeds 10x $\implies$ sign **decision events only**, not every event, and say
+  which classes are covered wherever the guarantee is quoted. [asserted]
+- If signing breaks canonical-digest equality $\implies$ the signature belongs outside the canonical
+  form, in a sidecar the digest does not include. [asserted]
+**What it cannot decide:** whether signing prevents the failure V0-18 was written about. EXP-16
+measured **structural confusion**, not forgery, and a signature stops forgery. It is entirely
+possible this closes a hole nothing has ever come through — which is worth knowing before it is
+built, and is the strongest argument for running the experiment before writing the ADR.
+
+
 ### EXP-51 · Probe OpenRouter's spend controls before any spend is authorised `READY`
 **Pre-registered 20 Aug 2026 in ADR-0044, before any credential exists. Not run.**
 **Decides:** whether the capabilities ADR-0044 relies on are real. Everything in that ADR's
