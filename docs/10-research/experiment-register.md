@@ -1512,6 +1512,36 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
 - Higher-order multi-point semantic failures not captured by single-mutant operators.
 
+### EXP-49 · Mutation testing on the research instruments themselves `DONE (partial) 20 Aug 2026 — see experiments/exp49/findings-exp49.md`
+**Pre-registered at `7b6ada0`. Two runs, 20 Aug 2026. Verdict under the fixed stopping rules:
+`insufficient_evidence` — the census did not complete, twice.**
+**Headline (5 of 6 targets, 5,430 mutants):**
+- Research instruments raw $\beta = 0.6825$ [0.6700, 0.6948] against the product code's
+  $0.3345$ [0.3138, 0.3559] (EXP-47). **The instruments are twice as permissive as the code they
+  measure**, and the intervals are far apart.
+- **32.7% of mutants (1,773) lie in 15 functions where NOTHING is killed** — including
+  `exp43/run_commit_test` (the retro-verifier's oracle, 295/295), `exp31/summarise` (224/224),
+  `exp07/run_attempt` (215/215) and `exp27_collector/collect` (208/208). The measurement apparatus
+  has no automated verification.
+- Critical paths are worse than average: `results_write` 0.7984, `timeout` 0.7753, `run_id` 0.5567,
+  `lock` 0.5092.
+- Equivalence uncorrected, so $\beta$ is an **upper bound**. Sensitivity: 75.4% of survivors would
+  have to be equivalent for the gap to close; EXP-47 measured 9.29%. [algebra]
+- **Determinism control passes:** 2,390 mutants compared across two independent 24-worker runs,
+  **zero** outcome disagreements (`compare_runs.py`).
+**Why incomplete:** `input_manifest()` hashes every file found by `rglob` under the watched
+directories, so a transient file created by an instrument's own test suite aborts the census. It is
+a race — run 1 passed the checkpoint that stopped run 2, and no pinned path differs afterwards. The
+repair is proposed in the findings and deliberately not applied, because it changes `harness_sha256`
+and must be recorded as an amendment rather than a silent patch. `exp27_handshake` (965 mutants)
+remains unmeasured; its verifier makes live CLI capability probes and is ~10x slower per mutant.
+**Decides:** whether the error bars on this project's published figures rest on code that is itself
+verified. They do not.
+**What it cannot decide:** whether any published number is wrong — a weakly guarded instrument is
+not a wrong one; the competence-difficulty gap it inherits from EXP-47, which **EXP-50** is
+registered to measure; and the sixteen research instruments never selected as targets.
+
+
 ### EXP-50 · Do LLM-emitted faults evade the checks at the same rate as synthetic mutants? `READY`
 **Pre-registered 20 Aug 2026, before any fault was generated. Not yet run.**
 **Decides:** the one residual empirical question that both `P1-proxy.md` §2.4 and `P3-echo.md`
