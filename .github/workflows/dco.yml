@@ -1,0 +1,21 @@
+name: DCO
+# Invariant I2/CONTRIBUTING: every commit carries a Signed-off-by matching its author.
+# This check ships in the same commit as the policy it enforces (I1).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  dco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install dco-check
+      - name: Check DCO sign-off on all commits
+        run: dco-check --verbose

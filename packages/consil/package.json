@@ -1,0 +1,7 @@
+{
+  "name": "consil",
+  "version": "0.0.1",
+  "description": "Reserved short name for Consilience (the consilience package) — an open-source meta-harness organised around measuring β. Pre-release.",
+  "license": "MIT",
+  "files": ["README.md"]
+}

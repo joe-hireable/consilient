@@ -1,0 +1,38 @@
+node_modules/
+dist/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# workflow-agent scratch snapshots — never commit
+*_models.json
+modelsdev.json
+
+# regenerable graphify artifacts (rebuilt by post-commit hook)
+graphify-out/
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+
+# derived: the SQLite projection is rebuildable from the trajectory (V0-02)
+.harness/state.db
+.harness/state.db-wal
+.harness/state.db-shm
+
+# Transient runner state: a pid and a run id, meaningful only while a run is live.
+# Committing it would assert a lock that is not held.
+docs/10-research/experiments/*/run.lock
+
+# EXP-27 collector runtime state: rebuilt by running the collector; not evidence.
+docs/10-research/experiments/exp27/collector-state.json

@@ -1,0 +1,220 @@
+{
+  "summary": "EXP-16 Arm A: single agent per decision, all evidence, no communication layer",
+  "agentCount": 6,
+  "logs": [],
+  "result": [
+    {
+      "decision_id": "D1",
+      "decision": "Ship standalone, per ADR-0001: the β-meter is a small harness-agnostic core (history-mining first, live adapters second), not an OpenHarness plugin — though nothing stops a thin OpenHarness adapter later, the project's identity and packaging are standalone.",
+      "rationale": "Three lines of evidence converge, and they are different classes.\n\nFirst, what the instrument actually needs (E1). β is a binomial proportion over accepted diffs, and at solo volumes the only viable labelling route is historical mining of PR outcomes, reverts, and fix-commits — 50–200 accepted diffs only suffice far from threshold. That means the v0 β-meter's primary data source is git history, not live PreToolUse/PostToolUse hook streams. OpenHarness's hooks are the one concrete thing the plugin route buys (E3), and E1 says they are not the bottleneck resource for the first measurement (EXP-01 runs against jobboard-v2 history with no harness in the loop at all). Building as a plugin optimises for the wrong data path.\n\nSecond, the host is a poor bet for a false-safe-sensitive instrument (E3 + E1). OpenHarness is v0.1.x, last release 7 May 2026, 114 tests, 16% fork-to-star ratio suggesting reach rather than production use. E1's robustness sweep shows the closed form already errs false-safe under correlation and unequal slopes; the instrument that guards against false-safe routing cannot itself silently break when a v0.1.x hook surface changes under another team's roadmap. E4's binding constraint is Joe's hours — a plugin converts host churn into a standing maintenance tax Joe cannot refuse, whereas standalone adapters are a tax Joe schedules (EXP-05 exists precisely to price it, one-day budget).\n\nThird, the \"someone already built this\" pattern cuts the other way here (E3 + E2). That pattern has killed three components because the layer was taken; but E2 and E3 jointly establish that verifier false-accept measurement is untouched — Meta-Harness trusts its oracle, the 111-page survey never says \"verifier\", Dekoninck assumes β=0, OpenHarness has no notion of verifier reliability, and METR's 24.2 pp merge-rate gap shows the phenomenon is real at ecosystem scale. An unclaimed thesis deserves its own name and repo; folding it into someone else's plugin directory buries the claim and inherits their name collision problem (E3: \"OpenHarness/OH/oh\" all taken; \"Consilience\" already chosen, ADR-0008).\n\nE4 seals the scope argument: full-OSS, no revenue, small sharply-scoped core with a plugin boundary. That boundary should face outward from Consilience (adapters for Claude Code, Codex, and yes, eventually OpenHarness) rather than inward into a host. The audience argument for the plugin is real but weak: 14.8k stars of a possibly-idle project is not a distribution channel worth surrendering architectural independence for, and a standalone tool that reads plain git history has a larger addressable audience than OpenHarness users specifically.\n\nPreferential remainder: none of D1 is preferential — audience-vs-independence here is settled by the evidence above; only D4-style scope appetite is Joe's alone.",
+      "overturn": "EXP-05 returns the opposite of expectation: the standalone adapter for a second harness (Codex after Claude Code) proves unbuildable within budget or breaks unmaintainably, while a spike shows OpenHarness's hook surface captures every verifier invocation and outcome the β-meter needs with materially less code — that flips the maintenance-tax argument and with it the decision.",
+      "dissent_or_uncertainty": "Solo OSS projects die of obscurity, not adapter tax. OpenHarness offers a nonzero audience on day one, hooks purpose-built for observing tool/verifier outcomes, and MIT licensing; standalone starts at zero users, and E3's own recurring lesson — \"someone already built this\" has been right three times — should make me suspicious of any argument that concludes \"build our own thing anyway\". If live verifier observation (not history mining) turns out to be the data path that matters, the plugin route was the cheap one and I have chosen the expensive one for identity reasons.",
+      "evidence_classes_used": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    },
+    {
+      "decision_id": "D2",
+      "decision": "v0 is the β-meter alone: a read-only CLI that mines a repository's git/PR history (merges, reverts, fix-commits vs CI verdicts) to output a per-repo β̂ with a Wilson 95% interval and a safe/unsafe verdict against a threshold band — success is measured when it yields decision-grade intervals on jobboard-v2 and one weakly-verified contrast repo, and Joe uses the number to set his own routing policy for a week; the same artifact is the stranger's install (\"how much does your CI over-accept?\").",
+      "rationale": "E1 is decisive on ordering: β has never been measured on a real repository, and the robustness sweep shows the closed form's numeric value collapses under correlated model successes (β* 0.112 → 0.028 at ρ=0.6), unequal slopes, and guessing floors. Any v0 that ships routing gated on the closed form before EXP-01 is a false-safe instrument by our own numbers. E1 also settles feasibility of the artifact: β is a binomial proportion over accepted diffs, 50–200 diffs give usable Wilson bounds away from threshold, and historical mining is stated as the only viable labelling route at solo volumes — which is exactly what a history-mining CLI is.\n\nE2 supplies the stranger-value case: METR data show maintainer merge rates average 24.2 pp below automated grader scores for the same PRs — ecosystem-scale proof that automated accept signals over-accept — and the 111-page harness survey mentions \"verifier\" zero times; nobody measures the rate per repo. Meta-Harness trusts its oracle; Dekoninck et al. assume β=0 on SWE-Bench. The per-repository measurement is the confirmed unclaimed gap, so the meter is the one component with defensible novelty.\n\nE3 answers \"why won't this be the fourth thing someone already built?\": the harness layer is taken twice over (DeepSeek, OpenHarness), but neither has any notion of verifier reliability. A bigger v0 (cascade, worktrees, tiers) walks straight into MIT-licensed incumbents; the meter does not.\n\nE4 resolves \"Joe's week vs stranger's install — same artifact?\": yes. The top friction-log entry is \"chose model by feel with no measurement, every task\"; the meter is what replaces feel with a number. Joe's hours are the binding constraint and there is no revenue, arguing for the smallest sharply-scoped core. The measurable success condition, concretely: (1) β̂ with 95% CI on ≥2 repos including the mandated weakly-verified contrast repo (E4 warns jobboard-v2 alone flatters the thesis); (2) the interval is decision-grade — its upper or lower bound clears the threshold band rather than spanning it; (3) Joe runs one week of work routed per the verdict (dogfooding gate, ADR-0015). That is EXP-01 productised, which E4 already ranks as the highest-information unrun experiment — v0 and the critical-path experiment become the same deliverable, the cheapest possible spend of the binding resource.\n\nPreferential remainder: which contrast repo and whether a week of dogfooding is the right acceptance window are Joe's to set; the shape of v0 is not.",
+      "overturn": "If EXP-01 cannot extract decision-grade labels from real history — fewer than ~50 classifiable accepted diffs on jobboard-v2, or revert/fix-commit labelling so noisy that the 95% CI spans the entire threshold band — then history-mining β measurement is dead at solo volumes and v0 must be redefined around prospective logging inside a harness instead.",
+      "dissent_or_uncertainty": "A meter with no actuator may change nothing: a number does not route tasks, so Joe's week improves only if he manually acts on it, and strangers rarely npm-install a diagnostic without the payoff attached — the cascade is the payoff, and E1 shows depth is nearly free (+4.4 pp at 43.8% cost), so shipping meter-plus-minimal-cascade might be the smallest thing anyone actually wants. I cut the cascade anyway because E1 says its safety gate is untrustworthy until β is measured — but if adoption is the real success metric, that cut could be the wrong one.",
+      "evidence_classes_used": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    },
+    {
+      "decision_id": "D3",
+      "decision": "Defer the Inquiry tier from v0; in v0 only log the research-vs-priors decision points in the friction log (a one-line record, no gates), so the tier is designed later against measured need.",
+      "rationale": "Case FOR v0 inclusion, honestly stated: E4's friction log names \"decided research-vs-priors by feel, several times per session\" — the Inquiry trigger addresses one of the highest-frequency frictions recorded, and it is the design element hardest for incumbents to copy (E3: neither OpenHarness nor Meta-Harness has anything like it).\n\nCase AGAINST, which wins: (1) The project's actual novel, defensible contribution is β — verifier false-accept measurement. E2 establishes this precisely: the 111-page harness survey never mentions verifier reliability, Dekoninck et al. assume β=0, Meta-Harness trusts its oracle, and METR's 24.2 pp merge-rate gap shows the phenomenon is real at ecosystem scale. The Inquiry tier contributes nothing to that claim; it competes with it for Joe's hours, which E4 says are the binding constraint. (2) E1 shows the evidence base for the core routing thesis is itself fragile (correlated-success collapse of β* from 0.112 to 0.028; β never measured on any real repo; EXP-01 unrun). A project whose load-bearing quantitative claim is unmeasured should not add a second layer of unmeasured machinery — the four gates (reversibility, blast radius, prior dispersion, formalizability) are four more [asserted] quantities with no measurement protocol, exactly the kind of structure AGENTS.md's rules exist to block. (3) E3's repeating pattern — \"someone already built this, MIT\" has been the right answer three times — and deep-research tooling is the most crowded corner of the agent market; the trigger logic is the only novel part, and trigger logic needs a base-rate to trigger against, which only a logged history provides. (4) E4's own honesty check: \"if the friction log stays short for a month, either Claude Code suffices or the log is dishonest.\" Logging the research-vs-priors moments in v0 is the minimal act that keeps the tier's case falsifiable while costing near-zero hours. The tier's intellectual interest is real; the brief itself concedes it is \"possibly the least urgent,\" and nothing in E1–E3 rebuts that.\n\nPreferential remainder: how much intellectual delight is worth trading against shipping speed is Joe's call alone; I have decided the evidence-side question only.",
+      "overturn": "If one month of dogfooding shows research-vs-priors misjudgements are the largest wasted-hours category in the friction log (bigger than model-choice/routing friction), the deferral reverses and the Inquiry tier enters v0 ahead of secondary cascade features.",
+      "dissent_or_uncertainty": "The friction log already records this friction firing \"several times per session\" — more often than anything except model choice — so I am deferring the second-most-frequent measured pain on the theory that β work matters more; if the Inquiry tier is also the feature no competitor can trivially clone, deferring it may hand the differentiator away while we polish a cascade whose own threshold (E1) is currently untrustworthy.",
+      "evidence_classes_used": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    },
+    {
+      "decision_id": "D4",
+      "decision": "v0 is the β-meter (verifier-outcome logging plus historical PR mining, run on jobboard-v2 and one weakly-verified contrast repo) plus budget primitives — cascade routing, parallel worktrees, critic tier, Inquiry tier, and the local model library are all cut from v0.",
+      "rationale": "The candidate list fails its own evidence in order. (1) Cascade: E1's robustness sweep shows the closed-form β* is a knife-edge — correlated model successes (ρ=0.6) collapse β* from 0.112 to 0.028 and erase most of the quality gain, and the error direction is false-safe. E1 states it directly: any v0 that ships routing gated on the closed form before EXP-01 ships a false-safe instrument. β has never been measured on a real repo. So the cascade cannot responsibly be in v0; the instrument that would license it must come first. (2) Parallel worktrees: E3 shows OpenHarness already ships a worktree tool and subagent teams, MIT-licensed, and E3's own pattern warns any component must survive \"why won't this be the fourth thing someone already built?\" Worktrees don't survive it. (3) Critic tier: E1's identity (critic recall ≡ 1−β) means the critic tier is downstream of the same unmeasured quantity as the cascade — building it before measuring is building on the same sand. (4) Budget primitives stay: E2 documents 63 production budget-overrun incidents (\"not a v2 feature\"), they are small, and E4's solo-hours constraint tolerates them. (5) The β-meter is the only component that is simultaneously the project's thesis (E1: one quantity governs routing, parallelism, review load), the verified gap in the literature (E2: the 111-page survey mentions \"verifier\" zero times; METR merge rates run 24.2pp below automated grader scores; Dekoninck assumes β=0), the untouched space in the market (E3: neither DeepSeek Harness nor OpenHarness has any notion of verifier reliability), and the highest-information unrun experiment (E4: EXP-01 queues ahead of everything). E4's economics — Joe's hours binding, no revenue — force a small core, and the smallest core that is both novel and honest is the measurement instrument itself. This also converts D4's dependency on D2: v0's success condition becomes \"a measured β with Wilson bounds on two repos of opposite verification regimes\", which is achievable solo via historical mining (E1: the only viable labelling route at solo volumes). The preferential remainder: whether Joe's appetite stretches to a manual always-cheap-with-escalation mode alongside the meter (no learned routing — E1 shows Thompson sampling needs ~5,000 trajectories just to match it) is his call, not evidence; I default it out and let the measured β argue it back in.",
+      "overturn": "EXP-01 demonstrates β is unmeasurable at solo volumes — historical PR/revert mining on jobboard-v2 cannot yield enough labelled accepted diffs for a Wilson interval that separates β from β* (E1: n=800 for 86% power near threshold) — which would make a β-meter-only v0 an instrument with nothing to read, and flip v0 toward a friction-log-driven utility (memory wake-up, pre-design prior-art check) instead.",
+      "dissent_or_uncertainty": "A meter with no actuator is a science project, not a tool: E4's friction log says the felt pain is choosing models by feel every task, and a β-meter alone changes no decision Joe makes on Monday — the cascade is what makes the number useful, and shipping measurement without the routing it exists to gate risks a v0 nobody (including Joe) runs twice, while E1's own three-tier result (+4.4pp at 43.8% cost) shows the payoff being deferred is large.",
+      "evidence_classes_used": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    },
+    {
+      "decision_id": "D5",
+      "decision": "Out of v0 as a built feature: the cascade's cheap tier is any OpenAI-compatible endpoint URL in config, so local users point at LM Studio/Ollama and everyone else points at a cheap API model — no discovery, no hardware gating, no library code.",
+      "rationale": "Three evidence classes converge on \"out, wrapped by config\". E3 is the sharpest: the repeating pattern is \"someone already built this, MIT-licensed\", and the model library is literally the first listed instance of it (model library → LM Studio/LLM Checker). Hardware-gated cross-platform model discovery is a solved, actively maintained product category; building a fourth-time-loser component into a pre-v0 solo project fails E3's own survival question. LM Studio and Ollama both expose OpenAI-compatible local servers, so \"wrapped\" costs one config field, not an integration layer. E4 makes hours the binding constraint and argues for a small, sharply-scoped core with a plugin boundary; a cross-platform hardware-detection feature is exactly the kind of scope that eats weeks and traces to no part of the thesis. Nothing in the friction log seeds mentions model discovery — the friction was choosing models by feel with no measurement, which the β-meter addresses, not a library. E1 confirms the cascade needs *a* cheap tier and that depth is nearly free, but every E1 result is model-world: β has never been measured (EXP-01 unrun), the closed form is a knife-edge under correlated model successes, and the stated priority is measurement before any routing machinery. A local model library does zero work toward EXP-01 or EXP-05, the two highest-information unrun experiments everything else queues behind. E1's learned-router result even cautions that cheap-tier sophistication doesn't pay until failure costs are ≥2× wall-clock — a regime we haven't measured. E2 contributes nothing in favour of a library and much in favour of spending v0 effort on the actual gap (per-repo verifier false-accept measurement, which no surveyed system does). Traceability to CONSILIENCE.md seals it: a model library serves neither provenance, difference-of-class, nor measuring the test's error rate. The endpoint-config approach preserves the full local-model option (Joe's 5090 runs the cheap tier via LM Studio today) while writing zero speculative code. The only preferential residue is whether Joe personally wants first-class local UX as an adoption hook for a donations-only project — that's his call, not evidence any agent holds; the technical decision (no library in v0) stands regardless, because the hook can be a README recipe pointing at LM Studio rather than shipped discovery code.",
+      "overturn": "If dogfooding under ADR-0015 shows the config-endpoint cheap tier failing in practice — the friction log filling with local-model setup pain, or EXP-01-era measurement showing cascade gains are only realisable with hardware-matched model selection that a static endpoint cannot provide — the library (or a real LM Studio integration) moves into scope.",
+      "dissent_or_uncertainty": "The strongest counter is adoption economics plus working principle 8: this is a fully-OSS donations-only project (E4), and a stranger's `npm install` is far more likely to succeed if the tool finds a free local cheap tier automatically instead of demanding an API key or manual LM Studio setup — the local library could be the one feature that makes v0 usable at zero marginal cost, and the 5090 rig culture (\"run it, don't reason\") suggests local-first is the project's native mode. Deferring it may quietly bias v0 toward API-key users and understate real cascade economics.",
+      "evidence_classes_used": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    },
+    {
+      "decision_id": "D6",
+      "decision": "Keep the executable-model CI ratchet in v0, but in its minimal form: each ADR that already has a runnable decision model (the existing experiment scripts) gets a CI job that re-runs it and asserts only the SIGN/threshold conclusion, pinned dependencies, no new framework — and EXP-10 runs as the three-month kill-switch.",
+      "rationale": "Three lines of evidence converge, from different classes.\n\nFirst, the failure mode the ratchet guards against is not hypothetical — it already happened, this week, in this repo. The E1 robustness sweep (robustness_beta_star.py, 19 Aug) flipped the load-bearing conclusion of the cascade model: under correlated model successes (ρ=0.6) β* collapses from 0.112 to 0.028 and the quality gain from +4.0pp to +0.9pp; at ρ=0.9 the advantage is zero. That is precisely a sign/threshold flip in an ADR-backing model, caught only because someone happened to re-run it with a new assumption. ADR-0002 and ADR-0009 are PROVISIONAL pending EXP-01/06 (E4): when measured per-repo parameters land, the simulated models WILL be re-parameterised, and the ratchet is the mechanism that notices when a measured parameter overturns a recorded decision.\n\nSecond, the project's own constitution demands it (E4). Working principle 3 — \"a chokepoint without an enforcement rule is not a chokepoint\" — was bought at jobboard-v2's expense (five bypass paths around a documented boundary), and AGENTS.md's \"re-run experiments/*.py before relying on any number\" is today a prompt-level rule, exactly what the Engineering Ratchet principle (#4) says must move into code. Dropping the ratchet while keeping those principles is self-contradiction. The minimal form is also cheap in Joe's binding currency, hours: the scripts exist, jobboard-v2 already runs ~20 CI ratchets as routine practice, and a sign-assert wrapper is a few lines per ADR, not a mechanism.\n\nThird, it is the differentiated part of the stack (E2/E3). Meta-Harness trusts its oracle; the harness survey says \"verifier\" appears zero times across 23 systems; DGM/SICA accept self-modifications on unmeasured signals. Nobody in the landscape re-verifies the decisions their architecture rests on. A project whose entire thesis is \"automated accept signals have error rates you must measure\" cannot itself accept design decisions on stale, unre-run models — the ratchet is the thesis applied reflexively, and it is not the fourth \"someone already built this, MIT\" casualty (E3) because a CI sign-assert over local scripts is too small to be a product anyone shipped.\n\nScope guard, per the ceremony worry in the brief: sign/threshold assertions only (working principle 2 — never point estimates, so no brittle numeric equality); only ADRs that already have scripts (no obligation to write models for prose ADRs); pinned environments to bound dependency rot. EXP-10's three-month measurement stays as the honest exit: the mechanism ships cheap and must earn its keep.\n\nPreferential remainder: whether a fired ratchet blocks merge or merely flags for supersession is Joe's tolerance call; the mechanism's existence in v0 is decided here.",
+      "overturn": "If EXP-10's three-month run shows every ratchet firing was environmental (dependency rot, numerics drift, flaky seeds) and zero firings were genuine sign flips — pure maintenance cost, no signal — the mechanism is ceremony and gets dropped.",
+      "dissent_or_uncertainty": "The strongest argument against: the project is pre-code with day-old ADRs, and EXP-01's measured results will likely supersede the simulated models wholesale rather than re-parameterise them — a ratchet guarding models scheduled for replacement protects the wrong artefact, and with Joe's hours the binding constraint (E4) and D4 already fighting over scope, even a \"cheap\" mechanism competes with EXP-01, which is worth strictly more. The lazy alternative — re-run the scripts manually at each ADR supersession — might capture 90% of the value for zero standing cost.",
+      "evidence_classes_used": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ]
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "ArmA"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "armA:D1",
+      "phaseIndex": 1,
+      "phaseTitle": "ArmA",
+      "agentId": "ae589a7d9f2bf1799",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1787156694768,
+      "queuedAt": 1787156694757,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "D1",
+      "promptPreview": "You are a single decision-maker with access to ALL the evidence. Read these five files IN FULL:\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5bc157081/scratchpad/exp16/decisions.md  (your decision is D1; ignore the others)\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5b…",
+      "lastProgressAt": 1787156739895,
+      "tokens": 60521,
+      "toolCalls": 6,
+      "durationMs": 45127,
+      "resultPreview": "{\"decision_id\":\"D1\",\"decision\":\"Ship standalone, per ADR-0001: the β-meter is a small harness-agnostic core (history-mining first, live adapters second), not an OpenHarness plugin — though nothing stops a thin OpenHarness adapter later, the project's identity and packaging are standalone.\",\"rationale\":\"Three lines of evidence converge, and they are different classes.\\n\\nFirst, what the instrument …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "armA:D2",
+      "phaseIndex": 1,
+      "phaseTitle": "ArmA",
+      "agentId": "a3a8bc78e127b2381",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1787156694769,
+      "queuedAt": 1787156694757,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "D2",
+      "promptPreview": "You are a single decision-maker with access to ALL the evidence. Read these five files IN FULL:\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5bc157081/scratchpad/exp16/decisions.md  (your decision is D2; ignore the others)\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5b…",
+      "lastProgressAt": 1787156741100,
+      "tokens": 59647,
+      "toolCalls": 3,
+      "durationMs": 46331,
+      "resultPreview": "{\"decision_id\":\"D2\",\"decision\":\"v0 is the β-meter alone: a read-only CLI that mines a repository's git/PR history (merges, reverts, fix-commits vs CI verdicts) to output a per-repo β̂ with a Wilson 95% interval and a safe/unsafe verdict against a threshold band — success is measured when it yields decision-grade intervals on jobboard-v2 and one weakly-verified contrast repo, and Joe uses the numbe…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "armA:D3",
+      "phaseIndex": 1,
+      "phaseTitle": "ArmA",
+      "agentId": "a92f20371e311a100",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1787156694770,
+      "queuedAt": 1787156694757,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "D3",
+      "promptPreview": "You are a single decision-maker with access to ALL the evidence. Read these five files IN FULL:\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5bc157081/scratchpad/exp16/decisions.md  (your decision is D3; ignore the others)\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5b…",
+      "lastProgressAt": 1787156734746,
+      "tokens": 60522,
+      "toolCalls": 6,
+      "durationMs": 39976,
+      "resultPreview": "{\"decision_id\":\"D3\",\"decision\":\"Defer the Inquiry tier from v0; in v0 only log the research-vs-priors decision points in the friction log (a one-line record, no gates), so the tier is designed later against measured need.\",\"rationale\":\"Case FOR v0 inclusion, honestly stated: E4's friction log names \\\"decided research-vs-priors by feel, several times per session\\\" — the Inquiry trigger addresses on…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "armA:D4",
+      "phaseIndex": 1,
+      "phaseTitle": "ArmA",
+      "agentId": "a267c0a58957cd35d",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1787156694771,
+      "queuedAt": 1787156694757,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "D4",
+      "promptPreview": "You are a single decision-maker with access to ALL the evidence. Read these five files IN FULL:\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5bc157081/scratchpad/exp16/decisions.md  (your decision is D4; ignore the others)\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5b…",
+      "lastProgressAt": 1787156734748,
+      "tokens": 60523,
+      "toolCalls": 6,
+      "durationMs": 39977,
+      "resultPreview": "{\"decision_id\":\"D4\",\"decision\":\"v0 is the β-meter (verifier-outcome logging plus historical PR mining, run on jobboard-v2 and one weakly-verified contrast repo) plus budget primitives — cascade routing, parallel worktrees, critic tier, Inquiry tier, and the local model library are all cut from v0.\",\"rationale\":\"The candidate list fails its own evidence in order. (1) Cascade: E1's robustness sweep …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "armA:D5",
+      "phaseIndex": 1,
+      "phaseTitle": "ArmA",
+      "agentId": "a816905ec477c70fd",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1787156694772,
+      "queuedAt": 1787156694757,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "D5",
+      "promptPreview": "You are a single decision-maker with access to ALL the evidence. Read these five files IN FULL:\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5bc157081/scratchpad/exp16/decisions.md  (your decision is D5; ignore the others)\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5b…",
+      "lastProgressAt": 1787156734902,
+      "tokens": 60521,
+      "toolCalls": 6,
+      "durationMs": 40130,
+      "resultPreview": "{\"decision_id\":\"D5\",\"decision\":\"Out of v0 as a built feature: the cascade's cheap tier is any OpenAI-compatible endpoint URL in config, so local users point at LM Studio/Ollama and everyone else points at a cheap API model — no discovery, no hardware gating, no library code.\",\"rationale\":\"Three evidence classes converge on \\\"out, wrapped by config\\\". E3 is the sharpest: the repeating pattern is \\\"…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "armA:D6",
+      "phaseIndex": 1,
+      "phaseTitle": "ArmA",
+      "agentId": "aae8217f06c1b9d9b",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1787156694772,
+      "queuedAt": 1787156694757,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "D6",
+      "promptPreview": "You are a single decision-maker with access to ALL the evidence. Read these five files IN FULL:\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5bc157081/scratchpad/exp16/decisions.md  (your decision is D6; ignore the others)\n- C:/Users/jpbpr/AppData/Local/Temp/claude/C--Users-jpbpr-Repositories-consilience/c01aa5f0-9999-4816-ac11-f5b5b…",
+      "lastProgressAt": 1787156740187,
+      "tokens": 60523,
+      "toolCalls": 6,
+      "durationMs": 45415,
+      "resultPreview": "{\"decision_id\":\"D6\",\"decision\":\"Keep the executable-model CI ratchet in v0, but in its minimal form: each ADR that already has a runnable decision model (the existing experiment scripts) gets a CI job that re-runs it and asserts only the SIGN/threshold conclusion, pinned dependencies, no new framework — and EXP-10 runs as the three-month kill-switch.\",\"rationale\":\"Three lines of evidence converge,…"
+    }
+  ],
+  "totalTokens": 362257,
+  "totalToolCalls": 33
+}

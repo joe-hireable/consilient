@@ -1,0 +1,54 @@
+{
+  "experiment": "EXP-27-phase-A",
+  "observed_at": "2026-08-19T22:08:19.423862+00:00",
+  "sources": [
+    {
+      "harness": "claude-code",
+      "kind": "release",
+      "url": "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/feed.xml",
+      "status": 200,
+      "content_type": "text/plain",
+      "sample_bytes": 4096
+    },
+    {
+      "harness": "claude-code",
+      "kind": "status",
+      "url": "https://status.claude.com/api/v2/summary.json",
+      "status": 200,
+      "content_type": "application/json",
+      "sample_bytes": 2154
+    },
+    {
+      "harness": "codex",
+      "kind": "release",
+      "url": "https://github.com/openai/codex/releases.atom",
+      "status": 200,
+      "content_type": "application/atom+xml",
+      "sample_bytes": 4096
+    },
+    {
+      "harness": "codex",
+      "kind": "status",
+      "url": "https://status.openai.com/api/v2/summary.json",
+      "status": 200,
+      "content_type": "application/json",
+      "sample_bytes": 4096
+    },
+    {
+      "harness": "cursor",
+      "kind": "release-html",
+      "url": "https://cursor.com/changelog",
+      "status": 200,
+      "content_type": "text/html",
+      "sample_bytes": 4096
+    },
+    {
+      "harness": "cursor",
+      "kind": "status",
+      "url": "https://status.cursor.com/api/v2/summary.json",
+      "status": 200,
+      "content_type": "application/json",
+      "sample_bytes": 2693
+    }
+  ]
+}
