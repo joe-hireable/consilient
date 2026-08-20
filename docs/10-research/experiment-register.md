@@ -1319,6 +1319,50 @@ exceeded: cut to one question (goal achieved: fully/partially/no), drop sampling
 retired entirely and the outcome record runs on derived signals alone. The β-verdict
 prompt is never sacrificed to keep these prompts alive.
 
+### EXP-43 · Retro-verification of historical commits via forward test replay `DONE 20 Aug 2026 — see experiments/exp43/findings-exp43.md`
+**Decides:** whether replay of future test suites against historical commits (with parent-commit
+control) provides an automated, human-free ground truth for β = P(accept | bad), replacing
+the noisy revert/hotfix proxy without requiring human maintainer triage.
+**Precondition:** target repository git history; isolated scratch worktree/clone; deterministic unit
+test runner; strictly no mutation of target repository.
+**Procedure:**
+1. Draw a fixed sample of historical merge commits ($N=5$ pilot, $N=50$ primary evaluation).
+2. For each merge commit $C_i$, identify its first parent $P_i$.
+3. Overlay the later test suite (unit tests from HEAD or forward revision $C_i + \Delta$) onto both
+   $P_i$ and $C_i$ in a detached scratch worktree.
+4. Execute the filtered deterministic test runner under single-instance file lock and process-tree
+   kill timeout.
+5. Classify the pair:
+   - `defect`: $P_i$ PASS $\land$ $C_i$ FAIL (candidate introduced a regression caught by later tests).
+   - `clean`: $P_i$ PASS $\land$ $C_i$ PASS (candidate satisfies later tests).
+   - `drift`: $P_i$ FAIL $\land$ $C_i$ FAIL (interface evolution / pre-existing incompatibility; unattributable).
+   - `enhancement`: $P_i$ FAIL $\land$ $C_i$ PASS (candidate added functionality asserted by later tests).
+   - `execution_error` / `timeout`: execution aborted.
+6. On contemporaneous green merges with valid parent baseline ($P_i$ PASS), compute:
+   $\beta_{\text{retro}} = \text{Count}(\text{defect}) / (\text{Count}(\text{defect}) + \text{Count}(\text{clean}))$.
+**Exclusions (mandatory):**
+- Live-model / LLM evaluation suites (`evals/`, prompt evaluations).
+- End-to-end browser suites (Playwright / Cypress).
+- External network/API calls, database migrations requiring live cloud services, and non-deterministic timing tests.
+**Measures:**
+- Discrimination rate: fraction of evaluated commits where $P_i \neq C_i$.
+- Drift rate: fraction where $P_i$ FAIL $\land$ $C_i$ FAIL (censored by interface evolution).
+- Median wall-clock cost per commit pair $(P_i, C_i)$.
+- $\beta_{\text{retro}}$ point estimate and Wilson 95% confidence interval.
+**Stopping rules (fixed before the run):**
+- If drift rate $> 80\%$ across the sample, retro-verification is structurally unviable as a universal
+  β oracle due to interface evolution $\rightarrow$ REJECT as general oracle, restrict to regression diagnostic. [asserted]
+- If discrimination rate $> 0$ with zero false-positive drift on known-clean historical baseline commits
+  and drift rate $\le 80\%$, retro-verification is ADMITTED as a mechanical ground truth for regression β. [asserted]
+- If fewer than 10 commits yield an evaluable parent-pass baseline ($P_i$ PASS), record `insufficient evidence`
+  — do not report a point estimate from single-digit denominators. [asserted]
+- Pilot stopping rule: If median commit pair execution exceeds 120 s wall-clock or produces process runaway,
+  halt pilot and tighten test filtering before any larger run. [asserted]
+**What it cannot decide:**
+- β on greenfield/additive PRs where the interface did not exist at $P_i$ (censored by the parent control);
+- Latent defects that were never discovered and never received a regression test (survivorship bias);
+- Defect severity or maintainer intent.
+
 ---
 
 ## Not experiments
