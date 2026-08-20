@@ -236,7 +236,6 @@ def run_commit_test(
         "--testTimeout=5000",
     ]
 
-    test_started = time.monotonic()
     proc = subprocess.Popen(
         cmd,
         cwd=str(scratch_repo),
@@ -260,9 +259,8 @@ def run_commit_test(
             stdout, stderr = proc.communicate(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
-            stdout, stderr = "", ""
+            # No output is captured after a kill and nothing downstream reads it.
 
-    test_duration = time.monotonic() - test_started
     total_duration = time.monotonic() - started
 
     if timed_out:
@@ -384,8 +382,6 @@ def summarise(records: list[dict]) -> dict:
     cleans = outcomes.get("clean", 0)
     drifts = outcomes.get("drift", 0)
     enhancements = outcomes.get("enhancement", 0)
-    timeouts = outcomes.get("timeout", 0)
-    errors = outcomes.get("execution_error", 0)
 
     evaluable_parent_passes = defects + cleans
     drift_rate = round(drifts / total, 4) if total > 0 else 0.0
