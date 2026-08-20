@@ -766,6 +766,59 @@ cost. Self-reported confidence is excluded. [asserted]
   its role threshold, record “insufficient or negative evidence” and keep orchestration
   supervised. [asserted]
 
+### EXP-32 · Does the reviewer's unaided defect detection decay under sustained assistance? `BLOCKED: Gate A trajectory capture + a held-out defect bank`
+**Decides:** the β-drift hypothesis in `human-success-and-the-human-side-of-beta.md` — whether
+the human half of the acceptance signal is non-stationary, which would make β a moving target
+rather than a property of the checks. If it holds, every system in the self-improving-agent
+literature that validates modifications against a fixed acceptance signal inherits the
+problem. [asserted]
+**Why the mechanism and not β itself:** measuring β drift directly needs months of human
+verdicts, and EXP-01 already found verdicts to be the scarcest input in the system.
+[measured] This measures the proposed *mechanism* — unaided defect-detection ability —
+which is cheap, behavioural and does not consume verdict budget. A mechanism result cannot
+by itself establish drift in β. [asserted]
+**Precondition:** Stage 2 trajectory capture live (ADR-0015 Gate A); a defect bank of at
+least 120 diffs drawn from public repository history, each with an adjudicated defect or a
+verified clean label, stratified by defect class and explicitly over-sampling the classes
+Shen & Tamkin found to degrade most (defects found by debugging rather than by reading);
+items partitioned into waves before wave 1 so no item is ever seen twice; and a recorded
+count of assisted versus assistant-off working hours between waves. [asserted]
+**Procedure:** an N-of-1 repeated-measures design on the maintainer, with waves at fixed
+intervals. Each wave presents a held-out block of diffs assistant-off, in randomised order,
+with a fixed per-item time cap and no test execution. Record accept/reject and, where
+rejected, the located line. Between waves, the harness records assisted exposure from the
+trajectory. Wave composition is fixed before wave 1 and never adjusted after seeing a result.
+[asserted]
+**Measures:** unaided defect-detection rate per wave; false-reject rate on clean diffs per
+wave; per-item latency; detection rate split by defect class; assisted exposure hours between
+waves; and, separately, the concurrent behavioural scrutiny signals the harness already
+records — time from agent completion to human accept, and edit distance between proposed and
+merged diff. Self-reported confidence is recorded as an outcome and never as a gate, per
+working principle 5. [asserted]
+**Stopping rules (fixed before the run):**
+- Run every registered wave. Stop for item-bank exhaustion, a leak of a held-out item into
+  assisted work, fewer than four completed waves, or the maintainer withdrawing. Report
+  censored waves without outcome-aware replacement. [asserted]
+- **Drift is claimed only if** unaided detection falls monotonically across at least four
+  waves **and** the fall exceeds 10 percentage points from wave 1, **and** the false-reject
+  rate on clean diffs does not fall by a comparable amount — a uniform shift towards
+  accepting everything is fatigue or disengagement, not decay of discrimination. [asserted]
+- **A rise or a flat series across four or more waves falsifies the hypothesis for this
+  subject**, and the claim is withdrawn from the research document rather than reworded.
+  [asserted]
+- Fewer than four waves, or a non-monotonic series, is `insufficient evidence`. Do not
+  extend the item cap, change the interval or add waves after seeing a trend. [asserted]
+- **This is n=1 and yields no population estimate.** It can show that drift occurs in one
+  reviewer, or fail to; it can never establish a rate, and a single-subject result may not be
+  reported as evidence about developers in general. [asserted]
+**What it cannot decide:** whether β itself moved, since β needs verdicts on artefacts the
+checks accepted and this measures detection on a curated bank; whether any observed decay is
+caused by assistance rather than by ageing, workload, boredom or item-difficulty drift, none
+of which an N-of-1 design controls; and whether the counterexample regime applies — Kazemitabaar
+et al. found no retention harm when assistance was confined to authoring with manual
+modification following, so a null here may reflect a protective workflow rather than an absent
+effect. [asserted]
+
 ### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `READY: blocked only while EXP-07 holds the GPU`
 **Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
 specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a

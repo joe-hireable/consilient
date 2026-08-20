@@ -257,6 +257,34 @@ advertised length does not establish state retention or decision quality. [cited
 separates hard context fit from measured capability, and EXP-30 compares full relevant
 records with compact manifests, retrieval and bounded contracts. [asserted]
 
+**Q30. Is β stationary, and is its oracle independent of the thing it grades?**
+
+β is defined as the rate at which the automated checks accept an artefact the human verdict
+rejects. Two assumptions were never stated. First, that the human verdict is an independent
+test: Zhang, Liao & Bellamy measured no complementarity between human and model and
+attributed it to aligned error boundaries, so the two tests fail on overlapping inputs and β
+understates a joint error. [cited] Second, that the human verdict is stationary: Shen & Tamkin
+found debugging — the capability β leans on — degrading most under assistance, Budzyń et al.
+measured expert deskilling within three months, and Lee et al. measured earned trust reducing
+critical engagement. [cited] Together those give the β-drift hypothesis: β measured against a
+human verdict should rise over months of assisted work even with the checks held fixed.
+[asserted]
+
+This is Tier 0. If β is non-stationary, it is a moving target rather than a property of the
+verifier, and the reliability claim the whole project rests on needs restating. EXP-32
+measures the mechanism, not β itself, and is n=1. See
+`../10-research/human-success-and-the-human-side-of-beta.md`.
+
+**Q31. What is the honest counterfactual for a meta-harness?**
+
+The field's positive results compare AI against no AI. The realistic comparison for
+Consilience is against a well-configured Claude Code, and the one matched study of that
+transition measured +3.1% commits and −6.3% lines for repositories that had already adopted
+AI IDEs. [cited] Meanwhile the effect's sign is set by task selection — +55.8% on a greenfield
+toy task, −19% on real issues in a developer's own mature repository — so a harness that
+evaluates itself on curated tasks will measure the wrong regime. [cited] ADR-0013 already says
+evaluate on repository history; this is independent support and a sharper reason. [asserted]
+
 ## Method note for the brainstorm
 
 Joe has asked for a multi-agent approach to research → brainstorm → spec → plan.
