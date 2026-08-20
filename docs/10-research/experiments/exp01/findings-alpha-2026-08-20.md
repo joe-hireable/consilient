@@ -262,6 +262,56 @@ recorded here, only their counts and classes. Note that
 `.github/scripts/check_private_corpus.py` matches file paths and would **not** have caught a
 leaked check name; that is a known gap in the net.
 
+## 7.6 Independently replicated, and the two corrections reconciled
+
+Everything in §2 to §7.5 was derived by one model family from one reading of one dataset. That
+is the echo condition, and this project does not get to exempt itself from its own rule. A
+second family (`gemini-3.7-flash-high`, under WSL) was given the primary records and the four
+claims, and told to derive each from scratch before comparing. [measured]
+
+**All four replicate exactly.** α at 23/97 and 4/28 with identical Wilson intervals; 0 reverts
+in 203 and 22 bad labels; size ratios 2.60 and 3.00; 15/75 and 3/23 cancelled-only.
+
+One accounting divergence surfaced, and it is language rather than arithmetic:
+`hireable-platform` has **22** bad PRs of which **21** carry a recorded verdict. Both numbers
+were already in the table above; the word "total" was doing two jobs. Fixed here by saying so.
+
+**The new result is the reconciliation, which nobody had done.** Two corrections to α were
+produced independently and could have double-counted:
+
+- this document's §7.5 removes **3** cancelled-only good-and-red PRs, on the ground that no
+  verdict was taken;
+- a concurrent `gpt-5.6` adjudication of all 23 good-and-red PRs removes **9** as not
+  meaningful rejections.
+
+**They do not double-count: the 3 are a strict subset of the 9.** [measured] The other 6 failed
+non-blocking live-model evaluation suites or infrastructure checks — the same class of
+non-rejection, identified by a different route.
+
+The reconciled good row on `jobboard-v2`, N = 97:
+
+| | count | reading |
+|---|---|---|
+| CI green | 74 | verifier accepted |
+| cancelled only | 3 | no verdict taken |
+| non-blocking, live-model or lint only | 6 | ran, but not a rejection on the merits |
+| borderline | 3 | unresolved |
+| confirmed gating rejection | 11 | verifier rejected on the merits |
+
+| treatment | α | Wilson 95% |
+|---|---|---|
+| as recorded | 23/97 = 0.2371 | [0.1635, 0.3307] |
+| cancelled excluded from both (§7.5) | 20/94 = 0.2128 | [0.1422, 0.3059] |
+| all 9 non-verdicts kept in denominator | 14/97 = 0.1443 | [0.0880, 0.2278] |
+| **all 9 treated as no verdict** | **14/88 = 0.1591** | **[0.0972, 0.2495]** |
+
+**Under every treatment, the entire interval lies above the assumed 0.03.** That is the claim
+this file makes, and it is now the claim that survives three independent derivations rather
+than one. The point estimate is treatment-dependent and should always be quoted with its
+treatment; anyone wanting a single number should take **0.1591 [0.0972, 0.2495]**, the reading
+that counts an unrun or non-gating check as no verdict rather than as a rejection, because that
+is the conditional β\* is defined on.
+
 ## 8. Reversal and falsifier
 
 **Reversal:** `git revert` the commit carrying this file and the two scripts. Nothing else
