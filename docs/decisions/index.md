@@ -43,6 +43,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0030](0030-size-orchestration-by-usable-context-and-measured-outcomes.md) | **Size orchestration roles by usable context and measured outcomes**; Opus 5 senior default, Gemini 3.7 Flash High candidate | 🟡 |
 | [0041](0041-transports-are-projections-not-authority-and-untrusted-channels-cannot-deliver-verdicts.md) | **Transports are lossy projections, not coordination authority**; untrusted third-party channels cannot deliver human verdicts | 📋 |
 | [0042](0042-admit-connectors-by-capability-probing-credential-isolation-and-fail-closed-boundaries.md) | **Admit connectors by zero-inference capability probing, credential isolation, and fail-closed spend caps** | 📋 |
+| [0043](0043-gate-a3-counts-new-refusals-not-historical-ones.md) | **Gate A3 counts new refusals, not historical ones** — A3 is unpassable as written; the only way to satisfy it is to lose a day of capture | 📋 |
 
 ## Behaviour and safety
 
