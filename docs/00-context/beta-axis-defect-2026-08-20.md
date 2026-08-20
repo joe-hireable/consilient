@@ -229,3 +229,149 @@ that difference-of-class is worth the cost here — not that it always is.
 **What would overturn it:** a same-family pair converging equally well on a defect of this
 severity, which would mean the convergence came from the corpus rather than from the difference.
 That is a cheap experiment and it should be run before this paragraph is quoted anywhere.
+
+
+---
+
+# WITHDRAWN: the consilience claim above did not survive its own control
+
+The section above ends with a pre-registered overturning test:
+
+> **What would overturn it:** a same-family pair converging equally well on a defect of this
+> severity, which would mean the convergence came from the corpus rather than from the
+> difference. That is a cheap experiment and it should be run before this paragraph is quoted
+> anywhere.
+
+It was run immediately. **It fired.** The claim that difference-of-model-family produced the
+finding is **not supported**, and is withdrawn. [measured]
+
+## What the control did
+
+A third arm — **same model family** as the first — was given the same five attack angles and the
+same repository, with the two write-ups withheld by name. It found the transpose defect. Not a
+cousin of it; the same one, in the same file:
+
+> *"`mine_beta.py:2` promises `P(checks accepted | artifact was bad)`. `mine_beta.py:135-137`
+> computes `accepted = green PRs`, `bad_acc = bad ∧ green`, `k, n = len(bad_acc), len(accepted)` —
+> and `mine_beta.py:158` prints its own label: `beta-hat = P(bad | green)`. That is the false-omission
+> rate, the reverse conditional."*
+
+Same lines, and independently the same concealment mechanism to four decimals: 128/202 = 0.6337
+against 128/203 = 0.6305. [measured]
+
+Worse for the claim: it also reproduced the **Gemini** arm's contribution, running `beta.py` over a
+check-pre-filtered queue and getting `beta [all]: 1.000 [0.886, 1.000] from 30/30 rejections` —
+the counterexample in executable form. **One same-family run recovered both arms.**
+
+## Why the earlier claim was wrong, and it is not close
+
+1. **The blind leaked, and I built the leak.** The control read
+   `.harness/log/2026-08-20.jsonl` and found `measurement.axis_defect_found`, which states the
+   defect in plain text including 202/203, 0.6337/0.6305 and 0.4286/0.8182. I had committed the
+   finding to the trajectory **inside the repository the control was told to read**. Withholding
+   two filenames from a git-tracked tree is not a blind. [measured]
+2. **The corpus was not the same corpus.** Commits `153ca51`, `32eacb8` and `02913bb` landed the
+   earlier arms' conclusions into the tree before the control started. [measured]
+3. **All three arms were handed the same five angles**, and angle 5 as written points at the
+   denominator. The common cause may not even be the corpus — **it may be the prompt.** That
+   possibility was available before any of this ran and I did not see it.
+4. **Family was confounded with scaffold.** Arm 1 was a fourteen-agent workflow with a refuting
+   skeptic, arm 2 a different harness *and* a different family, the control a single run.
+5. **n = 1 against n = 1 separates nothing** — not family, not sampling variance, not run-to-run
+   variance.
+6. **The adjudicator was same-family with the arm that made the claim.** Echo, by this project's
+   own definition, in the very act of testing for echo.
+
+## What survives, and what does not
+
+**The defect survives, and is stronger.** Three independent hand-verifications now, and the
+arithmetic reproduces every time. It was simply *there to be found* by anyone who read
+`mine_beta.py:158` against `beta.py:172`.
+
+**The claim about consilience does not.** Nothing about Whewell's second clause was demonstrated
+on 20 August. The `significance` field in the 05:50 trajectory event is withdrawn and the event's
+honest tag is `[asserted]`, downgraded.
+
+## The lesson, which is worth more than the claim was
+
+**You cannot run a blind experiment inside the repository you are writing your findings into.**
+The trajectory log is append-only, committed, and the first thing a thorough agent reads. Every
+finding recorded there becomes part of the corpus for every subsequent run. [asserted]
+
+That is not a small operational slip; it is a structural property of a project that keeps its
+evidence and its instrument in one tree, and it will recur every time an arm is asked to be
+independent. Any future independence test needs a **frozen corpus snapshot taken before the first
+arm runs**, and the angle text itself committed — because an unrecorded prompt makes no arm's
+result interpretable.
+
+**The cheapest honest repair**, if this is worth doing at all: freeze a snapshot, record the angle
+text, run two more same-family and two more cross-family arms against it, and count. Until then
+this project has **no measured evidence** that difference-of-class does anything for it, which is
+exactly the position it was in yesterday.
+
+---
+
+# What the control found that neither earlier arm did
+
+The control was a failure as a control and a success as an attack. Three findings, verified here.
+
+## 1. `MIN_REJECTIONS = 30` is one sample below the smallest n that can ever clear β\*
+
+Recomputed with the repository's own `wilson()` against its own β\* = 0.111: [measured]
+
+| record | Wilson upper bound | clears β\*? |
+|---|---|---|
+| 0/29 | 0.11697 | no |
+| **0/30** | **0.11352** | **no** |
+| **0/31** | **0.11026** | **yes** |
+
+At n = 30 **no outcome whatsoever, not even a flawless one, produces an interval clearing β\***.
+The smallest n that can is 31.
+
+**Stated fairly, because the temptation to overclaim is the thing being corrected here.** The
+constant is not a bug. `MIN_REJECTIONS` gates the `measured` verdict, and a measured β at n = 30
+is still a number; it is not a claim that routing is safe. What the arithmetic shows is that **no
+routing decision can ever be taken at the evidence floor as set**, and nothing in the code or the
+specification says so. The constant's own comment marks it `[asserted]` — it is derivable, and
+the derivation gives 31 as an absolute floor.
+
+And the realistic requirement is far higher. Rejections needed for the upper bound to clear β\*
+at each true β: [measured]
+
+| true β | rejections needed |
+|---|---|
+| 0.02 | 48 |
+| 0.04 | 62 |
+| 0.06 | 137 |
+| 0.08 | 368 |
+| 0.10 | 3,045 |
+| ≥ 0.111 | **never** (searched to 200,000) |
+
+EXP-01's corrected estimates are **0.12** and **0.14**. Both sit above β\* itself, so on the two
+repositories actually measured, **no sample size clears the threshold at all.**
+
+## 2. The retrospective mining route cannot supply β's denominator, structurally
+
+ADR-0002 records the plan: *"Prospective labelling is too slow; historical mining is the route."*
+But `mine_beta.py` fetches with `--state merged`, so **every row is a human accept**, while
+`compute()` counts `human_verdict == "reject"`. `n_rejected` over the entire corpus is **zero**.
+[asserted — the control ran it; I have confirmed the `--state merged` argument and the `compute`
+filter by reading, not by re-running the miner]
+
+Mining more history adds accepts forever. The rejections — PRs abandoned, force-pushed away,
+never opened — left no artefact to mine. This is a different and deeper problem than the axis
+defect: fixing the conditional does not create a denominator that was never collected.
+
+## 3. β\* is in neither the specification nor the code
+
+`β*` appears **zero times** in `docs/40-spec/v0-draft.md` and zero times in `src/consilience/`.
+[asserted — from the control's grep, not re-run here] The threshold every β must be compared
+against lives only in research notes and one ADR.
+
+## Also raised, not verified here
+
+That **Gate B2 cannot fail** — it requires a parallelism ceiling "greater than one", and
+`findings.md` puts critic recall 0.00 at 3.1 agents, so the threshold sits below the floor of the
+quantity. If it holds it is the most consequential item after the axis defect, because Gate B2 is
+the project's only claim that β is load-bearing on a decision. **It is unverified and should be
+checked before it is repeated.** [asserted]
