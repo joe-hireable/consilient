@@ -3,7 +3,7 @@
 ### Structurally inert checks in a system built to verify itself: an experience report
 
 **Joe Brown** — `joe@gethireable.com` — sole accountable author
-Consilience research programme
+Consilient research programme
 Draft of 20 August 2026. **Not submitted. Not for circulation.**
 
 ---
@@ -66,7 +66,7 @@ property, with a passing test that certifies it. Mutation testing has no mutants
 condition written in English. Checked coverage has no dynamic slice for a rule in `AGENTS.md`.
 Neither would have found eleven of the thirteen inert checks below.
 
-The system under study makes the case sharper than a random repository would. Consilience is a
+The system under study makes the case sharper than a random repository would. Consilient is a
 meta-harness organised entirely around measuring $\beta$, the false-accept rate of automated
 verification — the rate at which the checks say yes to something that is wrong. Its working
 principles, written down before any of these defects were found, include:
@@ -133,7 +133,7 @@ mixing snapshots. [measured]
 
 ## 2. The system, and why it is a hard case
 
-Consilience is a research repository for an open-source meta-harness: an
+Consilient is a research repository for an open-source meta-harness: an
 orchestrator that sits above coding agents and routes work according to how much verification the
 artefact needs. It is named after Whewell's 1840 definition of consilience [22], and its central
 quantity is derived from the third clause of that definition — convergence is a *test*, and tests
@@ -265,7 +265,7 @@ the defect to the commit that repaired it, or to the anchor commit where still o
 | A9 | ADR-0014 / `skills-mirror.yml`: `.claude/skills` is a symlink resolving to `../.agents/skills` | The workflow asserts on `ubuntu-latest` that the path is a symlink. Git stores it at mode 120000 and a Linux checkout materialises it, so the assertion largely restates the checkout mechanism. On the author's own machine `core.symlinks=false`, `test -L .claude/skills` fails, and the path is a **17-byte regular file** containing the literal text `../.agents/skills`. The invariant is false in the only environment any agent on this project runs in, and CI cannot see it. | This work | ADR-0014 → **still open** | **Open.** We measured all three facts on the worktree | M |
 | A10 | ADR-0023: an admin merge that skips a gate appends to `gate-bypass-log.md` | The log cannot be non-empty, because the audited process has never run. The repository has 116 commits and **zero pull requests**; the four merge commits are local worktree merges. Four of the ADR's five declared checks were never implemented (only DCO exists). The log reads `(empty — no bypasses yet)`. It is empty for the wrong reason. | This work | ADR-0023 → **still open** | **Open.** ADR-0023's own overturn condition is precisely this case | M |
 | A11 | `MIN_REJECTIONS = 30` as the evidence floor for a measured $\beta$ | 30 is exactly one below the smallest sample at which even a flawless record clears $\beta^\* = 0.111$. Using the repository's own Wilson function: $0/29 \to 0.11697$ (fails), $0/30 \to 0.11352$ (fails), $0/31 \to 0.11026$ (clears). At the evidence floor as set, **no outcome whatsoever** produces an interval clearing the threshold. | Same-family control audit | initial → **still open** | **Open, and correctly so.** We state fairly that this is not a bug: the constant gates the *measured* verdict, not a routing decision. What is undocumented is that no routing decision can ever be taken at the floor as set. | M, X |
-| A13 | *"`mypy --strict` is clean"* — asserted in five internal documents as a standing property, and credited in the project's own autonomy table as the one defect-catching mechanism that is *"Now yes — CI gate"* | The check that found the defect is not the check that shipped. `invariants.yml` runs `python -m mypy src/consilience`, which loads the repository's `mypy.ini` — a configuration that enables `check_untyped_defs`, `strict_optional`, `warn_unreachable` and three warnings, and **none** of `disallow_untyped_defs`, `disallow_any_generics` or `warn_return_any`. Under that config the gate reports success. Under `--strict` it reports **21 errors in 3 files** at the anchor commit (14 `type-arg`, 4 `no-untyped-def`, 3 `no-any-return`) — and **19 errors** at `ffb3d60`, the commit whose message is *"make the check permanent"*, and 19 again at `32eacb8`, the commit whose write-up says strict was clean. It has never been clean. | This work, by running the command the documents claim | `ffb3d60` (01:40) → **still open** | **Open.** The crash it originally caught cannot recur — the repair was a constructor invariant, not a guard — but the standing claim is false and the ratchet is installed one notch below it | M |
+| A13 | *"`mypy --strict` is clean"* — asserted in five internal documents as a standing property, and credited in the project's own autonomy table as the one defect-catching mechanism that is *"Now yes — CI gate"* | The check that found the defect is not the check that shipped. `invariants.yml` runs `python -m mypy src/consilience`, which loads the repository's `mypy.ini` — a configuration that enables `check_untyped_defs`, `strict_optional`, `warn_unreachable` and three warnings, and **none** of `disallow_untyped_defs`, `disallow_any_generics` or `warn_return_any`. Under that config the gate reports success. Under `--strict` it reports **21 errors in 3 files** at the anchor commit (14 `type-arg`, 4 `no-untyped-def`, 3 `no-any-return`) — and **19 errors** at `ffb3d60`, the commit whose message is *"make the check permanent"*, and 19 again at `32eacb8`, the commit whose write-up says strict was clean. It has never been clean. | This work, by running the command the documents claim | `ffb3d60` (01:40) → **closed post-anchor at `9fc6120`** | **Repaired post-anchor at `9fc6120` (closed).** All 32 strict errors across `src/consilient/` were resolved with zero `type: ignore`; `invariants.yml` now runs `python -m mypy --strict src/consilient` with an invariant test enforcing the `--strict` flag in CI. | M |
 | A14 | `append()` is the sole writer of the trajectory log, and the only place `validate()` runs — the project's own chokepoint principle, applied to its own instrument | Nothing banned bypass, so the validator ran on almost nothing. We measured the log at the anchor commit: of the 93 events the projection accepts, **92 (98.9%) were written straight to the file by something other than `append()`**, and three of them carried a claim the validator forbids. This is working principle 3 — *a chokepoint without an enforcement rule is not a chokepoint* — reproduced inside the artefact the principle was written about, in the repository that declares it, within a day. | Found when the tightened `V0-18` (A3) made the reader raise on the first offending line and both `consil replay` and `consil beta` died on the real trajectory | initial → `03c239d` (10:17) | Repaired: refused lines are excluded **and named** with reason and line number rather than silently skipped or fatal; a rejection table so `state_digest` covers them; both commands report the count beside the figure; `events.bypassed()`; and a ratchet test grandfathering ≤92 bypassed and ≤3 refused, which may only fall. Its own documented ceiling: canonical-form comparison is a proxy — it catches hand-written JSON, the failure that actually happened, but not a bypassing writer that formats correctly | M |
 
 **Table 1′ — Class A′: the inverse.**
@@ -414,11 +414,13 @@ mechanism now enforced, and the cross-family audit that uses it to establish how
 defects of A1, A3 and A4 were to find.
 
 We measured all of it: 19 strict errors at `ffb3d60` itself, 19 at `32eacb8`, 21 at the anchor
-commit as the source grew from 636 to 972 lines. The gate is not worthless — it catches
+commit as the source grew from 636 to 972 lines (peaking at 32 errors). The gate is not worthless — it catches
 `strict_optional`, `warn_unreachable` and untyped-def bodies — and we are not claiming the
-repository is untyped. We are claiming that **the guarantee in the record is stronger than the
-guarantee in the gate, and nothing in the system could have noticed**, because no check checks the
-documents against the workflow.
+repository is untyped. We are claiming that **the guarantee in the record was stronger than the
+guarantee in the gate, and nothing in the system could have noticed**, because no check checked the
+documents against the workflow. Post-anchor, this was resolved at `9fc6120`: all 32 strict errors
+across `src/consilient/` were fixed with zero `type: ignore`, the CI workflow was updated to run
+`python -m mypy --strict src/consilient`, and an invariant test was installed to ensure `--strict` cannot regress.
 
 ---
 
@@ -763,16 +765,25 @@ The "survived the full life of the repository" figures are seventeen hours. In a
 the equivalent exposure would be years, and we have no basis to claim the mechanism scales that
 way.
 
-### 8.3 There is no detector, so §5.2 is a hypothesis
+### 8.3 Mutation testing cannot mechanically generate this catalogue (EXP-48)
 
 The permissive-fixture rule is the paper's strongest claim and it rests on three instances from one
-author in twelve hours. We assert it is mechanically detectable; **we have not built the detector
+author in twelve hours. We assert it is mechanically detectable; **we have not built the specialized fixture detector
 and have measured nothing outside this repository.** Until that is done, §5.2 is a hypothesis with
-three supporting cases, and a reader is entitled to discount it accordingly. The cheapest
-falsification is also the most damaging one and we name it: run PIT or `mutmut` over this
-repository's own checks. If mutation score identifies the same inert guards, the instrument was
-already free, off-the-shelf and forty-eight years old, and §6 is a re-derivation. That experiment
-is not registered and has not been run.
+three supporting cases, and a reader is entitled to discount it accordingly.
+
+The cheapest potential falsifier — asking whether standard mutation testing over this repository's
+codebase identifies the same inert guards, which would render §6 a forty-eight-year-old re-derivation —
+was executed in EXP-48 (`mutmut` 3.7.0 against the 1,931 first-order mutants from EXP-47). The result
+is decisive: **overall recall was only 20.00% (5/25 recovered)**, far below the 35% equivalence threshold.
+68.0% (17/25) of the catalogued guards live completely outside program mutation testing (ADR specifications,
+CI workflows, governance rules, and research runners). For the 8 code-resident guards, recall was 62.5% (5/8);
+the three missed code guards (A4, A5, A11) had zero surviving mutants because fixing an inert check kills
+the very mutants that would have detected it (the regression-test masking paradox). Cluster precision
+was also low (24.59% — 15/61 clusters).
+
+This result **strengthens P2**: its manual catalogue method is structurally necessary rather than merely
+first; vacuity in socio-technical governance cannot be mechanically generated by syntactic mutation testing.
 
 ### 8.4 The catalogue is self-reported from documents written by the same process
 
@@ -840,8 +851,9 @@ change and should not be quoted as such.
 The author is building the system under study and has an interest in it appearing rigorous. The
 mitigation we can offer is that the catalogue's contents are uniformly unflattering and that the
 repository's history preserves the defects, wrong claims and withdrawals in an append-only record.
-At the anchor, A5, A9, A10 and A13 were reported **open** rather than repaired; post-anchor, A5 is
-safety-mitigated but still does not verify its sampling property. [measured]
+At the anchor, A5, A9, A10 and A13 were reported **open** rather than repaired; post-anchor, A5 was
+safety-mitigated (though still does not verify its sampling property), and A13 was resolved at `9fc6120`
+by fixing all 32 strict mypy errors with zero `type: ignore` and enforcing `--strict` in CI. [measured]
 
 ---
 
@@ -913,7 +925,7 @@ fail — one of them the check for the rule the project is named after, one of t
 asserting an unevidenced mathematical claim, and one of them the type gate that the project
 credits, in its own table, as the single mechanism it has successfully ratcheted. Each was found
 with a green suite behind it. At the anchor, six of the thirteen were open: A5, A8, A9, A10, A11
-and A13. Post-anchor, A5 was safety-mitigated; the other five statuses are not silently refreshed in
+and A13. Post-anchor, A5 was safety-mitigated and A13 was resolved at `9fc6120`; the other four statuses are not silently refreshed in
 this anchored catalogue. [measured]
 
 The inverse cases sharpen the result: one gate simultaneously contained a condition that admitted

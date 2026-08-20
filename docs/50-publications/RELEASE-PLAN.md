@@ -280,8 +280,8 @@ Measured from worktree HEAD `99457d5` on 20 August 2026; this is not a release a
 | Active-worktree private-corpus command with `--require-corpora` | **PASS:** two corpora checked; no tracked-path finding |
 | Secret history plus self-test | **PASS** |
 | Product suite | **PASS:** 92 tests |
-| `mypy --strict src/consilient` | **FAIL:** 32 errors in 3 files |
-| Repository-wide Ruff | **FAIL:** 48 findings |
+| `mypy --strict src/consilient` | **FAIL:** 32 errors in 3 files. *Post-anchor: repaired at `9fc6120`; see the checklist below. The anchored measurement is not refreshed.* |
+| Repository-wide Ruff | **FAIL:** 48 findings. *Re-measured 20 August 2026 after the anchor: **54**, so this blocker has grown rather than shrunk.* |
 | Forward-replay instrument checks | **PASS:** 13 tests, including refused and stale lock paths |
 | Arithmetic-cancellation script | **PASS:** 0.0085 reported spread, 0.1192 cross spread, 14.0 ratio |
 | Source-depth audit | **BLOCKED:** P1 38, P2 26, P3 21 `[SNIP]`/`[2ND]`/`[STD]` markers |
@@ -327,7 +327,7 @@ git -C "$release_root" diff --check
   checkout for the release root. The explicit `--root` frozen-checkout command must pass.
 - [ ] Add and run a negative self-test for the private-corpus gate; it currently has no self-test
   mode. The test must demonstrate a known private-derived marker is rejected without printing it.
-- [ ] Resolve every strict-mypy error; do not substitute the repository's weaker configured check.
+- [x] Resolve every strict-mypy error; resolved at `9fc6120` with zero `type: ignore` across `src/consilient/` and `--strict` enforced in CI.
 - [ ] Resolve or explicitly scope every Ruff finding; a repository-wide failing command cannot be
   presented as a release gate that passed.
 - [ ] Replace every load-bearing `[SNIP]`, `[2ND]` or unfetched `[STD]` citation with an admissible

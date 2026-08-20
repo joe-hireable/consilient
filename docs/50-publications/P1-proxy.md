@@ -182,12 +182,18 @@ Harman & Tonella, ISSTA 2016) [SNIP]; checked coverage is a cheaper indicator of
 property (Schuler & Zeller, ICST 2011) [SNIP].
 
 This matters for positioning. Mutation testing already measures a per-repository, label-free
-false-negative rate. The residual empirical question — and it is the only one that justifies
-history mining over an off-the-shelf mutation tool — is whether **a check suite's
-false-negative rate against the faults an LLM agent actually emits differs from its rate
-against synthetic mutants.** That question is not answered here, and its cheapest test (run
-a mutation tool per check on the same repository and compare the ordering) has not been run.
-We state that as an open weakness, not a defence.
+false-negative rate. In the surrounding research programme, mutation testing over our own
+repository's codebase (`src/consilient/`) directly measured composite $\beta = 0.3132$ [0.2926, 0.3346]
+across 1,931 first-order mutants (EXP-47). This must not be confused with the corpus $\beta$
+investigated here: EXP-47 evaluates *our* suite against *our* code with synthetic mutants, whereas
+this paper evaluates *another* repository's CI against real human/agent changes. Different
+verifiers, different populations; synthetic $\beta = 0.3132$ does not reconcile the metadata
+range $[0.81, 0.93]$ with executable replay $[0.0, 0.0713]$. The residual empirical question —
+and it is the only one that justifies history mining over an off-the-shelf mutation tool — is
+whether **a check suite's false-negative rate against the faults an LLM agent actually emits
+differs from its rate against synthetic mutants.** That question is not answered here, and its
+cheapest test (run a mutation tool per check on the same repository and compare the ordering)
+has not been run on the historical corpus. We state that as an open weakness, not a defence.
 
 ### 2.5 Flaky tests, and where α belongs
 

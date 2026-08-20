@@ -3,7 +3,7 @@
 ### Divergent oracles, arithmetic cancellation, and an illustration that failed its own control
 
 **Joe Brown** — sole author and accountable principal
-Consilience research programme
+Consilient research programme
 Draft of 20 August 2026 · **Experience report · Not submitted · Not peer reviewed**
 Revision 3, after three independent hostile reviews and the post-anchor executable replay. Figures
 in the original proxy study and incident are anchored to `497cdd8`; §2.6 identifies results added
@@ -956,10 +956,13 @@ Falsifiers, in cost order. None has been run.
    variable is the evidence base and search strategy, not the lineage. A matched design — same
    family, deliberately different grounding — is the direct test, and if it reproduces §5's result
    then "cross-family" is the wrong knob and should be dropped from the vocabulary.
-5. **Run the cheap half of the mutation-testing comparison.** If mutation score reproduces the
-   per-check ordering of β on this repository, the instrument was already free, off the shelf and
-   decades old, and this programme is an orchestration front-end for mutation testing. That is the
-   single most decisive falsifier available and it is a day's work.
+5. **Direct mutation testing executed on self suite (EXP-47).** Over 1,931 first-order mutants
+   on `src/consilient/`, direct mutation testing measured composite equivalent-corrected $\beta = 0.3132$ [0.2926, 0.3346]
+   (pytest $\beta = 0.3848$, mypy 0.6981, ruff 0.9596). Crucially, it empirically refuted ADR-0012's
+   check-independence assumption ($\chi^2 = 187.28, p = 1.2 \times 10^{-42}$), proving that check survival is
+   strongly correlated across pytest and mypy (87.89% vs 58.50%) and vindicating direct composite measurement.
+   The remaining question is evaluating whether mutation scores reproduce per-check ordering on *external*
+   historical fault distributions.
 6. **Close the enforcement hole and measure what it rejects.** Make the different-class check
    mandatory for any event with more than one contributor rather than opt-in, then report what
    fraction of real multi-agent structures it refuses. A gate that rejects nothing is not a gate.
