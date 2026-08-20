@@ -81,7 +81,27 @@ conditions. What none of them says is **when not to ask**, and the evidence gath
 - **An ask the user cannot cheaply answer is answered badly, and paying them does not help.**
   Over-reliance is rational effort allocation, not a bias: explanations moved it from ~70% to
   ~68%, and raising the monetary bonus moved it from ~58% to ~57%. The only manipulation that
-  worked was making verification genuinely cheap, which dropped it to ~28%. [cited]
+  worked was making verification genuinely cheap, which dropped it to **0%**. [cited]
+
+> **Corrected 2026-08-20 — the ~28% figure is wrong, and the true reading supports this design
+> better than the wrong one did.** The bibliography carries **two `[FULL]` entries for the same
+> paper** (Vasconcelos et al., CSCW 2023, arXiv:2212.06823) with conflicting numbers. The later
+> and fuller entry quotes the paper verbatim: *"the salient explanation condition, our most
+> obvious explanation condition, has an average overreliance rate of **0%**"* — Study 3, N=286,
+> exploratory. Not 28%. [measured]
+>
+> The same entry records what the manipulation actually was, and it matters more than the
+> number: *"the condition that eliminated overreliance is not an explanation in any ordinary
+> sense — it is an error **detector** rendered in the UI (the error is highlighted in blue). That
+> is a verifier."* [cited]
+>
+> So the result is not "explanations work if they are salient enough". It is **"a verifier
+> works, and calling it an explanation obscures that"** — which is this project's own thesis
+> arriving from the human-factors literature rather than from us. The corrected figure is
+> quoted here and the interpretation with it.
+>
+> Found by Codex auditing numeric provenance; the conflict is between two of this repository's
+> own full-read entries, so it was settled by reading both rather than by fetching the paper.
 - **Earned trust reduces scrutiny, so asks decay in value as the harness improves.** Higher
   confidence in the AI associated with less critical engagement at b=−0.69 log-odds
   (p<0.001), the strongest effect in that model. [cited]
