@@ -1,0 +1,163 @@
+{
+ "run_id": "exp43-20260820T121149-79458",
+ "protocol": {
+  "sample_size": 5,
+  "test_ref": "HEAD",
+  "test_target": "tests/unit",
+  "timeout_s": 60
+ },
+ "limitations": [
+  "The oracle is structurally blind to greenfield/additive defects where the interface did not exist at the parent commit (censored by parent-commit control).",
+  "Survivorship bias: future test suites only contain regression tests for defects that were discovered and tested; latent unfound bugs remain unmeasured.",
+  "Dependency and schema drift over long time horizons can induce false parent/child failures.",
+  "Results apply to evaluated repository commits and unit test suites only."
+ ],
+ "complete": true,
+ "stop_reason": null,
+ "elapsed_s": 350.444,
+ "records": [
+  {
+   "child_commit": "908a37d36f4674cc482dbd3d1c5bdc1368ecbf63",
+   "parent_commit": "5f21d7b43dd46239be907e2d1318863f02bf3e2a",
+   "outcome": "drift",
+   "pair_duration_s": 71.188,
+   "parent_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 34.859,
+    "total_tests": 8504,
+    "passed_tests": 8472,
+    "failed_tests": 5,
+    "returncode": 1
+   },
+   "child_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 36.291,
+    "total_tests": 8508,
+    "passed_tests": 8477,
+    "failed_tests": 4,
+    "returncode": 1
+   }
+  },
+  {
+   "child_commit": "5f21d7b43dd46239be907e2d1318863f02bf3e2a",
+   "parent_commit": "6a81cc04a38ebbd50ff99131228fc4d86457a435",
+   "outcome": "drift",
+   "pair_duration_s": 72.558,
+   "parent_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 34.851,
+    "total_tests": 8488,
+    "passed_tests": 8454,
+    "failed_tests": 7,
+    "returncode": 1
+   },
+   "child_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 37.67,
+    "total_tests": 8504,
+    "passed_tests": 8473,
+    "failed_tests": 4,
+    "returncode": 1
+   }
+  },
+  {
+   "child_commit": "6a81cc04a38ebbd50ff99131228fc4d86457a435",
+   "parent_commit": "9ac91cf2054c081b5470a28e7014d5461f5807b8",
+   "outcome": "drift",
+   "pair_duration_s": 72.077,
+   "parent_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 37.061,
+    "total_tests": 8485,
+    "passed_tests": 8452,
+    "failed_tests": 6,
+    "returncode": 1
+   },
+   "child_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 34.972,
+    "total_tests": 8488,
+    "passed_tests": 8458,
+    "failed_tests": 3,
+    "returncode": 1
+   }
+  },
+  {
+   "child_commit": "9ac91cf2054c081b5470a28e7014d5461f5807b8",
+   "parent_commit": "94fd8b1304d5bdec9cf12d646d9f7493adf522af",
+   "outcome": "drift",
+   "pair_duration_s": 68.247,
+   "parent_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 34.305,
+    "total_tests": 8462,
+    "passed_tests": 8432,
+    "failed_tests": 3,
+    "returncode": 1
+   },
+   "child_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 33.905,
+    "total_tests": 8485,
+    "passed_tests": 8455,
+    "failed_tests": 3,
+    "returncode": 1
+   }
+  },
+  {
+   "child_commit": "94fd8b1304d5bdec9cf12d646d9f7493adf522af",
+   "parent_commit": "eeeeabb15321e3c547088b8ad9f5b7a0b9f9f6da",
+   "outcome": "drift",
+   "pair_duration_s": 66.361,
+   "parent_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 33.141,
+    "total_tests": 8418,
+    "passed_tests": 8388,
+    "failed_tests": 3,
+    "returncode": 1
+   },
+   "child_result": {
+    "passed": false,
+    "error": null,
+    "timed_out": false,
+    "duration_s": 33.183,
+    "total_tests": 8462,
+    "passed_tests": 8432,
+    "failed_tests": 3,
+    "returncode": 1
+   }
+  }
+ ],
+ "summary": {
+  "total_pairs_evaluated": 5,
+  "outcomes": {
+   "drift": 5
+  },
+  "drift_rate": 1.0,
+  "discrimination_rate": 0.0,
+  "evaluable_parent_pass_count": 0,
+  "beta_retro_point": null,
+  "beta_retro_95_interval": null,
+  "median_pair_duration_s": 71.188,
+  "stopping_rule_verdict": "rejected_high_drift"
+ }
+}

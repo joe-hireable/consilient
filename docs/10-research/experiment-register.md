@@ -1319,7 +1319,7 @@ exceeded: cut to one question (goal achieved: fully/partially/no), drop sampling
 retired entirely and the outcome record runs on derived signals alone. The β-verdict
 prompt is never sacrificed to keep these prompts alive.
 
-### EXP-43 · Retro-verification of historical commits via forward test replay `READY` (registered 20 Aug 2026)
+### EXP-43 · Retro-verification of historical commits via forward test replay `DONE 20 Aug 2026 — see experiments/exp43/findings-exp43.md`
 **Decides:** whether replay of future test suites against historical commits (with parent-commit
 control) provides an automated, human-free ground truth for β = P(accept | bad), replacing
 the noisy revert/hotfix proxy without requiring human maintainer triage.
