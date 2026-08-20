@@ -72,6 +72,28 @@ tokens, which plausibly pushes the multiplier past the 2× threshold. See
 `../10-research/local-experimentation.md`. **Measure it before assuming either way** — this
 is the named trigger to reopen this ADR.
 
+**Update 2026-08-20 — the trigger was tested, and this decision is unchanged.** EXP-07 ran the
+pre-registered replication at n=30: five frozen public fixtures, one `gpt-5.6-sol` Codex
+attempt each, five serial `qwen3:8b` local attempts each. [measured]
+
+- **Single unscaffolded attempt: median 1.69×.** It does **not** cross the 2× threshold, and
+  the verdict is `insufficient_evidence` rather than a failure to replicate, because two of
+  five pairs are censored and the instrument's own limitation is that a censored duration can
+  prove a crossing but never a non-crossing. [measured]
+- **Best of five serial attempts: median 17.95×**, and 16.75× when every censored duration is
+  clamped to its applied timeout, so the crossing survives the timeout-overrun defect found in
+  the same run. [measured]
+
+Only best-of-five crosses. The rule fixed before the run says that when the multiplier crosses
+**only** with the reasoning layer enabled, the finding is that *scaffolding is what makes
+routing priors worthwhile* — recorded that way rather than as a blanket reopening. [cited]
+**So ADR-0003 stands, and the wasted work is created by the retry layer rather than by the raw
+local attempt being slow.** [measured]
+
+The 19 August pilot's 5.6× single-attempt reading did **not** replicate: three of five fixtures
+sit between 1.20× and 1.69×, so that headline was one draw from a wide distribution. [measured]
+See `../10-research/experiments/exp07/findings-exp07.md`.
+
 ## Publication candidate?
 
 **Possibly, bundled.** "Escalation-on-verification recovers most of the benefit of learned

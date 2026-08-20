@@ -316,6 +316,16 @@ The verifier runs at task completion. [asserted] Verifier rejection, resource ex
 or a declared stopping condition produces a recorded terminal outcome or a new, separately
 admitted attempt; the model's confidence cannot trigger success. [asserted]
 
+**Superseded by EXP-07, 20 August 2026.** The pilot figure below is retained because it is what
+prompted the replication, but it is no longer the best available evidence. The replication at
+n=30 found the single-attempt median multiplier to be **1.69×**, which does not cross the
+threshold, while best-of-five reached **17.95×** (16.75× clamped). ADR-0003 is therefore not
+reopened, and the registered finding is that scaffolding rather than the raw local attempt
+creates the wasted work. [measured] A further finding from the same run bears directly on this
+section: `qwen3:8b` produced no file edit in any of 25 attempts, which is a capability question
+prior to any latency one — EXP-31 is running to establish whether that is the model or the
+composition. [measured]
+
 EXP-05 measured one failed local attempt at 114.2 seconds versus frontier successes at
 20.4–25.6 seconds, a 4.5–5.6× wasted-work multiplier on one trivial task. [measured] This
 crossed EXP-07's ≥2× investigation trigger and made replication high priority, but n=1 does

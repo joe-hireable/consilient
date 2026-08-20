@@ -1013,6 +1013,15 @@ pass functional tests but fail the scope gate; outcome class (`passed` / `reject
 `agent_timeout` / `verifier_timeout` / `verifier_error`); Ollama-reported eval counts and
 tokens/s; peak VRAM; model load time. Self-reported confidence is excluded. [asserted]
 **Stopping rules (fixed before the run):**
+- **Defect recorded 2026-08-20, mid-run, deliberately not repaired.** The first rule below
+  obliges a stop on a write outside the temporary repository, and **the instrument cannot
+  observe one**: the runner invokes Codex with `--dangerously-bypass-approvals-and-sandbox`
+  and the scope gate inspects only the temporary repository, exactly as EXP-07 checklist item
+  3 recorded. [measured] A stopping rule the instrument cannot observe is a declaration, not a
+  rule — the same defect ADR-0020 records for evidence classes and EXP-35 for reversibility.
+  It is **not** fixed here, because changing the instrument after the run began is the
+  outcome-aware tampering EXP-07 refused. Repair before the next registration, and treat this
+  run's out-of-repository writes as unobserved rather than absent. [asserted]
 - Run all 50 attempts without efficacy peeking. Stop for a write outside the temporary
   repository, any non-local provider in the resolved command, GPU out-of-memory in two
   attempts of the same model, a defective fixture or verifier, or the three-hour cap. Report
