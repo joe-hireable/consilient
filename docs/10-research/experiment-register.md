@@ -1482,7 +1482,13 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Specification defects where tests and code agree on an incorrect invariant (oracle correctness);
 - Human cognitive error distributions (mutants simulate synthetic syntactic mutations, not real developer failure modes).
 
-### EXP-48 · Mechanical generation of the defective-guard catalogue via mutation survivor clustering `READY` (registered 20 Aug 2026)
+### EXP-48 · Mechanical generation of the defective-guard catalogue via mutation survivor clustering `DONE 20 Aug 2026 — see experiments/exp48/findings-exp48.md`
+**Run 20 Aug 2026 across EXP-47's 586 non-equivalent surviving mutants (61 spatial clusters) vs P2's 25 defective guards.**
+**Headline:**
+- **Overall Catalogue Recall: 20.00% (5/25)** [8.9%, 39.1%]. 68.0% (17/25) of P2's catalogued guards live outside Python source code (in ADRs, CI workflows, governance rules, and research harnesses) where program mutation testing cannot operate.
+- **Code-Resident Recall: 62.50% (5/8)** [30.6%, 86.3%]. Recovers A1, A3, A6, A8, A14. The 3 missed code guards (A4, A5, A11) are killed by regression tests written for their fixes.
+- **Cluster Precision: 24.59% (15/61)**. 46 unmatched clusters (75.41%) represent unasserted CLI formatting (14 clusters / 182 mutants), gate regex parsing (12 clusters / 205 mutants), and unchecked exception strings, none of which represent claimed-but-inert invariants.
+- **Stopping Rules 2 & 3 FIRED (Structural Divergence):** Mutation testing cannot automate the guard catalogue. Guard vacuity is a claim-vs-implementation mismatch requiring governance intent, whereas mutation testing measures AST code-vs-test sensitivity.
 **Decides:** whether EXP-47's 743 `pytest` mutation survivors mechanically regenerate the 25 hand-curated inert/defective guards from `docs/50-publications/P2-guards.md` (turning an $n=1$ existence claim into an automatable prevalence method), or whether mutation survival and "guard-cannot-fail" are structurally distinct phenomena (because guard vacuity is a claim-vs-implementation mismatch requiring human/governance intent, whereas mutation testing only measures code-vs-test sensitivity).
 **Precondition:** EXP-47 mutation results file (`docs/10-research/experiments/exp47/results-exp47.json`) containing 1,931 mutants and 743 `pytest` survivors mapped to file, line, AST operator, and mutation details; `docs/50-publications/P2-guards.md` anchoring 25 hand-catalogued defective guards (A1–A11, A13, A14; A12, A15; B1–B10) plus 1 control (C1).
 **Procedure:**
