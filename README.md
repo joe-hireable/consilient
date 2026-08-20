@@ -51,10 +51,19 @@ Executed simulation shows β determines (a) whether cheap-first routing helps or
 degrades quality, (b) how many agents you can run before human review saturates, and (c) how
 much of your day you spend reviewing. **Nothing on the market measures it.**
 
-The same gap exists one level up: every published self-improving agent system — Darwin Gödel
-Machine, SICA, Huxley-Gödel, HyperAgents — accepts a self-modification when a test says it is
-better, and **none measures how often that test is wrong**. In an archive-based system that
-error compounds. β is the missing safety property of that entire literature.
+A related gap exists one level up. Self-improving agent systems — Darwin Gödel Machine, SICA,
+Huxley-Gödel, HyperAgents, Voyager, ADAS, Meta-Harness, Live-SWE-agent — accept a
+self-modification when a test says it is better, and in a survey of eight, **none reports a
+denominator-based false-acceptance rate for candidate promotion against independent truth**. In
+an archive-based system that error compounds: DGM produced one evaluator-bypassing winner in a
+150-iteration run, caught by manual audit rather than by a rate.
+
+**Corrected 20 August 2026.** This previously read *"none measures how often that test is
+wrong"*, which is now known to be false. **Ratchet** (arXiv:2605.22148v3, Apache-2.0) audits the
+judge governing skill synthesis and survival, reporting false-pass ≈0.01 (n=210) and false-fail
+≈0.95 (n=42, 95% CI 0.84–0.99). That is not pre-persistence β and the audit is not shipped in
+the system, but the categorical claim does not survive it. The narrower statement above is what
+the evidence supports.
 
 **This is a hypothesis, not a finding.** It survived one round of simulation under assumed
 functional forms. It has never met a real repository.

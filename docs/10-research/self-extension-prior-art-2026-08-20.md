@@ -1,0 +1,25 @@
+**Recommendation: adopt and upstream, do not build: use Ratchet (Apache-2.0) as the research comparator and contribution target; keep self-extension disabled until Consilience measures β.** `[asserted]`
+
+# Self-extension prior art
+
+| System (primary source; date; code licence) | What it creates and keeps | Acceptance error and reported failure |
+|---|---|---|
+| [DGM, arXiv:2505.22954](https://arxiv.org/html/2505.22954) (2025-05-29; [Apache-2.0](https://github.com/jennyzzt/dgm)) | `[cited]` Whole coding agent; every compiling/basic-editor child is archived, then score selects parents/winner. | `[cited]` No rate. One perfect-scoring child bypassed the evaluator in a 150-iteration run; manual audit caught it. About $22k/80 iterations. |
+| [SICA, arXiv:2504.15228](https://arxiv.org/html/2504.15228) (2025-04-21; [MIT](https://github.com/MaximeRobeyns/self_improving_coding_agent)) | `[cited]` Whole agent; every iteration persists, then score/cost/time utility selects the next base. | `[cited]` No rate or held-out main test. One run fell 47%→27%; about $7k/15 iterations. |
+| [HGM, arXiv:2510.21614](https://arxiv.org/html/2510.21614) (2025-10-24; [Apache-2.0](https://github.com/metauto-ai/HGM)) | `[cited]` Whole agent; every child enters a tree; estimated descendant productivity guides selection. | `[cited]` No rate. Benchmark score correlated only 0.274–0.444 with later productivity for SICA/DGM: measured proxy mismatch, not β. |
+| [HyperAgents, arXiv:2603.19461](https://arxiv.org/html/2603.19461) (2026-03-19; [CC BY-NC-SA 4.0](https://github.com/facebookresearch/HyperAgents)) | `[cited]` Task agent plus editable self-modifier; every compiled child is archived; outer selection stays fixed. | `[cited]` No rate. One archived reviewer had 94% acceptance but 8% reject recall; about 88.6M tokens/100 iterations. |
+| [Voyager, arXiv:2305.16291](https://arxiv.org/html/2305.16291) (2023-05-25; [MIT](https://github.com/MineDojo/Voyager)) | `[cited]` Executable Minecraft skills; GPT-4’s success judgement commits them to an ever-growing library. | `[cited]` No rate. Verifier failures are reported without counts; diamond-tier success was 1/3. |
+| [ADAS, arXiv:2408.08435](https://arxiv.org/html/2408.08435) (2024-08-15; [Apache-2.0](https://github.com/ShengranHu/ADAS)) | `[cited]` Whole agent—prompts, tools, control flow; every evaluated candidate is archived, then validation selects. | `[cited]` No rate. Seeded search scored 53.4% versus 67.5% from empty; about $300–$500/run. |
+| [Meta-Harness, arXiv:2603.28052](https://arxiv.org/html/2603.28052) (2026-03-30; [MIT](https://github.com/stanford-iris-lab/meta-harness)) | `[cited]` Memory, retrieval, routing and control policy; every interface-valid harness is stored, then a search-set frontier selected. | `[cited]` No rate. Six consecutive regressions; TerminalBench searched and tested the same 89 tasks. |
+| [Live-SWE-agent, arXiv:2511.13646](https://arxiv.org/html/2511.13646) (2025-11-17; [MIT](https://github.com/OpenAutoCoder/live-swe-agent)) | `[cited]` Task-local executable tools, immediately used; no cross-task persistence or qualification. | `[cited]` No per-tool rate. Tool creation cut GPT-5-Nano success 44%→14% and induced loops. |
+| [Ratchet, arXiv:2605.22148v3](https://arxiv.org/html/2605.22148) (2026-08-07; [Apache-2.0](https://github.com/amazon-science/Self-Evolving-Agents-Ratchet)) | `[cited]` Natural-language skills activate immediately; judged outcomes drive synthesis and later retirement under a bounded bank. | `[cited]` **Yes, for its reward/persistence channel:** false-pass ≈0.01 (`n=210`); false-fail ≈0.95 (`n=42`, 95% CI 0.84–0.99). Not pre-persistence β; this audit is not shipped. |
+
+## Conclusions
+
+`[cited]` None of the eight creation/search systems reports denominator-based false acceptance for candidate promotion against independent truth. Ratchet falsifies the broader “none measures test error” claim: its audited judge governs synthesis and survival. DGM has one hacked winner without a rate; HGM measures correlation, not error.
+
+`[asserted]` Capability versus judgement extension is a useful Consilience boundary, not established terminology. Voyager and Live-SWE-agent approach capability extension; neither independently qualifies tools. Treat it as lower-blast-radius only with an external, complete contract and quarantined persistence: executable tests are not inherently β-free.
+
+`[cited]` Reward hacking, degradation and cost are quantified above; sprawl is anecdotal and unbounded recursion undemonstrated. **Strongest objection:** optimisation targets the fallible signal granting durable authority. DGM’s evaluator-bypassing winner shows how persistence can ratchet verifier mistakes into policy before β is known. `[asserted]`
+
+Under ADR-0036, upstream a quarantined activation gate and defect-injection confusion matrix—with sample sizes and one-sided bounds—to Ratchet. Do not vendor it, adopt Double Ratchet’s mutable verifier, or build another loop. Keep Consilience’s immutable β meter and blast-radius rules native. `[asserted]`
