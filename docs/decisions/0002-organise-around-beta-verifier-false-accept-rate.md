@@ -28,13 +28,26 @@ Rasch / 1PL item-response model — that odds ratio is `e^{k(s_c − s_f)}`, and
 β* = (1 − α) · e^(−kΔ)          where Δ = s_f − s_c is the capability gap
 ```
 
-Verified against simulation to three significant figures at every gap tested:
-(1−0.03)·e^(−8×0.27) = 0.1118 vs 0.112 measured; gap 0.42 → 0.0337 vs 0.034;
-gap 0.10 → 0.4358 vs 0.436.
+Verified against simulation to three significant figures at every gap tested. **The closed
+form is `[algebra]`; every figure it is compared against is `[simulated]`** — a Monte Carlo
+estimate, not a measurement of anything in the world:
+(1−0.03)·e^(−8×0.27) = 0.1118 `[algebra]` vs 0.112 `[simulated]`; gap 0.42 → 0.0337
+`[algebra]` vs 0.034 `[simulated]`; gap 0.10 → 0.4358 `[algebra]` vs 0.436 `[simulated]`.
+
+> **Tag correction, 2026-08-20.** The `[algebra]` heading above covered this whole block, and
+> the simulation outputs inside it were described as *"measured"*. They are neither measured
+> nor algebra: they are draws. Working principle 2 — sign and threshold, never point estimates
+> — applies to them, and working principle 1 forbids presenting a simulated figure as an
+> empirical result. Found by an external numeric-provenance audit (finding 26) and confirmed
+> by a second. The agreement between the closed form and the draws is real and is the point of
+> the section; only the labelling was wrong.
 
 **Consequence, and it is the most important thing in this ADR:** β* is invariant to the
 difficulty distribution. Tested across unimodal Beta(2,2) and bimodal mixtures from 30% to
 90% easy, β* moved by ≤ 0.003 while the escalation rate swung from 18.8% to 63.5%.
+`[simulated]` — both figures are Monte Carlo outputs over 300,000 draws, not observations.
+The *invariance* is the algebraic result; **the ≤ 0.003 and the 18.8–63.5% are the evidence
+for it, and they are draws.**
 
 **Safety and savings separate.** The β-meter does not need to characterise a repository's
 task-difficulty distribution to say whether cheap-first routing is *safe* — only to say how
