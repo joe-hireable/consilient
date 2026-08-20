@@ -381,11 +381,46 @@ def test_beta_carries_count_interval_and_window():
     assert result.window == ("2026-08-19T01:00:00+01:00", "2026-08-20T01:00:00+01:00")
 
 
-def test_beta_declares_itself_a_lower_bound_on_a_joint_error():
-    """Q30: the oracle is a test whose errors correlate with the ones it grades."""
+def test_beta_claims_no_bound_unless_the_sampling_is_declared():
+    """Q30: the oracle is a test whose errors correlate with the ones it grades.
+
+    This asserted `is True` until 20 Aug 2026, against a field hard-coded to True. It
+    enforced the claim rather than the property — the fourth instance of that pattern found
+    in this repository — and the claim does not hold in general. β is a bound on joint error
+    only if the sample is not conditioned on the verifier's own outcome. If artefacts reach
+    a human only when the checks already accepted them, every rejected row has
+    verifier_accept=True and β is 1 by construction. No collection protocol exists, so the
+    honest default is that no bound is claimed.
+    """
     result = beta_mod.compute([])
-    assert result.lower_bound_on_joint_error is True
+    assert result.lower_bound_on_joint_error is False, (
+        "no bound may be claimed by default; the sampling property that would justify it "
+        "is not established anywhere"
+    )
     assert "non-stationary" in result.caveat
+
+    declared = beta_mod.compute([], sampling_unconditioned=True)
+    assert declared.lower_bound_on_joint_error is True, (
+        "a caller with an unconditioned sampling protocol must be able to declare it"
+    )
+
+
+def test_the_rendered_beta_does_not_say_bound_when_no_bound_is_claimed():
+    """The claim appeared in rendered output, which is the one place a reader looks."""
+    rows = [
+        {
+            "ts": now_ts(),
+            "verifier_accept": i < 7,
+            "human_verdict": "reject",
+        }
+        for i in range(30)
+    ]
+    undeclared = beta_mod.compute(rows).render()
+    assert "NOT a bound" in undeclared
+    assert "lower bound" not in undeclared
+
+    declared = beta_mod.compute(rows, sampling_unconditioned=True).render()
+    assert "lower bound on a joint human-plus-checks error" in declared
 
 
 def test_unlabelled_artefacts_are_not_counted_as_agreement():
@@ -565,7 +600,10 @@ def test_the_measured_render_path_is_exercised():
     ]
     line = beta_mod.compute(rows).render()
     assert "0.250" in line and "10/40" in line
-    assert "lower bound on a joint" in line
+    # Was `assert "lower bound on a joint" in line` until 20 Aug 2026, when the bound was
+    # found to be asserted rather than established. The rendered claim is now conditional
+    # on a declared sampling protocol, and the default declares none.
+    assert "NOT a bound" in line
 
 
 # ------------------------------------------------- V0-18, the second path (20 Aug 2026)

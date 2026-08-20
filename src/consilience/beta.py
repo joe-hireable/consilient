@@ -4,9 +4,24 @@ V0-06: routing consumes the composite-verifier β with its sample count and inte
 Per-check outcomes are diagnostics only, because their dependence is unknown (ADR-0012).
 
 β is conditional on an oracle that is itself a test. The human verdict is error-prone, is
-not independent of the automated checks, and may not be stationary (Q30). Every result
-therefore carries `lower_bound_on_joint_error: True` — β measures the pair, not the checks
-alone, and no caller may present it otherwise.
+not independent of the automated checks, and may not be stationary (Q30). β measures the
+pair, not the checks alone, and no caller may present it otherwise.
+
+`lower_bound_on_joint_error` was a hard-coded `True` until 20 August 2026, with a test
+asserting it was `True`. That test enforced the *claim*, not the property — the same
+"assert the mechanism, not the property" failure this repository has now found in four
+separate checks.
+
+The bound only follows if the sample is **not conditioned on the verifier's own outcome**.
+If artefacts reach a human only when the checks already accepted them, every rejected row
+has `verifier_accept=True` and β is 1 by construction rather than by measurement. The
+arithmetic in `compute` is correct; the exposure is entirely in which rows exist.
+
+Nothing recorded or checked that property, and there is no collection protocol at all —
+the meter has received zero rows. So the honest default is that **no bound is claimed**.
+A caller who has a sampling protocol that does not condition on the verifier may declare
+it, and only then does the bound hold. Found by a cross-family prior-art audit reading this
+file against its own defect record.
 """
 
 from __future__ import annotations
@@ -37,7 +52,9 @@ class Beta:
     point: float | None
     interval: tuple[float, float] | None
     window: tuple[str, str] | None
-    lower_bound_on_joint_error: bool = True
+    # False unless the caller declares a sampling protocol that does not condition on the
+    # verifier's outcome. Defaulting to True asserted a property of data that did not exist.
+    lower_bound_on_joint_error: bool = False
     caveat: str = field(
         default="beta is conditional on a human verdict that is itself fallible, "
         "not independent of the checks, and possibly non-stationary (Q30)"
@@ -122,10 +139,18 @@ class Beta:
                 # lets the checker prove it rather than take our word for it.
                 assert self.point is not None and self.interval is not None
                 low, high = self.interval
+                # The bound clause is conditional now. It was unconditional until 20 Aug
+                # 2026, so the rendered output asserted a property of the sample that
+                # nothing had established — the strongest possible way to state a claim,
+                # in the one place a reader actually looks.
+                bound = (
+                    " — lower bound on a joint human-plus-checks error"
+                    if self.lower_bound_on_joint_error
+                    else " — NOT a bound: sampling not declared unconditioned on the verifier"
+                )
                 return (
                     f"beta [{scope}]: {self.point:.3f} [{low:.3f}, {high:.3f}] "
-                    f"from {self.n_false_accept}/{self.n_rejected} rejections "
-                    f"— lower bound on a joint human-plus-checks error"
+                    f"from {self.n_false_accept}/{self.n_rejected} rejections{bound}"
                 )
             case _:
                 # A verdict added without handling it here fails the type check, by name.
@@ -148,6 +173,7 @@ def compute(
     task_family: str | None = None,
     verifier_version: str | None = None,
     min_rejections: int = MIN_REJECTIONS,
+    sampling_unconditioned: bool = False,
 ) -> Beta:
     """β over outcome rows.
 
@@ -187,6 +213,7 @@ def compute(
             None,
             None,
             window,
+            sampling_unconditioned,
         )
 
     return Beta(
@@ -198,6 +225,7 @@ def compute(
         false_accepts / n,
         wilson(false_accepts, n),
         window,
+        sampling_unconditioned,
     )
 
 
@@ -206,6 +234,7 @@ def from_connection(
     task_family: str | None = None,
     verifier_version: str | None = None,
     min_rejections: int = MIN_REJECTIONS,
+    sampling_unconditioned: bool = False,
 ) -> Beta:
     rows = [
         {

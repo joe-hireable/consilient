@@ -1,8 +1,19 @@
 # Consilience v0 implementation specification — draft for review
 
-> **DRAFT · NOT APPROVED · NO IMPLEMENTATION AUTHORITY.** This document is a concrete
-> target for criticism. Product implementation remains forbidden until Joe explicitly
-> approves a specification or supersedes that gate. [asserted]
+> **APPROVED FOR THE OBSERVE-ONLY INCREMENT — 20 August 2026, 01:22.** Joe sent the exact
+> sentence §13.1 requires; it is recorded in the trajectory as `spec.approval_observed`.
+> [measured]
+>
+> **What that authorises:** Stage 2 only — recording trajectory events, projecting them and
+> computing β. The increment does not route, block or accept anything, and a test asserts the
+> CLI exposes no surface that could. **Routing, blocking and orchestration remain gated** on
+> ADR-0015 Gate A and Gate B, neither of which has passed. [measured]
+>
+> **Corrected 20 August 2026.** This block read *"DRAFT · NOT APPROVED · NO IMPLEMENTATION
+> AUTHORITY… product implementation remains forbidden"* for the fifteen hours after the
+> approval it describes. Two agents read it and drew the wrong conclusion about what they were
+> permitted to do. A stale gate marker in the specification's own header is worse than a stale
+> one anywhere else, because it is the document every other document defers to. [measured]
 
 **Version:** 0.1-draft · **Date:** 19 August 2026 · **Owner:** Joe Brown ·
 **Evidence base:** [`../decisions/index.md`](../decisions/index.md),
