@@ -1,61 +1,42 @@
-# We broke our own blind
+# Agreement is not evidence
 
-### An experience report on testing a multi-agent independence claim inside the repository that recorded it, with two negative results about the measurement it was defending
+### Divergent oracles, arithmetic cancellation, and an illustration that failed its own control
 
 **Joe Brown** — sole author and accountable principal
 Consilience research programme
 Draft of 20 August 2026 · **Experience report · Not submitted · Not peer reviewed**
-Revision 2, after three independent hostile reviews. All figures are anchored to commit
-`497cdd8` unless stated otherwise; the repository moved during drafting and §2.1 records what
-that cost.
+Revision 3, after three independent hostile reviews and the post-anchor executable replay. Figures
+in the original proxy study and incident are anchored to `497cdd8`; §2.6 identifies results added
+through `bd8a599` rather than silently mixing snapshots.
 
 ---
 
 ## Abstract
 
-An earlier draft of this paper argued a position: that multi-agent verification is unsound unless
-each structure names a *different class of facts*, after Whewell's 1840 criterion for the
-consilience of inductions. Three reviews established that the position is a restatement. Campbell
-and Fiske set the requirement out operationally in 1959 as the multitrait–multimethod matrix; the
-software design-diversity and common-cause-failure literatures have priced forced diversity since
-the 1980s; Huang et al. measured in 2023 that language models do not improve their own reasoning
-without an external signal; and Kuai et al. published a statistical audit of behavioural
-entanglement between models, with a diagnostic and a verifier-reweighting remedy, four months
-before this draft. We withdraw the position and the contribution claim attached to it, and report
-instead what survived: **one incident and two negative results**.
+**Worst limitation.** The headline comparison joins differently selected populations. One oracle
+adjudicates metadata from records already selected by a proxy; the other executes a later test
+suite at each child and parent, then counts only parent-pass pairs. Just 25 of 162 historical merges
+touched the tested subsystem, so the executable null may measure subsystem uncoupling rather than
+verifier accuracy. [measured] [asserted]
 
-The incident. In August 2026 we claimed that two model families had independently located the same
-defect in our own measurement instrument, and recorded it as the first occasion on which the
-programme's central claim had been tested on itself and passed. We wrote the overturning test into
-the same paragraph and ran it within about twenty minutes. It fired: a same-family arm found the
-same defect, in the same file, at the same lines. Worse, the blind had leaked and we had built the
-leak — the finding had been committed, in plain text with its figures, to an append-only trajectory
-log inside the repository the control was instructed to read. The claim is withdrawn. We also state
-plainly, against our own earlier framing, that one arm against one arm has essentially no power to
-detect the effect the literature reports for cross-model diversity — Nogueira et al. measure
-three- and five-version ensembles realising 0.43 and 0.44 of the reliability gain achievable under
-independence, and below 0.3 when built from a single model — so this is an underpowered null, not
-evidence that difference-of-class buys nothing.
+The metadata-adjudicated proxy conditional has a sensitivity range of $[0.8090,0.9281]$ over every
+cross-combination of two model families' labels. This is not a confidence interval. [measured] Executable
+forward replay gives $0/15$, Wilson $[0,0.2039]$, and then $0/50$, Wilson $[0,0.0713]$; every primary
+parent and child passed and the registered stopping rule remained `inconclusive`. [measured] The
+replay interval lies wholly below the metadata sensitivity range, and increasing $n$ from 15 to 50
+tightened it without moving the point. [measured] Because the populations and estimands differ,
+this is oracle-conditioned divergence, not evidence that any one design choice caused it or that
+either number is true. [asserted] Either result alone could have looked well evidenced. [asserted]
 
-The two negative results concern the measurement programme the incident was defending, and both
-were produced by running arithmetic rather than by reasoning about it. **α, the verifier
-false-reject rate, had one value anywhere in the programme — 0.03 — and it was invented.** On a
-corpus of 356 merged pull requests the interval excludes 0.03 under every defensible treatment of
-unrun and non-gating checks; taking the treatment the estimand is actually defined on gives 0.1591
-with a 95% interval of [0.0972, 0.2495]. Every threshold derived from the assumed value is 12–27%
-looser than it should be, in the optimistic direction. **And β, the quantity the programme is
-organised around, has never been measured with sufficient data**: the meter returns *insufficient
-data* with zero rows, and retrospective mining structurally cannot supply its denominator.
+A second result shows the opposite failure. Two adjudicators reported values only 0.0085 apart
+while disagreeing by sixteen labels. Recombining their numerator and denominator decisions gives a
+spread of 0.1192, **14.0 times** the reported spread: arithmetic cancellation made unstable labels
+look like agreement. [measured] [algebra]
 
-Evidence limits, stated here and not only in a limitations section. The corpus is 356 merged pull
-requests from two private commercial repositories written largely by one developer with heavy AI
-assistance — that description is the author's own knowledge, not a measurement — so external
-validity is severely limited and the effective number of independent corpora is one, not two.
-Every rate is conditioned on a human merge decision that depends on both artefact quality and the
-CI verdict, which is a collider of unknown sign. Labels come from a keyword-and-file-overlap
-heuristic whose audited precision is 1 in 15, and whose dependence structure means every interval
-quoted is nominal and narrower than the truth. Nothing here is a rate: *n* is one in every
-direction that matters.
+We retain the illustration that killed our preferred claim. A same-family control reproduced the
+finding we had attributed to cross-family independence, and the repository itself had leaked the
+answer into the supposedly blind input. The claim is withdrawn; the one-against-one control is an
+underpowered null, not evidence that difference of class has no value. [measured] [asserted]
 
 **Keywords:** experience report · multi-agent systems · verification · negative results ·
 experimental blinding · correlated errors
@@ -84,14 +65,14 @@ for both after the first review, and it returned prior art for both. We report t
 they bit us, and we report the search because an unrun search is how this programme twice produced
 a "no prior art found" claim it later had to withdraw.
 
-What is left is small: an incident worth reporting because it is cheap for others to avoid; two
-measured negatives that move thresholds in a real system; and one arithmetic finding — §2.5 —
-about two model families agreeing to four decimal places on a number whose inputs they disagree
-about by sixteen items.
+What is left is bounded: a divergence between differently conditioned oracles (§2.6); an
+arithmetic-cancellation result (§2.5); two measured negatives that move thresholds in the system;
+and a failed illustration worth retaining because its control exposed both confounding and leakage.
+[measured] [asserted]
 
 **Evidence discipline throughout.** Every claim below is one of *measured* (we or the repository
 ran it and the artefact exists), *cited* (a source says so, at a declared read depth), *algebra*
-(it follows from stated premises), or *judgement*. Where a figure is assumed, unfetched or
+(it follows from stated premises), or *asserted* (our judgement). Where a figure is assumed, unfetched or
 model-produced, the sentence carrying it says so. §7 records read depth per source. The first
 review's most damaging finding was that the previous draft's read-depth table certified sources
 that existed nowhere in the repository; §7 says what we did about that.
@@ -106,7 +87,7 @@ a coding agent actually emits. β is the complement of a quantity software engin
 measured, label-free and per repository, for decades: mutation score. That is not a footnote, it
 is the honest frame, and §7 gives it properly.
 
-### 2.1 β has never been measured with sufficient data
+### 2.1 The prospective β meter has no data
 
 The programme's meter, run against the real trajectory on the day of this draft, returns:
 
@@ -135,7 +116,8 @@ the claim.
 **Figures about a moving tree need their commit.** Two earlier drafts of this programme's novelty
 assessment quote 789 lines / 47 tests and 924 lines / 51 tests; both were true when written, hours
 apart. The previous draft of this paper stated 62 test functions in one section and 40 in another
-for the same tree. Every count in this paper is anchored to `497cdd8`.
+for the same tree. Counts in §§2.1–2.5 and §3 are anchored to `497cdd8`; §2.6 is explicitly
+post-anchor.
 
 **Retrospective mining cannot close the gap.** The miner fetches *merged* pull requests, so every
 retrospective row is a human accept, while the estimator's denominator is human rejections. Mining
@@ -160,7 +142,7 @@ verifier's successes. So the quantities below are **P(CI red | good, merged)** a
 bad, merged)**, not repository-level verifier error rates, and conditioning on a common effect
 induces association between quality and CI status inside the selected set. The sign of that bias
 is unknown. This is not the estimand the programme's threshold arithmetic is defined on.
-[judgement, from the design of the miner]
+[asserted] This follows from the miner's selection design.
 
 **Table 2 — Rates derived from Table 1, by treatment, with nominal Wilson 95% intervals.
 [measured]** The treatment column is not decoration: the point estimate is treatment-dependent and
@@ -174,10 +156,9 @@ must never be quoted without it.
 | α | unrun counted as a rejection | — | 10/34 = 0.2941 [0.1683, 0.4617] |
 | β = P(green \| bad, merged) | raw proxy labels, verdict-bearing only | 128/203 = 0.6305 [0.5623, 0.6939] | 18/21 = 0.8571 [0.6536, 0.9502] |
 | β | cancelled runs excluded | 128/188 = 0.6809 [0.6112, 0.7433] | — |
-| **β** | **adjudicated labels (§2.5)** | **[0.81, 0.93]** | — |
 | Human override: merged over red CI | — | 98/300 = 0.3267 [0.2761, 0.3816] | 7/56 = 0.1250 [0.0619, 0.2363] |
 
-The bolded rows are the ones to quote. The reconciled α at 14/88 is the treatment that counts an
+The bolded row is the one to quote. The reconciled α at 14/88 is the treatment that counts an
 unrun or non-gating check as *no verdict* rather than as a rejection, because that is the
 conditional the threshold arithmetic is defined on; it survives three independent derivations
 including a cross-family replication.
@@ -209,9 +190,9 @@ rather than print a row that contradicts its own label.
    the regime in which the heuristic's false-positive rate is highest. The audit was itself
    model-judged, in the same family as most of the rest of the programme. A later, larger
    adjudication of the bad-and-red cell (§2.5) confirms 29/75 and 45/75 of bad labels — six to
-   nine times the audited 6.7%, on a different cell by a different method, and in the opposite
-   direction to what the size bias predicts. Two estimates of the same construct differing by an
-   order of magnitude both live in our tree; we quote both.
+   nine times the audited 6.7%, on a different selected cell by a different method. The estimates
+   do not share a sampling frame and should not be treated as replications; we quote both with their
+   conditioning.
 3. **A uniform precision correction cancels exactly, and this is why the transpose survived.** If
    a single label precision *p* applies to both bad cells, β = 128*p*/(128*p* + 75*p*) = 0.6305 for
    every *p* in (0, 1]. [algebra] Only a *differential* precision between the bad-and-green and
@@ -224,8 +205,8 @@ rather than print a row that contradicts its own label.
    coincide, which is precisely why the defect survived; on Repository B, against the primary row,
    they differ by a factor of 2.00. This is the defect at the centre of §3. Two corrected figures,
    0.12 and 0.14, are corrections to the *transpose* and must never be quoted as β.
-5. **Every interval in Table 2 is nominal and is a lower bound on its true width.** Wilson
-   intervals assume independent Bernoulli draws; the labelling procedure guarantees dependence.
+5. **No interval in Table 2 establishes actual 95% coverage.** Wilson intervals assume independent
+   Bernoulli draws; the labelling procedure guarantees dependence.
    One later fix pull request can label many earlier ones bad, and labels are positively correlated
    across every pull request touching a shared manifest; CI health is serially correlated over
    time. The effective sample size has not been computed. The programme prescribes Kish's
@@ -235,11 +216,11 @@ rather than print a row that contradicts its own label.
    versus include no-CI rows; exclude versus include cancelled runs; four treatments of α;
    transpose versus correct axis; four cross-combinations of two adjudications; audited versus
    raw. The cancelled-run correction was found by a post-hoc re-fetch. No interval in Table 2
-   carries nominal 95% coverage under this path multiplicity. [judgement]
+   carries nominal 95% coverage under this path multiplicity. [asserted]
 
 **The effective number of independent corpora is one, not two.** Both repositories were written
 largely by one developer with heavy AI assistance — a description that rests on the author's
-knowledge and is *judgement*, not measurement — and they share a CI convention, a
+knowledge and is *asserted*, not measured — and they share a CI convention, a
 conventional-commit style (the direct cause of the fix regex misfiring), one 14-day window, one
 labelling pass and one auditor family. Presenting them side by side implies a replication the
 design does not contain. The intervals bear this out: α_A [0.1635, 0.3307] overlaps α_B [0.0570,
@@ -283,8 +264,8 @@ What that does to the thresholds, quoted with treatments rather than as one flat
 | 0.2371, Repository A as recorded | 0.0880 | 0.7865 |
 | 0.2941, Repository B unrun as rejection | 0.0814 | 0.7277 |
 
-**Every threshold derived from β\* is 12% to 27% looser than it should be, and the error is in the
-optimistic direction.** [algebra] The previous draft wrote this as "the system had been assuming
+**Across the measured treatments, the derived threshold falls 12% to 27% relative to the assumed
+α = 0.03 baseline.** [algebra] The previous draft wrote this as "the system had been assuming
 its verifiers were about 21% more reliable than the corpus says". That is a category slip and we
 withdraw it: 0.7865 is the rescale of the *threshold*, not a reliability ratio. Assuming α = 0.03
 against a measured 0.1591 to 0.2371 understates the false-reject rate by roughly **five- to
@@ -327,17 +308,14 @@ the measured ones**, so no routing decision can be taken at the floor as configu
 treatment. The "one sample below" flourish is spurious precision over two soft constants and is
 withdrawn.
 
-### 2.5 β on adjudicated labels, and why two families agreeing to four decimals is not evidence
+### 2.5 Arithmetic cancellation: reported agreement over disagreeing labels
 
 The previous draft stated that a label-corrected β on the correct axis "does not exist anywhere".
-That was false at the moment of writing: the result had landed in the tree four minutes earlier.
-It is reported here because it is both the largest measured result the programme has and a worked
-instance of this paper's own subject.
+That was already false: the result had landed in the tree four minutes earlier. [measured] The
+bad-and-red cell had been adjudicated twice, blind, by different model families over the same 75
+proxy-selected records, using metadata only. [measured]
 
-The bad-and-red cell was adjudicated **twice, blind, by different model families**, over all 75
-pull requests, from metadata only. [measured]
-
-**Table 5 — Two blind adjudications of the same 75 pull requests.**
+**Table 5 — Two blind metadata adjudications of the same 75 selected records. [measured]**
 
 | | `gpt-5.6` | `gemini-3.7` |
 |---|---|---|
@@ -348,9 +326,9 @@ pull requests, from metadata only. [measured]
 | red **not** meaningful | 33 | 38 |
 | corrected β | 144/167 = 0.8623 | 155/178 = 0.8708 |
 
-Two families reporting β within **0.0085** of each other while disagreeing by **16 pull requests**
-on how many bad labels are genuine. That is the shape of a tight cross-validated estimate, and it
-is not one. Recomputing β under every cross-combination of the two adjudications' inputs:
+The reported values are only **0.0085 apart**, although the adjudicators differ by **16 records**
+on how many bad labels are genuine. [measured] Recombining the numerator and denominator decisions
+under every cross-combination gives:
 
 | promoted from | refuted from | β |
 |---|---|---|
@@ -359,38 +337,61 @@ is not one. Recomputing β under every cross-combination of the two adjudication
 | `gemini-3.7` | `gpt-5.6` | **0.9281** |
 | `gemini-3.7` | `gemini-3.7` | 0.8708 *(as reported)* |
 
-**Reported spread 0.0085. Cross spread 0.1192. The agreement is 14× narrower than the disagreement
-in its inputs warrants.** [algebra] The mechanism is arithmetic, not epistemic: an adjudicator that
-refutes more labels also promotes fewer, so a larger numerator trades against a smaller denominator
-in roughly compensating amounts. β is stable while the labels underneath are not.
+**Reported spread 0.0085; cross-combination spread 0.1192; ratio 14.0.** [measured] [algebra]
+The mechanism is arithmetic: an adjudicator that refutes more labels also promotes fewer, so a
+larger numerator trades against a smaller denominator. [algebra] Agreement between the two reported
+ratios therefore does not establish agreement on the classifications that produced them.
+[asserted]
 
-**So the interval to quote is [0.81, 0.93], not [0.862, 0.871].** Had only one family run, or had
-the two been compared on β alone, this would have been published as a tight cross-validated
-estimate. This is the clearest case in the programme of two agents agreeing without that agreement
-being evidence — and, unlike §3, it comes with the arithmetic that says why.
+The result to carry forward is the **sensitivity range** $[0.8090,0.9281]$, not a confidence
+interval and not the narrow gap between the two reported ratios. [measured] Had only one
+adjudicator run, or had the comparison stopped at the reported ratios, either output could have
+looked stable. [asserted]
 
-**What it says.** On this corpus, once spurious labels and non-rejections are removed, the verifier
-accepts roughly four in five to nine in ten of the bad artefacts it actually rules on, against a
-recorded 0.63 and a design-time threshold near 0.09–0.11.
+**What it is not.** Promoting confirmed-bad records whose red result was not a meaningful rejection
+changes the estimand to *P(not meaningfully rejected | bad, merged)*. No adjudicator read a patch,
+the 10 and 5 `unclear` verdicts remain unresolved, and the merge collider and proxy-selection limits
+of §2.2 remain. [measured] A diff-level audit of any 20 of the 75 that disagreed materially with
+both metadata adjudications would retire this sensitivity analysis rather than tune it. [asserted]
 
-**What it is not.** The estimand changes: promoting confirmed-bad pull requests whose red was not
-a meaningful rejection into the numerator estimates *P(not meaningfully rejected | bad, merged)*,
-not *P(green | bad, merged)*. It is not a diff-level audit — no adjudicator read a patch. It is
-not β for the project; it is β for one repository's CI on merged pull requests. It inherits every
-proxy problem in §2.2, and the collider with them. The 10 and 5 `unclear` verdicts are unresolved.
-**Falsifier:** a diff-level audit of any 20 of the 75 that disagreed materially with both metadata
-adjudications would retire this estimate rather than adjust it.
+An independent correction from Table 1 yields approximately 0.71 and ranges from 0.64 to 0.76 over
+the audit factors' Wilson corners. [algebra] (from measured Table 1 inputs) That calculation uses
+correction factors with $n=15$ and $n=5$ and an estimator that can leave $[0,1]$ when sensitivity
+plus specificity is below one; it is a fragility check, not corroboration. [algebra] [asserted]
 
-An independent check from figures already in Table 1: applying the programme's own two audit
-factors symmetrically gives a corrected β near 0.71, ranging 0.64 to 0.76 over the audit factors'
-Wilson corners alone, before any sampling error in the cells. The Rogan–Gladen-style estimator we
-hand-rolled is unbounded and can leave [0, 1] when sensitivity plus specificity falls below 1, and
-n = 15 and n = 5 correction factors give it enormous variance. Both routes say the recorded 0.6305
-is too low; they do not agree on how much.
+### 2.6 Two oracles diverged, but not on a common estimand
+
+The two evidence channels differ materially. The metadata oracle adjudicates proxy-selected records
+from a merged-history table. The executable oracle replays a later subsystem suite at a historical
+child and its parent, then evaluates only parent-pass pairs. [measured] They are therefore neither
+independent replications nor estimates of one common population. [asserted]
+
+The metadata sensitivity analysis spans $[0.8090,0.9281]$ after adjudicating 75 contested rows
+within 203 proxy-bad rows. [measured] The
+executable pilot returned $0/15$ with Wilson interval $[0,0.2039]$; the registered primary run
+returned $0/50$ with $[0,0.0713]$. All 50 primary pairs were parent-pass/child-pass, and the stopping
+rule was `inconclusive`. [measured] Raising $n$ from 15 to 50 tightened the upper endpoint without
+moving the point, and the resulting Wilson interval lies wholly below the metadata sensitivity
+range. [measured]
+
+That separation is a diagnostic, not a bracket around truth. [asserted] The runner evaluated 50
+chronological pairs, while only 25 of 162 historical merges (15.4%) touched the chosen subsystem;
+it also censors cases whose parents cannot run the later suite. [measured] Its zero may therefore measure a sparse coupling
+between the chosen suite and historical changes rather than a low false-accept rate. [asserted]
+Conversely, the metadata range inherits proxy labels, merge selection and no patch inspection.
+[measured] Either result, viewed alone, could look well evidenced; together they expose an
+oracle-conditioned incompatibility without isolating whether mechanism, evidence surface, selection
+or estimand caused it. [asserted]
+
+The executable method also supplied its own positive control. In a broader-suite pilot, all five
+children failed and all five parents failed, so the classifier marked every pair as drift, leaving
+no evaluable parent-pass baseline and β not applicable. [measured] Ignoring the parents and calling
+the five child failures escapes would give a **counterfactual**, not observed, $\beta=5/5=1.0$.
+[algebra] The extra parent checkout and test execution prevented that wrong number. [measured]
 
 ---
 
-## 3. The incident
+## 3. The illustration that failed its own control
 
 ### 3.1 The claim
 
@@ -458,7 +459,7 @@ figures to the control is the wrong way round.
 **The defect survives and is stronger** for three independent hand-verifications; the axis decision
 is recorded and the definition stands as P(accept | bad), with the transpose retained under its own
 name and reported alongside. **The consilience claim does not survive.** The significance field in
-the original trajectory event is withdrawn and downgraded from *measured* to *judgement*.
+the original trajectory event is withdrawn and downgraded from *measured* to *asserted*.
 
 ### 3.6 The correction the reviews forced: this is an underpowered null
 
@@ -627,11 +628,13 @@ genuine consilience event this project has recorded about itself", tagged measur
 structurally identical to the claim withdrawn in §3. We do not rely on it, its *measured* tag should
 be challenged, and it is on the list to be retracted or controlled.
 
-Two internal-catalogue figures are corrected here against a sibling draft that anchors the same
-catalogue: this programme's audit of its own tree records **twenty-four** instances of a check, gate
-or invariant that was structurally incapable of failing, **sixteen** of them on a single day. The
-previous draft said "at least twenty ... fourteen of them". Two drafts in one tree disagreeing about
-one catalogue is exactly the traceability failure this paper is about.
+Two internal-catalogue figures are corrected here against the sibling `P2-guards.md` draft (Tables
+1–3), which anchors the same catalogue: the current recount is **twenty-five defective guards** —
+thirteen unable to fail, two unable to pass and ten with uninformative passes — plus one successful
+parent control. [measured]
+Sixteen of the original twenty-four entries were recorded on one day. [measured] The previous draft
+said "at least twenty ... fourteen of them". Two drafts in one tree disagreeing about one catalogue
+is exactly the traceability failure this paper is about. [asserted]
 
 ---
 
@@ -779,21 +782,22 @@ reward function stays effective as policy capability grows. [cited, ABS — fetc
 
 ### 7.4 What is left
 
-Three things, and each is small.
+Four bounded results remain.
 
-1. **An incident report.** A pre-registered falsifier for a multi-agent-independence claim, written
-   into the same paragraph as the claim, run within the hour, refuted, and published with the
-   mechanism — including that the team built the leak that broke its own blind. We make no priority
-   claim; we report it because it is cheap for others to avoid and because §3.6 shows how little a
-   one-against-one design could ever have established.
-2. **The cancellation finding (§2.5).** Two model families agreeing on a number to 0.0085 while
-   their inputs disagree by sixteen items, with the arithmetic showing why the agreement is
-   compensating rather than corroborating, and a cross-combination spread 14× wider than the
-   reported one. We have not looked for prior art on this specific arithmetic and make no claim
-   about it; we report it because it is the only place in the programme where "agreement is not
-   evidence" is demonstrated rather than asserted.
-3. **The flat-tally trap (§4.2).** Small, general, transferable and, as far as one search goes,
-   unstated.
+1. **The oracle-divergence result (§2.6).** A metadata sensitivity range of $[0.8090,0.9281]$ and
+   an executable replay result of $0/50$, Wilson $[0,0.0713]$, separate completely while the latter
+   stays at zero as its sample grows from 15 to 50. [measured] This is oracle-conditioned divergence;
+   because mechanism, evidence surface, selection and estimand move together, the design does not
+   isolate its cause. [asserted]
+2. **The cancellation finding (§2.5).** Two reported values differ by 0.0085 while their inputs
+   disagree by sixteen records; cross-combination produces a spread 14.0 times wider. [measured]
+   [algebra] We have not searched specifically for prior art on this arithmetic and make no priority
+   claim. [asserted]
+3. **A failed illustration (§3).** A pre-stated falsifier for a multi-agent-independence claim ran
+   within the hour and refuted the attribution, while exposing a blind the team itself had leaked.
+   [measured] The example remains because its failure is the evidence.
+4. **The flat-tally trap (§4.2).** Small and transferable; one search did not establish priority.
+   [asserted]
 
 We explicitly do **not** claim: that cross-family verification outperforms same-family verification;
 that the different-class rule is new; that agreement is never informative; that multi-agent systems
@@ -837,6 +841,12 @@ and its ownership of a quantity, that is what the sentence says.
 
 Worst first.
 
+**Primary threat. The two headline oracles do not share a sampling frame or estimand.** The metadata
+range begins with proxy-selected merged records; executable replay includes only historical pairs
+whose parents can run a later subsystem suite. [measured] Only 25 of 162 merges touch that subsystem.
+[measured] The numerical separation is real, but interpreting it as two measurements of one $\beta$
+would recreate the paper's central mistake. [asserted]
+
 **T1. The paper's own arithmetic was checkable in an hour and was wrong in at least eight places,
 all in the programme's favour.** The previous draft asserted `mypy --strict` clean against 21
 reproducible errors; asserted that a label-corrected β on the correct axis did not exist four
@@ -852,12 +862,11 @@ most quantitatively load-bearing external claims had **no retained artefact**; t
 fetched (§7.1), two figures were withdrawn as unsupported and one title was wrong. A subagent's
 report of a number is not a citation. This is §3 happening again, to the document that reports §3.
 
-**T2. The single controlled test refuted our own central example, and it had no power anyway.** §3.6.
-Everything positive we report is uncontrolled *n* = 1 anecdote of exactly the kind §3 shows to be
-unreliable. The specified repair — frozen snapshot, committed angle text, further arms per family —
-is cheap and has not been run. *n* is one everywhere else too: one leak audit, one invariant audit,
-one three-arm decision experiment, one blind grading with twelve judgements from two graders. **No
-rate in this paper is a rate.**
+**T2. The single controlled test of the original illustration refuted it, and had no power anyway.**
+§3.6. The specified repair — frozen snapshot, committed angle text and further arms per family —
+has not been run. The remaining audit examples are still *n* = 1: one leak audit, one invariant
+audit, one three-arm decision experiment and one blind grading with twelve judgements from two
+graders. [measured]
 
 **T3. The decision experiment does not license the inference the previous draft drew, and its
 protocol was misdescribed.** Budgets were **deliberately not matched** across arms — "at matched
@@ -885,12 +894,12 @@ cannot be independently replicated, and cannot satisfy the data-availability exp
 technical software-engineering track. Public agent-authored pull-request corpora now exist at larger
 scale and are the correct next substrate.
 
-**T5. The headline quantity has never been measured.** §2.1 and §2.4. Separately, one field on every
-result asserts that the quantity is a lower bound on a joint error, and a passing test enforces that
-assertion; it is not a lower bound, because two unmeasured biases run in opposite directions — human
-misses push the estimate down, verifier pre-filtering pushes it toward 1.0 — and do not compose into
-a bound in either direction. That defect is open at the time of writing, in the project that
-measures false certification.
+**T5. The prospective headline quantity remains unmeasured.** §2.1 and §2.4. Executable replay adds
+a conditioned retrospective proxy, not the missing prospective denominator. [measured] The product
+now defaults its joint-error-bound declaration to false, but a caller may assert the sampling
+condition without a collection protocol verifying it, and the database path does not propagate the
+declaration. [measured] (Verified in `src/consilient/beta.py` and P2 A5.) The accidental overclaim is
+safety-mitigated; the property is not verified. [asserted]
 
 **T6. Our own enforcement mechanism is opt-in and fires on three events in ninety-six** (§6), and it
 validates a *declared* class it cannot verify.
@@ -954,42 +963,52 @@ Falsifiers, in cost order. None has been run.
 6. **Close the enforcement hole and measure what it rejects.** Make the different-class check
    mandatory for any event with more than one contributor rather than opt-in, then report what
    fraction of real multi-agent structures it refuses. A gate that rejects nothing is not a gate.
-7. **Re-run the instrument on a public agent-authored corpus.** This repairs external validity,
-   reproducibility and artefact availability at once, and demotes the private corpus to a contrast
-   case.
+7. **Run both oracles on one public, pre-registered population.** Fix the eligible histories and
+   executable suites before inspecting outcomes, report suite-contact and parent-pass fractions,
+   and publish aggregate records. Pre-register the hypothesis that intervals overlap when population
+   and estimand are held common. Persistent non-overlap at the registered power would falsify that
+   hypothesis; overlap would limit the present result's scope without undoing or explaining the
+   historical divergence. [asserted]
 
 ---
 
 ## 10. Conclusion
 
-We set out to argue that agreement between agents is evidence about the agents rather than about the
-artefact, and that a multi-agent structure must name the different class of facts it introduces. The
-argument is right and it is not ours: Campbell and Fiske stated it operationally in 1959, the
-design-diversity literature priced it in the 1980s, Huang et al. measured it for language models in
-2023, and Kuai et al. shipped a diagnostic and a remedy for it in April 2026. We withdraw the
-position and the contribution.
+The strongest result is divergence. Metadata adjudication yields a sensitivity range of
+$[0.8090,0.9281]$; executable replay yields $0/50$, Wilson $[0,0.0713]$, after remaining at zero from
+$n=15$ to $n=50$. [measured] The numerical separation is not a bracket on truth because the
+selection frames and estimands differ. [asserted] Increasing *n* did not reconcile these differently
+conditioned estimators. [measured] The design does not isolate why. [asserted]
 
-What we can report is smaller and, we think, still worth four pages. We believed two model families
-had independently found the same defect in our own instrument. We wrote the overturning test into the
-same paragraph, ran it within the hour, and it fired — and the blind it depended on had been broken
-by our own committed findings log, which is a contamination channel with no analogue in the memory
-literature precisely because it is prose, is in version control, and is the first thing a diligent
-agent reads. Reviewing that incident forced us to say what we had not: one arm against one arm could
-never have detected the effect the literature measures, so this is an underpowered null and not a
-refutation of difference-of-class.
+The second result is agreement produced by cancellation. Two adjudicators' reported ratios differ
+by 0.0085 while their labels differ by sixteen records; cross-combination expands the spread to
+0.1192, 14.0 times wider. [measured] [algebra] A stable ratio did not establish stable inputs.
+[asserted]
 
-Along the way the programme's assumed verifier false-reject rate turned out to be invented, by a
-factor of five to eight, in the optimistic direction; its evidence floor turned out to sit below
-every threshold it could be checked against; and its best cross-validated number turned out to be
-two adjudications whose agreement was compensating arithmetic rather than corroboration. Those are
-the results.
+We also retain the illustration that failed. Its pre-stated same-family control reproduced the
+finding, withdrew the cross-family attribution and exposed that the repository had leaked the answer
+into the blind. [measured] One arm against one arm remains an underpowered null, not a refutation of
+difference of class. [asserted]
 
-The one thing we would defend at full strength is the practice, not the thesis: when you believe
-agents agreed for a good reason, write down the observation that would show they did not, and go and
-make it. This revision exists because three reviewers did that to us and found seven arithmetic
-errors that all flattered us; an eighth surfaced while we were checking a citation they had told us
-to fetch, and it flattered us too. That is the argument for the practice, and it is equally the
-argument for not trusting the paper that makes it until someone has checked the numbers.
+The broader position — that a multi-agent structure must introduce a different class of facts — is
+pre-empted by older literatures, so we withdraw priority. [cited] (Source depths in §7.) What survives
+is a practice: preserve the classifications beneath an aggregate, compare evidence channels before
+celebrating agreement, and state the observation that would overturn the preferred explanation.
+[asserted]
+
+<!--
+Decision record — 20 August 2026
+Reasoning: centre the paper on the measured oracle divergence and arithmetic cancellation, while
+retaining the self-refuting incident as a failed illustration. The divergent figures are described
+as differently conditioned results, not competing estimates of one true beta.
+Alternative not taken: call the non-overlap corroboration that one oracle is right. Their sampling
+frames and estimands differ, so that inference is not licensed.
+Reversal: git restore --source=b27906d -- docs/50-publications/P3-echo.md
+Falsifier of the paper-level judgement: if a public, pre-registered shared-population replication
+with adequate suite contact produces overlapping oracle intervals, and its adjudicators show no
+arithmetic cancellation, the two patterns are too local to carry P3; fold them into P1. The
+historical divergence would remain measured.
+-->
 
 ---
 
@@ -999,13 +1018,15 @@ argument for not trusting the paper that makes it until someone has checked the 
 script and the read-only recomputation scripts (contingency tables, α sensitivity, proxy diagnostics,
 red-cell adjudication, β cross-combination); the estimator, event log and projection modules with
 their test suite; the private-corpus pre-publication gate; and the executable models behind the
-threshold arithmetic. The findings documents, decision records, experiment register and the
+threshold arithmetic. The forward-replay instrument, its stopping rule and aggregate findings are
+also tracked. The findings documents, decision records, experiment register and the
 append-only trajectory log are in the tree, including the withdrawal in §3 in its original position
 beneath the claim it withdraws.
 
 **Published in aggregate.** The contingency tables (Table 1) and every rate derived from them
 (Table 2 and Table 3), the two blind adjudications (Table 5), the trajectory-event counts of §6, and
-the aggregate positive-control counts for the revert detector.
+the aggregate positive-control counts for the revert detector; plus the executable pilot and primary
+class counts, Wilson intervals, suite-contact fraction and parent-baseline drift counts.
 
 **Not released, and it cannot be.** The two measurement corpora are private commercial repositories.
 Per-pull-request records, file paths, check names, pull-request titles and commit subjects are
@@ -1147,8 +1168,9 @@ position paper.** Campbell and Fiske (1959) own the rule; the design-diversity a
 literatures own the engineering; Huang et al. (2310.01798), sitting uncited in our own bibliography,
 own the measured LLM version; and Kuai et al. (2604.07650) — fetched for this revision, and it is
 real and it does what the reviewer said — own the operational verifier-ensemble treatment. Contribution
-#1 is **withdrawn**. The taxonomy is relabelled a teaching aid. The paper is retitled around the
-incident and restructured as an experience report, and reviewer 2's venue advice (a
+#1 is **withdrawn**. The taxonomy is relabelled a teaching aid. The paper is restructured as an
+experience report around the oracle divergence and arithmetic cancellation, with the failed
+incident retained, and reviewer 2's venue advice (a
 verification-of-agents workshop or ICSE-NIER) is accepted in principle.
 
 **It did not get shorter, and that is the honest report.** Reviewer 2 asked for a four-to-six-page
@@ -1168,10 +1190,12 @@ self-containment for length and that is the author's call, not a drafting decisi
   names the gate that actually runs, and cites the sibling catalogue's "it has never been clean". The
   40-versus-62 test-count inconsistency is fixed and every count anchored to `497cdd8`.
 - **"A label-corrected β on the correct axis does not exist anywhere"** (R1, R3). False four minutes
-  after it was written. §2.5 now reports [0.81, 0.93] with its estimand change and all caveats, plus
-  the cancellation finding, which is promoted to one of the paper's three remaining contributions.
-  R3's symmetric-correction cross-check (≈0.71, range 0.64–0.76) is included, as is the note that the
+  after it was written. §2.5 now reports $[0.8090,0.9281]$ as a sensitivity range, not a confidence
+  interval, with its estimand change and all caveats; the cancellation finding is retained. R3's
+  symmetric-correction cross-check (≈0.71, range 0.64–0.76) is included, as is the note that the
   Rogan–Gladen form is unbounded.
+- **Executable replay added post-anchor.** §2.6 reports the pilot and primary result, the parent
+  control, the 15.4% suite-contact limit and why the two oracles are not common-estimand replicates.
 - **The evidence floor** (R1, R3). Recomputed against every threshold: 31 assumed, 36 reconciled, 40
   as-recorded, 34–46 across intervals, against an enforced 30. The "one sample below" flourish is
   withdrawn.

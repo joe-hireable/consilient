@@ -10,43 +10,35 @@ Draft of 20 August 2026. **Not submitted. Not for circulation.**
 
 ## Abstract
 
-We report twenty-four checks, gates and declared invariants that were found, over seventeen hours
-of a single repository's life, to be incapable of doing the job they were declared to do. Thirteen
-of them could not fail under any input whatsoever. One could never have passed. Ten passed for a
-reason that made the pass uninformative. At the moment each was discovered the repository's test
-suite was green and its static type gate passed; several of the defective guards had tests written
-specifically for them, and those tests passed. Drafting this paper produced a twenty-third entry:
-five internal documents assert that `mypy --strict` is clean, the continuous-integration gate runs
-a non-strict configuration, and `mypy --strict` reports 21 errors today and 19 at the commit that
-installed the gate. It has never been clean. The check that found the defect was never the check
-that shipped.
+**Worst limitation.** This is a self-selected experience report from one repository after
+seventeen hours and 116 commits, written and audited by one developer with heavy AI assistance.
+The same process wrote and selected every defective guard in the catalogue. The evidence
+establishes existence, not prevalence, a rate or a comparison. [measured] [asserted]
 
-The system is not an incidental one. It is an orchestrator whose entire declared purpose is to
-measure $\beta$, the rate at which automated checks accept a bad artefact, built under a written
-discipline that requires every declared invariant to ship with the check that enforces it, in the
-same commit. If inert guards survive there, the failure is not carelessness; it is structural.
+We report **twenty-five defective guards and one successful control**. Thirteen guards could not
+fail under any input, two gate conditions could never pass, and ten checks could pass for reasons
+that made the pass uninformative. [measured] The twenty-sixth exhibit is the contrast: a
+parent-commit control that prevented five later-suite failures from becoming a counterfactual
+$\beta = 1.0$; every parent also failed, so all five pairs were classified as drift. [measured]
+[algebra] The control cost one additional checkout and test execution per pair. [measured]
 
-We identify one mechanism behind most of the catalogue. **The tests asserted the mechanism, not
-the property.** A test that asserts `build()` raises passes forever while the property "a forged
-verdict never reaches the table $\beta$ is computed from" quietly stops holding, because the code
-grew a second path to the same state. A closely related mechanism recurred three times in twelve
-hours in three different files: **a test fixture that can construct a state the invariant forbids
-will train the suite to permit that state.** We could not find that second sentence stated
-anywhere in the test-smell literature, and it is mechanically detectable.
+The cleanest failure sits in the file that computes the programme's central quantity. A field
+declared that $\beta$ was a lower bound on joint human-plus-check error by default, and a dedicated
+test asserted the hard-coded `True`. No collection protocol established the sampling condition
+the bound requires. [measured] The repair defaults the claim to false and makes it explicit, but
+still trusts a caller's declaration rather than verifying the sampling property. [measured]
+[asserted] In the same gate, one condition admitted every possible $\beta$ while another required
+twenty uses of behaviour the gate itself forbade until it passed. [algebra]
 
-The recommendation is cheap and unoriginal in its insight, which we say plainly: run every guard
-against input it should reject, and record that it did. This is mutation testing's forty-eight
-year old question — *can this check fail?* — asked of invariant checks, gate conditions and
-governance rules rather than of unit tests, and asked in the one place where no existing
-instrument is defined over the objects that broke. We position against vacuity detection,
-mutation testing, checked coverage and oracle assessment honestly, and claim no new technique.
+The common mechanism is that **tests asserted mechanisms rather than properties**. A test can
+certify a constant, an early-return path or a comparison while never exercising the property the
+guard was meant to secure. [measured] A related hypothesis recurred three times: a fixture able to
+construct a forbidden state trains the suite to permit that state. [measured] [asserted] We have
+not built the proposed detector or run it on a public corpus. [measured]
 
-**External validity is severely limited and we state it here rather than in a limitations
-section.** This is n = 1: one repository, 116 commits, seventeen hours of recorded history,
-written by one developer with heavy AI assistance. We are also the people who wrote every
-defective check in the catalogue. We report no prevalence, no rate and no comparison. What we
-offer is a mechanism, an anchored catalogue with survival times and repair status, and a
-discipline that costs approximately one extra test per guard.
+The recommendation is deliberately old: exhibit every guard rejecting an input it should reject
+and retain that falsification record. [asserted] We claim no new technique; §9 treats mutation
+testing as the baseline and records that its sources are not yet publication-depth. [asserted]
 
 **Keywords:** inert checks, vacuity, invariant enforcement, test oracles, agentic software
 engineering, experience report, negative results.
@@ -94,9 +86,9 @@ with a false-accept rate of one.
 
 ### 1.1 Contributions
 
-1. **An anchored catalogue** (§4) of twenty-four instances with discovery mode, survival time,
-   repair commit and current status, every entry traceable to a file or commit in a repository we
-   release the instruments from.
+1. **An anchored catalogue** (§4) of twenty-five defective instances, plus one positive control,
+   with discovery mode, survival time, repair commit and status, every entry traceable to a file or
+   commit in a repository from which we release the instruments. [measured]
 2. **A common mechanism** (§5): tests that assert the mechanism rather than the property; and the
    permissive-fixture rule, which we could not locate in the literature and which is mechanically
    detectable.
@@ -105,7 +97,7 @@ with a false-accept rate of one.
    and the one case in this corpus where following it worked, including a check that on its first
    run correctly flagged **itself**.
 4. **An honest prior-art position** (§7) which retires most of what a reader might otherwise take
-   as novel.
+   as novel. [asserted]
 
 ### 1.2 Evidence discipline used in this paper
 
@@ -124,7 +116,8 @@ assessment", and a **C** claim names its source. A number produced by a model, n
 instrument, is never written as an empirical result. Nothing in this paper is upgraded from its
 tag without new evidence.
 
-**Anchor.** All measurements were taken on branch `worktree-consilience-cto` at commit
+**Anchor.** The original twenty-four-entry catalogue was measured on branch
+`worktree-consilience-cto` at commit
 `81e7143`, 20 August 2026 11:33:11 +0100, unless a different commit is stated, with Python 3.13.11
 and mypy 2.3.1. At that commit the repository has 116 commits, the suite reports `62 passed in
 0.44s`, the continuous-integration static gate (`python -m mypy src/consilience`, under the
@@ -132,7 +125,9 @@ repository's non-strict `mypy.ini`) reports `Success: no issues found`, `mypy --
 errors in 3 files (exhibit A13), and the private-corpus gate exits 0. The branch was moving while
 this was written — two of the catalogue's exhibits were repaired by a parallel session at 11:01 and
 11:04 on the day of writing — so every entry carries its status **as of that commit** and not as of
-publication.
+publication. A post-anchor supplement adds A15 and C1, records A5's repair at `9c2fe62`, and records
+the still-unaccepted A15 correction proposed at `05bf3ac`; those entries say so rather than silently
+mixing snapshots. [measured]
 
 ---
 
@@ -216,23 +211,26 @@ Findings arrived through five channels, which we record because the channel matt
 
 An internal brief described these as found "over roughly 48 hours". That is wrong and we measured
 the correction: the repository's entire recorded history at the anchor commit is **17 hours 2
-minutes**, spanning two calendar days. Sixteen of the twenty-four entries were recorded on 20
+minutes**, spanning two calendar days. Sixteen of the original twenty-four entries were recorded on 20
 August alone. Where an entry's survival time is given as "the full life of the repository", that
 means seventeen hours, not seventeen months. This matters for §8 and we would rather state it than
 let a reader infer a longer exposure.
 
 ### 3.3 What counts as an entry
 
-We admit an instance to the catalogue if a check, gate, assertion or declared rule was, at some
-committed state, incapable of distinguishing the condition it named. We separate three classes:
+We admit a defective instance to the catalogue if a check, gate, assertion or declared rule was,
+at some committed state, incapable of distinguishing the condition it named. We add one positive
+control as a contrast. [asserted] The four classes are:
 
 - **Class A — structurally inert.** No input, state or execution could have made it fail, or the
   declared guarantee has no executing check at all. Thirteen entries.
-- **Class A′ — the inverse.** A declared invariant that could never have passed. One entry, kept
-  because it is the same drift running the other way.
+- **Class A′ — the inverse.** A declared invariant that could never have passed. Two entries,
+  kept because they are the same drift running the other way.
 - **Class B — uninformative pass.** The check could in principle fail, but on the corpus and in
   the configuration in which it ran, its pass carried no information about the property. Ten
   entries.
+- **Class C — prevented wrong answer.** A control exhibited the failure it existed to distinguish
+  and stopped a counterfactual result from being reported. One positive entry. [measured]
 
 The classification is our judgement and a reader may reasonably move two or three entries between
 A and B. We flag the contested ones inline.
@@ -249,7 +247,7 @@ private commercial repositories, and cannot be reproduced outside the author's m
 
 ## 4. Results: the catalogue
 
-Table 1 is the whole result. Everything after it is interpretation.
+Tables 1–3 are the result. Everything after them is interpretation.
 
 **Table 1 — Class A: checks that could not fail.** "Survived" is from the commit that introduced
 the defect to the commit that repaired it, or to the anchor commit where still open.
@@ -260,7 +258,7 @@ the defect to the commit that repaired it, or to the anchor commit where still o
 | A2 | ADR-0015 Gate B condition 2: *the derived parallelism ceiling is > 1* | $n_{max} = T_a/(f \cdot T_r)$ with $f \le 1$, so $n_{max} \ge 25/8 = 3.125$ for **every** critic recall and therefore every $\beta$, including $\beta = 1.0$ — a critic that catches nothing. The gate asked whether a quantity with a floor of 3.125 exceeds 1. | Raised in an internal sweep; confirmed by independent verification | initial commit `99e7e81` → `82475a8` (11:01) = **16 h 30 m**, the full life of the repository | Superseded by ADR-0037; we ran the replacement and it exhibits both a PASS and a FAIL row | M, X |
 | A3 | `V0-18`: an agent may never author a human's decision — the oracle $\beta$ is computed against | `_check_human_authority()` returned early unless `data["human_decision"]` was present. `projection._apply_outcome()` read `data["human_verdict"]` straight off an `attempt.outcome` event into the `outcomes` table `beta.compute()` reads. The constant `HUMAN_ONLY` already contained `"verdict"`; nothing consulted it on that path. | Cross-family invariant audit | to `32eacb8` | Repaired, 5 tests; `actor` remains unauthenticated, so it stops an accidental forgery, not a determined one | M |
 | A4 | `Beta.__post_init__`: a *measured* $\beta$ must be evidenced | It checked only whether `point` and `interval` were **present**. A `measured` verdict with zero rejections, a rate outside $[0,1]$, an inverted interval or a point outside its own interval constructed cleanly and rendered without complaint. `compute()`'s `min_rejections` argument could also *lower* the floor it enforced. | Cross-family invariant audit | to `32eacb8` | Repaired, 6 tests; `min_rejections` may now only be raised | M |
-| A5 | `lower_bound_on_joint_error: bool = True`, with `test_beta_declares_itself_a_lower_bound_on_a_joint_error` asserting it is `True` | The field is a hard-coded dataclass default. The test asserts a constant. It cannot fail — and the claim it certifies is false: human misses bias $\hat\beta$ down, verifier pre-filtering of the review queue biases it up toward 1.0, and two unmeasured biases in opposite directions do not compose into a bound in either direction. | Cross-family invariant audit | initial → **still open** | **Open.** Verified unchanged at the anchor commit | M (code), A (the mathematical objection) |
+| A5 | `lower_bound_on_joint_error: bool = True`, with `test_beta_declares_itself_a_lower_bound_on_a_joint_error` asserting it is `True` | The field was a hard-coded dataclass default. The test asserted a constant, so it could not fail. The bound requires a sample not conditioned on the verifier's own outcome; no collection protocol established that property. | Cross-family invariant audit | initial → `9c2fe62` (12:22), post-anchor | **Safety-mitigated, not property-verified.** The default is now `False`, direct computation and rendering test both declarations, and undeclared output says `NOT a bound`. A caller may still assert `sampling_unconditioned=True`; the sampling property itself is not checked, and the database path does not propagate the flag. | M (code and tests), A (sufficiency of the sampling condition) |
 | A6 | Event schema: `ts` must be a valid timestamp | `validate()` checked the **format** of `ts` and required an explicit UTC offset. Both were impeccable. It never asked whether the value was true. Six consecutive trajectory events carry invented timestamps, drifting up to 2 h 15 m ahead of the wall clock. | The author, in the hour he documented a runner ignoring its own append-only invariant | to `cdd21f7` (04:13) | Repaired: `append()` refuses a `ts` more than 15 minutes from the clock, at append only | M |
 | A7 | `AGENTS.md`: *never publish anything from the private corpora* | Declared in a governance file and enforced by nothing. Violated in the **initial commit**. The repository's own sweep was structurally incapable of finding it: the sweep searched for paths *prefixed* with a repository name, and the leak was the same paths written bare, with no prefix to search for. | Paid cross-family leak audit against 5,256 real corpus paths | `99e7e81` → `fafd1a6` = **100 commits, 16 h 08 m** | Repaired: a local pre-publication gate, `--require-corpora` so a missing corpus fails rather than skips | M |
 | A8 | `V0-26`: a multi-contributor event must declare a distinct evidence class per contributor — the check for the rule the project is named after | `_check_evidence_class` returns early whenever `contributors` is absent, and nothing requires a multi-agent event to carry the field. We measured the trajectory: **9 of 96 events carry `contributors`; only 3 are multi-contributor.** 87 events are structurally exempt. This is the identical early-return bypass as A3, shipped seven hours after the write-up naming that shape. | This work | landed `f9b7e11` (11:04) → **still open** | **Open.** An opt-in invariant | M |
@@ -275,6 +273,7 @@ the defect to the commit that repaired it, or to the anchor commit where still o
 | # | The guard | Why it could never pass | Status | Ev. |
 |---|---|---|---|---|
 | A12 | `V0-02`, ADR-0006 and ADR-0015 Gate A condition 2 all require **byte-identical** state after delete-and-replay | SQLite files are not byte-stable: the header carries a change counter and a schema cookie, freelist and page allocation depend on insertion history, and WAL adds a random salt. The shipped code already knew and had implemented a canonical ordered row-dump digest instead — so the documents specified an invariant the code correctly refused to implement, and the check that exists is *stronger* than the one written down. | The specification was corrected; **ADR-0006 line 137 and ADR-0015 line 115 still carry the impossible wording at the anchor commit** | M (code and text), C (SQLite non-determinism) |
+| A15 | ADR-0015 Gate B condition 4 requires twenty tickets on another repository before Stage 3 | Stage 3 begins only after Gate B, but the condition requires twenty instances of Stage 3 behaviour. The conjunction is unsatisfiable as written: the evidence needed to pass the gate can be produced only after passing it. | **Open post-anchor at `f110882`.** ADR-0039 proposes a correction at `05bf3ac`, but is explicitly not accepted; only the principal may alter the gate. | M (text), X (circularity) |
 
 **Table 2 — Class B: passes that carried no information.** Condensed; each is one paragraph in §4.2.
 
@@ -291,14 +290,20 @@ the defect to the commit that repaired it, or to the anchor commit where still o
 | B9 | A newly written gate, run and reported as passing | It was piped into `tail`, which discarded the exit code, so a **failing** gate reported success and work continued on it. The repository is private, so nothing was exposed. | Corrected `33b753e` | M |
 | B10 | An external project-management projection as a state store | A write of a state that does not exist in the target system was accepted with no error, leaving the record unchanged. A trajectory log would have carried the write as true. An external projection that cannot fail loudly is not a state store. | Recorded | M |
 
+**Table 3 — Class C: a control that prevented a wrong answer.**
+
+| # | The guard | What it prevented | Status and cost | Ev. |
+|---|---|---|---|---|
+| C1 | Parent-commit baseline in forward test replay | Five historical children failed a later monolithic suite, but every corresponding parent also failed. The pair classifier therefore marked all five as test-suite drift. Without the parent run, treating the five child failures as five escapes would have produced a counterfactual $\beta=5/5=1.0$. | Retained as a required control. It adds one checkout **and one test execution** per pair. | M (five child/parent FAIL/FAIL pairs), X (counterfactual) |
+
 ### 4.1 What the aggregate looks like
 
-Two summary observations, both measured.
+Three summary observations, all measured except the stated counterfactual.
 
 **First: at every discovery, the suite was green.** The three defects of A1, A3 and A4 were found
-after a 40-test suite passed and the static gate reported success. A5's defect *has* a dedicated
-test and that test passes — it asserts a constant. A3's fixture built forbidden events and every
-test passed. B3 shipped with five passing tests.
+after a 40-test suite passed and the static gate reported success. At the anchor, A5's defect had a
+dedicated passing test — it asserted a constant. A3's fixture built forbidden events and every test
+passed. B3 shipped with five passing tests.
 
 The write-up of that audit states that `mypy --strict` was also clean at the time. **It was not**,
 and we measured the correction while drafting this paper: at `32eacb8` the strict checker reports
@@ -317,7 +322,34 @@ enforced fraction can rise because errors stop being *counted* rather than becau
 happening, so the denominator has to come from somewhere independent of the mechanism being
 credited.
 
-### 4.2 Four entries in longer form
+**Third: one control rejected the tempting result.** Five historical children failed a later test
+suite and every parent failed too, so the classifier rejected all five pairs as drift. [measured]
+Calling the child failures escapes without that baseline would have yielded $\beta=1.0$.
+[algebra] The control is the same phenomenon from the useful side: it was seen fail in the exact
+case it existed to distinguish, and its failure prevented an unsupported number.
+
+### 4.2 Seven exhibits in longer form
+
+**A5, and why the central quantity certified itself.** The programme's own $\beta$ result carried
+`lower_bound_on_joint_error=True` by default, while its dedicated test asserted only that constant.
+The bound requires sampling not conditioned on the verifier's own outcome, but no collection
+protocol established that condition. [measured] The post-anchor repair at `9c2fe62` defaults the
+claim to false and exposes an explicit declaration; it prevents accidental overstatement, but a
+caller can still set the declaration without evidence and the database path currently drops it.
+[measured] Whether an unconditioned sample is sufficient for the bound remains asserted rather
+than measured. [asserted]
+
+**A2 and A15, a gate broken in both directions.** Condition 2 compared a derived ceiling with a
+threshold below its algebraic minimum, so it admitted every possible $\beta$. Condition 4 requires
+twenty instances of behaviour that the same gate forbids until it has passed, so the full
+conjunction admits none. [algebra] These are not empirical error rates: no labelled distribution
+was sampled. They are opposite failures of discrimination in the same decision rule.
+
+**C1, and the control that earned its cost.** A later suite failed at each of five historical
+children, but it also failed at every parent. [measured] The parent baseline converted an alarming
+but counterfactual $5/5$ into the recorded result: no evaluable parent-pass baseline and $\beta$
+not applicable. [measured] One extra checkout without the extra execution would establish nothing;
+the measured cost is both. [measured]
 
 **A3, and why it is the one that mattered.** $\beta$ is *defined* as the rate at which the checks
 accept an artefact **the human rejected**. If an agent can author the human verdict, $\beta$ is
@@ -517,7 +549,7 @@ We do not claim the mechanism explains everything in Table 2. B1, B2 and B4 are 
 failure — a signal that reports a state it never verified — which the repository's own standing
 rule already covers: *verify by artefact, never by exit code or process identity*. B5 and B6 are
 measurement-instrument defects that belong to the mining literature (§7.1). B7 is a transcription
-error. B8 is a design defect in a blinding protocol. Grouping all twenty-four under one mechanism
+error. B8 is a design defect in a blinding protocol. Grouping all twenty-five defects under one mechanism
 would be exactly the overclaim this paper is trying to avoid.
 
 ---
@@ -529,7 +561,7 @@ would be exactly the overclaim this paper is trying to avoid.
 > **A guard is not a guard until it has been exhibited rejecting something, and the exhibit is
 > stored.**
 
-Operationally, seven clauses. All are cheap; none is novel in its insight, and we say so in §7.
+Operationally, eight clauses. None is novel in its insight, and we say so in §7.
 
 1. **Every guard ships with a test that exhibits it failing.** Not only a test that it passes on
    good input. If you cannot write the failing input, you do not yet know what the guard checks.
@@ -552,6 +584,9 @@ Operationally, seven clauses. All are cheap; none is novel in its insight, and w
    ratcheted into CI as `mypy`, and the record then described the gate by the name of the check
    that found the bug. Where the two differ, the artefact — the exact command line the workflow
    runs — is the claim, and the prose must quote it.
+8. **Replay the parent under the same future check before calling a child failure a defect.** A
+   later test suite is evidence only when it passes immediately before the change it is meant to
+   judge. C1 shows the control rejecting five tempting classifications as drift.
 
 ### 6.2 Cost
 
@@ -568,6 +603,10 @@ processes**, and the record names why: *a mock of `subprocess` would have passed
 implementation, because the defect is that the real thing does not behave as the API suggests.*
 One of those tests deliberately reproduces the original defect and fails if it ever stops
 overrunning. That is expensive, slow, and the only test that could have caught it.
+
+C1 also corrects the slogan “one extra test per guard”. Its parent baseline adds one checkout and
+one execution of the same suite per historical pair. [measured] The checkout alone carries no
+verdict; omitting the execution recreates the defect the control prevents. [algebra]
 
 ### 6.3 The worked example, including the part where it failed
 
@@ -690,7 +729,7 @@ We put the worst first.
 
 Every entry was found by the people and processes that produced the defect, and every entry was
 recorded by them. There is no independent enumeration. The catalogue's **denominator is unknown**:
-we can say twenty-four inert or uninformative checks exist, and we cannot say what fraction of the
+we can say twenty-five defective guards exist, and we cannot say what fraction of the
 repository's checks that is, because the only census available is the one performed by the author
 of the census's subject.
 
@@ -799,10 +838,10 @@ change and should not be quoted as such.
 ### 8.9 Conflict of interest
 
 The author is building the system under study and has an interest in it appearing rigorous. The
-mitigation we can offer is that the catalogue's contents are uniformly unflattering, that the
-repository's history preserves the defects, the wrong claims and the withdrawals in an append-only
-record, and that four of the strongest exhibits (A5, A9, A10, A13) are reported **open** rather than
-repaired.
+mitigation we can offer is that the catalogue's contents are uniformly unflattering and that the
+repository's history preserves the defects, wrong claims and withdrawals in an append-only record.
+At the anchor, A5, A9, A10 and A13 were reported **open** rather than repaired; post-anchor, A5 is
+safety-mitigated but still does not verify its sampling property. [measured]
 
 ---
 
@@ -871,10 +910,16 @@ and it is one of the few places where this paper's subject has a life outside ou
 We built a system to measure how often automated checks accept bad artefacts, wrote down a rule
 that every invariant must ship with its enforcement, and then shipped thirteen checks that could not
 fail — one of them the check for the rule the project is named after, one of them a passing test
-asserting a mathematical claim that is false, and one of them the type gate that the project
+asserting an unevidenced mathematical claim, and one of them the type gate that the project
 credits, in its own table, as the single mechanism it has successfully ratcheted. Each was found
-with a green suite behind it. Six of the thirteen are still open at the commit this was written
-from — A5, A8, A9, A10, A11 and A13 — and of those we argue only A11 is correctly open.
+with a green suite behind it. At the anchor, six of the thirteen were open: A5, A8, A9, A10, A11
+and A13. Post-anchor, A5 was safety-mitigated; the other five statuses are not silently refreshed in
+this anchored catalogue. [measured]
+
+The inverse cases sharpen the result: one gate simultaneously contained a condition that admitted
+every possible value and a condition whose evidence could be produced only after the gate passed.
+[algebra] The positive control shows the other side: five alarming later-suite failures were
+classified and excluded as drift because every parent failed too. [measured]
 
 The mechanism is that tests assert mechanisms and properties are what we meant. The variant that
 worries us most is the permissive fixture, because it is silent, self-reinforcing and — unlike the
@@ -888,14 +933,27 @@ family finding these better was withdrawn by its own control within four hours. 
 is the catalogue, anchored; the mechanism, stated so it can be attacked; and the cheapest possible
 next step, which is to build the fixture detector and run it somewhere that is not ours.
 
+<!--
+Decision record — 20 August 2026
+Reasoning: retain A5 as an existing defective instance with a post-anchor mitigation; add the
+unpassable gate condition as A15 and the parent baseline as positive control C1. This yields 25
+defects plus one control without counting A5 twice.
+Alternative not taken: count both new briefs as additional defective guards. That would inflate the
+catalogue to 27 and misclassify the successful parent control.
+Reversal: git restore --source=b27906d -- docs/50-publications/P2-guards.md
+Falsifier: withdraw the recount if a source-anchored enumeration does not reproduce 13 Class A,
+2 Class A-prime and 10 Class B defects, or if the retained replay records contain an evaluable
+parent-pass baseline among the five monolithic pairs.
+-->
+
 ---
 
 ## Data availability
 
-**Released.** The product source (`src/consilience/`, 972 lines), the test suite (62 tests), the
+**Released.** The product source (`src/consilient/`), the test suite, the
 CI workflows, the private-corpus gate (`.github/scripts/check_private_corpus.py`), the four
 read-only analysis scripts for the retrospective study, and every decision record and finding cited
-in Tables 1 and 2 are in the repository this paper is drafted in. All live checks reported here —
+in Tables 1–3 are in the repository this paper is drafted in. All live checks reported here —
 `consil beta`, `consil replay --json`, `pytest`, both mypy invocations at three commits, the
 private-corpus gate, the Wilson bounds of A11 and the exact binomial figures of B7 — run from a
 clean checkout with no private data. The private-corpus gate is the one exception: it requires the
@@ -909,7 +967,7 @@ check evidence) live only on the author's machine, and consequently **no figure 
 from that corpus can be independently reproduced.** The mining figures are published only as
 aggregate contingency cells:
 
-**Table 3 — the aggregate tables, published in full; nothing finer may be released.** Labels are
+**Table 4 — the aggregate tables, published in full; nothing finer may be released.** Labels are
 proxy-derived (hotfix heuristic; audited precision 1/15 on 40 sampled labels).
 
 | Corpus | merged PRs | bad·green | bad·red | bad·no-CI | good·green | good·red | good·no-CI |
