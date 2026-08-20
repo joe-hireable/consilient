@@ -36,7 +36,7 @@ abstract only — `[ABS]`).
 
 ## 1. Why this question is the load-bearing one
 
-β is defined in `src/consilience/beta.py` as the rate at which the automated verifier
+β is defined in `src/consilient/beta.py` as the rate at which the automated verifier
 accepts an artefact **the human rejected**. The human is the reference oracle, `MIN_REJECTIONS`
 is 30, and EXP-01's first pass produced β̂ ≈ 0.12 with a 95% interval of [0.02, 0.42] — an
 interval the register records as *audit-limited, not history-limited*. [measured] The
@@ -284,7 +284,7 @@ Let `A` be the primary verifier (tests, types, build, lint) and `M` a manufactur
    without a human verdict. This is the label-supply gain. [algebra]
 2. It is only a false accept *within `M`'s defect class*. The numerator counts what `M` can
    see; the denominator does not shrink correspondingly. **The resulting figure is a lower
-   bound on β and must be reported as one** — the same discipline `src/consilience/beta.py`
+   bound on β and must be reported as one** — the same discipline `src/consilient/beta.py`
    already applies with `lower_bound_on_joint_error: True`. [algebra]
 3. If `M` is later moved *upstream* into the acceptance gate, it stops producing labels and
    starts producing acceptances. **An oracle cannot be both a gate and a meter for the same

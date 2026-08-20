@@ -79,7 +79,7 @@ functional forms. It has never met a real repository.
 
 ## Status: v0 approved, observe-only increment shipped
 
-The v0 specification was approved for implementation on 20 August 2026. `src/consilience/`
+The v0 specification was approved for implementation on 20 August 2026. `src/consilient/`
 records trajectory events, projects them into SQLite and computes β — and does nothing else:
 it cannot route, block or accept anything, and a test asserts the CLI exposes no surface that
 could. Everything past instrumentation is gated on ADR-0015 Gate A, which has not been passed.

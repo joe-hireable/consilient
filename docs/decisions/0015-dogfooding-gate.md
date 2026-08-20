@@ -34,7 +34,7 @@ happened: a gate condition passed for a day on evidence that could not have fail
 
 The original reasoning, retained because it is what a reader would otherwise repeat:
 `.github/workflows/invariants.yml` runs
-`consilience.cli --json replay` against the committed trajectory on every push and pull
+`consilient.cli --json replay` against the committed trajectory on every push and pull
 request and exits non-zero when `identical` is false. [measured] — true as far as it went, and
 insufficient, because nothing established that `identical` could ever *be* false.
 

@@ -130,7 +130,7 @@ Three windows are specified in days and none has started. Every day of delay is 
   ADR-0029 cannot promote before roughly 20 September, and later for each day lost.
   **File:** `docs/10-research/experiment-register.md` § EXP-27, procedure step 2.
 - **EXP-33** — 30 consecutive days observing ordinary working. **Not startable as things
-  stand:** the shipped event schema (`src/consilience/events.py`) has no typed field for an ask
+  stand:** the shipped event schema (`src/consilient/events.py`) has no typed field for an ask
   class, an approval latency, or whether the ask stated a default action. Starting the clock
   without them produces a window that cannot answer its own question.
   **Owed first:** the recording fields plus the check that enforces them, in the same commit (I1).
@@ -178,7 +178,7 @@ agent-hours, not human-weeks.
 **Gated on user:** no, but it touches `docs/10-research/`, which AGENTS.md puts under "ask first".
 
 ### P11 — The override channel is measured and owned by nobody
-33% of jobboard-v2 merges (98/300) went in over red CI. [measured] `src/consilience/beta.py`
+33% of jobboard-v2 merges (98/300) went in over red CI. [measured] `src/consilient/beta.py`
 defines β as *"the rate at which the automated verifier accepts an artefact the human rejected"* —
 so the (checks accept → human rejects) direction is modelled. The direction EXP-01 actually
 measured is the converse: **checks reject → human accepts**, which is not in β's denominator, has
@@ -186,7 +186,7 @@ no name, and is not recorded anywhere as owed work. On that repository the human
 acceptance gate and CI is advisory; a β instrument that models only one direction is measuring
 the minority channel.
 **Files:** `docs/decisions/0002-organise-around-beta-verifier-false-accept-rate.md` § *Evidence*;
-`src/consilience/beta.py` module docstring; `docs/10-research/experiment-register.md` § EXP-01
+`src/consilient/beta.py` module docstring; `docs/10-research/experiment-register.md` § EXP-01
 *Measures*.
 **Gated on user:** no for the record; yes if it implies a second measured quantity in v0 scope.
 
@@ -368,7 +368,7 @@ keep — on exactly the standard ADR-0015 applies to its own gates.
 per-PR private records are genuinely protected — by a local
 `docs/10-research/experiments/exp01/.gitignore` whose first line is `data/`, which I missed on my
 first read of the root ignore file and confirmed with `git check-ignore`. And EXP-16's
-fabricated-human-participation finding has been fully actioned: `src/consilience/events.py`
+fabricated-human-participation finding has been fully actioned: `src/consilient/events.py`
 enforces V0-18 with four tests, including that the `principal` field is not itself an authority
 grant. That is the Engineering Ratchet working exactly as AGENTS.md principle 4 describes, and it
 is the strongest evidence in the repository that post-experiment actions *do* get discharged when

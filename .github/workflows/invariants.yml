@@ -18,7 +18,7 @@ jobs:
       - name: Static checks
         # Added after mypy found a reachable crash in beta.render() that 24 passing tests
         # missed. A stronger check is a lower beta; this is the ratchet applied to us.
-        run: python -m mypy src/consilience
+        run: python -m mypy src/consilient
       - name: Invariant checks
         run: python -m pytest tests -q
       - name: Replay invariant on the real trajectory
@@ -28,7 +28,7 @@ jobs:
         # construction. Gate A condition 2 was recorded as satisfied on a check that could
         # not fail. `compared` must now be true, or the run failed to test anything.
         run: |
-          PYTHONPATH=src python -m consilience.cli --json beta > beta.json
-          PYTHONPATH=src python -m consilience.cli --json replay > replay.json
+          PYTHONPATH=src python -m consilient.cli --json beta > beta.json
+          PYTHONPATH=src python -m consilient.cli --json replay > replay.json
           cat replay.json
           python -c "import json,sys; r=json.load(open('replay.json')); sys.exit(0 if r['compared'] and r['identical'] else 1)"

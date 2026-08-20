@@ -8,7 +8,7 @@ Read it. This file adds session-start guidance only.
 ## Start here
 
 The v0 specification is **approved** and the observe-only increment has shipped to
-`src/consilience/`. The repository holds that increment, experimental adapters, research
+`src/consilient/`. The repository holds that increment, experimental adapters, research
 instruments, CI invariants, 34 ADRs and 35 registered experiments. Routing, blocking and
 orchestration are still gated on ADR-0015.
 

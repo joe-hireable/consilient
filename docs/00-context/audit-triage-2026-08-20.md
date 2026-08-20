@@ -108,7 +108,7 @@ Four patterns, all recurring:
 untraceable when they were excluded from the staging snapshot *by design* — EXP-01's raw labels in
 gitignored `data/`, the private repository histories, the raw session logs. **An agent in a partial
 snapshot cannot distinguish "outside this snapshot by privacy policy" from "missing from the
-universe".** This is the same failure that made an earlier auditor report `src/consilience/` as
+universe".** This is the same failure that made an earlier auditor report `src/consilient/` as
 phantom code, and it is the orchestrator's fault both times for not declaring the boundary.
 
 **2. Confusing its own sandbox limits with artefact absence.** When its execution sandbox blocked

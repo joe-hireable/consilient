@@ -25,7 +25,7 @@ rates. The multi-agent constraints exist because of his second clause: **differe
 
 **Current phase: approved for the observe-only increment.** Joe approved the v0
 specification for implementation on 20 August 2026, recorded as `spec.approval_observed`.
-Product code lives in `src/consilience/` and is **observe-only**: it records trajectory
+Product code lives in `src/consilient/` and is **observe-only**: it records trajectory
 events, projects them into SQLite and computes β. It does not route, block or accept
 anything, and a test asserts the CLI exposes no surface that could.
 

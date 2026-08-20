@@ -5,7 +5,7 @@ attack angles converged on it from opposite directions. Verified by hand against
 before this file was written. [measured]
 
 **This is the most consequential defect recorded on this project so far.** It is not a bug in
-the shipped code — `src/consilience/beta.py` is correct. It is in the only measurement that has
+the shipped code — `src/consilient/beta.py` is correct. It is in the only measurement that has
 ever produced a β from a real repository, and therefore in the number every downstream document
 quotes.
 
@@ -17,7 +17,7 @@ quotes.
 
 > **β = P(automated checks accept | the artefact is bad)**
 
-`src/consilience/beta.py` implements exactly that. Its denominator is the set of artefacts the
+`src/consilient/beta.py` implements exactly that. Its denominator is the set of artefacts the
 **human rejected**:
 
 ```python
@@ -152,7 +152,7 @@ directions and located in **different files**.
 
 | | Claude arm | Cursor arm |
 |---|---|---|
-| Where it looked | `exp01/mine_beta.py` — the mining script | `src/consilience/beta.py` — the estimator |
+| Where it looked | `exp01/mine_beta.py` — the mining script | `src/consilient/beta.py` — the estimator |
 | What it found | the script computes P(bad \| accepted), the transpose of the definition | the estimator's denominator is "bad artefacts that reached a human", not "bad artefacts" |
 | How it argued | Bayes: the two conditionals differ unless P(green) = P(bad) | a worked counterexample on a censored review queue |
 | Severity given | reshapes | fatal |
@@ -364,7 +364,7 @@ defect: fixing the conditional does not create a denominator that was never coll
 
 ## 3. β\* is in neither the specification nor the code
 
-`β*` appears **zero times** in `docs/40-spec/v0-draft.md` and zero times in `src/consilience/`.
+`β*` appears **zero times** in `docs/40-spec/v0-draft.md` and zero times in `src/consilient/`.
 [asserted — from the control's grep, not re-run here] The threshold every β must be compared
 against lives only in research notes and one ADR.
 

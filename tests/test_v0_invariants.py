@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from consilience import beta as beta_mod
-from consilience import events as events_mod
-from consilience import projection
-from consilience.cli import build_parser, main
-from consilience.events import (
+from consilient import beta as beta_mod
+from consilient import events as events_mod
+from consilient import projection
+from consilient.cli import build_parser, main
+from consilient.events import (
     SCHEMA_VERSION,
     EventError,
     append,

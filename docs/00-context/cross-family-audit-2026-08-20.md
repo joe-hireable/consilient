@@ -56,7 +56,7 @@ document, which is a happier failure and just as much drift.
 
 ## Round two — the auditor was pointed at the code, and found the oracle forgeable
 
-The first pass audited documents. The second staged `src/consilience/`, the test suite, the
+The first pass audited documents. The second staged `src/consilient/`, the test suite, the
 CI workflow, the specification and the ADRs, with an explicit boundary note, and asked one
 question of each numbered invariant: **would its check actually catch a violation, and is
 there a second path to the same state?** That is the `jobboard-v2` question — a documented
@@ -227,7 +227,7 @@ would be deciding the question the experiment exists to answer.
 
 ## Rejected — one finding, and the reason matters more than the finding
 
-Cursor's **Finding 1** claimed that `src/consilience/`, the tests, the CI workflow and every
+Cursor's **Finding 1** claimed that `src/consilient/`, the tests, the CI workflow and every
 benchmark figure in ADR-0031 and ADR-0032 were *"phantom assertions tagged `[measured]` with zero
 backing artefacts"*, on the strength of *"an exhaustive filesystem scan of the repository"*.
 
