@@ -1539,3 +1539,89 @@ def test_no_new_commit_may_be_authored_by_a_fixture_identity():
         "a commit was authored by a fixture identity; check `git config user.email` — "
         "worktrees share the primary repository's config"
     )
+
+
+def _reachable_statuses() -> dict[str, set[str]]:
+    """Which statuses can each gate condition in `doctor` actually emit?
+
+    Reads `_condition(...)` call sites out of the AST. The status argument is either an
+    expression containing string literals, or a local name assigned string literals inside
+    the same function; both are resolved.
+    """
+    import ast
+
+    source = Path("src/consilient/cli.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    reachable: dict[str, set[str]] = {}
+
+    for function in ast.walk(tree):
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        assigned: dict[str, set[str]] = {}
+        for node in ast.walk(function):
+            if isinstance(node, ast.Assign):
+                names = {t.id for t in node.targets if isinstance(t, ast.Name)}
+                literals = {
+                    n.value
+                    for n in ast.walk(node.value)
+                    if isinstance(n, ast.Constant) and isinstance(n.value, str)
+                }
+                for name in names:
+                    assigned.setdefault(name, set()).update(literals)
+
+        for node in ast.walk(function):
+            call = node
+            if not isinstance(call, ast.Call):
+                continue
+            if not (isinstance(call.func, ast.Name) and call.func.id == "_condition"):
+                continue
+            if len(call.args) < 2:
+                continue
+            identifier, status = call.args[0], call.args[1]
+            if not (isinstance(identifier, ast.Constant) and isinstance(identifier.value, str)):
+                continue
+            found = {
+                n.value
+                for n in ast.walk(status)
+                if isinstance(n, ast.Constant) and isinstance(n.value, str)
+            }
+            if isinstance(status, ast.Name):
+                found |= assigned.get(status.id, set())
+            reachable.setdefault(identifier.value, set()).update(found)
+
+    return reachable
+
+
+def test_every_gate_condition_has_a_reachable_pass_state():
+    """A gate condition that cannot report PASS is not a gate, it is a wall.
+
+    Measured 20 Aug 2026: of the seven conditions, four cannot be satisfied. A3 is
+    satisfiable only by breaking capture, which is the data loss it exists to detect
+    (ADR-0043). B4 is circular by construction (ADR-0039). And **B2 and B3 have no `pass`
+    branch at all** — every path through `_fallback_condition` and through B2's arm of
+    `_experiment_conditions` returns `unknown` or `fail`, so no artefact anyone could build
+    would make them pass.
+
+    B4 is grandfathered for a different and honest reason: it reports
+    `structurally_unsatisfiable`, which is an accurate description of a circular condition
+    and is exactly what the status exists for. B2 and B3 are the failure this test is
+    written against — a condition whose success path was never written at all, reporting
+    FAIL or UNKNOWN as though the work simply had not been done yet.
+
+    The three are grandfathered BY NAME and the set may only SHRINK. Adding an identifier
+    here is not permitted; removing one is the whole point.
+    """
+    from consilient.cli import REQUIREMENTS
+
+    reachable = _reachable_statuses()
+    assert set(reachable) == set(REQUIREMENTS), (
+        f"conditions found in the AST {sorted(reachable)} do not match "
+        f"REQUIREMENTS {sorted(REQUIREMENTS)}"
+    )
+
+    known_unpassable = {"B2", "B3", "B4"}
+    unpassable = {key for key, statuses in reachable.items() if "pass" not in statuses}
+    assert unpassable <= known_unpassable, (
+        f"a gate condition lost its pass state: {sorted(unpassable - known_unpassable)}. "
+        "A condition that cannot report pass is a wall, not a gate."
+    )
