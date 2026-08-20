@@ -38,7 +38,6 @@ GATE_B2_ADR = Path(
 GATE_B_CIRCULARITY = Path(
     "docs/00-context/gate-b-cannot-be-passed-2026-08-20.md"
 )
-WORKFLOWS = Path(".github/workflows")
 # Refused lines already in the trajectory when ADR-0043 was accepted on 20 August 2026:
 # three V0-18 violations appended between 09:41 and 09:56 that day, permanent because the
 # log is append-only. A3 tolerates these and only these. This number may only ever go DOWN,
@@ -47,6 +46,12 @@ CAPTURE_REFUSAL_BASELINE = 3
 FALLBACK_RESULT = Path(".harness/fallback-result.json")
 # Two cycles of a weekly schedule (ADR-0045). One missed run is tolerated, two are not.
 FALLBACK_MAX_AGE_DAYS = 14
+GATE_B4_ADR = Path(
+    "docs/decisions/0039-stage-3-entered-on-approval-gate-b-gates-dependence.md"
+)
+# ADR-0015 Gate B condition 4, unchanged in number by ADR-0039 — only in meaning.
+B4_TICKETS_REQUIRED = 20
+THIS_REPOSITORY = "consilient"
 # The machine-readable critic measurement ADR-0045 requires in EXP-08's register entry.
 CRITIC_BETA = re.compile(
     r"critic-beta-measured:\s*([0-9.]+)\s*\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]"
@@ -333,19 +338,19 @@ def _capture_condition(log: Path) -> CommandResult:
 
 
 def _fallback_condition() -> CommandResult:
-    if not WORKFLOWS.is_dir():
-        return _condition("B3", "unknown", "No workflow evidence source exists.")
-    files = sorted((*WORKFLOWS.glob("*.yml"), *WORKFLOWS.glob("*.yaml")))
-    texts = [_read_text(path) for path in files]
-    if any(text is None for text in texts):
-        status = "unknown"
-        reason = "At least one workflow could not be read, so weekly fallback health is unknown."
-    elif not any(re.search(r"(?m)^\s*schedule\s*:", text or "") for text in texts):
-        status = "fail"
-        reason = f"All {len(files)} workflows were checked; none has a schedule trigger."
-    else:
-        status, reason = _fallback_result()
-    return _condition("B3", status, reason, WORKFLOWS.as_posix(), FALLBACK_RESULT.as_posix())
+    """Gate B condition 3, as amended by ADR-0046.
+
+    ADR-0045 required a schedule trigger as well as a result. Joe's rule — no secret anywhere
+    a public repository can reach — means the exercise cannot run in this repository's CI at
+    all, so that half was unsatisfiable within hours of being written.
+
+    A schedule trigger was only ever a proxy for "this runs regularly", and a proxy that can
+    hold while the job is disabled, failing to start, or watching a branch nobody pushes. A
+    result dated inside the window cannot be produced without something having run. The gate
+    reads the measurement and has no opinion about where it ran.
+    """
+    status, reason = _fallback_result()
+    return _condition("B3", status, reason, FALLBACK_RESULT.as_posix())
 
 
 def _fallback_result() -> tuple[str, str]:
@@ -381,24 +386,67 @@ def _fallback_result() -> tuple[str, str]:
     return "pass", f"`{command}` ran {age} day(s) ago and passed."
 
 
-def _structural_condition() -> CommandResult:
-    text = _read_text(GATE_B_CIRCULARITY)
-    if text is None:
+def _structural_condition(log: Path) -> CommandResult:
+    """Gate B condition 4, no longer circular since ADR-0039 was accepted.
+
+    It used to report `structurally_unsatisfiable`, and that was correct: the condition
+    required twenty tickets orchestrated on another repository, orchestrating another
+    repository was Stage 3 behaviour, and Stage 3 began only after Gate B. It could only be
+    satisfied by doing what it forbade until it was satisfied.
+
+    ADR-0039 broke that by separating entry from exit — Stage 3 is entered on the principal's
+    approval and exited through Gate B — so the work that produces this evidence is now
+    permitted and B4 gates DEPENDENCE rather than construction. The condition became ordinary
+    unfinished work, and reporting it as a structural impossibility would now be reporting
+    something an accepted decision has superseded.
+
+    The evidence is completed tickets in the trajectory naming a repository other than this
+    one. There are none, so it fails at 0 of 20 — which is what unfinished work looks like.
+    """
+    circularity = _read_text(GATE_B_CIRCULARITY)
+    resolved = _read_text(GATE_B4_ADR)
+    if circularity is None or resolved is None:
         return _condition("B4", "unknown", "The structural analysis is unavailable.")
-    established = (
-        "Condition 4 can only be satisfied by doing the thing the gate forbids" in text
-    )
+    if not resolved.lstrip().startswith("# 0039") or "ACCEPTED" not in resolved[:1200]:
+        return _condition(
+            "B4",
+            "structurally_unsatisfiable",
+            "Gate B forbids the non-Consilient orchestration required to produce its "
+            "own condition-four evidence.",
+            GATE_B_CIRCULARITY.as_posix(),
+        )
+
+    completed = _foreign_tickets(log)
     return _condition(
         "B4",
-        "structurally_unsatisfiable" if established else "unknown",
-        (
-            "Gate B forbids the non-Consilient orchestration required to produce its "
-            "own condition-four evidence."
-            if established
-            else "The structural analysis does not establish the recorded circularity."
-        ),
-        GATE_B_CIRCULARITY.as_posix(),
+        "pass" if completed >= B4_TICKETS_REQUIRED else "fail",
+        f"{completed} of {B4_TICKETS_REQUIRED} tickets completed on a repository other than "
+        "this one. ADR-0039 separated entry from exit, so this is unfinished work rather "
+        "than a circular condition.",
+        GATE_B4_ADR.as_posix(),
+        f"{log.as_posix()}/*.jsonl",
     )
+
+
+def _foreign_tickets(log: Path) -> int:
+    """Completed tickets in the trajectory naming a repository other than this one.
+
+    Counted over `append()`-validated events only. A ticket recorded by writing to the file
+    directly does not count, because nothing checked it — which is the same reason the
+    bypass ratchet exists.
+    """
+    seen: set[str] = set()
+    for path in sorted(log.glob("*.jsonl")):
+        events, _ = events_mod.read(path)
+        for event in events:
+            if event.raw.get("event") != "ticket.completed":
+                continue
+            data = event.raw.get("data") or {}
+            repository = str(data.get("repository", ""))
+            identifier = str(data.get("ticket", ""))
+            if repository and repository != THIS_REPOSITORY and identifier:
+                seen.add(f"{repository}#{identifier}")
+    return len(seen)
 
 
 def _gate(conditions: list[CommandResult]) -> CommandResult:
@@ -426,7 +474,7 @@ def cmd_doctor(args: argparse.Namespace) -> CommandResult:
     a1, b1, b2 = _experiment_conditions()
     gates = {
         "A": _gate([a1, _replay_condition(replay, log, db), _capture_condition(log)]),
-        "B": _gate([b1, b2, _fallback_condition(), _structural_condition()]),
+        "B": _gate([b1, b2, _fallback_condition(), _structural_condition(log)]),
     }
     expected = {"A": {"A1", "A2", "A3"}, "B": {"B1", "B2", "B3", "B4"}}
     enabled = all(

@@ -23,16 +23,25 @@ architecture itself is domain-blind (see `docs/20-design/architecture-sketch.md`
 β exists because of Whewell's third clause: convergence is a *test*, and tests have error
 rates. The multi-agent constraints exist because of his second clause: **different** class.
 
-**Current phase: approved for the observe-only increment.** Joe approved the v0
-specification for implementation on 20 August 2026, recorded as `spec.approval_observed`.
-Product code lives in `src/consilient/` and is **observe-only**: it records trajectory
-events, projects them into SQLite and computes β. It does not route, block or accept
-anything, and a test asserts the CLI exposes no surface that could.
+**Current phase: Stage 3, entered 20 August 2026.** Joe entered Stage 3 on that date
+under ADR-0039, which reserves entry to the principal, recorded in the trajectory as
+`stage.entered` authored by him. Routing, blocking and orchestration behaviour may now be
+built and run.
 
-Research, experiments, ADRs, invariant checks, specification work and observe-only
-implementation are all permitted. **Routing, blocking and orchestration remain gated** —
-ADR-0015 Gate A before anything routes or blocks, Gate B before orchestration on a
-non-Consilient repository. Neither gate has been passed.
+**Two things Stage 3 does not authorise, and they are the ones that matter.**
+
+1. **Gate B still governs dependence.** Under ADR-0039, Gate B is no longer a licence to
+   *build* orchestration; it is the evidence that the harness is trustworthy to *depend
+   on* for work on a repository other than this one. **Gate B is not passed.** Nothing
+   here may be pointed at `../hireable-3.0` or `../jobboard-v2`.
+2. **Gate A is not passed either.** A1, A2 and B1 pass; A3 needs seven consecutive days of
+   capture and stands at two; B2 needs the critic's own β measured; B3 needs the fallback
+   exercised. `consil doctor` is the authority on all of it, and
+   `routing_orchestration_enabled` is still `false` — **the flag reports the gates, and the
+   gates are not open.** Entering the stage permits the work; it does not pass the gates.
+
+Product code in `src/consilient/` remains observe-only *today* because nothing else has
+been built yet, not because it is forbidden.
 
 ## Working principles for this repo
 
@@ -82,8 +91,8 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 - Surface trade-offs when more than one approach is reasonable.
 
 ### Ask first
-- Writing routing, blocking or orchestration behaviour (gated on ADR-0015 Gate A/B).
-  Observe-only increment work is authorised.
+- Pointing the harness at any repository other than this one. Stage 3 permits building
+  orchestration; Gate B governs depending on it, and Gate B is not passed.
 - Naming the project.
 - Adding a dependency.
 - Changing anything in `docs/10-research/` — that's the evidence base.
@@ -97,6 +106,11 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
   19 Aug 2026.)
 - Commit secrets or `.env`. `.github/workflows/secret-scan.yml` enforces this against the
   tracked tree and repository history without printing a detected credential.
+- **Put a secret into a public repository, under any circumstances.** (Joe, 20 Aug 2026.)
+  This is stronger than the line above: not merely "do not commit one", but do not place one
+  in repository settings, Actions secrets, or anywhere the public repository can reach. A
+  capability that needs a credential there is not built — **it runs locally or it does not
+  run.** Gate B3 is the first thing this rule cost.
 - Present a simulated figure as an empirical result.
 - Add architecture with no falsifiable claim attached to it.
 - **Add a structure that cannot be traced back to `CONSILIENCE.md`.** If a proposal does not

@@ -1013,12 +1013,20 @@ def test_doctor_unknown_evidence_cannot_enable_control(tmp_path, capsys, monkeyp
 
 
 def test_doctor_fails_the_unbuilt_weekly_fallback(tmp_path, capsys):
+    """Amended by ADR-0046. The evidence path changed; the assertion did not weaken.
+
+    This used to assert the condition cites `.github/workflows`. Under Joe's no-secrets rule
+    the exercise can never run in this repository's CI, so the gate stopped having an opinion
+    about GitHub Actions and reads the dated result instead. An absent result still FAILS —
+    never `unknown`, which is the status that made B3 a wall in the first place.
+    """
     write_capture_days(tmp_path / "log", "2026-08-20")
 
     condition = doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"][2]
 
     assert condition["id"] == "B3" and condition["status"] == "fail"
-    assert ".github/workflows" in condition["evidence"]
+    assert ".harness/fallback-result.json" in condition["evidence"]
+    assert "never recorded one" in condition["reason"]
 
 
 def test_doctor_reads_the_wrapped_exp05_result_as_pass(tmp_path, capsys):
@@ -1053,17 +1061,97 @@ def test_doctor_does_not_substitute_repository_beta_for_exp08(
     assert payload["routing_orchestration_enabled"] is False
 
 
-def test_doctor_preserves_gate_b4_as_structurally_unsatisfiable(tmp_path, capsys):
+def _accepted_b4_docs(root):
+    """The two documents B4 reads: the circularity finding, and ADR-0039 accepting its repair."""
+    circularity = root / "docs/00-context/gate-b-cannot-be-passed-2026-08-20.md"
+    circularity.parent.mkdir(parents=True, exist_ok=True)
+    circularity.write_text(
+        "Condition 4 can only be satisfied by doing the thing the gate forbids\n",
+        encoding="utf-8",
+    )
+    adr = (
+        root
+        / "docs/decisions/0039-stage-3-entered-on-approval-gate-b-gates-dependence.md"
+    )
+    adr.parent.mkdir(parents=True, exist_ok=True)
+    adr.write_text(
+        "# 0039. Stage 3 is entered on approval\n\n"
+        "- **Status:** **ACCEPTED 20 August 2026.**\n",
+        encoding="utf-8",
+    )
+
+
+def test_doctor_reports_gate_b4_as_unfinished_work_not_a_wall(tmp_path, capsys):
+    """Amended after ADR-0039 was ACCEPTED. The circularity was real and is now resolved.
+
+    B4 required twenty tickets orchestrated on another repository; orchestrating another
+    repository was Stage 3; Stage 3 began only after Gate B. ADR-0039 separated entry from
+    exit, so the work that produces this evidence is permitted and B4 gates *dependence*
+    rather than construction.
+
+    Continuing to report `structurally_unsatisfiable` would be reporting something an
+    accepted decision has superseded — a check asserting a fact that is no longer true. The
+    honest report is a count, and the count is zero.
+    """
     write_capture_days(tmp_path / "log", "2026-08-20")
 
     condition = doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"][3]
 
     assert condition["id"] == "B4"
-    assert condition["status"] == "structurally_unsatisfiable"
+    assert condition["status"] == "fail"
+    assert "0 of 20" in condition["reason"]
     assert any(
-        source.endswith("gate-b-cannot-be-passed-2026-08-20.md")
+        source.endswith("gate-b-gates-dependence.md")
         for source in condition["evidence"]
     )
+
+
+def test_gate_b4_still_reports_a_wall_if_adr_0039_is_not_accepted(
+    tmp_path, capsys, monkeypatch
+):
+    """The repair is conditional on the decision, not on the code having been edited.
+
+    If ADR-0039 were reverted, B4 must go back to reporting the circularity rather than
+    quietly counting toward a condition that cannot be reached. This is what stops the
+    amendment being a one-way door taken by an agent.
+    """
+    monkeypatch.chdir(tmp_path)
+    for relative in (
+        "docs/00-context/gate-b-cannot-be-passed-2026-08-20.md",
+        "docs/decisions/0039-stage-3-entered-on-approval-gate-b-gates-dependence.md",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            "Condition 4 can only be satisfied by doing the thing the gate forbids\n",
+            encoding="utf-8",
+        )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+    condition = doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"][3]
+    assert condition["status"] == "structurally_unsatisfiable"
+
+
+def test_gate_b4_counts_only_validated_tickets_on_another_repository(
+    tmp_path, capsys, monkeypatch
+):
+    """Tickets on this repository do not count, and neither do duplicates."""
+    monkeypatch.chdir(tmp_path)
+    _accepted_b4_docs(tmp_path)
+    log = tmp_path / "log" / "2026-08-20.jsonl"
+    for index in range(3):
+        append(
+            log,
+            ev(event="ticket.completed", data={"repository": "other", "ticket": index}),
+        )
+    append(log, ev(event="ticket.completed", data={"repository": "other", "ticket": 0}))
+    append(
+        log,
+        ev(event="ticket.completed", data={"repository": "consilient", "ticket": 99}),
+    )
+
+    condition = _gate_b(tmp_path, capsys)["B4"]
+    assert "3 of 20" in condition["reason"], condition["reason"]
 
 
 def test_shared_options_survive_on_either_side_of_the_command(tmp_path, capsys):
@@ -1669,10 +1757,13 @@ def test_every_gate_condition_has_a_reachable_pass_state():
     `_experiment_conditions` returns `unknown` or `fail`, so no artefact anyone could build
     would make them pass.
 
-    B2 and B3 were given success criteria by ADR-0045 on the day this test was written, so
-    the set has already shrunk from three to one. B4 remains, for a different and honest
-    reason: it reports `structurally_unsatisfiable`, which is an accurate description of a
-    circular condition and is exactly what that status exists for. FAIL and UNKNOWN are not.
+    The set is now EMPTY. B2 and B3 were given success criteria by ADR-0045 and ADR-0046, and
+    B4 stopped being circular when ADR-0039 was accepted — all on the day this test was
+    written. Every one of the seven conditions can now report `pass`.
+
+    That is the whole point: an empty set means every gate condition is a gate. If a future
+    condition arrives without a success path, this fails, and the correct response is to give
+    it one rather than to add its name here.
 
     The three are grandfathered BY NAME and the set may only SHRINK. Adding an identifier
     here is not permitted; removing one is the whole point.
@@ -1685,7 +1776,7 @@ def test_every_gate_condition_has_a_reachable_pass_state():
         f"REQUIREMENTS {sorted(REQUIREMENTS)}"
     )
 
-    known_unpassable = {"B4"}
+    known_unpassable: set[str] = set()
     unpassable = {key for key, statuses in reachable.items() if "pass" not in statuses}
     assert unpassable <= known_unpassable, (
         f"a gate condition lost its pass state: {sorted(unpassable - known_unpassable)}. "
@@ -1778,17 +1869,19 @@ def test_the_capture_refusal_baseline_may_only_fall():
 
 # ---------------------------------------------------------------- ADR-0045
 def _gate_b(tmp_path, capsys):
-    return {c["id"]: c for c in doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"]}
+    return {
+        c["id"]: c for c in doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"]
+    }
 
 
-def _b3_world(tmp_path, result, *, scheduled=True):
-    """A workspace with a scheduled workflow and a given fallback result."""
-    workflows = tmp_path / ".github" / "workflows"
-    workflows.mkdir(parents=True)
-    trigger = "  schedule:\n    - cron: '0 6 * * 1'\n" if scheduled else "  push:\n"
-    (workflows / "fallback.yml").write_text(
-        f"on:\n{trigger}jobs:\n  run:\n    runs-on: ubuntu-latest\n", encoding="utf-8"
-    )
+def _b3_world(tmp_path, result):
+    """A workspace carrying a given fallback result.
+
+    ADR-0046 removed the schedule-trigger half. The exercise cannot run in this repository's
+    CI at all — that would need a secret in a public repository — and a schedule trigger was
+    only ever a proxy for "this runs regularly". A result dated inside the window cannot be
+    produced without something having run, so the dated result is the whole of the evidence.
+    """
     if result is not None:
         harness = tmp_path / ".harness"
         harness.mkdir(parents=True, exist_ok=True)
@@ -1848,7 +1941,9 @@ def test_b3_fails_on_an_unreadable_or_undated_fallback(tmp_path, capsys, monkeyp
     assert condition["status"] == "fail" and "unreadable" in condition["reason"]
 
 
-def test_b3_fails_when_the_result_timestamp_has_no_offset(tmp_path, capsys, monkeypatch):
+def test_b3_fails_when_the_result_timestamp_has_no_offset(
+    tmp_path, capsys, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     payload = _fallback(1)
     payload["ts"] = "2026-08-20T06:00:00"
@@ -1886,4 +1981,77 @@ def test_b2_fails_when_the_recorded_point_is_outside_its_own_interval(
     )
     write_capture_days(tmp_path / "log", "2026-08-20")
     condition = _gate_b(tmp_path, capsys)["B2"]
-    assert condition["status"] == "fail" and "outside its own interval" in condition["reason"]
+    assert (
+        condition["status"] == "fail"
+        and "outside its own interval" in condition["reason"]
+    )
+
+
+# ---------------------------------------------------------------- ADR-0046
+def test_the_fallback_runner_and_the_gate_agree_on_the_result_shape(
+    tmp_path, capsys, monkeypatch
+):
+    """Producer and consumer must not drift, and nothing else would notice if they did.
+
+    `scripts/run_fallback.py` writes the result and `_fallback_condition` reads it. They live
+    in different files, run in different places — one on the principal's machine, one in CI —
+    and share only a JSON shape. A renamed key would make B3 fail permanently with a message
+    about unreadable evidence, and the cause would be a keystroke.
+
+    This builds the result by executing the runner's own writer code path against a stubbed
+    command, then asserts the gate reads it as a pass.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "run_fallback", Path("scripts/run_fallback.py").resolve()
+    )
+    assert spec is not None and spec.loader is not None
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+
+    monkeypatch.setattr(runner, "run", lambda: ("pass", "stubbed"))
+    monkeypatch.setattr(
+        runner, "RESULT", tmp_path / ".harness" / "fallback-result.json"
+    )
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    monkeypatch.setattr("sys.argv", ["run_fallback.py"])
+    assert runner.main() == 0
+    capsys.readouterr()  # the runner prints; drain it so doctor's JSON stands alone
+
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    monkeypatch.chdir(tmp_path)
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "pass", condition["reason"]
+
+
+def test_the_fallback_runner_records_a_failure_rather_than_crashing(
+    tmp_path, monkeypatch
+):
+    """A broken fallback is a measurement. It must not look like a broken script.
+
+    If the runner exited non-zero on a failed exercise, a scheduler would treat the evidence
+    as an error and — depending on how it is wired — retry it, alert on it, or drop it. The
+    result file is the output; the exit code is not.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "run_fallback_fail", Path("scripts/run_fallback.py").resolve()
+    )
+    assert spec is not None and spec.loader is not None
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+
+    result_path = tmp_path / ".harness" / "fallback-result.json"
+    monkeypatch.setattr(
+        runner, "run", lambda: ("fail", "the `claude` executable is not on PATH")
+    )
+    monkeypatch.setattr(runner, "RESULT", result_path)
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    monkeypatch.setattr("sys.argv", ["run_fallback.py"])
+
+    assert runner.main() == 0, "a failed fallback must not exit non-zero"
+    recorded = json.loads(result_path.read_text(encoding="utf-8"))
+    assert recorded["outcome"] == "fail"
+    assert "not on PATH" in recorded["detail"]
