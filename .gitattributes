@@ -1,0 +1,26 @@
+# Normalise every text file to LF in the repository and in the working tree.
+#
+# Added 20 August 2026. Without it, `core.autocrlf=true` on Windows checks files out with CRLF
+# while agents working under WSL write LF, so git reports every line of every touched file as
+# changed. Three agent branches came back with diffs of 913, 2,691 and 1,814 lines whose real
+# content was 1, 9 and 48 lines. A diff nobody can read is a review nobody performs, and review
+# time is the scarce resource here.
+#
+# This is not cosmetic. `docs/40-spec/v0-draft.md` §12 requires replay from the published
+# fixture trajectory on Windows AND one non-Windows environment, so cross-platform byte
+# agreement is a release condition, not a preference. `events.append()` already writes the
+# trajectory with an explicit `newline="\n"`; this makes the rest of the tree agree with it.
+#
+# Reversal: delete this file and run `git add --renormalize .`.
+# Falsifier: a file that genuinely requires CRLF to work would break. None is known — the only
+# executable content is Python and shell — and any that appears should be pinned with an
+# explicit `-text` or `eol=crlf` entry below rather than by removing the default.
+
+* text=auto eol=lf
+
+# Explicitly binary, so git never tries to normalise them.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.db binary
+*.sqlite binary
