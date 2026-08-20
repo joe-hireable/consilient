@@ -1526,6 +1526,72 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
 - Higher-order multi-point semantic failures not captured by single-mutant operators.
 
+### EXP-58 · Harness uplift on a mainstream eval — and the number nobody else reports `READY`
+**Pre-registered 20 Aug 2026. Not run.** The flagship proof experiment.
+**Decides:** whether attaching this harness to a model produces a transformative, replicable gain on
+a benchmark outsiders already trust — and whether the gain is real or bought.
+**Joe's framing:** *"plug our harness onto any model and gain an average of x% on [mainstream eval].
+We are looking for transformative differences, proof."* That is the right ambition. This entry adds
+the two things that make such a claim believable rather than dismissable.
+
+**Benchmark:** SWE-bench Verified (500 human-validated instances). Chosen because it is the
+benchmark this field actually argues about, its instances are real repository issues, and its
+oracle is a test suite rather than a judge — which matters for the second measure below.
+
+**Arms — and the discipline is the whole design.** Harness-versus-bare comparisons are where this
+field cheats, almost always unintentionally:
+- **same model**, same weights, same decoding parameters;
+- **same token budget and same retry budget** — a scaffold that wins by spending five times as much
+  has not won, it has paid;
+- **same repository snapshot and same environment image**;
+- the only difference is the scaffold.
+**Cost per resolved instance is a primary result, not a footnote.**
+
+**Measure 1 — resolve rate.** The number everyone reports. Report the paired difference with a
+bootstrap interval, not two separate percentages, because the instances are the same.
+
+**Measure 2 — β on the benchmark, which nobody reports.** SWE-bench marks an instance resolved when
+its selected `FAIL_TO_PASS` and `PASS_TO_PASS` tests pass. **Those tests are an oracle, and oracles
+have error rates.** For every instance either arm marks resolved, run the repository's **full** test
+suite, not the benchmark's selected subset. An instance that passes the selected tests and fails the
+full suite is a **false accept** — a patch the benchmark called correct and which broke something.
+That ratio is β for SWE-bench itself.
+This is the differentiated claim and it is measurable with the corpus as it already ships: **every
+system on the leaderboard reports pass@1 and none reports how many of its passes are wrong.**
+
+**Sampling:** a stratified subsample if the full 500 exceeds the machine's budget, drawn and frozen
+**before** any run, with the seed committed. Power stated in advance: at a resolve rate near 0.4, a
+paired design needs roughly 200 instances to detect a 10-point difference at conventional power —
+**say so before running, not after.**
+
+**Stopping rules (fixed before the run):**
+- If the paired resolve-rate interval **excludes zero and the harness is higher at equal or lower
+  cost** $\implies$ **the uplift claim is supported** and is publishable with the cost figure
+  attached. [asserted]
+- If the harness is higher **only at materially greater cost** $\implies$ report it as a
+  cost/quality trade, never as an uplift. A scaffold that buys accuracy with tokens is a known and
+  uninteresting result. [asserted]
+- If the paired interval **contains zero** $\implies$ **no uplift on this benchmark.** Report it.
+  This project has published every result that went against it today and this one is not exempt.
+  [asserted]
+- If measure 2 finds β **above 0.10 for either arm** $\implies$ the leaderboard's own oracle admits
+  more than one bad patch in ten, and **that finding outranks the uplift result** regardless of which
+  way the uplift went. It should be the paper. [asserted]
+- If fewer than 60 instances complete in either arm $\implies$ **insufficient evidence**; report no
+  difference. [asserted]
+
+**What it cannot decide:** whether uplift transfers to work unlike SWE-bench — greenfield
+construction, multi-repository change, anything without an existing test suite to serve as oracle.
+EXP-43 already measured that this project's own retro-verifier is **blind to 72.8–75.9%** of merges
+because they add new components. SWE-bench is a repair benchmark and the same censoring applies.
+**State that before the numbers, not after.**
+
+**Precondition and honest blocker:** the harness does not route yet. ADR-0015 Gate A and Gate B both
+fail today, so the "harness arm" as of tonight is the observe-only increment plus dispatch, not the
+routing system the claim will eventually be about. **Measure 2 does not depend on that and can run
+first.**
+
+
 ### EXP-56 · Per-model β on a label-free corpus, and the CEILING on what routing can buy `READY`
 **Pre-registered 20 Aug 2026. Not run.** Flagship of the routing programme.
 **Decides:** which model family should do which task — and, before that, whether the question has an
