@@ -368,3 +368,52 @@ the cap rather than 1.1×. Together with the single-instance lock, it is the who
 needs before a clean re-run.
 
 Both runners' final states and both stdout streams are preserved in the session scratchpad.
+
+
+---
+
+# Near miss, 05:27 — removing a dangerous line from a file does not stop a process already running it
+
+While writing the instrument tests I included a cleanup helper that called:
+
+```
+taskkill /F /IM python.exe /FI "MEMUSAGE lt 20000"
+```
+
+**That kills every Python process on the machine under 20 MB**, not just the strays the test
+leaked. On this box that plausibly includes this session's own scratch scripts and whatever
+adjacent sessions are running. I noticed it while rewriting the file for a different reason —
+the sleeps were too long — and removed it before committing. [measured]
+
+**But I had already launched a test run against the old file.** Editing a file does not stop a
+process that has already imported it. The removal protected the commit; it did nothing about the
+run in flight.
+
+**Whether it executed is undetermined.** The helper is called at the end of the
+broken-pattern test, which blocks for the grandchild's full sleep, and the run was capped at 300 s
+against a sleep of 600 s — so on timing it should not have been reached. The task nonetheless
+reported exit 0, which a timeout-kill normally would not, so the two signals disagree and I cannot
+close it. [asserted]
+
+**Nothing depended on it survived damaged**, and that was checked rather than assumed: 47 product
+tests, 5 instrument tests, `mypy --strict` clean, `consil replay` correct, working tree clean but
+for the live results file. [measured]
+
+## The lesson, which is not the obvious one
+
+The obvious lesson is "do not write a broad `taskkill`". True, and I had already reached it — that
+is why the line was removed.
+
+The one worth keeping is narrower and I did not have it: **a destructive command becomes live the
+moment a process reads it, and editing the file afterwards is not a recall.** Tonight this
+project twice refused to change an instrument mid-run on the grounds that it would be tampering.
+The same reasoning applies in the other direction — a *fix* applied mid-run does not take effect
+either, and believing it has is worse than knowing it has not.
+
+Combined with the earlier finding that a runner which cannot be identified cannot be stopped, the
+rule is: **anything that can destroy state must be safe at the moment it is written, because there
+may be no point afterwards at which it can be recalled or stopped.** [asserted]
+
+Concretely, for this repository's own tooling: no `taskkill` or `kill` may target a process by
+**image name or a resource filter**. It targets a specific pid, obtained from a lock file the
+target itself wrote — which is precisely the artefact `run_exp31.py` now creates.
