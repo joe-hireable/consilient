@@ -43,7 +43,21 @@ is what produced all three collisions — it is the step that feels sufficient a
 > differs materially from the bad-and-green cell's audited 1/15, the two cannot share a
 > correction factor and every corrected β needs its own audit.
 
-### EXP-01 · Measure β on repository history `IN PROGRESS 19 Aug 2026 — see experiments/exp01/findings-exp01.md`
+### EXP-01 · Measure β on repository history `DONE 20 Aug 2026 — stopping rule FIRED for this method; see experiments/exp01/stopping-rule-verdict-2026-08-20.md`
+**Verdict, 20 Aug 2026.** The pre-registered rule fires: pooled across BOTH corpora there are
+**209** evaluable bad artefacts and ±0.05 needs **332** at the measured rate — 63.0% of what
+the rule demands, with no more history available. [algebra] Recorded-CI-verdict mining is
+therefore retired as the β instrument.
+**But the consequence the rule names does not follow.** The rule assumed history mining was how
+β gets measured. EXP-47 measured it at **0.3132 [0.2926, 0.3346]**, half-width 0.0210, in 104 s,
+with no proxy labels and no censoring. [measured] And precision was never the binding
+constraint: the metadata proxy (0.6809) and the executable replay (0.0000) differ by **14×** the
+rule's own ±0.05 tolerance, so the problem is validity, not width. [measured]
+**ADR-0002 stays PROVISIONAL.** The rule's stated consequence and the evidence point in opposite
+directions; reconciling them is a decision about the architecture's centre and belongs to Joe.
+**Gate note:** this flips `doctor`'s A1 to PASS. Gate A still fails on A3, which is permanently
+unsatisfiable, so no gate opens. One `git revert` returns A1 to FAIL.
+
 **First pass run on both repos** (recorded-CI-verdict mining, no replay). Raw proxy
 labels proved ~93% noise (audited precision 1/15 on both repos); corrected β̂ ≈ 0.12
 [0.02, 0.42] (jobboard-v2) — the honest verdict is "insufficient data", exactly
