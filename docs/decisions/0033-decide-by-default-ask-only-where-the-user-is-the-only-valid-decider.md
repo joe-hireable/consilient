@@ -41,8 +41,15 @@ could not — and most still preferred the changeable option, mispredicting thei
 
 So a harness that maximises reversibility amplifies two measured errors: over-investment in
 keeping doors open, and reduced commitment to the result. It also compounds tonight's finding
-that earned trust reduces critical engagement (b = −0.69): **perpetually reversible output
-invites perpetual non-commitment.** [cited] Recording a reversal path is therefore a safety
+that higher self-reported confidence in the AI is associated with less critical engagement
+(b = −0.69): **perpetually reversible output invites perpetual non-commitment.** [asserted]
+
+**Corrected 2026-08-20.** This previously read "earned trust *reduces* critical engagement" and
+was tagged `[cited]`. The source is a **cross-sectional self-report association**, and a
+cross-sectional coefficient carries no causal direction, no longitudinal "earning", and no
+measure of objective scrutiny or artefact quality. [measured] The association is real and is
+still worth naming; the mechanism built on top of it is this project's inference, so the
+inference is now tagged `[asserted]` while the coefficient stays `[cited]`. Recording a reversal path is therefore a safety
 property, **not** a goal to maximise, and §1 should be read as "make the reversal available",
 never "prefer the reversible option". [asserted]
 
@@ -132,8 +139,17 @@ deciding.
 An approval is evidence only if it was affordable. Approval latency is recorded on every ask.
 An approval returned faster than a floor proportional to what was being approved is marked
 `unread` and **does not satisfy a V0-18 human decision**; the harness must either make the
-ask cheaper or stop asking. Sub-second approval of a large diff is an unambiguous complacency
-signal available to the harness for free. [cited]
+ask cheaper or stop asking. Sub-second approval of a large diff is treated here as a
+complacency signal available to the harness for free. [asserted]
+
+**Corrected 2026-08-20.** This read "an *unambiguous* complacency signal" and was tagged
+`[cited]`. **No source in the bibliography validates a sub-second threshold for code review**, and
+none supplies the observed positive and negative counts from which its sensitivity or specificity
+could be computed. [measured] It is a plausible heuristic and it is ours, so it is tagged as
+ours. "Unambiguous" is withdrawn: a fast approval of a diff the user had already read in their
+editor is not complacency, and the rule cannot currently tell the two apart. Whether the signal
+discriminates at all is an empirical question nobody here has asked, and it should be registered
+before the floor is given any weight.
 
 The floor is a preferential parameter, set by the user, not derived. Naming it as preferential
 is deliberate: ADR-0021 fixed a pushback count and left its quality unmeasured, and this ADR

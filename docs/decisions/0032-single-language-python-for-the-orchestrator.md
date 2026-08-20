@@ -76,7 +76,7 @@ Thirty-two concurrent subprocesses are supervised in 0.56 s against 16 s serial,
 workload is process supervision and the GIL is released on I/O. Model inference runs
 out-of-process in Ollama.
 
-**7. Python leads on the failure mode that actually dominates.** [measured] SWE-PolyBench
+**7. Python leads on the failure mode that actually dominates.** [cited] SWE-PolyBench
 identifies mislocalisation, not code generation, as the principal agent failure mode, and
 Python leads file-retrieval recall by 9.3 points and precision by 12.5. That is also the
 failure a harness can attack directly.
@@ -92,7 +92,7 @@ failure a harness can attack directly.
   at matched iteration count*, so "typed language with a loop beats Python with a loop" is
   not established. It shows the loop is powerful, not that the language must change.
 - **Per-language agent benchmarks disagree with each other more than they disagree about
-  languages.** [measured] Multi-SWE-bench 2025 puts Python at 52.2% and TypeScript at 2.2%,
+  languages.** [cited] Multi-SWE-bench 2025 puts Python at 52.2% and TypeScript at 2.2%,
   a 23× gap; SWE-bench Multilingual puts Rust highest at 58.14%; ProMax at COLM 2026 finds no
   stable ordering and attributes variance to training data rather than language difficulty.
   Decisively for a meta-harness: the same model on the same TypeScript instances scores 2.23%
@@ -159,3 +159,21 @@ Each is a measurable trigger, fixed here before any of them is observed:
 No. [asserted] This is an implementation choice. The *method* — nine disjoint lenses, an
 adversarial steelman against the incumbent, and local measurement of every performance claim
 — is more interesting than the answer, and belongs in a practitioner note if anywhere.
+
+
+## Correction: 2026-08-20 — two published results were tagged as local measurements
+
+Points 7 and the per-language-benchmark bullet carried `[measured]`. They are **`[cited]`**:
+SWE-PolyBench's retrieval figures, Multi-SWE-bench's 52.2%/2.2%, SWE-bench Multilingual's 58.14%
+and the ProMax scaffold-variance result are all *other people's* published results. No artefact
+in this repository produced any of them. [measured]
+
+Found by Codex auditing numeric provenance across the 39 decision records. Retagged, with no
+change to the argument: the figures are unchanged and still support the decision. What was wrong
+was the claim about **where they came from**.
+
+Working principle 1 exists for exactly this. Reading a paper in full improves the quality of a
+citation; it does not turn that paper's results into a measurement this project made. The two
+tags that remain `[measured]` in this ADR — the Codex package composition and the local startup,
+replay and supervision benchmarks — were produced by running things on this machine, and those
+are correct. [measured]
