@@ -679,9 +679,12 @@ elapsed time; recovery after restart.
 > tests including one per forbidden action. A change feed may only *invalidate*; only an
 > authenticated account read may ever credit resource state.
 >
-> **Owed and not yet built:** the dispatch-time version/capability handshake (procedure step 4)
-> and the three injected fixtures (step 5). Neither blocks the clock, and both must land before
-> the window closes or the run cannot answer its own question.
+> **Built and verified on 20 August 2026:** the dispatch-time version/capability handshake
+> (procedure step 4) and the three injected fixtures with refusal tests (step 5) landed in
+> `handshake.py`, `injected_fixtures.py`, `test_handshake.py` and `test_injected_fixtures.py`.
+> Live zero-inference probes against Claude Code (2.1.237), Codex (0.148.0) and Cursor
+> (2026.08.11-e8db854, tier Ultra) pass; all 47 exp27 tests pass. Promotion verdict remains
+> **insufficient evidence** pending completion of the 30-day collection window. [measured]
 **Decides:** ADR-0029 — whether vendor change monitoring earns v0 scope as an early-warning
 and invalidation layer, while authenticated resource state remains a separate authority.
 **Phase-A result:** all six fixed endpoints returned HTTP 200 and the resource-mutation
