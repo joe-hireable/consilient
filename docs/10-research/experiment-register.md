@@ -1828,6 +1828,76 @@ self-adjudicated corpus is echo (ADR-0010).
 - Specification defects, where the code and the tests agree on the wrong thing. No arm here can
   see those; only P2's hand audit found any.
 
+### EXP-58 · Can output-free local adaptation predict verifier false accepts? `BLOCKED: EXP-56 + exact-model/dependency approval + provenance-complete fixture bank`
+**Pre-registered 20 Aug 2026. Not run.** This is the training gate proposed in
+`local-training-legality-and-feasibility-2026-08-20.md`, not authority to add a learned router.
+[measured]
+**Decides:** whether locally training an adapter on licence-cleared, mechanically labelled
+artefacts adds enough residual-defect signal to justify any further learned-critic work. It does
+not decide whether routing enters v0; ADR-0003 remains binding whatever the result. [asserted]
+**Why EXP-47 is not silently used as text:** its kill/survive labels are mechanical
+measurements, but its source examples do not carry line-level provenance proving that no text
+originated in a frontier-model response. Mechanical labels do not cleanse their examples.
+[measured] EXP-47 supplies check definitions and a secondary outcome benchmark only; no source,
+diff, prompt or response from it enters training until that provenance gap is closed. [asserted]
+**Precondition:**
+1. EXP-56 is complete, so the fixed zero-shot reviewer panel and its hindsight routing ceiling
+   exist as a baseline rather than being reconstructed after this result. [asserted]
+2. The exact 7–8B base revision is pinned by hash and its licence expressly permits local
+   fine-tuning and use of its outputs. The expected route is QLoRA, which fits the measured
+   32,607 MiB RTX 5090 by the arithmetic in the research note; model selection remains an
+   explicit pre-run amendment because no new weight may be downloaded without hardware and
+   licence admission. [algebra]
+3. A fixture/verifier bank with at least 40 independent task families is frozen. Every source
+   example, verifier and label-producing rule has a provenance record establishing that it is
+   principal-owned, permissively licensed for this use, or produced by a local open-weight model
+   whose exact licence permits reuse. Frontier inputs, outputs, teacher logits, synthetic
+   examples, rewards and evaluation answers are excluded. [asserted]
+4. Any new training dependency and any model download has the principal's separate approval.
+   Registration supplies no such approval. [measured]
+**Procedure:**
+1. Produce attempted artefacts locally against the frozen fixtures. Retain the complete
+   verifier 2×2: bad-and-green, bad-and-red, good-and-green and good-and-red. Ground truth comes
+   from the fixture's independent oracle, not from a model's self-report. [asserted]
+2. Split by fixture family before training: at least 25 families train, 5 validate and 10 remain
+   held out. No mutation location, template sibling or near-duplicate crosses a split. Freeze and
+   hash the split before fitting. [asserted]
+3. Compare three arms on the identical holdout: a prevalence-only baseline; the frozen base
+   model; and one QLoRA adapter. The adapter receives the artefact, task contract and real
+   verifier result and predicts the residual event `bad AND verifier_green`. It never replaces
+   the real verifier, whose EXP-47 census took about 0.054 seconds per mutant. [measured]
+4. Use one fixed hyperparameter budget selected before holdout evaluation. No second adapter,
+   prompt tuning or threshold tuning after a holdout result; that requires a new registration.
+   [asserted]
+**Measures:** recall on bad-and-green artefacts; false-escalation rate on good-and-green
+artefacts; precision and PR-AUC at the fixed threshold; Brier score/calibration; verifier and
+adapter wall-clock; peak VRAM; training time and energy estimate; and exact train/validation/
+holdout provenance digests. [asserted]
+**Stopping rules (fixed before any corpus or training run):**
+- **No corpus, no run.** Any item with missing/ambiguous rights or provider-output provenance,
+  any cross-split sibling, fewer than 10 held-out task families, fewer than 100 held-out
+  bad-and-green artefacts or fewer than 100 held-out good-and-green artefacts returns
+  `insufficient_evidence`; an item is not replaced after its outcome is known. [asserted]
+- The adapter earns a further supervised critic experiment only if its 95% interval lower bound
+  clears **50% recall** on bad-and-green at a fixed **≤10% false-escalation rate** on
+  good-and-green, and it improves recall by at least **10 percentage points** over both the
+  frozen base and prevalence baseline. [asserted]
+- If the adapter fails either absolute threshold, or its interval overlaps both baselines, local
+  adaptation is rejected for this task. Do not respond by adding frontier outputs, weakening the
+  split or increasing model size. [asserted]
+- If a random item split beats the family-held-out split by at least 10 percentage points in
+  recall, the apparent gain is leakage and the experiment fails regardless of its headline
+  score. [asserted]
+- Peak allocated VRAM above 30,500 MiB, any OOM, or any unbounded process-tree overrun rejects
+  unattended training on this card; a CPU-offloaded rerun is a different throughput regime and
+  needs a new registration. [asserted]
+- A passing model remains advisory and cannot route, block or accept. Promotion requires a new
+  ADR and a prospective β measurement under the unchanged v0 gates. [asserted]
+**What it cannot decide:** whether the signal transfers to real repositories, longer-horizon
+work or specification defects; whether a larger model would pass; whether fine-tuning on actual
+unintentional agent errors differs from locally manufactured attempts; or whether any frontier
+provider would authorise output training. [asserted]
+
 
 ### EXP-54 · Does a log-anchored view checker catch known-invalid projections, or is that just a missing test? `READY`
 **Pre-registered 20 August 2026, before any view-mutant was generated. Proposed in
