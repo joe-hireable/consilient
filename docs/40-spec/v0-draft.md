@@ -139,16 +139,20 @@ override: [asserted]
 
 ### Stage 3 — route, criticise and orchestrate, after Gate B
 
-Control begins on a project other than Consilient only after Gate B. [asserted]
+Control begins on a project other than Consilient only after Gate B. Under ADR-0039, Stage 3 is
+entered on the principal's approval (authorising construction and supervised orchestration) and
+exited through Gate B (which gates default dependence and unattended operation). [asserted]
 
 1. EXP-05 is complete and a second adapter did not force a shared-interface redesign.
    [measured]
-2. EXP-08 is complete and measured critic recall yields a parallelism ceiling greater
-   than one. [asserted]
-3. A one-command bare-agent fallback exists and a scheduled check exercises it weekly.
-   [asserted]
-4. Twenty non-Consilient tickets complete without intervention in the harness itself.
-   [asserted]
+2. EXP-08 is complete and the critic tier's own β has been measured, with a confidence interval,
+   by an instrument that does not depend on human rejections (ADR-0045, superseding the
+   tautological parallelism ceiling formula from ADR-0007 / ADR-0037). [asserted]
+3. A one-command bare-agent fallback exists and is evidenced by a machine-readable result dated
+   within the last 14 days recording a pass (ADR-0045 and ADR-0046, superseding the scheduled
+   CI job trigger requirement to comply with the no-secrets-in-public-repo rule). [asserted]
+4. Twenty non-Consilient tickets complete without intervention in the harness itself
+   (governing dependence on the harness for foreign repository work under ADR-0039). [asserted]
 
 The bare-agent fallback remains permanent; Consilient must never become the only way to
 work on its own repository. [asserted]

@@ -94,6 +94,7 @@ def main() -> int:
                 "outcome": outcome,
                 "detail": detail,
                 "run": "local",
+                "runner": "scripts/run_fallback.py",
             },
             indent=2,
         )

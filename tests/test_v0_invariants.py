@@ -1146,12 +1146,44 @@ def test_gate_b4_counts_only_validated_tickets_on_another_repository(
     for index in range(3):
         append(
             log,
-            ev(event="ticket.completed", data={"repository": "other", "ticket": index}),
+            ev(
+                event="attempt.outcome",
+                data={
+                    "repository": "other",
+                    "attempt_id": f"att-{index}",
+                    "task": f"ticket-{index}",
+                    "verifier_accept": True,
+                },
+            ),
         )
-    append(log, ev(event="ticket.completed", data={"repository": "other", "ticket": 0}))
+        append(
+            log,
+            ev(
+                event="ticket.completed",
+                data={
+                    "repository": "other",
+                    "ticket": f"ticket-{index}",
+                    "attempt_id": f"att-{index}",
+                },
+            ),
+        )
     append(
         log,
-        ev(event="ticket.completed", data={"repository": "consilient", "ticket": 99}),
+        ev(
+            event="ticket.completed",
+            data={
+                "repository": "other",
+                "ticket": "ticket-0",
+                "attempt_id": "att-0",
+            },
+        ),
+    )
+    append(
+        log,
+        ev(
+            event="ticket.completed",
+            data={"repository": "consilient", "ticket": "ticket-99"},
+        ),
     )
 
     condition = _gate_b(tmp_path, capsys)["B4"]
@@ -1802,20 +1834,104 @@ def test_a3_passes_seven_clean_days(tmp_path, capsys):
     assert condition["status"] == "pass", condition["reason"]
 
 
+HISTORICAL_REFUSAL_LINES: list[str] = [
+    (
+        '{"v": 1, "ts": "2026-08-20T09:41:46+01:00", "exp": "EXP-27", '
+        '"event": "longitudinal.clock_started", "actor": "claude-senior-orchestrator", '
+        '"data": {"principal": "joe-brown", "logical_identity": "senior-orchestrator", '
+        '"runtime_identity": "claude-code/remote-control-session", "model": "claude-opus-5", '
+        '"work_role": "implementer", "human_decision": "approval", "via": "chat, 20 August 2026", '
+        '"authority": "Joe: \'YES PROCEED DONT WANT MONTHS OF DELAY\' - explicit approval for the '
+        'read-only collector, which is new product-adjacent code and was the one gate he had to lift", '
+        '"day_1": "09:39, all six fixed first-party sources reachable, 31 events frozen", '
+        '"earliest_promotion": "19 September 2026, one day later for each day missed", '
+        '"design": "conditional polling with ETag and If-Modified-Since; each event frozen by upstream id '
+        'or content hash; one appended observation per source per run", "idempotent": "a second run '
+        'within the same day returned 304 on every source and zero new events, so the day count cannot be '
+        'inflated by re-running", "invariant_enforced_not_promised": "every emitted record passes '
+        'validate_change_record, which raises on any record claiming to increase headroom, decrease usage, '
+        'move a reset window or mark unknown headroom usable. Eleven tests, including one per forbidden action, '
+        'plus one asserting that silence about headroom is not permission.", "no_inference_no_metered_provider": true, '
+        '"owed": "the dispatch-time version/capability handshake (procedure step 4) and the three injected fixtures '
+        '(step 5). Neither blocks the clock; both must land before the window closes or the run cannot answer its '
+        'own question.", "scheduling_gap": "the collector must run once a day. Today\'s run is manual. A scheduled '
+        'task or a daily invocation is needed and is not yet in place - if nobody runs it, the window silently '
+        'accumulates missing days, which is exactly the failure the register warns about."}}\n'
+    ),
+    (
+        '{"v": 1, "ts": "2026-08-20T09:42:46+01:00", "exp": "decision-protocol", '
+        '"event": "autonomy.scope_widened", "actor": "claude-senior-orchestrator", '
+        '"data": {"principal": "joe-brown", "logical_identity": "senior-orchestrator", '
+        '"runtime_identity": "claude-code/remote-control-session", "model": "claude-opus-5", '
+        '"work_role": "decision owner", "human_decision": "approval", "via": "chat, 20 August 2026", '
+        '"quote": "I don\'t have any appetite for granular technical decisions - these need to be made by '
+        'agents. Many users will prefer it this way.", "why_it_is_an_ADR_and_not_a_note": "the second sentence '
+        'makes it a statement about who the product is for, not one maintainer\'s preference on one morning", '
+        '"unchanged": "the reserved list - money, credentials, anything published or exposed outside the machine, '
+        'irrecoverable deletion, and genuine preference questions no fact settles", "now_explicit": "the converse '
+        'the ADR implied and did not say: a technical question with a defensible answer is not a preference '
+        'question and must not be escalated as one. Escalating one is a defect, not caution.", "named_classes": '
+        '["which of two conditionals a quantity is defined on, where one is already implied by the code and the '
+        'algebra", "which of several defensible estimators, thresholds or samples", "whether an experiment is '
+        're-run and in what order work is done", "how an instrument is repaired and what its tests must cover", '
+        '"any change reversible by one git revert, whatever its blast radius on paper"], "the_failure_it_prevents": '
+        '"an ask the user cannot cheaply answer gets approved to keep things moving, and a rubber-stamped approval '
+        'launders the agent\'s decision into a human one - worse than deciding, because it destroys the record of who '
+        'actually chose", "obligation_replacing_the_ask": "every such decision carries, in the same commit, the '
+        'reasoning including the option not taken, the reversal command rather than an assurance, and the falsifier. '
+        'A decision recorded without a falsifier is a preference wearing a technical costume and should have been '
+        'escalated.", "product_posture": "the harness decides technical questions and reports; the human decides '
+        'irreversible and preferential ones and is asked. A user who wants more say turns the ADR-0035 visibility '
+        'dial up rather than the harness asking more.", "overturning_test": "a user who wanted to be asked, was not, '
+        'and lost something they cared about - measurable, and EXP-33 is where it would show. The unread-approval '
+        'floor is the same signal from the other side: approvals returned faster than they could be read mean the asks '
+        'were not wanted either."}}\n'
+    ),
+    (
+        '{"v": 1, "ts": "2026-08-20T09:56:48+01:00", "exp": "EXP-27", '
+        '"event": "collection.scheduled", "actor": "claude-senior-orchestrator", '
+        '"data": {"principal": "joe-brown", "logical_identity": "senior-orchestrator", '
+        '"runtime_identity": "claude-code/remote-control-session", "model": "claude-opus-5", '
+        '"work_role": "implementer", "human_decision": "approval", "via": "chat, 20 August 2026", '
+        '"authority": "Joe: \'exp 27 schedule what you need to schedule\' - explicit authorisation for a '
+        'system-level change, a Windows scheduled task on his machine", "task": "Consilience-EXP27-Collector, '
+        'daily 09:00, first fire 21 August 2026", "verified_by_artefact": "task Ready, next run 21/08 09:00, '
+        'on-demand run returned Last Result 0, log grew 11 to 22 lines, six of six sources reachable - '
+        'checked rather than inferred from the SUCCESS message", "settings_that_matter": {"StartWhenAvailable": '
+        '"a laptop asleep at 09:00 runs on wake rather than skipping the day - the single most important setting", '
+        '"RunOnlyIfNetworkAvailable": "a run with no network would record six failures and make the day look '
+        'collected when it was not", "RestartOnFailure": "3 attempts 30 minutes apart, so a transient outage does '
+        'not cost a day", "DisallowStartIfOnBatteries": "false, because the default would skip on battery, which '
+        'on a laptop is most of the time", "InteractiveToken": "runs as Joe with no stored credentials. A day he '
+        'never logs in is a day missed; storing a password to avoid that is not a trade worth making for a read-only '
+        'poll."}, "wrapper_rationale": "a scheduled task that fails silently is worse than none, because the window '
+        'accumulates missing days while looking healthy. run-daily.cmd prefers the worktree, falls back to the main '
+        'checkout so it survives the branch being merged, writes a loud failure if the collector is in neither place, '
+        'and preserves the exit code.", "branch_note": "the collector currently exists only on branch '
+        'worktree-consilience-cto. Main is still at 27b4bc2, last night\'s handoff, and the main checkout has no '
+        'collector.py. The wrapper\'s fallback handles the merge whenever it happens.", "how_to_tell_it_stopped": '
+        '"python collector.py prints \'distinct days recorded N of 30\'. If N stops advancing the window has '
+        'stalled regardless of what Task Scheduler claims. Running it by hand is idempotent - a second run the same '
+        'day returns 304 everywhere and adds nothing.", "reversal": "schtasks /Delete /TN Consilience-EXP27-Collector /F. '
+        'Touches nothing else, and the collected log survives deletion.", "still_owed": "the dispatch-time capability '
+        'handshake and the three injected fixtures. Neither blocks the clock; both must land before the window '
+        'closes or the run cannot answer its own question."}}\n'
+    ),
+]
+
+
 def test_a3_tolerates_the_recorded_historical_refusals(tmp_path, capsys):
     """ADR-0043's whole content: a permanent refusal must not block forever.
 
     Before the amendment, unbroken capture failed A3 at 7 days, at 60 and at 365, while a run
     that LOST a day passed. The only way to satisfy "no data loss" was to lose data.
     """
-    from consilient.cli import CAPTURE_REFUSAL_BASELINE
-
     log = tmp_path / "log"
     days = [f"2026-08-{day:02d}" for day in range(10, 17)]
     write_capture_days(log, *days)
     with (log / f"{days[0]}.jsonl").open("a", encoding="utf-8") as fh:
-        for _ in range(CAPTURE_REFUSAL_BASELINE):
-            fh.write("{not json}\n")
+        for line in HISTORICAL_REFUSAL_LINES:
+            fh.write(line)
 
     condition = _a3(tmp_path, capsys)
     assert condition["status"] == "pass", condition["reason"]
@@ -1825,14 +1941,13 @@ def test_a3_tolerates_the_recorded_historical_refusals(tmp_path, capsys):
 
 def test_a3_still_fails_on_one_new_refusal(tmp_path, capsys):
     """The amendment is not a removal. One refusal above the baseline still fails."""
-    from consilient.cli import CAPTURE_REFUSAL_BASELINE
-
     log = tmp_path / "log"
     days = [f"2026-08-{day:02d}" for day in range(10, 17)]
     write_capture_days(log, *days)
     with (log / f"{days[0]}.jsonl").open("a", encoding="utf-8") as fh:
-        for _ in range(CAPTURE_REFUSAL_BASELINE + 1):
-            fh.write("{not json}\n")
+        for line in HISTORICAL_REFUSAL_LINES:
+            fh.write(line)
+        fh.write("{not json}\n")
 
     condition = _a3(tmp_path, capsys)
     assert condition["status"] == "fail", condition["reason"]
@@ -1897,10 +2012,13 @@ def _b3_world(tmp_path, result):
 
 def _fallback(days_old, outcome="pass"):
     stamped = datetime.now(timezone.utc) - timedelta(days=days_old)
+    from consilient.cli import EXPECTED_FALLBACK_COMMAND, FALLBACK_RUNNER_IDENTITY
+
     return {
         "ts": stamped.isoformat(),
-        "command": "claude -p 'fix the failing test'",
+        "command": EXPECTED_FALLBACK_COMMAND,
         "outcome": outcome,
+        "runner": FALLBACK_RUNNER_IDENTITY,
         "run": "https://example.invalid/run/1",
     }
 
@@ -2266,3 +2384,143 @@ def test_agent_transcripts_and_briefs_cannot_be_committed():
     ignored = Path(".gitignore").read_text(encoding="utf-8")
     assert ".harness/dispatch/" in ignored, "agent transcripts became committable again"
     assert "brief-*.md" in ignored, "dispatch briefs became committable again"
+
+
+# ---------------------------------------------------------------- Audit Fixes (ADR-0043, ADR-0045, ADR-0046, ADR-0039)
+def test_gate_a1_fails_when_exp01_stopping_rule_fired(tmp_path, capsys, monkeypatch):
+    """Gate A1 must fail if EXP-01 stopping rule fired, even if status is DONE."""
+    monkeypatch.chdir(tmp_path)
+    register = tmp_path / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True)
+    register.write_text(
+        "### EXP-01 · Mining beta from prior repositories `DONE: stopping rule FIRED: history mining could not narrow interval`\n"
+        "beta-measured: 0.3132 [0.2800, 0.3464]\n",
+        encoding="utf-8",
+    )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    gate_a = doctor_payload(tmp_path, capsys)["gates"]["A"]
+    condition = {c["id"]: c for c in gate_a["conditions"]}["A1"]
+    assert condition["status"] == "fail", condition["reason"]
+    assert "stopping rule fired" in condition["reason"].lower()
+
+
+def test_gate_a1_fails_when_interval_half_width_exceeds_tolerance(
+    tmp_path, capsys, monkeypatch
+):
+    """Gate A1 must fail if EXP-01 beta interval half-width is > 0.05."""
+    monkeypatch.chdir(tmp_path)
+    register = tmp_path / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True)
+    register.write_text(
+        "### EXP-01 · Mining beta from prior repositories `DONE 20 Aug 2026`\n"
+        "beta-measured: 0.3132 [0.1500, 0.4500]\n",
+        encoding="utf-8",
+    )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    gate_a = doctor_payload(tmp_path, capsys)["gates"]["A"]
+    condition = {c["id"]: c for c in gate_a["conditions"]}["A1"]
+    assert condition["status"] == "fail", condition["reason"]
+    assert "exceeds" in condition["reason"] and "0.05" in condition["reason"]
+
+
+def test_gate_a1_passes_when_usable_interval_recorded(tmp_path, capsys, monkeypatch):
+    """Gate A1 passes when EXP-01 is DONE and carries a usable interval (half-width <= 0.05)."""
+    monkeypatch.chdir(tmp_path)
+    register = tmp_path / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True)
+    register.write_text(
+        "### EXP-01 · Mining beta from prior repositories `DONE 20 Aug 2026`\n"
+        "beta-measured: 0.3132 [0.2800, 0.3464]\n",
+        encoding="utf-8",
+    )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    gate_a = doctor_payload(tmp_path, capsys)["gates"]["A"]
+    condition = {c["id"]: c for c in gate_a["conditions"]}["A1"]
+    assert condition["status"] == "pass", condition["reason"]
+    assert "0.3132" in condition["reason"]
+
+
+def test_gate_b2_fails_when_exp08_not_done(tmp_path, capsys, monkeypatch):
+    """Gate B2 must fail if EXP-08 is not DONE, even if a measurement tag exists."""
+    monkeypatch.chdir(tmp_path)
+    register = tmp_path / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True)
+    register.write_text(
+        "### EXP-08 · Critic recall `IN PROGRESS`\n"
+        "critic-beta-measured: 0.31 [0.29, 0.33]\n",
+        encoding="utf-8",
+    )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    condition = _gate_b(tmp_path, capsys)["B2"]
+    assert condition["status"] == "fail", condition["reason"]
+    assert "must be DONE" in condition["reason"]
+
+
+def test_b3_fails_on_unexpected_command_or_runner(tmp_path, capsys, monkeypatch):
+    """Gate B3 fails if fallback result JSON has forged command or runner."""
+    monkeypatch.chdir(tmp_path)
+
+    # Wrong command
+    bad_cmd = _fallback(1)
+    bad_cmd["command"] = "claude -p 'do something else'"
+    _b3_world(tmp_path, bad_cmd)
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "fail", condition["reason"]
+    assert "unexpected command" in condition["reason"]
+
+    # Wrong runner
+    bad_runner = _fallback(1)
+    bad_runner["runner"] = "scripts/forged_runner.py"
+    _b3_world(tmp_path, bad_runner)
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "fail", condition["reason"]
+    assert "unexpected runner" in condition["reason"]
+
+
+def test_gate_b4_ignores_bare_ticket_completed_and_repo_aliases(
+    tmp_path, capsys, monkeypatch
+):
+    """Gate B4 ignores bare ticket.completed without verifier acceptance and filters internal repo aliases."""
+    monkeypatch.chdir(tmp_path)
+    _accepted_b4_docs(tmp_path)
+    log = tmp_path / "log" / "2026-08-20.jsonl"
+
+    # Bare ticket.completed without attempt.outcome is ignored
+    append(
+        log,
+        ev(
+            event="ticket.completed",
+            data={"repository": "foreign-repo", "ticket": "T1"},
+        ),
+    )
+    # Internal repo aliases are ignored even with outcome
+    for idx, alias in enumerate(("consilient", "consilience", "joe-hireable/consilient", "consilient-work")):
+        append(
+            log,
+            ev(
+                event="attempt.outcome",
+                data={"repository": alias, "attempt_id": f"a-{idx}", "task": f"T-{idx}", "verifier_accept": True},
+            ),
+        )
+        append(
+            log,
+            ev(
+                event="ticket.completed",
+                data={"repository": alias, "ticket": f"T-{idx}", "attempt_id": f"a-{idx}"},
+            ),
+        )
+
+    condition = _gate_b(tmp_path, capsys)["B4"]
+    assert "0 of 20" in condition["reason"], condition["reason"]
+
+
+def test_historical_refusal_digests_pin_real_log_rejections():
+    """Ensure HISTORICAL_REFUSAL_DIGESTS accurately pins the exact 3 historical rejections."""
+    import hashlib
+    from consilient.cli import HISTORICAL_REFUSAL_DIGESTS
+
+    assert len(HISTORICAL_REFUSAL_DIGESTS) == 3
+    for line in HISTORICAL_REFUSAL_LINES:
+        digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
+        assert digest in HISTORICAL_REFUSAL_DIGESTS, f"digest {digest} not in baseline"
+

@@ -3,5 +3,6 @@
   "command": "claude -p Read src/consilient/beta.py and reply with the exact name of the function that computes the Wilson score interval. Reply with the name alone and nothing else.",
   "outcome": "pass",
   "detail": "answered in 6 chars",
-  "run": "local"
+  "run": "local",
+  "runner": "scripts/run_fallback.py"
 }

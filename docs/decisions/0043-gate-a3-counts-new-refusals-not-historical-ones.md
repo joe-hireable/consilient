@@ -110,3 +110,9 @@ the one diagnosed here and this ADR should be withdrawn rather than patched.
 If, after acceptance, the pre-existing refusal count has not fallen in three months, the ratchet is
 decorative and the honest response is to say so — as ADR-0038's own test requires of a PROVISIONAL
 decision — not to leave a tolerance standing because it is quiet.
+
+## Correction: 2026-08-20 — A1 was already PASS when this ADR was written
+
+Section *Consequences — Positive* claimed that *"A1 (EXP-01) becomes the genuine remaining blocker on Gate A"*. **That was a factual error:** EXP-01 had already been recorded as `DONE` earlier on 20 August 2026, so `consil doctor` already evaluated A1 as `PASS` when this text was written. [measured] A1 was not blocking Gate A at that time; Gate A's failure was entirely on A3 (and uncompared state on A2).
+
+Furthermore, a subsequent audit by a fourth model family (Grok) noted that A1's PASS status was itself flawed because EXP-01's stopping rule had fired and history mining was retired without achieving a usable β measurement ($\le \pm 0.05$). Gate A's condition 1 was subsequently tightened so that a fired stopping rule without a usable interval fails. The body of this accepted ADR is preserved; this note records the correction.

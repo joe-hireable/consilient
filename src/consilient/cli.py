@@ -40,18 +40,44 @@ GATE_B_CIRCULARITY = Path(
 )
 # Refused lines already in the trajectory when ADR-0043 was accepted on 20 August 2026:
 # three V0-18 violations appended between 09:41 and 09:56 that day, permanent because the
-# log is append-only. A3 tolerates these and only these. This number may only ever go DOWN,
-# and it cannot go down by editing the log — only by the log's history being superseded.
-CAPTURE_REFUSAL_BASELINE = 3
+# log is append-only. ADR-0043 tolerates these exact three lines by their content digests.
+HISTORICAL_REFUSAL_DIGESTS: frozenset[str] = frozenset(
+    {
+        "0fb234324063389745b5e79be163b8b6e3988a955d2a2fbd19f4036e225a7b90",
+        "6921e71b2c687dd2f1f816410d20f53e106db1126bbf39fceeec02e33204f260",
+        "65df9c30eeaf7095072eaada45ce276cbaca877b9540c48c519bcfdc729eb300",
+    }
+)
+CAPTURE_REFUSAL_BASELINE = len(HISTORICAL_REFUSAL_DIGESTS)
 FALLBACK_RESULT = Path(".harness/fallback-result.json")
 # Two cycles of a weekly schedule (ADR-0045). One missed run is tolerated, two are not.
 FALLBACK_MAX_AGE_DAYS = 14
+EXPECTED_FALLBACK_COMMAND = (
+    "claude -p Read src/consilient/beta.py and reply with the exact name of the "
+    "function that computes the Wilson score interval. Reply with the name alone and "
+    "nothing else."
+)
+FALLBACK_RUNNER_IDENTITY = "scripts/run_fallback.py"
 GATE_B4_ADR = Path(
     "docs/decisions/0039-stage-3-entered-on-approval-gate-b-gates-dependence.md"
 )
 # ADR-0015 Gate B condition 4, unchanged in number by ADR-0039 — only in meaning.
 B4_TICKETS_REQUIRED = 20
+THIS_REPOSITORIES: frozenset[str] = frozenset(
+    {
+        "consilient",
+        "consilience",
+        "joe-hireable/consilient",
+        "joe-hireable/consilience",
+        "consilient-work",
+        "consilience-work",
+    }
+)
 THIS_REPOSITORY = "consilient"
+# The machine-readable beta measurement in EXP-01's register entry required for Gate A1.
+EXP01_BETA = re.compile(
+    r"(?:beta-measured|exp-01-beta-measured):\s*([0-9.]+)\s*\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]"
+)
 # The machine-readable critic measurement ADR-0045 requires in EXP-08's register entry.
 CRITIC_BETA = re.compile(
     r"critic-beta-measured:\s*([0-9.]+)\s*\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]"
@@ -196,15 +222,63 @@ def _experiment_entry(identifier: str) -> tuple[str | None, str]:
 
 def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResult]:
     register = EXPERIMENT_REGISTER.as_posix()
-    a1_status, _ = _experiment_entry("EXP-01")
-    a1 = _condition(
-        "A1",
-        "unknown" if a1_status is None else "pass" if a1_status.startswith("DONE") else "fail",
-        "No EXP-01 result is recorded."
-        if a1_status is None
-        else f"EXP-01 is recorded as {a1_status}.",
-        *(() if a1_status is None else (register,)),
+    a1_status, a1_entry = _experiment_entry("EXP-01")
+    a1_evidence = (register,)
+    a1_measurement = EXP01_BETA.search(a1_entry)
+    stopping_rule_fired = "stopping rule FIRED" in a1_entry or (
+        a1_status is not None and "stopping rule FIRED" in a1_status
     )
+    if a1_status is None:
+        a1 = _condition("A1", "unknown", "No EXP-01 result is recorded.")
+    elif not a1_status.startswith("DONE"):
+        a1 = _condition(
+            "A1",
+            "fail",
+            f"EXP-01 is recorded as {a1_status}; must be DONE with a usable beta interval.",
+            *a1_evidence,
+        )
+    elif stopping_rule_fired:
+        a1 = _condition(
+            "A1",
+            "fail",
+            "EXP-01 stopping rule fired: history mining could not narrow the interval below "
+            "\u00b10.05 and the method was retired without a usable beta measurement.",
+            *a1_evidence,
+        )
+    elif a1_measurement is None:
+        a1 = _condition(
+            "A1",
+            "fail",
+            f"EXP-01 is {a1_status}; its entry records no `beta-measured: p [lo, hi]` "
+            "measurement with interval half-width <= 0.05, which Gate A requires.",
+            *a1_evidence,
+        )
+    else:
+        point, low, high = (float(value) for value in a1_measurement.groups())
+        half_width = (high - low) / 2
+        if not (0 <= low <= point <= high <= 1):
+            a1 = _condition(
+                "A1",
+                "fail",
+                f"Recorded beta {point} lies outside its own interval [{low}, {high}].",
+                *a1_evidence,
+            )
+        elif half_width > 0.05:
+            a1 = _condition(
+                "A1",
+                "fail",
+                f"Recorded beta interval [{low}, {high}] half-width {half_width:.4f} exceeds "
+                "\u00b10.05 tolerance; does not decide the threshold.",
+                *a1_evidence,
+            )
+        else:
+            a1 = _condition(
+                "A1",
+                "pass",
+                f"EXP-01 is DONE; beta is measured at {point} [{low}, {high}] with half-width "
+                f"{half_width:.4f} <= 0.05.",
+                *a1_evidence,
+            )
 
     b1_status, b1_entry = _experiment_entry("EXP-05")
     b1_result = b1_entry.partition("**Result:**")[2].partition("\n\n")[0]
@@ -226,6 +300,14 @@ def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResul
     measurement = CRITIC_BETA.search(b2_entry)
     if b2_status is None:
         b2 = _condition("B2", "unknown", "No EXP-08 result is recorded.")
+    elif not b2_status.startswith("DONE"):
+        b2 = _condition(
+            "B2",
+            "fail",
+            f"EXP-08 is {b2_status}; must be DONE and carry a `critic-beta-measured: p [lo, hi]` "
+            "measurement (ADR-0045).",
+            *b2_evidence,
+        )
     elif measurement is None:
         b2 = _condition(
             "B2",
@@ -263,6 +345,20 @@ def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResu
     return _condition("A2", status, reason, f"{log.as_posix()}/*.jsonl", db.as_posix())
 
 
+def is_this_repository(name: str) -> bool:
+    """Identify whether a repository string refers to this project rather than a foreign one.
+
+    ADR-0038 renamed the repository from consilience to consilient. The public GitHub repo is
+    joe-hireable/consilient and the working repository is consilient-work. Any ticket on any of
+    these is internal work, not evidence of foreign-repository orchestration.
+    """
+    normalized = name.strip().casefold()
+    return (
+        normalized in THIS_REPOSITORIES
+        or normalized.split("/")[-1] in THIS_REPOSITORIES
+    )
+
+
 def _capture_condition(log: Path) -> CommandResult:
     """Gate A condition 3, as amended by ADR-0043 and accepted 20 August 2026.
 
@@ -273,14 +369,17 @@ def _capture_condition(log: Path) -> CommandResult:
     *lost a day* passed. The only way to satisfy "no data loss" was to lose data.
 
     A refusal is the opposite of loss. It is a line that IS in the record, named invalid,
-    with its reason and line number, reported beside every figure derived from the log. So
-    historical refusals are counted and reported and do not block; a NEW one does.
+    with its reason and line number, reported beside every figure derived from the log.
+    ADR-0043 tolerates the exact three historical baseline refusals on 2026-08-20 by
+    pinning their SHA-256 content digests. Any refusal whose digest is not in that baseline
+    is a new refusal and fails the gate.
 
     Misdated lines are not ratcheted. A timestamp that disagrees with its file is a live
     capture fault rather than a historical judgement, and it must still fail.
     """
     days: list[date] = []
-    refusals: dict[date, int] = {}
+    historical_refusals_by_day: dict[date, int] = {}
+    new_refusals_by_day: dict[date, int] = {}
     misdated: dict[date, int] = {}
     for path in log.glob("*.jsonl"):
         try:
@@ -289,7 +388,12 @@ def _capture_condition(log: Path) -> CommandResult:
             matching = [event for event in events if event.raw["ts"][:10] == path.stem]
             if day <= datetime.now(timezone.utc).date() and matching:
                 days.append(day)
-                refusals[day] = len(rejected)
+                hist_count = sum(
+                    1 for r in rejected if r.content_digest in HISTORICAL_REFUSAL_DIGESTS
+                )
+                new_count = len(rejected) - hist_count
+                historical_refusals_by_day[day] = hist_count
+                new_refusals_by_day[day] = new_count
                 misdated[day] = len(events) - len(matching)
         except (OSError, ValueError):
             continue
@@ -312,26 +416,31 @@ def _capture_condition(log: Path) -> CommandResult:
             gap = earlier + timedelta(days=1)
             break
     run = (days[-1] - run_start).days + 1
-    refused = sum(count for day, count in refusals.items() if day >= run_start)
+    historical_refused = sum(
+        count for day, count in historical_refusals_by_day.items() if day >= run_start
+    )
+    new_refused = sum(
+        count for day, count in new_refusals_by_day.items() if day >= run_start
+    )
+    total_refused = historical_refused + new_refused
     stale = sum(count for day, count in misdated.items() if day >= run_start)
-    new_refusals = max(0, refused - CAPTURE_REFUSAL_BASELINE)
     reason = (
         f"Latest capture run is {run}/7 days, {run_start.isoformat()} through "
         f"{days[-1].isoformat()}."
     )
     if gap is not None:
         reason += f" The preceding gap is {gap.isoformat()}."
-    if refused:
+    if total_refused:
         reason += (
-            f" The run carries {refused} refused line(s), of which "
-            f"{CAPTURE_REFUSAL_BASELINE} are the recorded historical baseline (ADR-0043) "
-            f"and {new_refusals} are new."
+            f" The run carries {total_refused} refused line(s), of which "
+            f"{historical_refused} are the recorded historical baseline (ADR-0043) "
+            f"and {new_refused} are new."
         )
     if stale:
         reason += f" The run has {stale} misdated line(s)."
     return _condition(
         "A3",
-        "pass" if run >= 7 and new_refusals == 0 and stale == 0 else "fail",
+        "pass" if run >= 7 and new_refused == 0 and stale == 0 else "fail",
         reason,
         evidence,
     )
@@ -359,6 +468,12 @@ def _fallback_result() -> tuple[str, str]:
     B3 asks whether the bare-agent fallback is *exercised weekly*. A result with no date, or
     an old one, is evidence about some other week. Fourteen days is two cycles: one missed
     run is tolerated, two are not.
+
+    Gaming protection: the result must match the documented command and include the runner
+    identity from `scripts/run_fallback.py`.
+    Honest limit: this stops accidental schema drift, partial hand-typed JSON, or arbitrary
+    unexecuted strings; it does NOT prevent deliberate JSON fabrication by an agent or human
+    who explicitly mimics the runner's exact output shape.
     """
     raw = _read_text(FALLBACK_RESULT)
     if raw is None:
@@ -371,6 +486,7 @@ def _fallback_result() -> tuple[str, str]:
         stamped = datetime.fromisoformat(str(result["ts"]))
         outcome = str(result["outcome"])
         command = str(result["command"])
+        runner = str(result.get("runner", ""))
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         return "fail", f"The fallback result is unreadable: {exc}."
     if stamped.tzinfo is None:
@@ -381,6 +497,10 @@ def _fallback_result() -> tuple[str, str]:
             f"The fallback result is {age} days old, over the {FALLBACK_MAX_AGE_DAYS}-day "
             "limit; that is evidence about a different week."
         )
+    if command != EXPECTED_FALLBACK_COMMAND:
+        return "fail", f"The fallback executed unexpected command {command!r}."
+    if runner and runner != FALLBACK_RUNNER_IDENTITY:
+        return "fail", f"The fallback was recorded by unexpected runner {runner!r}."
     if outcome != "pass":
         return "fail", f"The fallback ran {age} day(s) ago and reported {outcome!r}."
     return "pass", f"`{command}` ran {age} day(s) ago and passed."
@@ -432,20 +552,50 @@ def _foreign_tickets(log: Path) -> int:
     """Completed tickets in the trajectory naming a repository other than this one.
 
     Counted over `append()`-validated events only. A ticket recorded by writing to the file
-    directly does not count, because nothing checked it — which is the same reason the
-    bypass ratchet exists.
+    directly does not count, because nothing checked it.
+
+    Gaming protection: counts distinct foreign tickets that carry verified execution evidence
+    in the trajectory (an `attempt.outcome` event with `verifier_accept == True`). Bare
+    `ticket.completed` events recorded via `consil record` without an associated verified
+    attempt outcome are ignored.
+    Honest limit: this prevents isolated hand-recorded events; it does NOT stop someone who
+    artificially constructs both attempt outcome and ticket completion pairs.
     """
-    seen: set[str] = set()
+    verified_attempts: set[tuple[str, str]] = set()
+    ticket_completions: list[tuple[str, str, str]] = []
+
     for path in sorted(log.glob("*.jsonl")):
         events, _ = events_mod.read(path)
         for event in events:
-            if event.raw.get("event") != "ticket.completed":
-                continue
             data = event.raw.get("data") or {}
+            kind = event.raw.get("event")
             repository = str(data.get("repository", ""))
-            identifier = str(data.get("ticket", ""))
-            if repository and repository != THIS_REPOSITORY and identifier:
-                seen.add(f"{repository}#{identifier}")
+            if not repository or is_this_repository(repository):
+                continue
+            if kind == events_mod.OUTCOME_KIND:
+                accept = data.get("verifier_accept")
+                task = str(data.get("task", "") or data.get("attempt_id", ""))
+                attempt_id = str(data.get("attempt_id", ""))
+                if accept is True or accept == 1:
+                    if task:
+                        verified_attempts.add((repository, task))
+                    if attempt_id:
+                        verified_attempts.add((repository, attempt_id))
+            elif kind == "ticket.completed":
+                identifier = str(data.get("ticket", ""))
+                attempt_id = str(data.get("attempt_id", ""))
+                task = str(data.get("task", "")) or identifier
+                if identifier:
+                    ticket_completions.append((repository, identifier, attempt_id or task))
+
+    seen: set[str] = set()
+    for repo, ticket_id, attempt_or_task in ticket_completions:
+        if (
+            (repo, attempt_or_task) in verified_attempts
+            or (repo, ticket_id) in verified_attempts
+        ):
+            seen.add(f"{repo}#{ticket_id}")
+
     return len(seen)
 
 
