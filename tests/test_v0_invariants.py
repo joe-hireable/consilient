@@ -117,6 +117,35 @@ def append_judged(path, attempt_id, task, accept, human_verdict):
     append(path, verdict(attempt_id, human_verdict))
 
 
+def write_capture_days(log_dir, *days):
+    log_dir.mkdir(parents=True, exist_ok=True)
+    for day in days:
+        (log_dir / f"{day}.jsonl").write_text(
+            canonical(ev(ts=f"{day}T12:00:00+00:00")) + "\n",
+            encoding="utf-8",
+        )
+
+
+def doctor_payload(tmp_path, capsys):
+    parser = build_parser()
+    subparsers = next(
+        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
+    )
+    assert "doctor" in subparsers.choices, "doctor command is missing"
+    code = main(
+        [
+            "--log",
+            str(tmp_path / "log"),
+            "--db",
+            str(tmp_path / "state.db"),
+            "--json",
+            "doctor",
+        ]
+    )
+    assert code == 0
+    return json.loads(capsys.readouterr().out)
+
+
 # ---------------------------------------------------------------- V0-01
 def test_unversioned_event_is_rejected():
     bad = ev()
@@ -813,10 +842,123 @@ def test_the_cli_exposes_no_routing_or_blocking_surface():
     for sub in subparsers.choices.values():
         actions |= {a.dest for a in sub._actions}
 
-    assert commands == {"record", "replay", "beta"}, commands
+    assert commands == {"record", "replay", "beta", "doctor"}, commands
     for forbidden in ("route", "dispatch", "block", "accept", "gate", "escalate"):
         offenders = {x for x in actions | commands if forbidden in x}
         assert not offenders, f"observe-only CLI exposes {offenders}"
+
+
+def test_doctor_fails_a_gapped_capture_run_and_names_the_gap(tmp_path, capsys):
+    write_capture_days(tmp_path / "log", "2026-08-14", "2026-08-15", "2026-08-17")
+
+    condition = doctor_payload(tmp_path, capsys)["gates"]["A"]["conditions"][2]
+
+    assert condition["id"] == "A3" and condition["status"] == "fail"
+    assert "2026-08-16" in condition["reason"]
+
+
+def test_doctor_passes_seven_clean_consecutive_capture_days(tmp_path, capsys):
+    write_capture_days(
+        tmp_path / "log",
+        "2026-08-14",
+        "2026-08-15",
+        "2026-08-16",
+        "2026-08-17",
+        "2026-08-18",
+        "2026-08-19",
+        "2026-08-20",
+    )
+
+    condition = doctor_payload(tmp_path, capsys)["gates"]["A"]["conditions"][2]
+
+    assert condition["id"] == "A3" and condition["status"] == "pass"
+
+
+def test_doctor_rejects_a_quarantined_line_in_the_seven_day_run(tmp_path, capsys):
+    write_capture_days(
+        tmp_path / "log",
+        "2026-08-14",
+        "2026-08-15",
+        "2026-08-16",
+        "2026-08-17",
+        "2026-08-18",
+        "2026-08-19",
+        "2026-08-20",
+    )
+    with (tmp_path / "log" / "2026-08-20.jsonl").open(
+        "a", encoding="utf-8"
+    ) as stream:
+        stream.write("not-json\n")
+
+    condition = doctor_payload(tmp_path, capsys)["gates"]["A"]["conditions"][2]
+
+    assert condition["id"] == "A3" and condition["status"] == "fail"
+    assert "rejected" in condition["reason"]
+
+
+def test_doctor_unknown_evidence_cannot_enable_control(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+    payload = doctor_payload(tmp_path, capsys)
+    condition = payload["gates"]["A"]["conditions"][0]
+
+    assert condition["id"] == "A1" and condition["status"] == "unknown"
+    assert condition["evidence"] == []
+    assert {
+        name: {item["id"] for item in gate["conditions"]}
+        for name, gate in payload["gates"].items()
+    } == {"A": {"A1", "A2", "A3"}, "B": {"B1", "B2", "B3", "B4"}}
+    assert payload["routing_orchestration_enabled"] is False
+
+
+def test_doctor_fails_the_unbuilt_weekly_fallback(tmp_path, capsys):
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+    condition = doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"][2]
+
+    assert condition["id"] == "B3" and condition["status"] == "fail"
+    assert ".github/workflows" in condition["evidence"]
+
+
+def test_doctor_reads_the_wrapped_exp05_result_as_pass(tmp_path, capsys):
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+    condition = doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"][0]
+
+    assert condition["id"] == "B1" and condition["status"] == "pass"
+
+
+def test_doctor_does_not_substitute_repository_beta_for_exp08(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    register = tmp_path / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True)
+    register.write_text("### EXP-08 · Critic recall `DONE`\n", encoding="utf-8")
+    log = tmp_path / "log" / "2026-08-20.jsonl"
+    for index in range(30):
+        append_judged(log, f"critic-{index}", f"t{index}", False, "reject")
+
+    payload = doctor_payload(tmp_path, capsys)
+    condition = payload["gates"]["B"]["conditions"][1]
+
+    assert condition["id"] == "B2" and condition["status"] == "unknown"
+    assert "not critic-recall evidence" in condition["reason"]
+    assert payload["routing_orchestration_enabled"] is False
+
+
+def test_doctor_preserves_gate_b4_as_structurally_unsatisfiable(tmp_path, capsys):
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+    condition = doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"][3]
+
+    assert condition["id"] == "B4"
+    assert condition["status"] == "structurally_unsatisfiable"
+    assert any(
+        source.endswith("gate-b-cannot-be-passed-2026-08-20.md")
+        for source in condition["evidence"]
+    )
 
 
 def test_shared_options_survive_on_either_side_of_the_command(tmp_path, capsys):
