@@ -8,6 +8,42 @@
 - **Executable model:** none — the new rules restrict the feasible action set with
   Boolean vetoes; EXP-21 measures their false-admit and false-refusal rates.
 
+## Update: 2026-08-20 — unknown headroom disqualifies *unbounded* work, not bounded work
+
+The rule below excludes a backend from unattended routing whenever its headroom lower bound is
+unknown. Applied literally on 20 August it idled a paid Cursor subscription all night while the
+maintainer slept, because Cursor exposes a plan tier and no remaining allowance. [measured]
+
+That is over-broad, and the reason is a confusion between two different risks. The danger an
+unknown lower bound creates is **exhausting an allowance mid-task and failing in an
+unrecoverable state**. Where the work is bounded such that its worst case cannot plausibly
+exhaust the allowance — a fixed corpus, a read-only pass, a capped number of turns with no
+retry loop — the unknown is not load-bearing, because the worst case is bounded by the *task*
+rather than by the meter. [asserted]
+
+**Amendment.** A backend whose headroom lower bound is unknown remains excluded from unbounded
+unattended work. It is admissible for **bounded unattended work** where all of the following
+hold and are recorded before dispatch: [asserted]
+
+1. the work has a fixed, enumerable input — a named document set, a fixed fixture list — not a
+   loop whose length depends on what it finds;
+2. a hard turn or attempt cap is set and enforced in the loop, with exhaustion escalating
+   rather than retrying;
+3. the task is read-only, or its writes are confined to a scratch location outside the
+   repository;
+4. failure of the backend mid-task loses only that task, with no partial state to reconcile;
+5. the composition's authenticated identity is confirmed at dispatch, since that check does not
+   depend on headroom.
+
+Where any of the five is false, the original exclusion stands unchanged. [asserted]
+
+**Enforcement.** A dispatch to a backend with unknown headroom that does not carry all five
+recorded conditions is rejected at the admission boundary, not by convention. A bounded task
+that exceeds its recorded cap is a defect in the cap, and is logged as one. [asserted]
+
+**What would overturn this.** A bounded task exhausting an allowance despite its cap, which
+would mean the bound was never real and the original blanket exclusion was right. [asserted]
+
 ## Context
 
 The first comparable backend run produced two frontier successes in 20.4–25.6 seconds and
