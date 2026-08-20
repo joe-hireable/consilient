@@ -12,8 +12,9 @@ alone, and no caller may present it otherwise.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
-from typing import Iterable, Literal, assert_never
+from typing import Literal, assert_never
 
 # Below this many human rejections there is no interval worth showing. ADR-0002 puts verifier
 # calibration at 50-200 labels; 30 is the floor for reporting anything at all and is
