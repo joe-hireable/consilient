@@ -1,30 +1,30 @@
 {
  "complete": false,
  "probe": {
-  "free_mib_before": 19126,
+  "free_mib_before": 19132,
   "models": {
    "qwen3:8b": {
-    "load_and_reply_s": 6.15,
+    "load_and_reply_s": 2.47,
     "returncode": 0,
-    "reply_head": "Thinking...\nOkay, the user wants me to reply with the single word \"ready\". Let me check\u001b[5D\u001b[K\ncheck the instructions ag",
-    "free_mib_while_loaded": 19126,
+    "reply_head": "Thinking...\nOkay, the user wants me to reply with the single word \"ready\" or \"think\". L\u001b[1D\u001b[K\nLet me check the query ag",
+    "free_mib_while_loaded": 19132,
     "identity": {
      "requested": "qwen3:8b",
-     "show": "  Model\n    architecture        qwen3     \n    parameters          8.2B      \n    context length      40960     \n    embedding length    4096      \n    quantization        Q4_K_M    \n\n  Capabilities\n    completion    \n    tools         \n    thinking      \n\n  Parameters\n    top_p             0.95              \n    repeat_penalty    1                 \n    stop              \"<|im_start|>\"    \n    sto"
+     "show": "  Model\n    architecture        qwen3     \n    parameters          8.2B      \n    context length      40960     \n    embedding length    4096      \n    quantization        Q4_K_M    \n\n  Capabilities\n    completion    \n    tools         \n    thinking      \n\n  Parameters\n    repeat_penalty    1                 \n    stop              \"<|im_start|>\"    \n    stop              \"<|im_end|>\"      \n    tem"
     }
    },
    "gemma4:31b": {
-    "load_and_reply_s": 16.64,
+    "load_and_reply_s": 9.73,
     "returncode": 0,
-    "reply_head": "Thinking...\nThe user wants me to reply with a single specific word: \"ready\".\n\n    - Content: \"ready\"\n    - Format: Singl",
-    "free_mib_while_loaded": 28622,
+    "reply_head": "Thinking...\nThe user wants me to reply with a single word: \"ready\".\n\n    - Target word: \"ready\"\n    - Constraint: Single",
+    "free_mib_while_loaded": 3186,
     "identity": {
      "requested": "gemma4:31b",
      "show": "  Model\n    architecture        gemma4    \n    parameters          31.3B     \n    context length      262144    \n    embedding length    5376      \n    quantization        Q4_K_M    \n    requires            0.20.0    \n\n  Capabilities\n    completion    \n    vision        \n    tools         \n    thinking      \n\n  Parameters\n    temperature    1       \n    top_k          64      \n    top_p          0"
     }
    }
   },
-  "free_mib_after": 24462
+  "free_mib_after": 29131
  },
  "limitations": [
   "The estimand is substitution of one installed model for another in a fixed composition. It is NOT a size effect: family, training data, tokeniser, instruction tuning and quantisation all differ, and no same-family sibling pair is installed.",
@@ -40,7 +40,7 @@
    "attempt": 1,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 50.091,
+   "duration_s_including_verifier": 106.284,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -54,14 +54,14 @@
     "scope_valid": true,
     "scope_error": null,
     "changed_files": [],
-    "duration_s": 0.072,
-    "test_tail": "exp07-duration-parser-owaut2qz\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-owaut2qz\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+    "duration_s": 0.12,
+    "test_tail": "exp07-duration-parser-jn9p0x2v\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-jn9p0x2v\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
    },
    "usage": {
-    "input_tokens": 25916,
+    "input_tokens": 153513,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 6154,
+    "output_tokens": 15081,
     "reasoning_output_tokens": 0
    }
   },
@@ -71,7 +71,7 @@
    "attempt": 2,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 173.508,
+   "duration_s_including_verifier": 72.654,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -85,14 +85,14 @@
     "scope_valid": true,
     "scope_error": null,
     "changed_files": [],
-    "duration_s": 0.068,
-    "test_tail": "exp07-duration-parser-1iovz3nu\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-1iovz3nu\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+    "duration_s": 0.059,
+    "test_tail": "exp07-duration-parser-q_u47osu\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-q_u47osu\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
    },
    "usage": {
-    "input_tokens": 141127,
+    "input_tokens": 52757,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 10925,
+    "output_tokens": 10940,
     "reasoning_output_tokens": 0
    }
   },
@@ -102,32 +102,7 @@
    "attempt": 3,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 457.815,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 217.815,
-   "censored": true,
-   "outcome": "agent_timeout",
-   "return_code": null,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": false,
-    "tests_passed": false,
-    "timeout": true,
-    "scope_valid": false,
-    "scope_error": "agent timed out",
-    "changed_files": [],
-    "duration_s": 0,
-    "test_tail": "agent timeout"
-   },
-   "usage": {}
-  },
-  {
-   "fixture": "duration-parser",
-   "model": "qwen3:8b",
-   "attempt": 4,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 67.488,
+   "duration_s_including_verifier": 97.848,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -141,14 +116,45 @@
     "scope_valid": true,
     "scope_error": null,
     "changed_files": [],
-    "duration_s": 0.072,
-    "test_tail": "exp07-duration-parser-m9yz0n_0\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-m9yz0n_0\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+    "duration_s": 0.064,
+    "test_tail": "exp07-duration-parser-v4c6lupx\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-v4c6lupx\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
    },
    "usage": {
-    "input_tokens": 25603,
+    "input_tokens": 103133,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 6425,
+    "output_tokens": 14322,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "qwen3:8b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 195.731,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.058,
+    "test_tail": "exp07-duration-parser-isp3d3j3\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-isp3d3j3\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 734752,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 24503,
     "reasoning_output_tokens": 0
    }
   },
@@ -158,24 +164,30 @@
    "attempt": 5,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 415.998,
+   "duration_s_including_verifier": 113.69,
    "timeout_s_applied": 240,
-   "timeout_overrun_s": 175.998,
-   "censored": true,
-   "outcome": "agent_timeout",
-   "return_code": null,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
    "oom_suspected": false,
    "verifier": {
     "passed": false,
     "tests_passed": false,
-    "timeout": true,
-    "scope_valid": false,
-    "scope_error": "agent timed out",
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
     "changed_files": [],
-    "duration_s": 0,
-    "test_tail": "agent timeout"
+    "duration_s": 0.059,
+    "test_tail": "exp07-duration-parser-xgjmmk9c\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-xgjmmk9c\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
    },
-   "usage": {}
+   "usage": {
+    "input_tokens": 140714,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 12531,
+    "reasoning_output_tokens": 0
+   }
   },
   {
    "fixture": "duration-parser",
@@ -183,106 +195,7 @@
    "attempt": 1,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 157.502,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "passed",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": true,
-    "tests_passed": true,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [
-     "solution.py"
-    ],
-    "duration_s": 0.054,
-    "test_tail": ""
-   },
-   "usage": {
-    "input_tokens": 145485,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 2795,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "duration-parser",
-   "model": "gemma4:31b",
-   "attempt": 2,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 190.399,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "passed",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": true,
-    "tests_passed": true,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [
-     "solution.py"
-    ],
-    "duration_s": 0.057,
-    "test_tail": ""
-   },
-   "usage": {
-    "input_tokens": 192486,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 4046,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "duration-parser",
-   "model": "gemma4:31b",
-   "attempt": 3,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 147.924,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "passed",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": true,
-    "tests_passed": true,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [
-     "solution.py"
-    ],
-    "duration_s": 0.054,
-    "test_tail": ""
-   },
-   "usage": {
-    "input_tokens": 143074,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 2677,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "duration-parser",
-   "model": "gemma4:31b",
-   "attempt": 4,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 147.396,
+   "duration_s_including_verifier": 78.902,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -302,10 +215,109 @@
     "test_tail": ""
    },
    "usage": {
-    "input_tokens": 143806,
+    "input_tokens": 153968,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 2777,
+    "output_tokens": 3114,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "gemma4:31b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 70.518,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.054,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 153553,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3236,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "gemma4:31b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 61.875,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.052,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 112459,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2797,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "gemma4:31b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 61.949,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.052,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 130469,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2745,
     "reasoning_output_tokens": 0
    }
   },
@@ -315,7 +327,7 @@
    "attempt": 5,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 136.252,
+   "duration_s_including_verifier": 57.133,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -335,10 +347,10 @@
     "test_tail": ""
    },
    "usage": {
-    "input_tokens": 146749,
+    "input_tokens": 168859,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 3676,
+    "output_tokens": 2395,
     "reasoning_output_tokens": 0
    }
   },
@@ -348,106 +360,7 @@
    "attempt": 1,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 188.749,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "passed",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": true,
-    "tests_passed": true,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [
-     "solution.py"
-    ],
-    "duration_s": 0.166,
-    "test_tail": ""
-   },
-   "usage": {
-    "input_tokens": 153050,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 4800,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "event-replay",
-   "model": "gemma4:31b",
-   "attempt": 2,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 156.657,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "passed",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": true,
-    "tests_passed": true,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [
-     "solution.py"
-    ],
-    "duration_s": 0.056,
-    "test_tail": ""
-   },
-   "usage": {
-    "input_tokens": 163780,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 2301,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "event-replay",
-   "model": "gemma4:31b",
-   "attempt": 3,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 159.029,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "passed",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": true,
-    "tests_passed": true,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [
-     "solution.py"
-    ],
-    "duration_s": 0.056,
-    "test_tail": ""
-   },
-   "usage": {
-    "input_tokens": 156748,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 3339,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "event-replay",
-   "model": "gemma4:31b",
-   "attempt": 4,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 224.308,
+   "duration_s_including_verifier": 84.466,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -467,20 +380,20 @@
     "test_tail": ""
    },
    "usage": {
-    "input_tokens": 173950,
+    "input_tokens": 175250,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 3001,
+    "output_tokens": 3716,
     "reasoning_output_tokens": 0
    }
   },
   {
    "fixture": "event-replay",
    "model": "gemma4:31b",
-   "attempt": 5,
+   "attempt": 2,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 226.594,
+   "duration_s_including_verifier": 60.393,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -496,14 +409,113 @@
     "changed_files": [
      "solution.py"
     ],
-    "duration_s": 0.055,
+    "duration_s": 0.052,
     "test_tail": ""
    },
    "usage": {
-    "input_tokens": 216309,
+    "input_tokens": 171695,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 3532,
+    "output_tokens": 2594,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "gemma4:31b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 68.628,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.065,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 155791,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3118,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "gemma4:31b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 63.925,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.053,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 172144,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2806,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "gemma4:31b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 74.149,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.057,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 176417,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3400,
     "reasoning_output_tokens": 0
    }
   },
@@ -513,24 +525,30 @@
    "attempt": 1,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 270.288,
+   "duration_s_including_verifier": 79.861,
    "timeout_s_applied": 240,
-   "timeout_overrun_s": 30.288,
-   "censored": true,
-   "outcome": "agent_timeout",
-   "return_code": null,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
    "oom_suspected": false,
    "verifier": {
     "passed": false,
     "tests_passed": false,
-    "timeout": true,
-    "scope_valid": false,
-    "scope_error": "agent timed out",
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
     "changed_files": [],
-    "duration_s": 0,
-    "test_tail": "agent timeout"
+    "duration_s": 0.058,
+    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-_qew30ai\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-_qew30ai\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
    },
-   "usage": {}
+   "usage": {
+    "input_tokens": 387957,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 10126,
+    "reasoning_output_tokens": 0
+   }
   },
   {
    "fixture": "event-replay",
@@ -538,94 +556,7 @@
    "attempt": 2,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 17.219,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "rejected",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": false,
-    "tests_passed": false,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [],
-    "duration_s": 0.067,
-    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-7snyslif\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-7snyslif\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
-   },
-   "usage": {
-    "input_tokens": 22913,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 2015,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "event-replay",
-   "model": "qwen3:8b",
-   "attempt": 3,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 110.316,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "rejected",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": false,
-    "tests_passed": false,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [],
-    "duration_s": 0.063,
-    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-_8nr8mz6\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-_8nr8mz6\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
-   },
-   "usage": {
-    "input_tokens": 265401,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 6895,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "event-replay",
-   "model": "qwen3:8b",
-   "attempt": 4,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 241.365,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 1.365,
-   "censored": true,
-   "outcome": "agent_timeout",
-   "return_code": null,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": false,
-    "tests_passed": false,
-    "timeout": true,
-    "scope_valid": false,
-    "scope_error": "agent timed out",
-    "changed_files": [],
-    "duration_s": 0,
-    "test_tail": "agent timeout"
-   },
-   "usage": {}
-  },
-  {
-   "fixture": "event-replay",
-   "model": "qwen3:8b",
-   "attempt": 5,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 63.412,
+   "duration_s_including_verifier": 132.849,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -640,13 +571,106 @@
     "scope_error": null,
     "changed_files": [],
     "duration_s": 0.064,
-    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-ptjdhua0\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-ptjdhua0\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
+    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-v0qpv43x\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-v0qpv43x\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
    },
    "usage": {
-    "input_tokens": 62047,
+    "input_tokens": 807514,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 3829,
+    "output_tokens": 16755,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "qwen3:8b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 163.015,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.063,
+    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-y4cm5isq\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-y4cm5isq\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 369272,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 21221,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "qwen3:8b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 31.092,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.061,
+    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-3yoaga1l\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-3yoaga1l\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 75996,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 4161,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "qwen3:8b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 21.205,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.057,
+    "test_tail": "t call last):\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-u6g4z95_\\test_runner.py\", line 9, in <module>\n    state = replay(events)\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-event-replay-u6g4z95_\\solution.py\", line 2, in replay\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 35333,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2977,
     "reasoning_output_tokens": 0
    }
   },
@@ -656,7 +680,7 @@
    "attempt": 1,
    "provider": "ollama",
    "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 216.797,
+   "duration_s_including_verifier": 220.845,
    "timeout_s_applied": 240,
    "timeout_overrun_s": 0.0,
    "censored": false,
@@ -670,45 +694,14 @@
     "scope_valid": true,
     "scope_error": null,
     "changed_files": [],
-    "duration_s": 0.063,
-    "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-co1z70uf\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
+    "duration_s": 0.061,
+    "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-iwxo7miq\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
    },
    "usage": {
-    "input_tokens": 211383,
+    "input_tokens": 473444,
     "cached_input_tokens": 0,
     "cache_write_input_tokens": 0,
-    "output_tokens": 14825,
-    "reasoning_output_tokens": 0
-   }
-  },
-  {
-   "fixture": "windows-wsl-path",
-   "model": "qwen3:8b",
-   "attempt": 2,
-   "provider": "ollama",
-   "reasoning_mode": "ollama-default",
-   "duration_s_including_verifier": 182.037,
-   "timeout_s_applied": 240,
-   "timeout_overrun_s": 0.0,
-   "censored": false,
-   "outcome": "rejected",
-   "return_code": 0,
-   "oom_suspected": false,
-   "verifier": {
-    "passed": false,
-    "tests_passed": false,
-    "timeout": false,
-    "scope_valid": true,
-    "scope_error": null,
-    "changed_files": [],
-    "duration_s": 0.063,
-    "test_tail": " in <module>\n    assert windows_to_wsl(r\"C:\\Users\\Joe\\repo\") == \"/mnt/c/Users/Joe/repo\"\n           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-windows-wsl-path-om_n9g_i\\solution.py\", line 2, in windows_to_wsl\n    raise NotImplementedError\nNotImplementedError\n"
-   },
-   "usage": {
-    "input_tokens": 113579,
-    "cached_input_tokens": 0,
-    "cache_write_input_tokens": 0,
-    "output_tokens": 11282,
+    "output_tokens": 25214,
     "reasoning_output_tokens": 0
    }
   }

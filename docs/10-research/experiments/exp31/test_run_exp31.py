@@ -177,3 +177,62 @@ def test_the_holder_can_still_release(tmp_path, monkeypatch):
     assert run_exp31.acquire_lock("mine", cap_s=3600) is True
     run_exp31.release_lock()
     assert not lock.exists()
+
+
+
+def test_acquire_is_atomic_against_a_file_that_appears_mid_check(tmp_path, monkeypatch):
+    """Acquisition used to be exists / read / write, so two simultaneous starts could both
+    observe no lock and both write one. O_CREAT|O_EXCL closes that window.
+
+    Simulated by creating the file after the existence check but before the write — which is
+    exactly the interleaving a second process produces.
+    """
+    import run_exp31
+
+    lock = tmp_path / "run.lock"
+    monkeypatch.setattr(run_exp31, "LOCK", lock)
+
+    real_open = os.open
+    state = {"planted": False}
+
+    def open_and_plant(path, flags, *a, **k):
+        # First call is the acquire; plant a rival lock just before it lands.
+        if not state["planted"] and str(path) == str(lock):
+            state["planted"] = True
+            lock.write_text('{"pid": 1, "run_id": "rival"}', encoding="utf-8")
+        return real_open(path, flags, *a, **k)
+
+    monkeypatch.setattr(os, "open", open_and_plant)
+    assert run_exp31.acquire_lock("mine", cap_s=3600) is False, (
+        "acquire overwrote a lock that appeared between the check and the write"
+    )
+    assert json.loads(lock.read_text(encoding="utf-8"))["run_id"] == "rival"
+
+
+def test_a_killed_attempt_has_its_working_copy_inspected(tmp_path):
+    """The censoring defect: changed_files was hard-coded to [] on timeout.
+
+    `produced_an_edit` counts that field, so every censored attempt was recorded as "no edit"
+    without the repository ever being looked at — and an audit of my own findings caught me
+    citing 58 attempts of evidence when only 40 had been observed.
+    """
+    import subprocess as sp
+
+    import run_exp31
+
+    repo = tmp_path / "r"
+    repo.mkdir()
+    sp.run(["git", "init", "-q"], cwd=repo, check=True)
+    (repo / "a.txt").write_text("before", encoding="utf-8")
+    sp.run(["git", "add", "-A"], cwd=repo, check=True)
+    sp.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "base"],
+        cwd=repo, check=True,
+    )
+
+    # An edit an agent might have made just before being killed.
+    (repo / "a.txt").write_text("after", encoding="utf-8")
+
+    changed = run_exp31.changed_files_now(repo, None)
+    assert changed, "a killed attempt's edit was not observed; this is the censoring defect"
+    assert any("a.txt" in c for c in changed)

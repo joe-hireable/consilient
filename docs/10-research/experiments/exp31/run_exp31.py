@@ -155,6 +155,27 @@ def kill_tree(pid: int) -> None:
             pass
 
 
+def changed_files_now(repo, baseline) -> list:
+    """What the working copy holds right now, relative to the fixture baseline.
+
+    Used after a timeout kill, where the attempt produced no verdict but may well have
+    produced an edit. Reuses EXP-07's frozen `verify` where it can, and falls back to a
+    direct status read so an inspection failure never silently reads as "no edit".
+    """
+    try:
+        return list(verify(repo, baseline).get("changed_files") or [])
+    except Exception:
+        out = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+        return [ln[3:].strip() for ln in (out.stdout or "").splitlines() if ln.strip()]
+
+
 def acquire_lock(run_id: str, cap_s: int) -> bool:
     """Refuse to start alongside a live run. Returns False if another run holds the lock.
 
@@ -179,12 +200,27 @@ def acquire_lock(run_id: str, cap_s: int) -> bool:
             )
             return False
         print(f"stale lock ({age / 60:.1f} min old, past the cap) — taking over", file=sys.stderr)
-    LOCK.write_text(
-        json.dumps(
-            {"pid": os.getpid(), "run_id": run_id, "started_epoch": time.time()}, indent=1
-        ),
-        encoding="utf-8",
+        LOCK.unlink(missing_ok=True)
+
+    # O_CREAT|O_EXCL is atomic on Windows and POSIX alike: of two simultaneous starts,
+    # exactly one creates the file. The previous version did exists / read / write, so two
+    # runners starting together could both observe no lock and both write one — the same
+    # incident through a narrower window. Found by an external audit of this very repair,
+    # which is the second defect that audit found in the fix rather than in the original.
+    payload = json.dumps(
+        {"pid": os.getpid(), "run_id": run_id, "started_epoch": time.time()}, indent=1
     )
+    try:
+        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        print(
+            f"REFUSING TO START: {LOCK} was created by another runner between this "
+            "process's check and its write — two runners started simultaneously.",
+            file=sys.stderr,
+        )
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(payload)
     return True
 
 
@@ -269,13 +305,27 @@ def run_attempt(fixture: dict, model: str, attempt: int, timeout_s: int) -> dict
             outcome = "rejected"
     else:
         duration, rc, usage, oom = time.monotonic() - started, None, {}, False
+        # The tree is dead and the working copy is still on disk, so ask it what changed
+        # rather than asserting nothing did. This block used to hard-code changed_files to
+        # [], and `produced_an_edit` in summarise() counts exactly that field — so every
+        # censored attempt was silently recorded as "no edit" without the repository ever
+        # being inspected. Edit production was censored by the same mechanism the durations
+        # were, which is precisely what I had claimed it was independent of. Found by an
+        # external audit of my own findings.
+        try:
+            changed = changed_files_now(repo, baseline)
+            scope_error = "agent timed out; working copy inspected after the kill"
+        except Exception as exc:  # an inspection failure must not read as "no edit"
+            changed = []
+            scope_error = f"agent timed out; inspection failed: {exc}"
         verifier = {
             "passed": False,
             "tests_passed": False,
             "timeout": True,
             "scope_valid": False,
-            "scope_error": "agent timed out",
-            "changed_files": [],
+            "scope_error": scope_error,
+            "changed_files": changed,
+            "edit_observed_after_timeout": bool(changed),
             "duration_s": 0,
             "test_tail": "agent timeout",
         }

@@ -564,3 +564,64 @@ near-miss lesson from earlier applied in the other direction: editing a file doe
 running process, so this run's checkpoints will lack `run_id` and its release will use the old
 unconditional code. Recorded here so the gap in *this* run's artefacts is expected rather than
 discovered.
+
+
+---
+
+# The one result I said survived was censored too
+
+An external audit — the same GPT family, this time pointed at **my findings rather than at the
+repository** — found that the "zero edits" result rests on a field the runner never fills in.
+
+On timeout, `run_attempt` hard-coded:
+
+```python
+"changed_files": [],
+```
+
+and `summarise()` computes `produced_an_edit` from exactly that field. **So every censored attempt
+was recorded as "no edit" without the repository ever being inspected.** [measured] Edit production
+is censored by precisely the mechanism I claimed it was independent of.
+
+## The corrected numbers
+
+| source | `qwen3:8b` attempts | **observed** | censored | edits among observed |
+|---|---|---|---|---|
+| EXP-31 writer 19126 | 18 | 12 | 6 | 0 |
+| EXP-31 writer 29126 | 15 | 9 | 6 | 0 |
+| EXP-07 | 25 | 19 | 6 | 0 |
+| **pooled** | **58** | **40** | **18** | **0** |
+
+**The honest claim is zero edits in 40 *observed* attempts, with 18 further attempts where the
+working copy was never looked at** — not "zero in 58". I wrote 58. [measured]
+
+**The contrast is still stark, and on the observed subset it is cleaner than I stated.**
+`gemma4:31b` produced an edit in **19 of 19 observed attempts** (10 + 9), against `qwen3:8b`'s 0 of
+40. That comparison stands on observations alone.
+
+## Fixed, for the next run
+
+A killed attempt now has its working copy inspected: the tree is dead, the files are still there,
+so the runner asks `verify()` what changed and falls back to a direct status read rather than
+asserting nothing did. An inspection failure records *why* instead of silently reading as "no
+edit", and the row carries `edit_observed_after_timeout`.
+
+**This does not reach the run now in flight**, which imported the module at 08:59 — the same
+near-miss lesson, third time. Its edit counts will be censored the old way, and that is expected
+rather than a surprise to be discovered later.
+
+## And a third lock defect, which I had not found
+
+I found two problems in my own lock and fixed them. The audit found a third: **acquisition was a
+non-atomic `exists` / `read` / `write`**, so two runners starting *simultaneously* could both
+observe no lock and both write one. The narrower window, same incident.
+
+Now `os.open(LOCK, O_CREAT | O_EXCL | O_WRONLY)` — atomic on Windows and POSIX alike, exactly one
+of two racing starts creates the file. Two more tests: one plants a rival lock between the
+existence check and the write and asserts acquisition refuses; one proves a killed attempt's edit
+is observed. Nine tests now.
+
+**Three separate defects in a lock written to prevent one incident.** Two found by using it, one
+by an external audit, none by the tests I wrote alongside it. The tests were not wrong so much as
+uniformly shaped: they exercised the paths I had in mind while writing the code, which are by
+construction the paths I did not get wrong.
