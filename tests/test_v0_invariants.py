@@ -55,34 +55,66 @@ HUMAN = "joe-brown"
 
 
 def outcome(
+    attempt_id,
     task,
     accept,
-    verdict=None,
     family="repair",
     version="v1",
     ts=None,
 ):
-    """An outcome event, authored by the human when it carries their verdict.
+    """An agent outcome that cannot carry a human verdict.
 
     This helper used to attach a `human_verdict` to an event with `actor="agent"` and no
     principal, and every test passed. That is precisely the forgery V0-18 forbids, so the
-    fixture was modelling an invalid event as valid — which is why no test caught the hole
-    in `_check_human_authority`. A fixture that can express a forbidden state will teach a
-    suite to accept it.
+    fixture was modelling an invalid event as valid. Identity is a separate required
+    argument from task because several attempts may legitimately belong to the same task.
     """
     ts = ts or now_ts()
     data = {
+        "attempt_id": attempt_id,
         "task": task,
         "verifier_accept": accept,
         "task_family": family,
         "verifier_version": version,
     }
-    if verdict is None:
-        return ev(ts=ts, event=projection.OUTCOME_KIND, data=data)
-    data["human_verdict"] = verdict
-    data["principal"] = HUMAN
-    data["via"] = "cli"
-    return ev(ts=ts, actor=HUMAN, event=projection.OUTCOME_KIND, data=data)
+    return ev(ts=ts, event=projection.OUTCOME_KIND, data=data)
+
+
+def verdict(attempt_id, human_verdict, ts=None):
+    """A human verdict fixture whose actor cannot be changed to an agent."""
+    return ev(
+        ts=ts or now_ts(),
+        actor=HUMAN,
+        event=projection.VERDICT_KIND,
+        data={
+            "attempt_id": attempt_id,
+            "human_verdict": human_verdict,
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    )
+
+
+def verdict_correction(attempt_id, previous, human_verdict, reason, ts=None):
+    """A human correction fixture whose actor cannot be changed to an agent."""
+    return ev(
+        ts=ts or now_ts(),
+        actor=HUMAN,
+        event=projection.VERDICT_CORRECTION_KIND,
+        data={
+            "attempt_id": attempt_id,
+            "previous_verdict": previous,
+            "human_verdict": human_verdict,
+            "reason": reason,
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    )
+
+
+def append_judged(path, attempt_id, task, accept, human_verdict):
+    append(path, outcome(attempt_id, task, accept))
+    append(path, verdict(attempt_id, human_verdict))
 
 
 # ---------------------------------------------------------------- V0-01
@@ -205,7 +237,7 @@ def test_delete_and_replay_reproduces_identical_state(tmp_path):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
     for i in range(5):
-        append(path, outcome(f"t{i}", accept=bool(i % 2), verdict="reject"))
+        append_judged(path, f"attempt-{i}", f"t{i}", bool(i % 2), "reject")
 
     first = projection.build(log_dir, db)
     digest = projection.state_digest(first)
@@ -221,11 +253,14 @@ def test_delete_and_replay_reproduces_identical_state(tmp_path):
 def test_projection_carries_no_state_the_log_lacks(tmp_path):
     """A row written straight into SQLite does not survive a rebuild."""
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    append_judged(
+        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
+    )
     conn = projection.build(log_dir, db)
     conn.execute(
-        "INSERT INTO outcomes (position, ts, task, verifier_accept)"
-        " VALUES (999, '2026-08-20T02:00:00+01:00', 'smuggled', 1)"
+        "INSERT INTO outcomes (position, attempt_id, ts, task, verifier_accept)"
+        " VALUES (999, 'smuggled-attempt', '2026-08-20T02:00:00+01:00',"
+        " 'smuggled', 1)"
     )
     conn.commit()
     smuggled = projection.state_digest(conn)
@@ -245,11 +280,236 @@ def test_projection_carries_no_state_the_log_lacks(tmp_path):
 def test_malformed_outcome_fails_closed(tmp_path):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     bad = ev(
-        event=projection.OUTCOME_KIND, data={"task": "t", "verifier_accept": "yes"}
+        event=projection.OUTCOME_KIND,
+        data={"attempt_id": "attempt-001", "task": "t", "verifier_accept": "yes"},
     )
     append(log_dir / "2026-08-20.jsonl", bad)
     with pytest.raises(projection.ProjectionError, match="must be a boolean"):
         projection.build(log_dir, db)
+
+
+def test_a_deferred_human_verdict_amends_one_attempt_for_beta(tmp_path):
+    """The verifier result and human judgement may arrive at different times."""
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "same-task-may-have-retries", True))
+    append(path, verdict("attempt-001", "reject"))
+
+    conn = projection.build(log_dir, db)
+    assert conn.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 1
+    result = beta_mod.from_connection(conn)
+    assert result.n_rejected == 1
+    assert result.n_false_accept == 1
+    conn.close()
+
+
+def test_an_attempt_outcome_without_identity_is_quarantined(tmp_path):
+    log = tmp_path / "2026-08-20.jsonl"
+    log.write_text(
+        canonical(
+            ev(
+                event=projection.OUTCOME_KIND,
+                data={"task": "t", "verifier_accept": True},
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    events, rejected = read(log)
+    assert events == []
+    assert len(rejected) == 1
+    assert "attempt_id" in rejected[0].reason
+
+
+def test_a_verdict_for_an_unknown_attempt_fails_closed(tmp_path):
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    append(log_dir / "2026-08-20.jsonl", verdict("missing-attempt", "reject"))
+
+    with pytest.raises(projection.ProjectionError, match="unknown attempt"):
+        projection.build(log_dir, db)
+
+
+def test_two_verdicts_for_one_attempt_fail_closed(tmp_path):
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "t", True))
+    for human_verdict in ("accept", "reject"):
+        append(path, verdict("attempt-001", human_verdict))
+
+    with pytest.raises(projection.ProjectionError, match="already has a verdict"):
+        projection.build(log_dir, db)
+
+
+def test_duplicate_attempt_identity_fails_closed(tmp_path):
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    for task in ("first-task", "second-task"):
+        append(path, outcome("attempt-001", task, True))
+
+    with pytest.raises(projection.ProjectionError, match="duplicate attempt_id"):
+        projection.build(log_dir, db)
+
+
+def test_attempt_identity_not_task_selects_the_deferred_verdict(tmp_path):
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "repeated-task", False))
+    append(path, outcome("attempt-002", "repeated-task", True))
+    append(path, verdict("attempt-002", "reject"))
+
+    conn = projection.build(log_dir, db)
+    rows = list(
+        conn.execute(
+            "SELECT attempt_id, human_verdict FROM outcomes ORDER BY position"
+        )
+    )
+    assert rows == [("attempt-001", None), ("attempt-002", "reject")]
+    result = beta_mod.from_connection(conn)
+    assert result.n_rejected == 1 and result.n_false_accept == 1
+    conn.close()
+
+
+def test_an_agent_cannot_author_a_deferred_human_verdict():
+    forged = ev(
+        event="attempt.verdict",
+        actor="claude-code-agent",
+        data={
+            "attempt_id": "attempt-001",
+            "human_verdict": "reject",
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    )
+    with pytest.raises(EventError, match="only the principal may author"):
+        validate(forged)
+
+
+def test_a_null_correction_cannot_bypass_human_authority():
+    forged = ev(
+        event=projection.VERDICT_CORRECTION_KIND,
+        actor="claude-code-agent",
+        data={
+            "attempt_id": "attempt-001",
+            "previous_verdict": "accept",
+            "human_verdict": None,
+            "reason": "erase the label",
+        },
+    )
+    with pytest.raises(EventError, match="human_verdict must be"):
+        validate(forged)
+
+
+def test_an_agent_cannot_author_a_verdict_correction():
+    forged = ev(
+        event=projection.VERDICT_CORRECTION_KIND,
+        actor="claude-code-agent",
+        data={
+            "attempt_id": "attempt-001",
+            "previous_verdict": "accept",
+            "human_verdict": "reject",
+            "reason": "changed my mind",
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    )
+    with pytest.raises(EventError, match="only the principal may author"):
+        validate(forged)
+
+
+def test_a_human_changes_their_mind_with_an_explicit_correction(tmp_path):
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "t", True))
+    append(path, verdict("attempt-001", "accept"))
+    append(
+        path,
+        verdict_correction(
+            "attempt-001", "accept", "reject", "reviewed the failing edge case"
+        ),
+    )
+
+    conn = projection.build(log_dir, db)
+    assert conn.execute(
+        "SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'"
+    ).fetchone()[0] == "reject"
+    result = beta_mod.from_connection(conn)
+    assert result.n_rejected == 1
+    assert result.n_false_accept == 1
+    conn.close()
+
+
+def test_a_correction_against_the_wrong_prior_verdict_fails_closed(tmp_path):
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "t", True))
+    append(path, verdict("attempt-001", "accept"))
+    append(
+        path,
+        verdict_correction(
+            "attempt-001", "reject", "accept", "mistyped prior state"
+        ),
+    )
+
+    with pytest.raises(projection.ProjectionError, match="expected prior verdict"):
+        projection.build(log_dir, db)
+
+
+def test_a_correction_without_an_existing_verdict_fails_closed(tmp_path):
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "t", True))
+    append(
+        path,
+        verdict_correction(
+            "attempt-001", "accept", "reject", "review changed the judgement"
+        ),
+    )
+
+    with pytest.raises(projection.ProjectionError, match="no verdict to correct"):
+        projection.build(log_dir, db)
+
+
+def test_a_verdict_correction_requires_a_reason():
+    with pytest.raises(EventError, match="non-empty reason"):
+        validate(verdict_correction("attempt-001", "accept", "reject", ""))
+
+
+def test_an_outcome_cannot_carry_the_human_verdict():
+    combined = ev(
+        event=projection.OUTCOME_KIND,
+        actor=HUMAN,
+        data={
+            "attempt_id": "attempt-001",
+            "task": "t",
+            "verifier_accept": True,
+            "human_verdict": "reject",
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    )
+    with pytest.raises(EventError, match="separate attempt.verdict"):
+        validate(combined)
+
+
+def test_the_projection_has_no_inline_human_verdict_path():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(projection.SCHEMA)
+    combined = events_mod.Event(
+        outcome("attempt-001", "t", True)
+        | {"actor": HUMAN}
+    )
+    combined.raw["data"].update(
+        {
+            "human_verdict": "reject",
+            "principal": HUMAN,
+            "via": "cli",
+        }
+    )
+
+    with pytest.raises(projection.ProjectionError, match="separate attempt.verdict"):
+        projection._apply_outcome(conn, 0, combined)
+    conn.close()
 
 
 def test_unknown_human_verdict_fails_closed_at_validation(tmp_path):
@@ -262,7 +522,7 @@ def test_unknown_human_verdict_fails_closed_at_validation(tmp_path):
     with pytest.raises(EventError, match="human_verdict must be"):
         append(
             log_dir_unused := tmp_path / "log" / "2026-08-20.jsonl",
-            outcome("t", accept=True, verdict="probably fine"),
+            verdict("attempt-001", "probably fine"),
         )
     assert not log_dir_unused.exists(), "a refused event must not reach the log"
 
@@ -283,7 +543,8 @@ def test_the_projection_still_fails_closed_on_an_unknown_verdict(tmp_path):
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
-    good = outcome("t", accept=True, verdict="reject")
+    append(path, outcome("attempt-001", "t", True))
+    good = verdict("attempt-001", "reject")
     append(path, good)
     smuggled = canonical(
         {**good, "data": {**good["data"], "human_verdict": "probably fine"}}
@@ -297,7 +558,7 @@ def test_the_projection_still_fails_closed_on_an_unknown_verdict(tmp_path):
 
     rejected = list(conn.execute("SELECT line, reason FROM rejections"))
     assert len(rejected) == 1, "and its refusal must be recorded, not dropped"
-    assert rejected[0][0] == 2
+    assert rejected[0][0] == 3
     assert "human_verdict must be" in rejected[0][1]
     assert projection.rejection_count(conn) == 1
     conn.close()
@@ -455,7 +716,9 @@ def test_wilson_behaves_at_the_boundaries():
 # ---------------------------------------------------------------- V0-14
 def test_human_output_renders_the_same_result_as_json(tmp_path, capsys):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    append_judged(
+        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
+    )
     argv = ["--log", str(log_dir), "--db", str(db), "beta"]
 
     assert main(argv + ["--json"]) == 0
@@ -472,21 +735,24 @@ def test_human_output_renders_the_same_result_as_json(tmp_path, capsys):
 def test_replay_command_reports_a_stable_digest(tmp_path, capsys):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     for i in range(3):
-        append(
+        append_judged(
             log_dir / "2026-08-20.jsonl",
-            outcome(f"t{i}", accept=True, verdict="reject"),
+            f"attempt-{i}",
+            f"t{i}",
+            True,
+            "reject",
         )
     # Nothing on disk yet: the comparison has no subject, and must not claim a pass.
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
     first = json.loads(capsys.readouterr().out)
     assert first["compared"] is False and first["identical"] is None
-    assert first["events"] == 3
+    assert first["events"] == 6
 
     # The first call left state behind, so the second has something to compare against.
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["compared"] is True and payload["identical"] is True
-    assert payload["events"] == 3 and payload["prior_digest"] == payload["digest"]
+    assert payload["events"] == 6 and payload["prior_digest"] == payload["digest"]
 
 
 def test_replay_reports_divergence_when_the_state_on_disk_has_drifted(tmp_path, capsys):
@@ -496,13 +762,16 @@ def test_replay_reports_divergence_when_the_state_on_disk_has_drifted(tmp_path, 
     after unlinking the very state whose drift it was meant to detect.
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    append_judged(
+        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
+    )
     projection.build(log_dir, db).close()
 
     drifted = sqlite3.connect(db)
     drifted.execute(
-        "INSERT INTO outcomes (position, ts, task, verifier_accept)"
-        " VALUES (999, '2026-08-20T02:00:00+01:00', 'out-of-band', 1)"
+        "INSERT INTO outcomes (position, attempt_id, ts, task, verifier_accept)"
+        " VALUES (999, 'out-of-band-attempt', '2026-08-20T02:00:00+01:00',"
+        " 'out-of-band', 1)"
     )
     drifted.commit()
     drifted.close()
@@ -557,7 +826,9 @@ def test_shared_options_survive_on_either_side_of_the_command(tmp_path, capsys):
     directory and replayed the wrong trajectory.
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    append_judged(
+        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
+    )
     projection.build(log_dir, db).close()  # give `replay` something to compare against
 
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 0
@@ -566,7 +837,7 @@ def test_shared_options_survive_on_either_side_of_the_command(tmp_path, capsys):
     assert main(["replay", "--log", str(log_dir), "--db", str(db), "--json"]) == 0
     after = json.loads(capsys.readouterr().out)
 
-    assert before["events"] == after["events"] == 1
+    assert before["events"] == after["events"] == 2
     assert before["digest"] == after["digest"]
 
 
@@ -615,9 +886,9 @@ def test_the_measured_render_path_is_exercised():
 
 def test_an_agent_cannot_author_a_human_verdict_by_omitting_human_decision():
     forged = ev(
-        event=projection.OUTCOME_KIND,
+        event=projection.VERDICT_KIND,
         actor="claude-code-agent",
-        data={"task": "t1", "verifier_accept": True, "human_verdict": "accept"},
+        data={"attempt_id": "attempt-001", "human_verdict": "accept"},
     )
     with pytest.raises(EventError, match="must name its principal"):
         validate(forged)
@@ -626,11 +897,10 @@ def test_an_agent_cannot_author_a_human_verdict_by_omitting_human_decision():
 def test_an_agent_cannot_author_a_human_verdict_by_naming_the_principal():
     """Naming whose authority is exercised is not the same as holding it."""
     forged = ev(
-        event=projection.OUTCOME_KIND,
+        event=projection.VERDICT_KIND,
         actor="claude-code-agent",
         data={
-            "task": "t1",
-            "verifier_accept": True,
+            "attempt_id": "attempt-001",
             "human_verdict": "accept",
             "principal": HUMAN,
             "via": "cli",
@@ -642,11 +912,10 @@ def test_an_agent_cannot_author_a_human_verdict_by_naming_the_principal():
 
 def test_a_human_verdict_must_record_the_channel_it_arrived_through():
     no_via = ev(
-        event=projection.OUTCOME_KIND,
+        event=projection.VERDICT_KIND,
         actor=HUMAN,
         data={
-            "task": "t1",
-            "verifier_accept": True,
+            "attempt_id": "attempt-001",
             "human_verdict": "accept",
             "principal": HUMAN,
         },
@@ -657,11 +926,10 @@ def test_a_human_verdict_must_record_the_channel_it_arrived_through():
 
 def test_a_human_verdict_may_not_be_filed_as_a_different_decision():
     mislabelled = ev(
-        event=projection.OUTCOME_KIND,
+        event=projection.VERDICT_KIND,
         actor=HUMAN,
         data={
-            "task": "t1",
-            "verifier_accept": True,
+            "attempt_id": "attempt-001",
             "human_verdict": "accept",
             "human_decision": "approval",
             "principal": HUMAN,
@@ -674,7 +942,7 @@ def test_a_human_verdict_may_not_be_filed_as_a_different_decision():
 
 def test_the_human_authored_verdict_is_accepted():
     """The guard must not also block the legitimate path."""
-    validate(outcome("t1", True, "accept"))
+    validate(verdict("attempt-001", "accept"))
 
 
 # ------------------------------------------------------ V0-06, the constructor beneath
@@ -768,10 +1036,10 @@ def test_a_log_that_has_grown_reads_as_stale_not_diverged(tmp_path, capsys):
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
-    append(path, outcome("t0", accept=True, verdict="reject"))
+    append_judged(path, "attempt-0", "t0", True, "reject")
     projection.build(log_dir, db).close()
 
-    append(path, outcome("t1", accept=False, verdict="accept"))
+    append_judged(path, "attempt-1", "t1", False, "accept")
 
     # Exit 0 means the check ran AND passed. A stale run verified nothing, so it is not a
     # pass - but it is reported as STALE rather than DIVERGED, which is the distinction.
@@ -780,13 +1048,15 @@ def test_a_log_that_has_grown_reads_as_stale_not_diverged(tmp_path, capsys):
     assert payload["stale"] is True
     assert payload["compared"] is False
     assert payload["identical"] is None
-    assert payload["events_projected"] == 1 and payload["events"] == 2
+    assert payload["events_projected"] == 2 and payload["events"] == 4
 
 
 def test_real_drift_is_still_caught_once_the_counts_match(tmp_path, capsys):
     """The narrowing must not have blunted the check it narrows."""
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    append_judged(
+        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
+    )
     projection.build(log_dir, db).close()
 
     drifted = sqlite3.connect(db)
@@ -859,7 +1129,7 @@ def test_replay_preserves_state_that_is_both_stale_and_drifted(tmp_path, capsys)
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
-    append(path, outcome("t0", accept=True, verdict="reject"))
+    append_judged(path, "attempt-0", "t0", True, "reject")
     projection.build(log_dir, db).close()
 
     drifted = sqlite3.connect(db)
@@ -867,7 +1137,7 @@ def test_replay_preserves_state_that_is_both_stale_and_drifted(tmp_path, capsys)
     drifted.commit()
     drifted.close()
 
-    append(path, outcome("t1", accept=False, verdict="reject"))  # now stale as well
+    append_judged(path, "attempt-1", "t1", False, "reject")  # now stale as well
 
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
