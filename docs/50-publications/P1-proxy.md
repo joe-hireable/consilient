@@ -3,7 +3,7 @@ title: "Mining verifier false-accept rates from repository history: a method, tw
 author: "Joe Brown"
 date: "20 August 2026"
 status: "DRAFT — not submitted, not published, not transmitted. Drafting artefact only."
-venue-target: "MSR Registered Reports (Stage 1) → EMSE; arXiv cs.SE"
+venue-target: "Research note; pilot motivation for an EXP-44 MSR 2027 Registered Report (Stage 1) → EMSE"
 ---
 
 # Mining verifier false-accept rates from repository history: a method, two disagreeing oracles, and missing human ground truth
@@ -17,39 +17,26 @@ venue-target: "MSR Registered Reports (Stage 1) → EMSE; arXiv cs.SE"
 
 ## Abstract
 
-Automated check suites have two off-diagonal error rates: α = P(reject | good artefact) and
-β = P(accept | bad artefact). We estimate both from CI-at-merge and a revert-or-hotfix label
-proxy for 356 merged pull requests in two repositories. [measured]
+Automated checks have α = P(reject | good artefact) and β = P(accept | bad artefact). We apply
+retrospective estimators to 356 merged pull requests. [measured]
 
-**The headline is a method plus negative results, not a measurement of β.** History mining
-refutes the design-time α = 0.03 and exposes three proxy failures: no revert signal,
-change-size bias and a no-verdict state counted as rejection. [measured] Two blind,
-metadata-only adjudications put corrected-label β in the **cross-combination sensitivity range
-[0.81, 0.93]**. Their 16-label disagreement makes the cross-combination spread 14× wider than
-their reported ratios suggest. Only the sign — far above the recorded 0.6305 — is robust.
-[measured]
+**This is a method plus negative results, not a β measurement.** History mining refutes the
+assumed α = 0.03 and finds no revert signal, change-size bias and a no-verdict state counted as
+rejection. Two blind metadata adjudications put corrected-label β in the **cross-combination
+sensitivity range [0.81, 0.93]**. Their 16-label disagreement makes the spread 14× wider than
+reported; only the sign — above 0.6305 — is robust. [measured]
 
-A mechanically different oracle gives the opposite result: later-test replay finds β = 0/50
-= 0.0 (Wilson 95% [0.0, 0.0713]), disjoint from the proxy range and *inconclusive*. [measured]
-Raising n from 15 to 50 tightened that interval without moving it toward the proxy's, so the
-disjunction is not small-sample noise. [measured] A parent control prevents five drifted pairs
-from producing a counterfactual naïve β = 1.0. [measured]
+A mechanically different later-test replay returns pilot 0/15 = 0.0 [0.0, 0.2039] and primary
+0/50 = 0.0 [0.0, 0.0713] (Wilson 95%), disjoint yet *inconclusive*. A parent control prevents
+five drifted pairs yielding a counterfactual naïve β = 1.0. The primary samples chronological
+merges against one subsystem; only 15.4% of repository merges touch it, so the zero may measure
+uncoupling. [measured] [asserted]
 
-**Replay's own bound is the more useful number.** It cannot evaluate a change that adds a
-component absent from the parent, and 72.8–75.9% of merges in the primary corpus do exactly
-that; separately, only 15.4% of merges touch the subsystem whose suite is replayed. [measured]
-Its estimate is therefore a rate over a small, doubly selected slice of history — the quarter of
-changes where regression tests already exist, which is where escapes are least likely — and
-must never be quoted without it. [asserted]
-
-The worst limitation precedes both estimators: **the human-ground-truth fallback was never
-available on these corpora.** The sole maintainer reported that he could not adjudicate the
-labels because the changes had been entirely AI-orchestrated; no contemporaneous human verdicts
-exist.
-[measured] (first-party) We report the conditioned results as a bracket and do not pool them.
-[asserted] We hypothesise that this ground truth is disappearing as AI authorship rises. Our
-dated search found no direct study; EXP-44 registers the test but is unrun. This is a
-hypothesis with a design, not a result. [cited] [asserted]
+The worst limitation: **the human-ground-truth fallback was unavailable.** The sole maintainer
+could not adjudicate entirely AI-orchestrated changes; no contemporaneous verdicts exist.
+[measured] (first-party) We display a diagnostic bracket and never pool. [asserted] We
+hypothesise that ground truth becomes unavailable as AI authorship rises. A dated search found
+no direct study; EXP-44 registers the unrun test. [cited] [asserted]
 
 ---
 
@@ -78,9 +65,10 @@ absence of a human ground truth with which to settle the disagreement is the lar
    Across all cross-combinations of two blind metadata adjudications, β lies in [0.81, 0.93].
    The two reported ratios appeared 0.0085 apart despite a 16-label disagreement because
    numerator and denominator changes compensated. [measured]
-3. **A mechanically different oracle that diverges.** Forward test replay returns 0/50,
-   Wilson 95% [0.0, 0.0713], on evaluable subsystem pairs. A parent-commit control prevents a
-   counterfactual naïve β = 1.0 on five drifted monolithic-suite pairs. [measured]
+3. **A mechanically different oracle that diverges.** Forward replay moves from pilot
+   0/15 [0.0, 0.2039] to primary 0/50 [0.0, 0.0713], but only 15.4% of repository merges touch
+   the tested subsystem. A parent control prevents a counterfactual naïve β = 1.0 on five
+   drifted monolithic-suite pairs. [measured]
 4. **A missing ground truth, and a registered test of the generalisation.** The sole
    maintainer reports that the human audit cannot be supplied because the corpus was entirely
    AI-orchestrated. [measured] (first-party) EXP-44 is registered and unrun; it tests the
@@ -98,8 +86,9 @@ absence of a human ground truth with which to settle the disagreement is the lar
 It does not claim that proxy-label noise is new; that is established at larger scale in the
 SZZ and defect-prediction literature (§2.2). It does not claim a first measurement of verifier
 false accepts on agent-produced artefacts; SWE-Bench+ reports 31.08% of passed patches as
-suspicious (§2.7). It does not claim that either oracle has measured *the* β: one conditions
-on metadata-adjudicated proxy labels and the other on surfaced regressions with later tests.
+suspicious (§2.7). It does not claim that either oracle has measured *the* β: one conditions on
+metadata-adjudicated proxy labels; the other samples chronological merges but can expose only
+failures covered by a compatible later test suite.
 It does not claim that human ground truth has disappeared generally. That is the registered,
 unrun EXP-44 hypothesis. The measured corpus remains two private repositories maintained by
 one developer, who reports that the analysed changes were entirely AI-orchestrated. [measured]
@@ -150,8 +139,8 @@ at greater scale, the results that would otherwise look like our contribution:
   of Pull Requests", arXiv:2209.03311) [SNIP], as do LLM-assisted variants claiming
   state-of-the-art link recovery (LLM4SZZ, arXiv:2504.01404; AgentSZZ, arXiv:2604.02665)
   [SNIP]. **A reviewer will ask why we hand-rolled a regex-plus-overlap heuristic instead of
-  using one of these. The honest answer is that we did not know they existed**; the
-  correction is registered as future work (§8).
+   using one of these. The honest answer is that we did not know they existed**; a public
+   replication should compare the heuristic with PR-SZZ directly (§8).
 
 What is different is the **use**. That literature studies proxy-label noise as a threat to a
 *trained predictor*, where noise degrades recall. We use the labels to estimate the
@@ -278,9 +267,9 @@ name, pull-request title or commit message from either repository appears in thi
 only aggregate counts and coarse classes. This is a hard constraint, not a courtesy, and it
 is also the paper's most serious reproducibility limitation (§7.3).
 
-**A sampling bias worth naming immediately:** the strongly-verified repository is a low-β
-repository, which is the exact regime in which cascading looks best. Measuring there
-flatters the thesis the measurement exists to test.
+**A sampling bias worth naming immediately:** the strongly-verified repository was selected
+as a nominally low-β case, which is the exact regime in which cascading looks best. Measuring
+there flatters the thesis the measurement exists to test. [asserted]
 
 ### 3.2 The verifier and its recorded decision
 
@@ -298,7 +287,7 @@ Three properties of this definition are load-bearing and all three turn out to m
 to the ternary and **per-check identities were discarded**, so "was this red meaningful?"
 was unanswerable from the stored records until a separate re-fetch (§4.8). And the rollup
 reflects only what GitHub recorded: any check the developer ran locally before pushing is a
-verifier whose decisions left no artefact at all (§7.6).
+verifier whose decisions left no artefact at all (§7.4).
 
 ### 3.3 The label proxy
 
@@ -417,11 +406,19 @@ and a parent failure censors the pair as drift rather than attributing a failure
 not introduce. [asserted] method; [measured] implementation.
 
 This is mechanically different evidence from title regexes, file overlap and CI metadata, but
-only partially independent epistemically. It samples regressions that surfaced and later
+only partially independent epistemically. It can detect only regressions that surfaced and later
 received tests; latent defects remain invisible. Under this parent-control design, a new
 component is also unevaluable when the parent lacks the symbols required by the later test.
 [asserted] The parent control is not optional: §5 reports the maximally wrong result the pilot
 would otherwise have produced.
+
+The 15-pair pilot and 50-pair primary runs take chronological merge commits; they do not select
+commits that touched the tested subsystem. Only 25 of 162 repository merges (15.4%) touched
+that subsystem. [measured] A separate file-status proxy marks 123/162 (75.9%) as adding any
+file and 118/162 (72.8%) as adding a code file. Those are not semantic greenfield labels: the
+proxy has both false positives and false negatives, so the measured percentages indicate the
+scale of the possible blindness but do not identify an evaluable fraction. [measured]
+[asserted]
 
 ---
 
@@ -449,7 +446,7 @@ unless stated.
 | **good** | 24 | 4 | 6 | 28 | 34 |
 | total | 42 | 7 | 7 | 49 | 56 |
 
-Every rate in this paper is a ratio of these cells. Base rate P(bad) = 203/300 = 0.6767
+Every history-miner rate in §§4.1–4.9 is a ratio of these cells. Base rate P(bad) = 203/300 = 0.6767
 [0.6218, 0.7271] and 21/49 = 0.4286 [0.3002, 0.5673] — high, and a direct consequence of the
 proxy's precision (§3.7), not of the repositories being unusually broken.
 
@@ -557,7 +554,7 @@ is an algebraic result on model-adjudicated labels, not a routing decision. [alg
 | `jobboard-v2` | 203 | **0** | 203 |
 | `hireable-platform` | 22 | **0** | 22 |
 
-**All 224 bad labels across both corpora come from the weak circumstantial arm. The revert
+**All 225 bad labels across both corpora come from the weak circumstantial arm. The revert
 arm did not fire on a single pull request out of 356.**
 
 A detector returning zero on 356 subjects has two readings — the repositories genuinely
@@ -738,14 +735,16 @@ estimate as a lower bound on joint error is asserting a property the quantity do
 | oracle | β | n | conditioning |
 |---|---|---|---|
 | revert-or-hotfix proxy, cross-family metadata adjudication | **[0.81, 0.93]** sensitivity range | 75 contested of 203 proxy-bad rows | title regex, file-set overlap, CI rollup and metadata adjudication |
-| retro-verifier, later subsystem tests with parent control | **0/50 = 0.0**, Wilson 95% **[0.0, 0.0713]** | 50 evaluable commit pairs | surfaced regressions that later received tests |
+| retro-verifier pilot, later subsystem tests with parent control | **0/15 = 0.0**, Wilson 95% **[0.0, 0.2039]** | 15 chronological parent-pass pairs | later subsystem suite; not selected for subsystem contact |
+| retro-verifier primary, later subsystem tests with parent control | **0/50 = 0.0**, Wilson 95% **[0.0, 0.0713]** | 50 chronological parent-pass pairs | later subsystem suite; not selected for subsystem contact |
 
-The retro-verifier's Wilson interval does not intersect the proxy's cross-combination
-sensitivity range. Its stopping rule nevertheless records *inconclusive*, correctly, because
-n = 15 decides little at a low event rate. [measured] The mechanisms are a different class of
-facts — metadata association versus executable behaviour — but the two oracles still share a
-surfaced-defect channel because later fixes and later regression tests are both written for
-problems that became visible. [asserted]
+Neither retro-verifier Wilson interval intersects the proxy's cross-combination sensitivity
+range. Both stopping verdicts nevertheless record *inconclusive*. The primary run narrows
+binomial uncertainty for this chronological sample, but it does not repair the sample's domain
+sparsity: only 25/162 repository merges touch the tested subsystem. [measured] The mechanisms
+are a different class of facts — metadata association versus executable behaviour — but the
+oracles still share a surfaced-defect channel because later fixes and regression tests are both
+written for problems that became visible. [asserted]
 
 ### 5.2 Reconciliation without pooling
 
@@ -756,9 +755,9 @@ in conditional β. The retro-verifier under-samples by construction: latent defe
 later regression test are invisible, and the parent control censors additions whose required
 symbols do not exist in the parent. [asserted]
 
-Both conditioned estimates may therefore be right on their own terms. We report them as the
-current empirical bracket — proxy [0.81, 0.93], retro 0.0 [0.0, 0.0713] — but **not** as a
-statistical bound on a single latent quantity and never as a pooled number. [asserted] The
+Both conditioned estimates may therefore be right on their own terms. We display a diagnostic
+bracket — proxy [0.81, 0.93], retro 0.0 [0.0, 0.0713] — but **not** a statistical bound on a
+single latent quantity and never a pooled number. [asserted] The
 divergence is the difference-of-class test producing a negative result, not an inconvenience
 to average away.
 
@@ -776,9 +775,13 @@ is part of the method, not a robustness appendix. [asserted]
 
 ### 5.4 Falsifier
 
-A larger retro-verifier run on subsystem suites whose Wilson interval overlaps [0.81, 0.93]
-would falsify the structural reconciliation above: the apparent divergence would be
-small-sample noise rather than oracle conditioning. That run has not been completed. [asserted]
+The original numerical falsifier was a larger subsystem-suite run whose Wilson interval
+overlapped [0.81, 0.93]. The 50-pair run was completed and its interval did not overlap, so that
+falsifier did not fire. [measured] It exposed a stronger selection objection instead: the
+chronological sample was not selected for contact with the tested subsystem. A replay restricted
+to merges that touched that subsystem, or spanning representative subsystem suites, whose
+Wilson interval overlaps the proxy sensitivity range would falsify the structural-divergence
+reconciliation. [asserted]
 
 ---
 
@@ -831,24 +834,44 @@ be replayed, but neither operation recovers a missing human judgement. This is f
 presenting either conditioned estimate as *the* β. It is not evidence that the same problem
 holds outside these corpora. [asserted]
 
-### 7.2 The two oracles condition on different selected populations
+### 7.2 Neither estimator observes the target population; the retro sample is domain-sparse
 
-The metadata oracle conditions on rows selected by a title-and-overlap proxy. [measured] The
-retro-verifier conditions on modifications that later surfaced and received compatible
-regression tests. [asserted] Their results are disjoint, but neither set is known to contain
-the target population of all bad artefacts. The apparent bracket in §5 is an honest display of
-disagreement, not an identified statistical bound. [asserted]
+The history miner cannot supply its prospective denominator: because it selects merged pull
+requests, every row is a human accept and there are no human rejections (§4.10). [measured]
+The 50-pair primary sample comprises chronological, parent-pass merges; it was not selected for
+contact with the tested subsystem, and only 25/162 merges in the repository's history touch that
+subsystem. [measured] Its narrower interval may therefore describe subsystem uncoupling rather
+than verifier reliability. [asserted] Separately, later tests can expose only regressions that
+surfaced and received compatible tests; latent defects remain invisible. Under this
+parent-control design, additions whose required symbols are absent from the parent are censored
+as drift. [asserted]
+
+The file-status proxy finds that 123/162 merges add any file and 118/162 add a code file, but it
+has false positives and false negatives for semantic greenfield work and does not identify the
+evaluable fraction. [measured] [asserted] The metadata oracle instead conditions on rows selected
+by a title-and-overlap proxy. [measured] The results are disjoint, but neither population is
+known to equal all bad artefacts. The bracket in §5 displays disagreement; it is not an
+identified statistical bound. [asserted]
 
 ### 7.3 The corpus cannot be released, so nothing here is independently reproducible
 
 Both repositories are private commercial code. Their per-PR records are gitignored and will
-never be published. We release the instruments and the aggregate contingency tables, which
-means an independent party can audit the *arithmetic* and the *method* but cannot reproduce a
-single number. That fails the data-availability expectations of the technical tracks this
-work would otherwise target, and it is the reason the recommended venue is a registered
-report and the recommended next step (§8) is a public corpus. [measured]
+never be published. We release the instruments, aggregate contingency tables and current
+50-pair retro-verifier result records. An independent party can audit the arithmetic and method
+and re-derive that replay aggregate, but cannot reproduce the history-mined rates or rerun the
+replay against its source history. That fails the data-availability expectations of the
+technical tracks this work would otherwise target. [measured] The recommended route is a
+registered report centred on public EXP-44, with these results as pilot motivation. [asserted]
 
-### 7.4 The labels are a close relative of SZZ and fail differently by cell
+### 7.4 The verifier we measured is not the verifier that operated
+
+`statusCheckRollup` reflects only what GitHub recorded. On the primary corpus roughly forty
+check scripts run locally, outside CI. Every accept or reject those made left no artefact.
+The estimated verifier is therefore weaker than the acceptance process actually was, in an
+unmeasured direction. Relatedly, §4.8 shows that no failing check in the corpus was a
+*required* status check, so "red" here does not mean "blocked".
+
+### 7.5 The labels are a close relative of SZZ and fail differently by cell
 
 The initial bad-and-green audit measured hotfix-label precision at 1/15 ≈ 0.0667 [0.0119,
 0.2982]. In bad-and-red, the later adjudicators refuted 25 and 36 of 75 labels and disagreed by
@@ -856,21 +879,13 @@ The initial bad-and-green audit measured hotfix-label precision at 1/15 ≈ 0.06
 profiles, and neither audit read diffs. The [0.81, 0.93] range is therefore a sensitivity
 analysis over model judgements, not a corrected ground-truth interval.
 
-### 7.5 The adjudications share evidence
+### 7.6 The adjudications share evidence
 
 The initial labels, their first audit and most analysis came from one model family. The two
 later families shared the same metadata and framing, and their apparent ratio agreement is
 14× narrower than the disagreement exposed by crossing their inputs. [measured] That is a
 second opinion, not corroboration. Retro-verification adds executable behaviour, but shares
 the surfaced-defect channel through later test writing (§5.1). [asserted]
-
-### 7.6 The verifier we measured is not the verifier that operated
-
-`statusCheckRollup` reflects only what GitHub recorded. On the primary corpus roughly forty
-check scripts run locally, outside CI. Every accept or reject those made left no artefact.
-The estimated verifier is therefore weaker than the acceptance process actually was, in an
-unmeasured direction. Relatedly, §4.8 shows that no failing check in the corpus was a
-*required* status check, so "red" here does not mean "blocked".
 
 ### 7.7 The proxy's window and regex are unvalidated hyperparameters
 
@@ -953,7 +968,8 @@ Each follows from a measured failure or an explicitly labelled limitation above.
 
 **The highest-value action for this work specifically is to run EXP-44 as registered:** a
 longitudinal public-corpus test of whether proxy reliability changes with AI-authorship share,
-and then demote the private 356-PR corpus to a contrast case. [asserted] The second-highest is
+compare the heuristic with PR-SZZ, and then demote the private 356-PR corpus to a contrast case.
+[asserted] The second-highest is
 to run a mutation-testing tool per check and ask whether mutation score reproduces the
 per-check ordering — because if it does, the instrument was already off-the-shelf and
 forty-eight years old (§2.4).
@@ -964,10 +980,13 @@ forty-eight years old (§2.4).
 
 We set out to measure β on real repositories and obtained two oracle-conditioned answers that
 do not agree. Metadata-adjudicated proxy labels put β in the sensitivity range [0.81, 0.93];
-forward replay of later subsystem tests returns 0/50 = 0.0, Wilson 95% [0.0, 0.0713].
-[measured] The parent-commit control prevents the replay method from reporting a counterfactual
-β = 1.0 on five monolithic-suite pairs whose parents also fail. [measured] The estimates
-are not pooled because they condition on different selected defect populations. [asserted]
+forward replay returned 0/15 = 0.0 [0.0, 0.2039] in the pilot and 0/50 = 0.0 [0.0, 0.0713]
+in the primary run. [measured] The primary sample was chronological rather than selected for
+subsystem contact, and only 15.4% of repository merges touch that subsystem; its zero may measure
+uncoupling rather than verifier reliability. [measured] [asserted] The parent-commit control
+prevents the method from reporting a counterfactual β = 1.0 on five monolithic-suite pairs whose
+parents also fail. [measured] The estimates are not pooled because they condition on different
+selected populations. [asserted]
 
 The history miner also measures α against its proxy, refutes the assumed 0.03, and exposes
 three failures: no revert signal, change-size-dependent hotfix labels and a no-verdict state
@@ -993,12 +1012,14 @@ public comparison this draft reports a method and negative results, not *the* me
   commit message from either repository appears in this paper.
 - **Aggregates and trace:** the contingency tables (§4.1, Appendix B), corrected-label
   sensitivity script and EXP-43 findings are published; Appendix C maps every new result to
-  its retained artefact. The tracked EXP-43 JSON retains the five-pair monolithic arm, but the
-  15-pair subsystem result survives only as an aggregate findings record and cannot be
-  independently re-derived pair by pair from the tracked repository. [measured]
+  an aggregate source. A current tracked EXP-43 pair-level artefact exists. [measured] It is
+  outside the aggregate-only publication boundary and must be removed or sanitised before
+  release; this paper neither reproduces its fields nor treats it as available data. [asserted]
+  The 15-pair pilot and five-pair monolithic arm survive only as aggregate findings. [measured]
 - **Consequence, stated plainly:** a reader can audit the arithmetic and the method but
-  **cannot reproduce a single number from primary data.** A public replication is required
-  before this work should clear a technical track, and it is the first item of future work.
+  cannot independently reproduce the history-mined rates or rerun the replay against the source
+  history. A public replication is required before this work should clear a technical track,
+  and it is the first item of future work.
 
 ## AI assistance
 
@@ -1011,9 +1032,9 @@ re-executed during this revision; the retro-verifier numbers were checked agains
 findings and result artefacts, not rerun against the private corpus. [measured]
 
 AI systems are not authors and are not listed as such. The load-bearing limitations are stated
-in §7.5: the adjudicators shared metadata and framing, apparent ratio agreement concealed
-disagreement in their inputs, and even the mechanically different retro-verifier shares the
-surfaced-defect channel through later test writing. [measured] [asserted]
+in §§7.2 and 7.6: the adjudicators shared metadata and framing, apparent ratio agreement
+concealed disagreement in their inputs, and even the mechanically different retro-verifier
+shares the surfaced-defect channel through later test writing. [measured] [asserted]
 
 ## Author statement
 
@@ -1105,7 +1126,8 @@ while ignoring its *weakness*, which is what β measures.
 ## Appendix A — Instruments
 
 The relevant instruments are dependency-free Python 3. Publication-facing outputs are
-aggregate-only; private per-PR and per-pair evidence stays outside the release. Line counts are
+aggregate-only; the current EXP-43 pair-level artefact is excluded pending privacy remediation.
+Its source checkout and the older pair-level records stay private. [asserted] Line counts are
 as released.
 
 | file | lines | role |
@@ -1117,8 +1139,8 @@ as released.
 | `alpha_sensitivity.py` | 64 | Evaluates β\* = (1 − α)·e^(−kΔ) at every candidate α and prints the exact scale factor and the Wilson-propagated interval. Produces §4.3. Lists the merge-selected 0.3267 explicitly flagged **not α**, to show the direction of the error does not depend on which wrong quantity is substituted. |
 | `independent_replicate.py` | 370 | A second-family re-derivation of the headline claims directly from the primary records (§4.9). |
 | `beta_convergence.py` | 62 | Recomputes corrected-label β under every cross-combination of the two metadata adjudications' promotion and refutation counts. Produces the [0.81, 0.93] sensitivity range and the 14× spread (§3.8, §4.4). |
-| `run_exp43.py` | 501 | Replays a later test target against child/parent commit pairs, classifies only parent-pass/child-fail as an attributable defect, kills timed-out process trees and writes retained results (§3.9, §5). |
-| `test_exp43.py` | 110 | Exercises the Wilson calculation, parent/child outcome classification, lock and high-drift stopping rule. |
+| `run_exp43.py` | 509 | Replays a later test target against child/parent commit pairs, classifies only parent-pass/child-fail as an attributable defect, kills timed-out process trees and writes retained results (§3.9, §5). |
+| `test_exp43.py` | 142 | Exercises the Wilson calculation, parent/child outcome classification, lock and high-drift stopping rule. |
 
 History-miner reproduction requires per-PR JSON records in the layout `mine_beta.py` writes;
 retro-verification requires the private repository and sampled commit pairs. Those inputs are
@@ -1185,7 +1207,8 @@ Corrected-label sensitivity and retro-verification (primary corpus):
 | corrected-label β, all cross-combinations | **[0.81, 0.93]** | sensitivity range, not a confidence interval; metadata-only, n = 75 contested rows |
 | reported-ratio spread | 0.0085 | not reported as a point pair because the inputs disagree |
 | cross-combination spread | 0.1192 | 14× the reported spread |
-| retro-verifier β | **0/50 = 0.0** | Wilson 95% [0.0, 0.0713]; subsystem suite; `inconclusive` |
+| retro-verifier pilot β | **0/15 = 0.0** | Wilson 95% [0.0, 0.2039]; subsystem suite; `inconclusive` |
+| retro-verifier primary β | **0/50 = 0.0** | Wilson 95% [0.0, 0.0713]; chronological pairs, subsystem suite; `inconclusive` |
 | monolithic replay with parent control | 0/5 attributable defects | 5/5 drift; `rejected_high_drift` |
 | monolithic replay without parent control | counterfactual β = 1.0 | naïve result prevented by the control, not an observed estimate |
 
@@ -1194,10 +1217,11 @@ Corrected-label sensitivity and retro-verification (primary corpus):
 | claim | evidence tag | retained source |
 |---|---|---|
 | [0.81, 0.93], 0.0085 versus 0.1192, 14×, and the 16-label disagreement | `[measured]` | `docs/10-research/experiments/exp01/beta_convergence.py`; `docs/10-research/experiments/exp01/findings-alpha-2026-08-20.md` §9 |
-| retro β = 0/50 [0.0, 0.0713] and `inconclusive` | `[measured]` | `docs/10-research/experiments/exp43/findings-exp43.md`; the public repository does not retain the 50 pair-level records |
-| replay evaluable on 24.1–27.2% of merges; 15.4% touch the subsystem | `[measured]` | `docs/10-research/experiments/exp43/findings-exp43.md`, greenfield bound over N=162 merges |
-| five monolithic drift pairs, 3–7 later-test failures, and the prevented naïve β = 1.0 | `[measured]` | `docs/10-research/experiments/exp43/results-exp43.json`; `docs/10-research/experiments/exp43/findings-exp43.md` |
-| oracle reconciliation and larger-run falsifier | `[asserted]` | `docs/10-research/two-oracles-disagree-2026-08-20.md` |
+| retro pilot β = 0/15 [0.0, 0.2039] and primary β = 0/50 [0.0, 0.0713], both `inconclusive` | `[measured]` | `docs/10-research/two-oracles-disagree-2026-08-20.md`; `docs/10-research/experiments/exp43/findings-exp43.md` |
+| file-status proxy: 123/162 add any file, 118/162 add a code file; 25/162 touch the subsystem | `[measured]` | `docs/10-research/experiments/exp43/findings-exp43.md`, N=162 merges |
+| the file proxy is not a semantic greenfield label or evaluability fraction; absent parent symbols can censor additions under this design | `[asserted]` | `docs/10-research/experiments/exp43/findings-exp43.md`; `docs/10-research/two-oracles-disagree-2026-08-20.md` |
+| five monolithic drift pairs, 3–7 later-test failures, and the prevented naïve β = 1.0 | `[measured]` | `docs/10-research/experiments/exp43/findings-exp43.md`; `docs/10-research/two-oracles-disagree-2026-08-20.md` |
+| non-pooling reconciliation and targeted-rerun falsifier | `[asserted]` | `docs/10-research/two-oracles-disagree-2026-08-20.md`; `docs/10-research/experiments/exp43/findings-exp43.md` |
 | maintainer statement and unavailable human fallback | `[measured]` (first-party) | `docs/10-research/ground-truth-evaporates-2026-08-20.md` |
 | no directly matching study found; EXP-44 design and five-percentage-point falsifier | `[cited]` `[asserted]` | `docs/10-research/public-corpus-study-design.md`; `docs/10-research/experiment-register.md` EXP-44; `docs/10-research/bibliography.md` §15 |
 
@@ -1209,6 +1233,7 @@ Alternative not taken: pool the oracles or select either as the beta; rejected b
 condition on different selected populations and neither has human ground truth.
 Reversal: git restore --source=baadc8740d34f13a35a1058c54f463f390adfc96 -- docs/50-publications/P1-proxy.md
 Falsifiers: a diff audit of 20 contested labels that materially disagrees with both metadata
-adjudications; a larger subsystem replay whose interval overlaps [0.81, 0.93]; or EXP-44 finding
-proxy precision invariant within five percentage points across authorship eras.
+adjudications; a replay restricted to subsystem-touching merges or representative suites whose
+interval overlaps [0.81, 0.93]; or EXP-44 finding proxy precision invariant within five
+percentage points across authorship eras.
 -->
