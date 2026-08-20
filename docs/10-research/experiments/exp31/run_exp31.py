@@ -15,6 +15,7 @@ card, and a concurrent load would have corrupted the durations that were its mea
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import statistics
 import subprocess
@@ -127,6 +128,73 @@ def feasibility_probe() -> dict:
     return probe
 
 
+LOCK = RESULTS.parent / "run.lock"
+
+
+def kill_tree(pid: int) -> None:
+    """Kill a process and every descendant.
+
+    `subprocess.run(timeout=...)` kills only the direct child, and with `capture_output=True`
+    it then blocks in `communicate()` because the surviving grandchildren still hold the pipe
+    write-ends open. That is why a 240 s cap produced a 2,011 s attempt on 20 Aug 2026 — the
+    `TimeoutExpired` is not raised until the descendants finally exit. EXP-07 measured the
+    same defect at 10–269 s; two concurrent runners took it to 8.4x the cap.
+    """
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(pid)],
+            capture_output=True,
+            timeout=30,
+        )
+    else:
+        import signal
+
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+
+def acquire_lock(run_id: str, cap_s: int) -> bool:
+    """Refuse to start alongside a live run. Returns False if another run holds the lock.
+
+    On 20 Aug 2026 this experiment was launched twice. Each runner held its results in
+    memory and rewrote the whole file per checkpoint, so they silently destroyed each
+    other's progress for three hours. It was detectable only because the VRAM probe happened
+    to differ between the two processes — luck, not design.
+    """
+    if LOCK.exists():
+        try:
+            held = json.loads(LOCK.read_text(encoding="utf-8"))
+            age = time.time() - float(held.get("started_epoch", 0))
+        except (ValueError, OSError):
+            held, age = {}, cap_s + 1
+        if age < cap_s:
+            print(
+                f"REFUSING TO START: {LOCK} is held by pid {held.get('pid')} "
+                f"(run {held.get('run_id')}), started {age / 60:.1f} min ago, within the "
+                f"{cap_s / 60:.0f} min wall-clock cap. Two concurrent runners overwrite each "
+                "other's results. Wait, or delete the lock if that process is gone.",
+                file=sys.stderr,
+            )
+            return False
+        print(f"stale lock ({age / 60:.1f} min old, past the cap) — taking over", file=sys.stderr)
+    LOCK.write_text(
+        json.dumps(
+            {"pid": os.getpid(), "run_id": run_id, "started_epoch": time.time()}, indent=1
+        ),
+        encoding="utf-8",
+    )
+    return True
+
+
+def release_lock() -> None:
+    try:
+        LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def run_attempt(fixture: dict, model: str, attempt: int, timeout_s: int) -> dict:
     repo, baseline = make_repo(fixture)
     command = [
@@ -146,21 +214,35 @@ def run_attempt(fixture: dict, model: str, attempt: int, timeout_s: int) -> dict
         model,
     ]
     started = time.monotonic()
+    # Popen rather than run(), so the whole process tree can be killed on timeout and the
+    # pipes drained afterwards. See kill_tree() for why run(timeout=) does not bound anything.
+    proc = subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        **({} if os.name == "nt" else {"start_new_session": True}),
+    )
+    timed_out = False
     try:
-        proc = subprocess.run(
-            command,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
-        )
+        stdout, stderr = proc.communicate(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        kill_tree(proc.pid)
+        try:
+            stdout, stderr = proc.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = "", ""
+    if not timed_out:
         verifier = verify(repo, baseline)
         duration = time.monotonic() - started
-        usage = usage_from_events(proc.stdout)
+        usage = usage_from_events(stdout)
         rc = proc.returncode
-        oom = "out of memory" in (proc.stderr or "").lower()
+        oom = "out of memory" in (stderr or "").lower()
         if verifier["timeout"]:
             outcome = "verifier_timeout"
         elif not verifier["scope_valid"]:
@@ -169,7 +251,7 @@ def run_attempt(fixture: dict, model: str, attempt: int, timeout_s: int) -> dict
             outcome = "passed"
         else:
             outcome = "rejected"
-    except subprocess.TimeoutExpired:
+    else:
         duration, rc, usage, oom = time.monotonic() - started, None, {}, False
         verifier = {
             "passed": False,
@@ -292,6 +374,10 @@ def main() -> int:
         print("codex not found", file=sys.stderr)
         return 2
 
+    run_id = f"exp31-{time.strftime('%Y%m%dT%H%M%S')}-{os.getpid()}"
+    if not acquire_lock(run_id, MAX_ELAPSED_S):
+        return 3
+
     free = gpu_free_mib()
     print(f"GPU free before probe: {free} MiB")
     probe = feasibility_probe()
@@ -314,6 +400,7 @@ def main() -> int:
             "limitations": LIMITATIONS,
             "runs": [],
         }
+        payload["run_id"] = run_id
         RESULTS.write_text(json.dumps(payload, indent=1), encoding="utf-8")
         print(f"INFEASIBLE: only {worst} MiB spare while loaded")
         return 1
@@ -382,10 +469,14 @@ def main() -> int:
         "runs": runs,
         "summary": summarise(runs),
     }
+    payload["run_id"] = run_id
     RESULTS.write_text(json.dumps(payload, indent=1), encoding="utf-8")
     print(json.dumps(payload["summary"], indent=1))
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    finally:
+        release_lock()
