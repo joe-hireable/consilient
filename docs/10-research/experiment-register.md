@@ -1319,6 +1319,40 @@ exceeded: cut to one question (goal achieved: fully/partially/no), drop sampling
 retired entirely and the outcome record runs on derived signals alone. The β-verdict
 prompt is never sacrificed to keep these prompts alive.
 
+### EXP-44 · Defect-proxy reliability vs repository AI-authorship share `READY` (registered 20 Aug 2026 — see public-corpus-study-design.md)
+**Decides:** whether SZZ and revert/hotfix defect-mining proxies remain valid under increasing
+AI authorship, or whether the defect-mining literature's foundational assumptions have expired.
+**Precondition:** 30 longitudinal public GitHub repositories with continuous history across
+2018–2026 (including CPython as primary human-review control); GitHub GraphQL API access; Python
+analysis scripts.
+**Procedure:**
+1. Ingest all merged PRs across three eras: Pre-AI (2018–2021), Early Adoption (2023–2024), and
+   High-AI (2025–2026).
+2. Classify commit AI-authorship share via explicit bot identities, git trailers, and PR tool signatures.
+3. Apply standard SZZ and 14-day hotfix proxies to extract candidate defect-inducing commits.
+4. Evaluate candidate labels against independent ground truth: developer-informed `Fixes:` links,
+   triaged bug issues, and retro-verifier regression test execution.
+5. Perform blind human/cross-model audit on a stratified sample of 300 candidate pairs (100 per era).
+6. Compute proxy precision, recall, and differential misclassification by file count and commit velocity across eras.
+**Measures:** proxy precision $P(\text{True Defect} \mid \text{Proxy Flag})$ by era; revert-to-hotfix ratio;
+proxy F1 against developer-informed oracles; correlation between AI-share and false-positive rate;
+size ratio between bad-and-red and bad-and-green cells.
+**Stopping rules (fixed before the run):**
+- Proxy precision in the High-AI era (2025–2026) is lower than the Pre-AI era (2018–2021) by
+  $\ge 20$ percentage points ($p < 0.01$) across the panel $\implies$ **The literature has expired.**
+  Defect proxies cannot be used on AI-authored code without primary ground-truth audits. Update research
+  position and publication draft P1. [asserted]
+- Proxy precision is invariant to AI share (change $\le 5$ percentage points across eras) $\implies$
+  **The hypothesis is refuted.** Proxy noise is an intrinsic baseline property of git history, not an
+  AI degradation effect. Cut the larger claim and restrict findings to corpus-specific noise. [asserted]
+- Revert arm fires $\ge 10\%$ in both human and AI eras $\implies$ Lack of reverts is an idiosyncratic
+  property of fix-forward private repos, not a universal property of AI workflows. [asserted]
+- If fewer than 60 audit pairs per era achieve unambiguous ground truth, the verdict is **insufficient evidence**.
+  Do not extrapolate from inconclusive audit samples. [asserted]
+**What it cannot decide:** whether AI code has higher *absolute* defect density in production (it measures
+*proxy reliability*, not code quality); whether closed-source commercial workflows match open-source
+GitHub practices; and $\beta$ for unverified local environments. [asserted]
+
 ---
 
 ## Not experiments
