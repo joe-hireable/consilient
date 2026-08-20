@@ -375,3 +375,86 @@ That **Gate B2 cannot fail** — it requires a parallelism ceiling "greater than
 quantity. If it holds it is the most consequential item after the axis defect, because Gate B2 is
 the project's only claim that β is load-bearing on a decision. **It is unverified and should be
 checked before it is repeated.** [asserted]
+
+
+---
+
+# Settled against the raw labels: both conditionals, and the cell that was thrown away
+
+The sections above computed both conditionals from the **published aggregates**. EXP-01's raw
+mining output was then found still on disk in the main checkout — gitignored, as the privacy rule
+requires, which is why an auditor working from a `docs/` snapshot reported it absent. It is not
+absent; it was simply outside that corpus. [measured]
+
+Recomputing directly from the retained labels reproduces every predicted figure exactly.
+**Aggregate counts only below**, as the privacy rule permits; no record, title or path from either
+repository is reproduced anywhere.
+
+| | `jobboard-v2` | `hireable-platform` |
+|---|---|---|
+| merged PRs | 300 | 56 |
+| CI green | 202 | 42 |
+| CI red, merged anyway | 98 | 7 |
+| no recorded checks | 0 | 7 |
+| proxy-labelled bad | 203 | 22 |
+| bad **and** green | 128 | 18 |
+| **bad and red** | **75** | **3** |
+
+**As recorded** — P(bad \| green):
+
+- `jobboard-v2` 128/202 = **0.6337**, Wilson [0.5653, 0.6970]
+- `hireable-platform` 18/42 = **0.4286**, Wilson [0.2912, 0.5779]
+
+**On β's axis** — P(green \| bad):
+
+- `jobboard-v2` 128/203 = **0.6305**, Wilson [0.5623, 0.6939] — a ratio of **0.9951**
+- `hireable-platform` 18/22 = **0.8182**, Wilson [0.6148, 0.9269] — a ratio of **1.9091**
+
+Every figure predicted from the published aggregates reproduces to four decimal places. [measured]
+
+## The number that changes what to do next
+
+**75 bad artefacts on `jobboard-v2` were rejected by the checks — 37% of every bad artefact in
+the corpus.** [measured]
+
+That is the cell EXP-01 discarded as a nuisance, and it is **more than a third of the denominator
+β actually needs.** β = P(checks accept \| artefact bad) is estimated over *all* bad artefacts,
+both the ones the checks let through and the ones they caught. The material is not missing and it
+never was: it has been sitting in the mining output since 19 August, excluded by a filter rather
+than by a lack of data.
+
+On `hireable-platform` the same cell holds 3 of 22, or 14%.
+
+## What this does and does not settle
+
+**It settles that the axis error is real, and that its size is repository-dependent.** On
+`jobboard-v2` it moves the estimate by 0.5% — invisible, which is why nobody caught it. On
+`hireable-platform` it is a factor of **1.91**.
+
+**It settles that the correct axis is computable today**, from data that already exists, without
+the ~146-pair audit. The audit's purpose was to sharpen an interval; the axis question does not
+need it.
+
+**It does not produce a corrected β̂, and I have deliberately not manufactured one.** The
+published estimates of 0.12 and 0.14 come from applying audited label-precision and miss-rate
+corrections to the raw figures. Those corrections were audited **on the bad-and-green cell
+specifically** — 15 sampled bad pairs and 5 cleans per repository. Propagating them to a
+denominator that now includes 75 previously unexamined bad-and-red PRs would assume the label
+noise is the same in a cell nobody audited. It may not be: a PR that was reverted *and* had red
+CI is a different population from one that was reverted *and* passed.
+
+**So the honest position is:** the raw figures above are sound, the label-corrected figures on the
+new axis are unknown, and closing that gap needs an audit of the bad-and-red cell — which is
+smaller, cheaper and more decision-relevant than the ~146-pair audit currently queued. [asserted]
+
+## Why this was findable only by reading the private data
+
+Two independent auditors reported EXP-01's raw labels as absent. Both were right about their
+corpus and wrong about the world, because the privacy rule correctly keeps that data out of the
+repository and therefore out of every snapshot staged for an agent. [measured]
+
+That is a permanent structural feature of this project, not a one-off: **the most decision-relevant
+data is the data agents will always report as missing.** Any audit of EXP-01 conducted by a scoped
+agent will produce this false negative, every time, and the finding will look identical to a real
+one. The mitigation is not to relax the privacy rule; it is to state in the dispatch that the
+corpus excludes gitignored data, and to treat any absence claim about it as unevaluable.
