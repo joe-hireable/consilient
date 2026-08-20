@@ -1,7 +1,7 @@
 # Morning briefing — 20 August 2026
 
-Written for Joe to read over coffee. Twenty-four commits landed overnight across Claude Code,
-Codex and Cursor. This page orders what you have to decide; everything else is detail you can reach from
+Written for Joe to read over coffee. 28 commits landed overnight across Claude Code, Codex
+and Cursor. This page orders what you have to decide; everything else is detail you can reach from
 here.
 
 **The short version.** The night was mostly spent finding out that several things we believed
@@ -151,6 +151,40 @@ set**, and neither the code nor the specification says so.
 **The cheap thing that changes this:** start recording real `attempt.outcome` events with your
 verdicts on actual work. Nothing else in the project generates the input its central quantity
 needs.
+
+---
+
+## 2b. The counterweight, and it deserves equal billing
+
+Codex produced **33 findings** on numeric provenance. Nine were handed to Cursor — a third model
+family checking a second one's homework, with refutations named as the valuable output.
+
+**Six confirmed, two partial, one refuted — and the column asking "does a decision turn on it?"
+reads *No* nine times out of nine.** [measured] `audit-triage-2026-08-20.md`
+
+These are **documentation-accuracy defects, not decision defects.** The corpus is less precise
+than it claims; it is not less correct than it claims.
+
+The clearest case, with the arithmetic done both ways: ADR-0002 says *"at true β = 0.08, even
+n=800 only reaches 84%"*. That reproduces **only** against the rounded 0.111 written in the prose;
+against the exact closed form the script actually uses, 0.1118654, k=72 is admitted and power is
+**86.5%**. The number is wrong. The sentence it supports — that prospective sampling near the
+threshold is severely underpowered — is identical at either value.
+
+**This is not a reason to relax.** Finding 3, the "zero" false-safe rate, was a genuine safety
+overstatement and is corrected. The distinction worth holding is between *a number that is wrong*
+and *a conclusion that is wrong*, and the night produced far more of the former.
+
+**And one finding was refuted, which is why the third family earned its place.** Codex classified
+ADR-0034's stall-detector parameters as untraceable empirical claims. The ADR labels them
+preferential and `[asserted]` at three separate points, and tags its prior-art figures `[cited]`.
+The auditor found a correctly tagged preferential parameter and mistook the tag for a gap — an
+auditor that penalises honest labelling teaches the opposite of what this project wants, and it
+would have taught it here had nobody checked.
+
+**Twenty findings remain unchecked** and stay `[asserted]`. On this sample the base rate is
+roughly two-thirds real — a useful prior for reading the rest, and not a substitute for checking
+them.
 
 ---
 
