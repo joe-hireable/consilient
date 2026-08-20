@@ -21,6 +21,7 @@ GIT = shutil.which("git")
 PYTHON = sys.executable
 HERE = Path(__file__).parent
 RESULTS = HERE / "results-exp07.json"
+LOCK = RESULTS.parent / "run.lock"
 MAX_ELAPSED_S = 90 * 60
 LOCAL_ATTEMPTS = 5
 MAX_FRONTIER_USED_PERCENT = 90
@@ -37,6 +38,71 @@ LIMITATIONS = [
     "Synthetic fixtures can replicate the latency mechanism but cannot establish that a "
     "learned router improves real work.",
 ]
+
+
+def kill_tree(pid):
+    """Kill a process and every descendant so a timeout bounds elapsed time."""
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(pid)],
+            capture_output=True,
+            timeout=30,
+        )
+    else:
+        import signal
+
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+
+def acquire_lock(run_id, cap_s):
+    """Atomically refuse a second runner while a lock is within the run cap."""
+    if LOCK.exists():
+        try:
+            held = json.loads(LOCK.read_text(encoding="utf-8"))
+            age = time.time() - float(held.get("started_epoch", 0))
+        except (ValueError, OSError):
+            held, age = {}, cap_s + 1
+        if age < cap_s:
+            print(
+                f"REFUSING TO START: {LOCK} is held by pid {held.get('pid')} "
+                f"(run {held.get('run_id')}), started {age / 60:.1f} min ago.",
+                file=sys.stderr,
+            )
+            return False
+        print(f"stale lock ({age / 60:.1f} min old) — taking over", file=sys.stderr)
+        LOCK.unlink(missing_ok=True)
+
+    payload = json.dumps(
+        {"pid": os.getpid(), "run_id": run_id, "started_epoch": time.time()}, indent=1
+    )
+    try:
+        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        print(
+            f"REFUSING TO START: {LOCK} was created concurrently by another runner.",
+            file=sys.stderr,
+        )
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(payload)
+    return True
+
+
+def release_lock():
+    """Release the lock only when this process owns it."""
+    try:
+        held = json.loads(LOCK.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if held.get("pid") != os.getpid():
+        return
+    try:
+        LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 FIXTURES = [
@@ -325,20 +391,32 @@ def run_attempt(fixture, condition, attempt, timeout_s, configured_timeout_s):
     else:
         command += ["--oss", "--local-provider", "ollama", "-m", "qwen3:8b"]
     started = time.monotonic()
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        **({} if os.name == "nt" else {"start_new_session": True}),
+    )
+    timed_out = False
     try:
-        process = subprocess.run(
-            command,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
-        )
+        stdout, _stderr = process.communicate(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        kill_tree(process.pid)
+        try:
+            stdout, _stderr = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout = ""
+    if not timed_out:
         verifier = verify(repo, baseline)
         duration_s = time.monotonic() - started
         return_code = process.returncode
-        usage = usage_from_events(process.stdout)
+        usage = usage_from_events(stdout)
         if verifier["timeout"]:
             outcome, error = "verifier_timeout", "verifier timeout"
         elif not verifier["scope_valid"]:
@@ -347,7 +425,7 @@ def run_attempt(fixture, condition, attempt, timeout_s, configured_timeout_s):
             outcome, error = "passed", None
         else:
             outcome, error = "rejected", None
-    except subprocess.TimeoutExpired:
+    else:
         duration_s = time.monotonic() - started
         return_code = None
         usage = {}
@@ -484,9 +562,10 @@ def summarise(runs):
     }
 
 
-def build_result(runs, snapshots, elapsed_s, stop_reason):
+def build_result(runs, snapshots, elapsed_s, stop_reason, run_id):
     complete = len(runs) == len(FIXTURES) * (1 + LOCAL_ATTEMPTS)
     return {
+        "run_id": run_id,
         "protocol": {
             "fixtures": [fixture["id"] for fixture in FIXTURES],
             "frontier": "gpt-5.6-sol, low reasoning, Codex Pro subscription",
@@ -531,6 +610,9 @@ def main():
     args = parser.parse_args()
     if CODEX is None or GIT is None:
         raise SystemExit("codex and git are required")
+    run_id = f"exp07-{time.strftime('%Y%m%dT%H%M%S')}-{os.getpid()}"
+    if not acquire_lock(run_id, MAX_ELAPSED_S):
+        return 3
     started = time.monotonic()
     runs = []
     snapshots = []
@@ -538,7 +620,13 @@ def main():
 
     def checkpoint():
         write_results(
-            build_result(runs, snapshots, time.monotonic() - started, stop_reason)
+            build_result(
+                runs,
+                snapshots,
+                time.monotonic() - started,
+                stop_reason,
+                run_id,
+            )
         )
 
     def report():
@@ -612,13 +700,23 @@ def main():
         stop_reason = "interrupted"
         print("STOP interrupted", flush=True)
     finally:
-        result = build_result(runs, snapshots, time.monotonic() - started, stop_reason)
+        result = build_result(
+            runs,
+            snapshots,
+            time.monotonic() - started,
+            stop_reason,
+            run_id,
+        )
         write_results(result)
 
     print(f"result={RESULTS} complete={result['complete']}", flush=True)
     if result["complete"]:
         print(json.dumps(result["summary"], indent=2), flush=True)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    finally:
+        release_lock()

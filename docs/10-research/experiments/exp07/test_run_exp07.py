@@ -1,5 +1,8 @@
 import json
+import os
 import subprocess
+import sys
+import time
 
 import pytest
 import run_exp07
@@ -18,10 +21,123 @@ from run_exp07 import (
 )
 
 
+CAP_S = 1
+GRANDCHILD_S = 8
+CHILD_S = 20
+CHILD = (
+    "import subprocess,sys,time;"
+    f"subprocess.Popen([sys.executable,'-c','import time;time.sleep({GRANDCHILD_S})']);"
+    f"time.sleep({CHILD_S})"
+)
+
+
+def spawn_process_tree():
+    return subprocess.Popen(
+        [sys.executable, "-c", CHILD],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        **({} if os.name == "nt" else {"start_new_session": True}),
+    )
+
+
+def clean_up_process_tree(process):
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+            capture_output=True,
+            timeout=10,
+        )
+    else:
+        import signal
+
+        try:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    try:
+        process.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+
+
 @pytest.fixture(autouse=True)
 def isolate_result_path(monkeypatch, tmp_path):
     """A test must never create, replace or delete the retained experiment result."""
     monkeypatch.setattr(run_exp07, "RESULTS", tmp_path / "results-exp07.json")
+    monkeypatch.setattr(run_exp07, "LOCK", tmp_path / "run.lock", raising=False)
+
+
+def test_timeout_kills_a_real_descendant_process_tree():
+    process = spawn_process_tree()
+    started = time.monotonic()
+    try:
+        with pytest.raises(subprocess.TimeoutExpired):
+            process.communicate(timeout=CAP_S)
+        run_exp07.kill_tree(process.pid)
+        process.communicate(timeout=5)
+        elapsed = time.monotonic() - started
+        assert elapsed < GRANDCHILD_S, (
+            f"process tree survived for {elapsed:.1f}s; the {CAP_S}s cap did not bound it"
+        )
+        assert process.poll() is not None
+    finally:
+        clean_up_process_tree(process)
+
+
+def test_a_second_runner_refuses_and_cannot_release_the_live_lock(monkeypatch):
+    assert run_exp07.acquire_lock("run-a", cap_s=3600) is True
+    held = json.loads(run_exp07.LOCK.read_text(encoding="utf-8"))
+    assert held["run_id"] == "run-a"
+    assert held["pid"] == os.getpid()
+
+    with monkeypatch.context() as contender:
+        contender.setattr(run_exp07.os, "getpid", lambda: held["pid"] + 1)
+        assert run_exp07.acquire_lock("run-b", cap_s=3600) is False
+        run_exp07.release_lock()
+
+    assert json.loads(run_exp07.LOCK.read_text(encoding="utf-8"))["run_id"] == "run-a"
+    run_exp07.release_lock()
+    assert not run_exp07.LOCK.exists()
+
+
+def test_lock_acquisition_is_atomic(monkeypatch):
+    real_open = os.open
+
+    def open_after_contender(path, flags, *args, **kwargs):
+        run_exp07.LOCK.write_text('{"pid": 1, "run_id": "rival"}', encoding="utf-8")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(run_exp07.os, "open", open_after_contender)
+    assert run_exp07.acquire_lock("mine", cap_s=3600) is False
+    assert json.loads(run_exp07.LOCK.read_text(encoding="utf-8"))["run_id"] == "rival"
+
+
+def test_result_is_stamped_with_run_id():
+    result = build_result([], [], 1.0, None, run_id="exp07-test")
+    assert result["run_id"] == "exp07-test"
+
+
+def test_main_refuses_while_another_runner_holds_the_lock(monkeypatch):
+    assert run_exp07.acquire_lock("holder", cap_s=3600) is True
+    monkeypatch.setattr(run_exp07, "CODEX", "codex-stub")
+    monkeypatch.setattr(run_exp07, "GIT", "git-stub")
+    monkeypatch.setattr(
+        run_exp07,
+        "read_codex_headroom",
+        lambda: pytest.fail("refused runner reached experiment work"),
+    )
+    monkeypatch.setattr(sys, "argv", ["run_exp07.py"])
+
+    assert run_exp07.main() == 3
+    assert json.loads(run_exp07.LOCK.read_text(encoding="utf-8"))["run_id"] == "holder"
+    run_exp07.release_lock()
+
 
 SOLUTION = """import re
 
@@ -240,7 +356,15 @@ def test_verifier_fails_closed_when_scope_evidence_is_unavailable(monkeypatch):
 def test_checkpoint_is_valid_and_retains_spent_attempts():
     runs = [row(FIXTURES[0]["id"], "frontier", 1, True, 10)]
     snapshots = [{"used_percent": 12}]
-    write_results(build_result(runs, snapshots, 42.0, "headroom probe failed: boom"))
+    write_results(
+        build_result(
+            runs,
+            snapshots,
+            42.0,
+            "headroom probe failed: boom",
+            run_id="exp07-test",
+        )
+    )
     from run_exp07 import RESULTS
 
     saved = json.loads(RESULTS.read_text(encoding="utf-8"))
@@ -289,6 +413,7 @@ def test_main_reduces_then_skips_attempts_against_the_outer_cap(monkeypatch):
     monkeypatch.setattr(run_exp07, "CODEX", run_exp07.CODEX or "codex-stub")
     monkeypatch.setattr(run_exp07, "read_codex_headroom", fake_headroom)
     monkeypatch.setattr(run_exp07, "run_attempt", fake_attempt)
+    monkeypatch.setattr(run_exp07, "acquire_lock", lambda *_args: True, raising=False)
     monkeypatch.setattr(sys, "argv", ["run_exp07.py"])
 
     # A cap tighter than the configured timeout reduces every attempt to fit.
@@ -327,7 +452,7 @@ def test_checkpoint_survives_a_transient_windows_lock(monkeypatch):
         return real_replace(src, dst)
 
     monkeypatch.setattr(run_exp07.os, "replace", flaky)
-    write_results(build_result([], [], 1.0, None))
+    write_results(build_result([], [], 1.0, None, run_id="exp07-test"))
     assert len(attempts) == 2
     assert json.loads(RESULTS.read_text(encoding="utf-8"))["complete"] is False
     assert not RESULTS.with_suffix(".json.tmp").exists()
