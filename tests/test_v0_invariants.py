@@ -245,7 +245,7 @@ def test_human_authored_decision_is_accepted():
             data={
                 "human_decision": "approval",
                 "principal": "joe-brown",
-                "via": "remote control session, 2026-08-20",
+                "via": "cli",
             },
         )
     )
@@ -259,6 +259,64 @@ def test_human_decision_must_record_its_channel():
                 data={"human_decision": "approval", "principal": "joe-brown"},
             )
         )
+
+
+# ---------------------------------------------------------------- V0-28
+@pytest.mark.parametrize(
+    "decision", ("verdict", "approval", "gate_lift", "spend_authorisation")
+)
+@pytest.mark.parametrize(
+    "via",
+    (
+        "slack",
+        " TWILIO ",
+        "Email",
+        "webhook",
+        "slack message 123",
+        "sms",
+        "clickup",
+        "gmail",
+        "remote control session, 2026-08-20",
+        "unknown",
+    ),
+)
+def test_only_declared_local_cli_can_deliver_a_human_decision(decision, via):
+    remote = ev(
+        actor=HUMAN,
+        data={"human_decision": decision, "principal": HUMAN, "via": via},
+    )
+    with pytest.raises(EventError, match="V0-28"):
+        validate(remote)
+
+
+def test_untrusted_transport_cannot_deliver_an_implicit_human_verdict():
+    remote = verdict("attempt-001", "accept")
+    remote["data"]["via"] = "slack"
+    with pytest.raises(EventError, match="V0-28"):
+        validate(remote)
+
+
+def test_a_self_reported_signature_does_not_bypass_transport_refusal():
+    remote = ev(
+        actor=HUMAN,
+        data={
+            "human_decision": "approval",
+            "principal": HUMAN,
+            "via": "slack",
+            "signature": "self-reported-and-unverified",
+        },
+    )
+    with pytest.raises(EventError, match="no signature verifier"):
+        validate(remote)
+
+
+def test_a_human_decision_channel_must_be_a_non_empty_string():
+    remote = ev(
+        actor=HUMAN,
+        data={"human_decision": "approval", "principal": HUMAN, "via": 1},
+    )
+    with pytest.raises(EventError, match="non-empty string"):
+        validate(remote)
 
 
 # ---------------------------------------------------------------- V0-02
@@ -833,7 +891,7 @@ def test_cli_rejects_an_invalid_event_with_a_nonzero_exit(tmp_path, capsys):
 
 # ---------------------------------------------------------------- scope
 def test_the_cli_exposes_no_routing_or_blocking_surface():
-    """Stage 3 needs Gate B. No command or flag here may route, block or accept.
+    """Stage 3 needs Gate B. The CLI exposes no labelled connector control surface.
 
     This inspects the parser surface rather than the help prose: the description
     legitimately contains "route" while saying the tool does not do it.
@@ -849,9 +907,32 @@ def test_the_cli_exposes_no_routing_or_blocking_surface():
         actions |= {a.dest for a in sub._actions}
 
     assert commands == {"record", "replay", "beta", "doctor"}, commands
-    for forbidden in ("route", "dispatch", "block", "accept", "gate", "escalate"):
+    for forbidden in (
+        "route",
+        "dispatch",
+        "block",
+        "accept",
+        "gate",
+        "escalate",
+        "connector",
+        "mcp",
+        "admit",
+        "admission",
+        "invoke",
+    ):
         offenders = {x for x in actions | commands if forbidden in x}
         assert not offenders, f"observe-only CLI exposes {offenders}"
+
+    for forbidden_argv in (
+        ["connector"],
+        ["doctor", "--connector", "x"],
+        ["replay", "--admission", "x"],
+        ["beta", "--invoke", "x"],
+        ["record", "--mcp", "x", "--event", "{}"],
+    ):
+        with pytest.raises(SystemExit) as refused:
+            parser.parse_args(forbidden_argv)
+        assert refused.value.code == 2
 
 
 def test_doctor_fails_a_gapped_capture_run_and_names_the_gap(tmp_path, capsys):

@@ -7,6 +7,7 @@ Invariants enforced here, each with a test in the same commit:
   V0-18  a human decision is valid only when the human principal authored it.
   V0-26  multi-contributor events must declare a distinct evidence_class per contributor.
   V0-27  attempt outcomes and their later human verdicts share one stable identity.
+  V0-28  a declared non-local channel cannot deliver a human decision.
 """
 
 from __future__ import annotations
@@ -267,9 +268,19 @@ def _check_human_authority(event: EventPayload) -> None:
             f"authored by {event['actor']!r}; only the principal may author their own "
             f"decision (V0-18)"
         )
-    if not event["data"].get("via"):
+    via = event["data"].get("via")
+    if not isinstance(via, str) or not via.strip():
         raise EventError(
-            f"human_decision {decision!r} must record `via`, the channel it arrived through"
+            f"human_decision {decision!r} must record `via` as a non-empty string"
+        )
+    if via.strip().casefold() != "cli":
+        # No signature verifier exists in the observe-only increment. A payload claiming
+        # to carry a signature is not evidence that the signature was verified. This
+        # checks declared provenance; trusted ingress must later establish authorship.
+        raise EventError(
+            f"human_decision {decision!r} declares non-local channel {via.strip()!r}; "
+            "only local CLI is accepted because this build has no signature verifier "
+            "(V0-28)"
         )
 
 
