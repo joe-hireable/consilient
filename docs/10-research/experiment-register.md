@@ -1968,6 +1968,81 @@ class; anything about a graphical surface, which this run does not have. Those l
 the load-bearing ones and are stated in the note before this experiment exists.
 
 
+### EXP-58 · Where inside its sharp bound does composite β actually land? `READY`
+**Pre-registered 20 Aug 2026 in `composite-beta-under-dependence-2026-08-20.md`, before any
+additional check was run.**
+
+**Decides:** whether *"composite β sits near the sharp upper bound"* is a property of software
+verifiers or an artefact of EXP-47's particular stack. That document derived the sharp
+Fréchet–Hoeffding/Hailperin bounds for EXP-47's three checks and found the measured composite at
+**91.03%** of the width between them — near the most pessimistic end. If that replicates, *"gate on
+the upper bound, it is nearly right"* is a usable rule for any CI system composing error rates. If
+it does not, the rule is needless pessimism and the recommendation must be withdrawn.
+
+**What must NOT be registered as a stopping rule, because it cannot fail:** *"does the measured
+composite fall inside the bound?"* It is a theorem, not a prediction — it holds for any internally
+consistent inputs. Only the **position** within the bound, the **model fit**, and
+**transportability** are falsifiable. This is stated because the vacuous version is the obvious one
+to write.
+
+**Preconditions.**
+- $k \ge 4$ checks, at least one killing $> 20\%$ of mutants. EXP-47's `ruff` accepted 95.96%, and a
+  near-constant check is nearly comonotone with anything — the leading confound for the 91% figure,
+  and the reason $k=3$ cannot settle this. A fourth check is also the identifiability threshold: a
+  two-class latent-difficulty model has $1+2k$ parameters against $2^k-1$ data df, so $k=3$ leaves
+  **zero** df and $k=4$ leaves **six**. [algebra]
+- **Full $2^k$ outcome vector recorded per mutant**, not per-check totals. `run_exp47.py` computed
+  `pytest_pass`/`mypy_pass`/`ruff_pass` per mutant and saved only aggregates plus one 2×2 table; the
+  other two pairwise margins survive only as ranges 71 mutants wide. This is a one-line
+  instrumentation change and it is the whole reason this experiment exists rather than being a
+  re-analysis.
+- $\ge 2$ source trees. `src/consilient/` is the first; the second must **not** be a research
+  instrument (EXP-49 measured those at $\beta = 0.6825$, twice as permissive, so they are a
+  different population). Gate B forbids pointing anything at `../hireable-3.0` or `../jobboard-v2`,
+  so the second tree is a public-corpus target or a synthetic one.
+
+**Measures.**
+- The position statistic $\pi = (\beta_{\text{comp}} - L)/(U - L)$ against the sharp bound $[L, U]$
+  computed from marginals plus all pairwise margins, per tree, with a bootstrap interval.
+- All $\binom{k}{2}$ pairwise margins and the full joint table, so bounds are computable at every
+  information level rather than one.
+- Two-class latent-difficulty model: fit by maximum likelihood, goodness of fit on $2^k-1-(1+2k)$ df.
+- Whether the independence product falls outside the bound implied by marginals plus **one** pairwise
+  table — the infeasibility-guard fire rate, which decides whether that guard is worth shipping.
+- Per-check kill rate, to test whether $\pi$ tracks the weakest check's β rather than anything
+  structural.
+
+**Stopping rules (fixed before the run).**
+- If $\pi < 0.50$ on either tree $\implies$ **the near-comonotone hypothesis is refuted.** Withdraw
+  the § 8 recommendation to gate at the conservative end as *empirically motivated*; it survives
+  only as a safety convention, which is a weaker and honest claim. [asserted]
+- If $\pi > 0.80$ on both trees, intervals excluding 0.50 $\implies$ **the regularity holds so far.**
+  Still $n=2$; record as a hypothesis with two supporting instances, never as a general result.
+- If $\pi$ correlates with the weakest check's β across trees $\implies$ **the effect is the
+  near-constant-check artefact, not verifier structure.** The 91% figure is then explained away and
+  must be reported as explained. [asserted]
+- If the latent-difficulty model fits ($p > 0.05$ on $\ge 6$ df) $\implies$ **model the dependence,
+  do not bound it.** One parameter replaces an interval, and the bounding framing in
+  `composite-beta-under-dependence-2026-08-20.md` becomes the fallback rather than the answer.
+- If the infeasibility guard fires on fewer than half the trees $\implies$ **do not ship it.** A
+  guard that rarely fires is a maintenance cost, and the § 10 grading of it as a worthwhile artefact
+  was wrong.
+- If any tree's census fails to complete $\implies$ **`insufficient_evidence` for that tree**, as
+  EXP-49 correctly recorded twice. Do not pool a partial census with a complete one.
+
+**What it cannot decide.**
+- **Anything about LLM-emitted faults.** Every β here is conditional on first-order syntactic
+  mutants. EXP-50 owns the transfer question, and if it fires, every figure in this experiment is a
+  floor rather than an estimate.
+- Whether the bounds are *useful*, as opposed to correct. On a tree where mutation testing runs at
+  0.054 s/mutant the composite is directly measurable and the bound is redundant; the decision-
+  relevant case is composing β measured on *different* corpora, which this design does not create.
+- Whether negative dependence between checks is achievable. Littlewood & Miller (1989) show forced
+  diversity permits it in multi-version software; nothing here selects checks adversarially to try.
+- Specification defects, where code and tests agree on the wrong thing — invisible to mutation
+  testing at any $k$.
+
+
 ---
 
 ## Not experiments
