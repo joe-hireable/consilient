@@ -440,6 +440,39 @@
     "output_tokens": 3339,
     "reasoning_output_tokens": 0
    }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "gemma4:31b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 224.308,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.053,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 173950,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3001,
+    "reasoning_output_tokens": 0
+   }
   }
  ]
 }
