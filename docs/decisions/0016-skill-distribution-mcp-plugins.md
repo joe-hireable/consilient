@@ -23,6 +23,45 @@ record:
 | **`skillfish`** | Multi-agent skill manager, `skillfish bundle` for teams | **AGPL-3.0**; ~279 stars; last push Jun 2026; third-party quality score 51/100 |
 | Registries | skills.sh, ClawHub, Tessl, agentskills.io, openagentskill.com | Ecosystem passed ~351,000 skills by March 2026 |
 
+## Update: 2026-08-20 — the artefact classes, and the line a curated library must not cross
+
+Joe asked for curated libraries of plugins, skills, agents, configs, prompt templates and
+workflows, adopted and contributed upstream rather than reinvented, and named **Ponytail** as a
+candidate. [asserted] This ADR already settles *distribution*; what it did not settle is
+*curation* — which artefacts are worth adopting and how anyone would know.
+
+**The classes are not equivalent, and the difference is enforceability.** ADR-0014 already
+draws the line: *"Never encode an invariant as a skill… a skill that says 'always do X' where X
+is load-bearing is a prompt pretending to be an enforcement mechanism."* [cited]
+
+| Class | What it is | May it carry an invariant? |
+|---|---|---|
+| MCP servers, plugins | Tool access and capability | No — capability, not rule |
+| Agent definitions, configs | Role, model and permission bindings | Only where a check enforces the binding |
+| Skills, prompt templates, workflows | Procedure and taste | **Never.** Guidance only |
+| Component libraries (shadcn-class) | Interface primitives | Not applicable; gated on ADR-0007 |
+
+A curated library is therefore a **register of candidates with their evidence**, in the shape
+of `public-apis` — not a set of defaults the harness silently applies. [asserted] Under
+ADR-0036 the curation itself is contributed back where an upstream register exists.
+
+**Ponytail is the worked example, and it must be measured rather than assumed.** It is a
+behavioural plugin — a lazy-senior-developer stance, a preference ladder, YAGNI — currently
+active in the maintainer's own sessions. [measured] Its claim is that it reduces
+over-engineering, and this project already has an instrument that measures exactly that:
+EXP-29's *counterfactually dispensable scope*, the one-minimal set of patch hunks removable
+while every verifier outcome is preserved. [cited]
+
+It should not be adopted on the strength of sounding right, because the closest measured
+evidence cuts against prompts of this shape: SlopCodeBench found a quality-directed prompt
+improved initial structure but did not stop longitudinal degradation, **raised mean cost per
+checkpoint by 12.1% and reduced strict correctness by 2.3 percentage points**. [cited] A
+blanket "write less" instruction is not a free improvement. EXP-36 tests it here.
+
+Frontend component libraries are noted and deferred: when a surface is eventually built it uses
+a maintained library rather than bespoke CSS, but ADR-0007 forbids building one until EXP-08 or
+EXP-19 fires, so there is nothing to decide yet. [asserted]
+
 ## Decision
 
 Three separate decisions, because these are three different problems.

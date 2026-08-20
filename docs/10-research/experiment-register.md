@@ -939,6 +939,42 @@ only mechanical state is checked; and it inherits the bias evidence in ADR-0033'
 low misclassification rate would show the gate works, not that maximising reversibility is
 desirable. [asserted]
 
+### EXP-36 · Does a behavioural plugin reduce counterfactually dispensable scope? `BLOCKED: EXP-29 fixtures and its delta-debugging instrument`
+**Decides:** whether a taste-directed prompt plugin — Ponytail is the named candidate — earns
+adoption, or whether it is a prompt that feels disciplined without changing the artefact.
+[asserted]
+**Why it is not assumed:** SlopCodeBench measured a quality-directed prompt improving initial
+structure while raising mean cost per checkpoint by 12.1% and reducing strict correctness by
+2.3 percentage points. [cited] A blanket instruction to write less is not free, and ADR-0014
+forbids treating a skill as an enforcement mechanism regardless of the outcome here.
+**Precondition:** EXP-29's four mutation-tested fixtures and its fixed hunk-level
+delta-debugging procedure, unchanged. This experiment adds an arm; it does not modify EXP-29,
+whose registration is frozen. [asserted]
+**Procedure:** for each fixture and each admitted runtime, run the native task-only prompt with
+the plugin active and with it absent, holding everything else identical including the fixture,
+the verifier and the attempt budget. Record the plugin's exact version and configured level,
+because a behavioural plugin with a level setting is a different intervention at each level.
+Run delta debugging in both canonical and reverse hunk order, inheriting EXP-29's
+minimisation-unstable class. [asserted]
+**Measures:** verified success; previously passing regressions; dispensable changed lines over
+all changed lines; unrequested files, dependencies and public surfaces; tokens; wall time. The
+plugin's own stated aims — fewer lines, fewer abstractions — are diagnostics, not outcomes,
+because shipping less broken code is not an improvement. [asserted]
+**Stopping rules (fixed before the run):**
+- Adopt only if median dispensable-line ratio falls by at least 0.15 **and** no verified
+  success is lost **and** regressions do not increase. [asserted]
+- Reject if verified success falls at all while dispensable scope improves. Smaller and more
+  broken is the failure mode this experiment exists to catch, and it is the likely one given
+  the SlopCodeBench result. [asserted]
+- If dispensable scope is unchanged within 0.05 either way, the plugin is presentation and is
+  not adopted; it may still be used as personal taste, which is a different claim. [asserted]
+- Fewer than 8 paired cells is `insufficient evidence`. Do not tune the plugin level after
+  seeing a result. [asserted]
+**What it cannot decide:** whether the plugin helps a human read the code afterwards, which is
+not measured here; whether it helps on tasks unlike the fixtures; and whether any effect
+survives the specific model and harness tested, since ADR-0027 keeps compositions separate.
+[asserted]
+
 ### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `READY: blocked only while EXP-07 holds the GPU`
 **Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
 specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a
