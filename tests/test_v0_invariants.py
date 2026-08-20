@@ -6,7 +6,9 @@ the check that bans bypassing it, in the same commit.
 
 import argparse
 import json
+import shutil
 import sqlite3
+import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -340,9 +342,7 @@ def test_delete_and_replay_reproduces_identical_state(tmp_path):
 def test_projection_carries_no_state_the_log_lacks(tmp_path):
     """A row written straight into SQLite does not survive a rebuild."""
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append_judged(
-        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
-    )
+    append_judged(log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject")
     conn = projection.build(log_dir, db)
     conn.execute(
         "INSERT INTO outcomes (position, attempt_id, ts, task, verifier_accept)"
@@ -447,9 +447,7 @@ def test_attempt_identity_not_task_selects_the_deferred_verdict(tmp_path):
 
     conn = projection.build(log_dir, db)
     rows = list(
-        conn.execute(
-            "SELECT attempt_id, human_verdict FROM outcomes ORDER BY position"
-        )
+        conn.execute("SELECT attempt_id, human_verdict FROM outcomes ORDER BY position")
     )
     assert rows == [("attempt-001", None), ("attempt-002", "reject")]
     result = beta_mod.from_connection(conn)
@@ -517,9 +515,12 @@ def test_a_human_changes_their_mind_with_an_explicit_correction(tmp_path):
     )
 
     conn = projection.build(log_dir, db)
-    assert conn.execute(
-        "SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'"
-    ).fetchone()[0] == "reject"
+    assert (
+        conn.execute(
+            "SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'"
+        ).fetchone()[0]
+        == "reject"
+    )
     result = beta_mod.from_connection(conn)
     assert result.n_rejected == 1
     assert result.n_false_accept == 1
@@ -533,9 +534,7 @@ def test_a_correction_against_the_wrong_prior_verdict_fails_closed(tmp_path):
     append(path, verdict("attempt-001", "accept"))
     append(
         path,
-        verdict_correction(
-            "attempt-001", "reject", "accept", "mistyped prior state"
-        ),
+        verdict_correction("attempt-001", "reject", "accept", "mistyped prior state"),
     )
 
     with pytest.raises(projection.ProjectionError, match="expected prior verdict"):
@@ -582,10 +581,7 @@ def test_an_outcome_cannot_carry_the_human_verdict():
 def test_the_projection_has_no_inline_human_verdict_path():
     conn = sqlite3.connect(":memory:")
     conn.executescript(projection.SCHEMA)
-    combined = events_mod.Event(
-        outcome("attempt-001", "t", True)
-        | {"actor": HUMAN}
-    )
+    combined = events_mod.Event(outcome("attempt-001", "t", True) | {"actor": HUMAN})
     combined.raw["data"].update(
         {
             "human_verdict": "reject",
@@ -809,9 +805,7 @@ def test_wilson_behaves_at_the_boundaries():
 # ---------------------------------------------------------------- V0-14
 def test_human_output_renders_the_same_result_as_json(tmp_path, capsys):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append_judged(
-        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
-    )
+    append_judged(log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject")
     argv = ["--log", str(log_dir), "--db", str(db), "beta"]
 
     assert main(argv + ["--json"]) == 0
@@ -855,9 +849,7 @@ def test_replay_reports_divergence_when_the_state_on_disk_has_drifted(tmp_path, 
     after unlinking the very state whose drift it was meant to detect.
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append_judged(
-        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
-    )
+    append_judged(log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject")
     projection.build(log_dir, db).close()
 
     drifted = sqlite3.connect(db)
@@ -972,9 +964,7 @@ def test_doctor_rejects_a_quarantined_line_in_the_seven_day_run(tmp_path, capsys
         "2026-08-19",
         "2026-08-20",
     )
-    with (tmp_path / "log" / "2026-08-20.jsonl").open(
-        "a", encoding="utf-8"
-    ) as stream:
+    with (tmp_path / "log" / "2026-08-20.jsonl").open("a", encoding="utf-8") as stream:
         stream.write("not-json\n")
 
     condition = doctor_payload(tmp_path, capsys)["gates"]["A"]["conditions"][2]
@@ -1055,9 +1045,7 @@ def test_shared_options_survive_on_either_side_of_the_command(tmp_path, capsys):
     directory and replayed the wrong trajectory.
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append_judged(
-        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
-    )
+    append_judged(log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject")
     projection.build(log_dir, db).close()  # give `replay` something to compare against
 
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 0
@@ -1283,9 +1271,7 @@ def test_a_log_that_has_grown_reads_as_stale_not_diverged(tmp_path, capsys):
 def test_real_drift_is_still_caught_once_the_counts_match(tmp_path, capsys):
     """The narrowing must not have blunted the check it narrows."""
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append_judged(
-        log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject"
-    )
+    append_judged(log_dir / "2026-08-20.jsonl", "attempt-0", "t0", True, "reject")
     projection.build(log_dir, db).close()
 
     drifted = sqlite3.connect(db)
@@ -1509,3 +1495,41 @@ def test_duplicate_evidence_class_is_quarantined_at_read_without_breaking_log(tm
     assert len(rejected) == 1, "the duplicate class event must be quarantined"
     assert rejected[0].line == 2
     assert "duplicate evidence_class" in rejected[0].reason
+
+
+def test_no_new_commit_may_be_authored_by_a_fixture_identity():
+    """A ratchet on git authorship, found on 20 Aug 2026 and not by any check here.
+
+    EXP-07 builds throwaway repositories and stamps them `EXP-07 <exp07@local>` so its
+    synthetic commits are distinguishable. That identity — along with a WSL-absolute
+    `core.worktree` — was also present in the *primary* repository's `.git/config`, which
+    every worktree shares. Fifty-one of this branch's commits, including two written the
+    day this test was added, are therefore authored and committed by a test fixture rather
+    than by the person accountable for them.
+
+    This is V0-18's concern inverted. V0-18 stops an agent claiming a human's decision; the
+    same record silently attributed a human's work to a fixture, and nothing looked. The
+    repair for the config is done; this is the ratchet that stops it recurring.
+
+    The published history is NOT rewritten here — that is a force-push and belongs to the
+    principal. The constant below is the measured legacy baseline and may only go DOWN.
+    """
+    git = shutil.which("git")
+    if git is None or not Path(".git").exists():  # pragma: no cover - repository-only
+        pytest.skip("no git checkout")
+    result = subprocess.run(
+        [git, "log", "--format=%ae%n%ce", "HEAD"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    fixture_stamped = [
+        line for line in result.stdout.splitlines() if line.endswith("@local")
+    ]
+    assert len(fixture_stamped) <= 102, (
+        "a commit was authored by a fixture identity; check `git config user.email` — "
+        "worktrees share the primary repository's config"
+    )
