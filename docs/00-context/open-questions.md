@@ -285,6 +285,32 @@ toy task, −19% on real issues in a developer's own mature repository — so a 
 evaluates itself on curated tasks will measure the wrong regime. [cited] ADR-0013 already says
 evaluate on repository history; this is independent support and a sharper reason. [asserted]
 
+**Q32. Can the harness close the QA-automation gap, and is there a measurable claim in it?**
+
+Joe, 20 August 2026: *"QA and QA automation is a huge gap in capability of coding and product
+and GTM agents. A real and deeply frustrating bottleneck for developers and a big opportunity
+to solve"* — including synthetic data generation, synthetic users and sandboxes, with *"a
+dedicated and extensive R&D pipeline including experimentation and simulations"*. [asserted]
+
+Nothing in this repository addresses it. [measured] The connection to the thesis is direct and
+is the reason it is Tier 1 rather than a feature request: **β is the rate at which automated
+checks accept a bad artefact, and QA automation is the business of building those checks.**
+Manufacturing an oracle where none existed is the same mechanism that let fuzzing find defects
+experts missed — cheap iteration against a cheap oracle, not insight. [cited]
+
+Three questions must be answered before any design, and the second is the dangerous one:
+
+1. What different class of facts does a synthetic user introduce that a test suite does not?
+   If none, ADR-0010 cuts it. [asserted]
+2. **Is generated-test acceptance simply β under another name?** A harness that writes its own
+   tests and then measures how often those tests accept bad work is grading its own homework,
+   and EXP-13 already pre-registers the hazard that a system edits its tests into agreement
+   with itself. [cited]
+3. Where is the human verdict in a synthetic-user loop, given EXP-01 found verdicts to be the
+   scarcest input in the system? [measured]
+
+Do not write a QA design document before these are answered. [asserted]
+
 ## Method note for the brainstorm
 
 Joe has asked for a multi-agent approach to research → brainstorm → spec → plan.

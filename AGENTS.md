@@ -23,11 +23,16 @@ architecture itself is domain-blind (see `docs/20-design/architecture-sketch.md`
 β exists because of Whewell's third clause: convergence is a *test*, and tests have error
 rates. The multi-agent constraints exist because of his second clause: **different** class.
 
-**Current phase: pre-approval.** A draft implementation specification exists at
-`docs/40-spec/v0-draft.md`, alongside experimental adapters and research instruments.
-The draft carries no implementation authority. Research, experiments, ADRs, invariant
-checks and specification work are permitted; product implementation is not permitted until
-the user explicitly approves the specification or supersedes that gate.
+**Current phase: approved for the observe-only increment.** Joe approved the v0
+specification for implementation on 20 August 2026, recorded as `spec.approval_observed`.
+Product code lives in `src/consilience/` and is **observe-only**: it records trajectory
+events, projects them into SQLite and computes β. It does not route, block or accept
+anything, and a test asserts the CLI exposes no surface that could.
+
+Research, experiments, ADRs, invariant checks, specification work and observe-only
+implementation are all permitted. **Routing, blocking and orchestration remain gated** —
+ADR-0015 Gate A before anything routes or blocks, Gate B before orchestration on a
+non-Consilience repository. Neither gate has been passed.
 
 ## Working principles for this repo
 
@@ -77,7 +82,8 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 - Surface trade-offs when more than one approach is reasonable.
 
 ### Ask first
-- Writing any implementation code (the project is pre-spec).
+- Writing routing, blocking or orchestration behaviour (gated on ADR-0015 Gate A/B).
+  Observe-only increment work is authorised.
 - Naming the project.
 - Adding a dependency.
 - Changing anything in `docs/10-research/` — that's the evidence base.
@@ -99,7 +105,7 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 - Invent terminology. If a concept needs a new name to sound important, it probably isn't
   a concept. (See `docs/30-source-material/gemini-session-critique.md`.)
 
-## The next step is pre-approval convergence
+## The next step is Gate A
 
 Inspect `docs/10-research/experiment-register.md`, the current ADR index and
 `docs/40-spec/v0-draft.md`. Resolve authorised evidence gaps with pre-registered stopping

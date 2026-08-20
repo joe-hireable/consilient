@@ -7,9 +7,10 @@ Read it. This file adds session-start guidance only.
 
 ## Start here
 
-This repository is in **pre-approval**, not initial brainstorming. It contains a draft
-implementation specification, experimental adapters, research instruments and CI
-invariants. None of those artefacts authorises product implementation.
+The v0 specification is **approved** and the observe-only increment has shipped to
+`src/consilience/`. The repository holds that increment, experimental adapters, research
+instruments, CI invariants, 34 ADRs and 35 registered experiments. Routing, blocking and
+orchestration are still gated on ADR-0015.
 
 Read in this order before doing anything:
 
@@ -37,8 +38,8 @@ Brainstorm, adversarially. Specifically:
   verification-gated orchestration. Establish honestly what is left that is genuinely new.
 - **Resolve authorised evidence gaps.** Pre-register the stopping rule before a run and
   record insufficient data honestly.
-- **Keep the draft unapproved.** Improve it when evidence changes, but do not convert it
-  into implementation authority.
+- **Keep the gates honest.** The specification is approved for the observe-only
+  increment only; do not let Gate A or Gate B be crossed by inference.
 
 ## What not to do
 

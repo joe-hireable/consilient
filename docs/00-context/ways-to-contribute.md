@@ -25,7 +25,7 @@ three times. Finding the fourth saves months.
 
 ## Experiments and benchmarks
 
-`docs/10-research/experiment-register.md` holds fifteen entries with preconditions,
+`docs/10-research/experiment-register.md` holds thirty-five entries with preconditions,
 measurements and stopping rules. Several are `READY` and need no harness at all.
 
 **Measure β on your repository.** The single most valuable dataset this project could

@@ -77,10 +77,48 @@ functional forms. It has never met a real repository.
 3. **The learned router isn't worth building.** ~5,000 trajectories to merely match plain
    cheap-first-then-escalate. The cascade already *is* adaptive routing. [ADR-0003]
 
-## Status: pre-brainstorm. No code exists.
+## Status: v0 approved, observe-only increment shipped
 
-This repository is **context, not code** — assembled in one session on 19 Aug 2026 to hand a
-design position to Claude Code. Nothing is built. Nothing is specified.
+The v0 specification was approved for implementation on 20 August 2026. `src/consilience/`
+records trajectory events, projects them into SQLite and computes β — and does nothing else:
+it cannot route, block or accept anything, and a test asserts the CLI exposes no surface that
+could. Everything past instrumentation is gated on ADR-0015 Gate A, which has not been passed.
+
+34 ADRs, 35 registered experiments, 27 invariant checks in CI.
+
+## What it is for
+
+The success condition, in the maintainer's words:
+
+> *"Users like I am right now should be able to ramble visionary concepts into the chat and
+> get world class execution fully autonomously within legal and ethical and security and
+> safety boundaries."*
+
+As stated that cannot fail, so it is restated in a form that can: **for a rambled intent, the
+quality of the execution does not depend on the rambler's technical expertise, and the
+failures are caught by the harness rather than by an attentive operator noticing.** On this
+repository's own baseline, 2 errors out of 9 were caught by an enforced mechanism and 7 by
+someone happening to look. That gap is the product.
+[`docs/20-design/autonomous-execution-from-intent.md`]
+
+Three consequences are already decided:
+
+- **Decisive by default.** The harness decides and records how to reverse; it asks only in
+  seven named classes — money, credentials, preferential questions, the safety floor, the β
+  verdict, anything leaving the machine, and lifting a gate. An ask the user cannot afford to
+  answer does not transfer a decision, it launders a machine's decision as a human's.
+  [ADR-0033]
+- **Verified human gain while preserving agency.** Quality, speed, cost, review burden,
+  learning, self-efficacy and stress are reported **separately and never composited** —
+  because satisfaction and quality are anti-correlated through a measured mechanism.
+  [`docs/40-spec/v0-draft.md` §1.1]
+- **Capacity-aware admission.** Subscription headroom, metered budget and local hardware are
+  structural vetoes before any routing decision: an unknown limit means no unattended work,
+  and a model that will not fit is never downloaded. [ADR-0026, ADR-0028]
+
+Research is a first-class output. Every completed experiment gets a public disposition, and
+negative or underpowered results ship as research notes rather than waiting for a paper.
+[`docs/publications/README.md`]
 
 ## Start here
 
@@ -91,7 +129,7 @@ design position to Claude Code. Nothing is built. Nothing is specified.
    marked
 3. [`docs/10-research/findings.md`](docs/10-research/findings.md) — the simulations
 4. [`docs/10-research/experiment-register.md`](docs/10-research/experiment-register.md) —
-   15 experiments with stopping rules
+   35 experiments with stopping rules
 5. [`docs/00-context/open-questions.md`](docs/00-context/open-questions.md) — what's still open
 
 **Then do these two things, in this order:**
