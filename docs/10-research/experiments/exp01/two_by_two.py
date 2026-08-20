@@ -42,14 +42,13 @@ def rate(k: int, n: int) -> str:
     return f"{k}/{n} = {k / n:.4f}  Wilson95 [{lo:.4f}, {hi:.4f}]"
 
 
+CELLS = [f"{q}_{c}" for q in ("bad", "good") for c in ("green", "red", "none")]
+
+
 def table(prs: list[dict]) -> dict[str, int]:
-    cells = {"bad_green": 0, "bad_red": 0, "good_green": 0, "good_red": 0, "no_ci": 0}
+    cells = dict.fromkeys(CELLS, 0)
     for p in prs:
-        ci = p["_ci"]
-        if ci == "none":
-            cells["no_ci"] += 1
-            continue
-        cells[("bad_" if p["_bad"] else "good_") + ci] += 1
+        cells[("bad_" if p["_bad"] else "good_") + p["_ci"]] += 1
     return cells
 
 
@@ -57,21 +56,44 @@ def report(name: str, prs: list[dict]) -> dict[str, object]:
     c = table(prs)
     bad = c["bad_green"] + c["bad_red"]
     good = c["good_green"] + c["good_red"]
-    green = c["bad_green"] + c["good_green"]
-    red = c["bad_red"] + c["good_red"]
 
     print(f"\n=== {name} — {len(prs)} merged PRs analysed ===")
-    print(f"  {'':10}{'CI green':>12}{'CI red':>10}{'total':>10}")
-    print(f"  {'bad':10}{c['bad_green']:>12}{c['bad_red']:>10}{bad:>10}")
-    print(f"  {'good':10}{c['good_green']:>12}{c['good_red']:>10}{good:>10}")
-    print(f"  {'total':10}{green:>12}{red:>10}{bad + good:>10}")
-    print(f"  excluded, verifier never ran (_ci == none): {c['no_ci']}")
+    print(f"  {'':10}{'CI green':>10}{'CI red':>9}{'no CI':>8}{'ran':>7}")
+    for q in ("bad", "good"):
+        ran = c[f"{q}_green"] + c[f"{q}_red"]
+        print(
+            f"  {q:10}{c[f'{q}_green']:>10}{c[f'{q}_red']:>9}{c[f'{q}_none']:>8}{ran:>7}"
+        )
     print()
-    print(f"  alpha = P(red | good)   {rate(c['good_red'], good)}")
-    print(f"  beta  = P(green | bad)  {rate(c['bad_green'], bad)}")
-    print(f"  transpose P(bad | green){rate(c['bad_green'], green)}")
-    print(f"  base rate P(bad)        {rate(bad, bad + good)}")
-    return {"repo": name, "cells": c, "bad": bad, "good": good, "green": green, "red": red}
+    print(f"  alpha = P(red | good)    {rate(c['good_red'], good)}")
+    print(f"  beta  = P(green | bad)   {rate(c['bad_green'], bad)}")
+    print(
+        f"  transpose P(bad | green) {rate(c['bad_green'], c['bad_green'] + c['good_green'])}"
+    )
+    print(f"  base rate P(bad)         {rate(bad, bad + good)}")
+
+    # The fork, printed rather than footnoted. "no CI" means no check was ever recorded, so
+    # the verifier neither accepted nor rejected. Excluding those rows answers "when the
+    # verifier ran, how often was it wrong?"; counting them as failures-to-catch answers
+    # "how often did nothing stop a bad artefact?". Both are defensible and they are
+    # different questions, so the number is shown both ways instead of one being chosen
+    # silently. Reading a conditional off a remembered marginal is how this project spent a
+    # day arguing about which quantity beta was.
+    if c["bad_none"] or c["good_none"]:
+        print(
+            "\n  under the other treatment of `no CI` (an unrun check counts as a miss):"
+        )
+        print(
+            f"    alpha' = P(not-green | good) {rate(c['good_red'] + c['good_none'], good + c['good_none'])}"
+        )
+        print(
+            f"    beta'  = P(green | bad)      {rate(c['bad_green'], bad + c['bad_none'])}"
+        )
+    else:
+        print(
+            "\n  no `no CI` rows, so the treatment of unrun checks changes nothing here."
+        )
+    return {"repo": name, "cells": c, "bad": bad, "good": good}
 
 
 def main(root: Path) -> None:
@@ -80,7 +102,9 @@ def main(root: Path) -> None:
         raise SystemExit(f"no data/*-prs.json under {root}")
     for f in files:
         report(f.stem.removesuffix("-prs"), json.loads(f.read_text(encoding="utf-8")))
-    print("\n  Aggregates only. Per-PR records stay gitignored (AGENTS.md privacy rule).")
+    print(
+        "\n  Aggregates only. Per-PR records stay gitignored (AGENTS.md privacy rule)."
+    )
 
 
 if __name__ == "__main__":
