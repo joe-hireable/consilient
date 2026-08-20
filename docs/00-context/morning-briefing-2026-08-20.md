@@ -1,13 +1,32 @@
 # Morning briefing — 20 August 2026
 
-Written for Joe to read over coffee. Around 31 commits landed overnight across Claude Code,
-Codex and Cursor. This page orders what you have to decide; everything else is detail you can reach from
+Written for Joe to read over coffee. Around 57 commits landed across Claude Code, Codex and
+Cursor. This page orders what you have to decide; everything else is detail you can reach from
 here.
 
-**The short version.** The night was mostly spent finding out that several things we believed
-were not true. That reads badly and is the system working — every one of these would have been
-far more expensive after v1. The instrument is materially stronger than it was at midnight. The
-evidence base is materially less certain.
+> ## Status at 09:50 — three decisions closed, and a policy change
+>
+> Joe delegated the three blocking questions. **All three are now closed**, and the delegation
+> became policy: **granular technical decisions are the harness's and are not escalated**
+> (ADR-0033 updated, `6dd9b40`). The reserved list is unchanged — money, credentials, anything
+> leaving the machine, irrecoverable deletion, and genuine preference questions.
+>
+> | was blocking | outcome |
+> |---|---|
+> | **A. β axis** | **DECIDED** `3ee8d68` — β stays `P(accept \| bad)`; `P(bad \| accepted)` kept and named alongside; `mine_beta.py` to emit the full 2×2; **the ~146-pair audit is cancelled** and replaced by a 75-pair audit of the never-examined bad-and-red cell |
+> | **C. grading pack** | **UNBLOCKED** — graded blind by two other model families, because an agent grading the multi-agent structure is the echo failure. **This answers a different question than the stopping rule asked**, and is recorded as such. Your grade supersedes whenever you want it |
+> | **F. EXP-27 clock** | **RUNNING** `5268869` — day 1 recorded 09:39, six of six sources reachable, 31 events frozen. Earliest ADR-0029 promotion **19 September** |
+>
+> **Still yours, unchanged:** **B** (ADR-0019 versus standing spend caps — preferential, and
+> reserved to you by that ADR) and **E** (the two Ollama upstream drafts — outward-facing, carries
+> your name).
+>
+> **One live gap:** the EXP-27 collector must run **daily** and today's run was manual. If nobody
+> runs it tomorrow, the window silently accumulates missing days — the exact failure the register
+> warns about. It needs a scheduled task.
+>
+> **ClickUp is rate-limited until roughly 17:20**, so the board stops at the overnight entries.
+> This file and `#consilience-exp16` are current.
 
 ---
 
