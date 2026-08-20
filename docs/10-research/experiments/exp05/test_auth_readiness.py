@@ -1,6 +1,11 @@
 """Installed vendor CLIs are not routable until their authentication check passes."""
 
-from run_all import claude_auth_ready, codex_auth_ready, cursor_auth_ready
+from run_all import (
+    claude_auth_ready,
+    codex_auth_ready,
+    cursor_auth_ready,
+    grok_auth_ready,
+)
 
 
 if __name__ == "__main__":
@@ -12,4 +17,8 @@ if __name__ == "__main__":
     assert not codex_auth_ready("Not logged in", 1)
     assert cursor_auth_ready("✓ Logged in as user@example.com", 0)
     assert not cursor_auth_ready("", 1)
+    assert grok_auth_ready("Default model: grok-4.6\n\nAvailable models:\n  * grok-4.6", 0)
+    assert not grok_auth_ready("You are not authenticated.\n\nDefault model: grok-4.6", 0)
+    assert not grok_auth_ready("Not signed in. To authenticate without a browser, run: grok login --device-code", 0)
+    assert not grok_auth_ready("", 1)
     print("vendor-native harness authentication gates pass")

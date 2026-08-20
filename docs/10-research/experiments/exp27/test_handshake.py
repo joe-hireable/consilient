@@ -116,6 +116,73 @@ def test_probe_cursor_live():
     assert res["capabilities"]["remaining_allowance_surface"]["usable"] is False
 
 
+def test_probe_grok_live():
+    """Live probe of Grok Build on this machine."""
+    res = H.probe_grok()
+    assert res["harness"] == "grok"
+    assert res["installed"] is True
+    assert res["version"] == "1.0.5"
+    assert res["is_authenticated"] is False
+    assert res["default_model"] == "grok-4.6"
+    assert "grok-4.6" in res["available_models"]
+    assert res["capabilities"]["headless_single"]["usable"] is True
+    assert res["capabilities"]["json_output"]["usable"] is True
+    assert res["capabilities"]["json_schema"]["usable"] is True
+    assert res["capabilities"]["sandbox_bypass"]["usable"] is True
+    assert res["capabilities"]["remaining_allowance_surface"]["usable"] is False
+
+
+def test_admission_grok_unauthenticated_rejected():
+    """Unauthenticated Grok is rejected per EXP-05 / ADR-0026."""
+    probe_res = H.probe_grok()
+    admission = H.evaluate_admission("grok", probe_res)
+    assert admission["admitted"] is False
+    assert admission["admission_state"] == "rejected_unauthenticated"
+    assert admission["usable_for_unattended"] is False
+
+
+def test_admission_grok_authenticated_bounded_supervised():
+    """Authenticated Grok is admitted for bounded supervised work under user attestation."""
+    fake_probe: dict[str, Any] = {
+        "harness": "grok",
+        "installed": True,
+        "version": "1.0.5",
+        "is_authenticated": True,
+        "capabilities": {},
+    }
+    admission = H.evaluate_admission(
+        "grok",
+        fake_probe,
+        context={
+            "mode": "bounded_supervised",
+            "user_headroom_attestation": "Joe Brown 2026-08-20: SuperGrok Heavy subscription verified active",
+        },
+    )
+    assert admission["admitted"] is True
+    assert admission["admission_state"] == "admitted_bounded_supervised"
+    assert admission["tier"] == "SuperGrok Heavy"
+    assert admission["usable_for_unattended"] is False
+
+
+def test_admission_grok_authenticated_unattended_unbounded_excluded():
+    """Authenticated Grok without headroom counter is excluded from unbounded unattended routing."""
+    fake_probe: dict[str, Any] = {
+        "harness": "grok",
+        "installed": True,
+        "version": "1.0.5",
+        "is_authenticated": True,
+        "capabilities": {},
+    }
+    admission = H.evaluate_admission(
+        "grok",
+        fake_probe,
+        context={"mode": "unattended_unbounded"},
+    )
+    assert admission["admitted"] is False
+    assert admission["admission_state"] == "excluded_unknown_headroom"
+    assert admission["usable_for_unattended"] is False
+
+
 def test_admission_cursor_unbounded_unattended_excluded():
     """Cursor without headroom counter is excluded from unbounded unattended routing."""
     probe_res = H.probe_cursor()
@@ -222,10 +289,10 @@ def test_to_wsl_path():
 
 
 def test_run_all_handshakes_live():
-    """End-to-end execution across all three harnesses."""
+    """End-to-end execution across all four harnesses."""
     suite = H.run_all_handshakes()
     assert "handshakes" in suite
-    assert set(suite["handshakes"].keys()) == {"claude-code", "codex", "cursor"}
+    assert set(suite["handshakes"].keys()) == {"claude-code", "codex", "cursor", "grok"}
     assert validate_change_record(suite) is True
     for harness, h_record in suite["handshakes"].items():
         assert h_record["harness"] == harness

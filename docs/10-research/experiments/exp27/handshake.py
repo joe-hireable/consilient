@@ -25,8 +25,13 @@ sys.path.insert(0, str(HERE))
 
 from change_record import validate_change_record  # noqa: E402
 
-SUPPORTED_HARNESSES = ("claude-code", "codex", "cursor")
+SUPPORTED_HARNESSES = ("claude-code", "codex", "cursor", "grok")
 CURSOR_WSL_BINARY = Path("/home/jpbpr/.local/bin/cursor-agent")
+GROK_BINARY_CANDIDATES = (
+    Path("/mnt/c/Users/jpbpr/.grok/bin/grok.exe"),
+    Path.home() / ".grok" / "bin" / "grok.exe",
+    Path.home() / ".grok" / "bin" / "grok",
+)
 
 
 def _now() -> str:
@@ -334,6 +339,130 @@ def probe_cursor() -> dict[str, Any]:
     }
 
 
+def _grok_launcher() -> list[str] | None:
+    """Find a runnable command for Grok on Windows or WSL."""
+    for p in GROK_BINARY_CANDIDATES:
+        if p.exists():
+            return [str(p)]
+    for name in ("grok.cmd", "grok.exe", "grok"):
+        w = shutil.which(name)
+        if w:
+            return [w]
+    bridge = shutil.which("cmd.exe")
+    if bridge and os.name == "nt":
+        return [bridge, "/c", "grok"]
+    return None
+
+
+def probe_grok() -> dict[str, Any]:
+    """Zero-inference version and capability probe for Grok Build CLI."""
+    launcher = _grok_launcher()
+    if launcher is None:
+        return {
+            "harness": "grok",
+            "installed": False,
+            "version": None,
+            "raw_version": "",
+            "is_authenticated": False,
+            "default_model": None,
+            "available_models_count": 0,
+            "available_models": [],
+            "error": "grok CLI binary not found on PATH, in ~/.grok/bin, or via cmd.exe",
+            "capabilities": {
+                "headless_single": {"status": "unobservable", "usable": False},
+                "json_output": {"status": "unobservable", "usable": False},
+                "json_schema": {"status": "unobservable", "usable": False},
+                "sandbox_bypass": {"status": "unobservable", "usable": False},
+                "remaining_allowance_surface": {"status": "unobservable", "usable": False},
+            },
+            "probed_at": _now(),
+        }
+
+    def grok_cmd(*args: str) -> list[str]:
+        return [*launcher, *args]
+
+    # Probe 1: version
+    code_ver, raw_version, err_ver = _run_cmd(grok_cmd("--version"))
+    if (code_ver != 0 or not raw_version) and shutil.which("cmd.exe"):
+        code_ver, raw_version, err_ver = _run_cmd(["cmd.exe", "/c", "grok --version"])
+
+    version: str | None = None
+    if code_ver == 0 and raw_version:
+        # Expecting e.g. "grok 1.0.5 (5115b46bc9)"
+        m = re.search(r"(\d+\.\d+\.\d+)", raw_version)
+        version = m.group(1) if m else raw_version.split()[1] if len(raw_version.split()) > 1 else raw_version
+
+    # Probe 2: help
+    _, help_out, _ = _run_cmd(grok_cmd("--help"))
+    if not help_out and shutil.which("cmd.exe"):
+        _, help_out, _ = _run_cmd(["cmd.exe", "/c", "grok --help"])
+
+    has_single = "--single" in help_out or "-p" in help_out
+    has_json = "--output-format" in help_out and "json" in help_out
+    has_schema = "--json-schema" in help_out
+    has_bypass = "--permission-mode" in help_out or "--always-approve" in help_out
+
+    # Probe 3: models (zero-token listing)
+    code_models, models_out, _ = _run_cmd(grok_cmd("models"))
+    if not models_out and shutil.which("cmd.exe"):
+        code_models, models_out, _ = _run_cmd(["cmd.exe", "/c", "grok models"])
+
+    available_models: list[str] = []
+    default_model: str | None = None
+    is_authenticated = False
+    if code_models == 0 and models_out:
+        is_authenticated = (
+            "not authenticated" not in models_out.lower()
+            and "not signed in" not in models_out.lower()
+        )
+        for line in models_out.splitlines():
+            line = line.strip()
+            if line.startswith("Default model:"):
+                default_model = line.split(":", 1)[1].strip()
+            elif line.startswith("*") or line.startswith("-"):
+                parts = line.lstrip("*- ").split()
+                if parts:
+                    available_models.append(parts[0])
+
+    capabilities = {
+        "headless_single": {
+            "status": "supported" if has_single else "unobservable",
+            "usable": bool(has_single),
+        },
+        "json_output": {
+            "status": "supported" if has_json else "unobservable",
+            "usable": bool(has_json),
+        },
+        "json_schema": {
+            "status": "supported" if has_schema else "unobservable",
+            "usable": bool(has_schema),
+        },
+        "sandbox_bypass": {
+            "status": "supported" if has_bypass else "unobservable",
+            "usable": bool(has_bypass),
+        },
+        "remaining_allowance_surface": {
+            "status": "unobservable",
+            "usable": False,  # Grok CLI exposes plan tier but no remaining allowance counter
+        },
+    }
+
+    installed = bool(version is not None)
+    return {
+        "harness": "grok",
+        "installed": installed,
+        "version": version,
+        "raw_version": raw_version,
+        "is_authenticated": is_authenticated,
+        "default_model": default_model,
+        "available_models_count": len(available_models),
+        "available_models": available_models,
+        "error": err_ver if not installed else None,
+        "capabilities": capabilities,
+        "probed_at": _now(),
+    }
+
+
 def probe_harness(harness: str) -> dict[str, Any]:
     """Probe a single named harness with zero inference."""
     if harness == "claude-code":
@@ -342,6 +471,8 @@ def probe_harness(harness: str) -> dict[str, Any]:
         return probe_codex()
     elif harness == "cursor":
         return probe_cursor()
+    elif harness == "grok":
+        return probe_grok()
     else:
         return {
             "harness": harness,
@@ -430,6 +561,35 @@ def evaluate_admission(
             "reason": "installed executable and status-line quota surface available",
             "usable_for_unattended": True,
         }
+
+    if harness == "grok":
+        if not probe_result.get("is_authenticated", False):
+            return {
+                "harness": harness,
+                "admitted": False,
+                "admission_state": "rejected_unauthenticated",
+                "reason": "grok reports not authenticated (device-code or OAuth login required)",
+                "usable_for_unattended": False,
+            }
+
+        if work_mode == "bounded_supervised" and user_attestation:
+            return {
+                "harness": harness,
+                "admitted": True,
+                "admission_state": "admitted_bounded_supervised",
+                "reason": "admitted for bounded supervised work under recorded user attestation",
+                "usable_for_unattended": False,
+                "tier": "SuperGrok Heavy",
+            }
+        else:
+            return {
+                "harness": harness,
+                "admitted": False,
+                "admission_state": "excluded_unknown_headroom",
+                "reason": "Grok exposes tier but no remaining allowance counter; excluded from unbounded unattended routing (ADR-0026)",
+                "usable_for_unattended": False,
+                "tier": "SuperGrok Heavy",
+            }
 
     return {
         "harness": harness,
