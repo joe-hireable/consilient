@@ -141,3 +141,65 @@ would make the alternating fingerprint an artefact of my reading rather than evi
 processes. I do not find such a path: the probe is written once at start-up, and the 22
 overlapping cells with 5 disagreements cannot be produced by one process executing each cell once.
 [asserted]
+
+
+---
+
+## Update 04:41 — the run is degrading, and it cannot be stopped
+
+**`gemma4:31b`'s timeout rate has risen from roughly 17% to 41%.** At the time this page was
+written the model under test showed 10 passes against 2–3 timeouts; it now shows **10 passes
+against 7 timeouts** in the richer of the two writers. [measured]
+
+That is the predicted direction. Two runners contend for one GPU, both run slower than either
+would alone, and a wall-clock timeout converts runs that would have passed into censored ones. The
+contention is not merely contaminating the comparison — **it is worsening**, and it worsens
+against the model whose capability the experiment exists to establish.
+
+Both writers' states are preserved again at this point, so the degradation itself is recorded
+rather than lost.
+
+### The judgement, and why it could not be carried out
+
+On the evidence above, **stopping both runners is the right call**: the run is already recorded as
+compromised, further cells are produced under worsening contention, and each runner is heading for
+a `complete: true` file that will look clean. Stopping is reversible — EXP-31 has to be re-run
+regardless — so under ADR-0033 it is a decision the harness should take rather than park.
+
+**It could not be executed.** The runners cannot be identified. On this machine
+`Get-CimInstance` fails (the PowerShell host cannot read its own config file from OneDrive),
+`wmic` is absent, and `psutil` is not installed, so no available tool returns a command line for a
+process. `tasklist /v` returns twelve `python.exe` processes with no window titles and no
+arguments — and **some of them are this session's own**: the heartbeat monitor, scratch analysis
+scripts, and whatever else is running in adjacent sessions. [measured]
+
+Killing on a guess risks taking down the monitor that is watching this very experiment, or another
+session's work. **A blind kill is a worse action than an ongoing bad measurement**, so it was not
+attempted.
+
+### The finding this produces, which is worth more than the stop would have been
+
+**Detection without identification is half a control.**
+
+ADR-0034 decides that stalls are detected by artefact progress rather than by PID, and it is right
+— PIDs recycle and a zombie can hold a pipe open. But the ADR stops at *detecting*. This incident
+shows the other half: **a runner that can be detected and not identified cannot be acted upon.**
+Tonight the harness could see the problem in perfect detail, could reason about it correctly, and
+could do nothing at all.
+
+The fix is the one already owed from § *The ratchet*, and this makes it stricter. A runner must
+write a **lock file naming its own PID, its `run_id` and its start time**, and remove it on exit.
+That single artefact would have delivered all three things this incident needed and lacked:
+
+1. **Prevention** — the second runner would have found the lock and refused to start.
+2. **Attribution** — the interleaving would have been obvious immediately, not inferred from an
+   alternating VRAM probe.
+3. **Action** — stopping it would have been one `kill` against a named PID, rather than a guess
+   among twelve.
+
+A lock file is perhaps ten lines. It is worth more than any of tonight's audits, because it is the
+difference between knowing and being able to act.
+
+**Recorded rather than done**, because the ten lines belong in `run_exp31.py`, and changing an
+instrument during its own run is the tampering this project has now refused three times in one
+night.
