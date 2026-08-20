@@ -1,13 +1,71 @@
 # 0040. The harness decides from evidence, not from pretraining — and runs the experiment when it has none
 
-- **Status:** PROVISIONAL — the supporting evidence is one operator, one project, one day.
-  EXP-46 is registered to measure it.
+- **Status:** DEPRECATED 20 August 2026. [asserted] The tested trajectory and commit rules
+  provide no mechanically complete decision-and-provenance discriminator. [algebra]
 - **Date:** 2026-08-20
 - **Deciders:** Joe Brown (the principle), Claude Opus 5 (the mechanism and the objections)
 - **Inquiry tier reached:** T1 ground — a principle plus a day of measured instances, none of
   them controlled.
 - **Executable model:** none yet. The decision variable is *when* to spend an experiment, and
   its parameter — the cost of being wrong — is exactly what β measures and β is not measured.
+
+## Update: 2026-08-20 — proposed EXP-46 cannot be instrumented; this ADR is deprecated
+
+The feasibility audit for the proposed experiment tested all three candidate definitions before
+changing the schema. [measured]
+
+- **A new event kind:** `validate()` accepts any non-empty kind and there is no event-kind
+  registry, so a new kind would leave the legacy log unchanged. [measured] A decision omitted
+  from that kind is invisible, so the resulting ratio measures recording diligence rather than
+  decision practice. [algebra]
+- **A `decision` data field:** the 96 retained lines have 96 distinct kinds. Only three carry
+  `data.decision`; five kinds contain `decid`, one other event carries `final_decision`, and one
+  carries `judgement`. No line carries `evidence_ref`, `evidence_reference` or
+  `decided_from_priors`. [measured] A validator limited to those explicit fields would add three
+  quarantines; treating heterogeneous fields such as `artefacts` or `local_measurements` as
+  evidence references instead requires an unrecorded semantic mapping. [algebra] There is no
+  uniform provenance field on which the check can operate without either interpretation.
+  [measured]
+- **Commit messages:** at the pre-result baseline `d579beedd0d88aeebee75666e0a4db89f2c3ac5d`,
+  the branch had 150 uniquely reachable commits, 127 author-dated 20 August. Under the fixed
+  case-sensitive uppercase-token rule, 40 carried both `REVERSAL` and `FALSIFIER`; a stricter
+  exact-heading rule (`^REVERSAL:` and `^FALSIFIER:`) found both in 36. [measured] No message
+  recorded a `decided_from_priors: true` or
+  `decided_from_priors: false` value; one merely mentions the absent field. Of the 40
+  uppercase-token candidates, 39 carried neither `evidence-derived` nor `prior-derived`, while
+  the remaining message carried both as the description of the proposed EXP-46. [measured]
+  The corpus therefore has no mechanical provenance discriminator from which to derive the
+  required ratio. [algebra]
+
+An exactly-one check could require either a non-empty evidence reference or literal
+`decided_from_priors: true`, so setting the latter to `false` would fail. [algebra] It would
+still be satisfied by omitting the decision event or field altogether, which schema validation
+cannot observe. [algebra] No such guard was built, no ratio was added to `doctor`, and no
+EXP-46 entry was added to the register; the register did not contain one before this audit.
+[measured] The proposed experiment's mechanical-identification precondition therefore failed.
+[algebra]
+
+**Decision.** ADR-0040 is deprecated rather than promoted or left aspirational. [asserted]
+The alternative retained for future work is an explicit event kind, but only after an
+independent capture boundary can measure omitted decisions; without that boundary it is a
+denominator over self-reports. [asserted]
+
+**Evidence against deprecation.** An explicit kind plus the exactly-one union would make the
+provenance of decisions that were recorded mechanically reportable. [algebra] That is useful
+prospective telemetry, but it does not satisfy this ADR's claim about consequential decisions
+because the current boundary cannot distinguish a complete record from an empty one. [asserted]
+
+**Reversal:** `git revert (git log -1 --format=%H --fixed-strings --grep="Deprecate ADR-0040")`
+restores the provisional status and removes this result.
+
+**Falsifier:** reopen this decision if a deterministic rule fixed before corpus inspection
+identifies consequential decisions independently of their self-report, distinguishes their
+provenance, and has its omission and classification errors measured against independent ground
+truth. [asserted]
+
+The original provisional text below is retained unchanged as history. Its statements that the
+ADR is provisional and that EXP-46 was registered are superseded by the measured update above.
+[measured]
 
 ## Context
 
