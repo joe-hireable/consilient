@@ -1,7 +1,7 @@
 # Orchestration dependencies: what would decide adoption
 
-**Date:** 20 August 2026  
-**Status:** assessment only; no dependency was added and no candidate was run. [measured]  
+**Date:** 20 August 2026
+**Status:** assessment only; no dependency was added and no candidate was run. [measured]
 **Governs:** dependency experiments under ADR-0036; it does not authorise adoption. [asserted]
 
 The brief names ADR-0048, but no `0048*.md` decision file exists in this clone at
@@ -60,6 +60,40 @@ local storage, no hosted account, and outbound telemetry disabled where applicab
 | **OpenTelemetry GenAI semantic conventions** | Apache-2.0; definitions and local collectors require no account. [cited] | Specification, not runtime. It should project committed events and must never replace or feed decisions into the trajectory. [cited][asserted] | 137 open issues; no tag, release or schema URL. Status is **Development**, which OTel defines as unsuitable for production. Current MCP fields still describe session/initialisation concepts removed by MCP `2026-07-28`. [cited] | EXP-62. Pinning can test fit; adoption waits for a tagged, aligned schema. [asserted] |
 | **MCP** | New code/spec contributions are Apache-2.0, unconsented older work remains MIT, and non-spec documentation is CC-BY-4.0. Local stdio needs no account. [cited] | Protocol for exposing tools/resources/prompts *to* an agent. It must remain below coordinator validation and `append()`; it does not control an external coding agent. [cited][asserted] | 93 open issues; stable specifications shipped from Nov 2024 to Jul 2026. `2026-07-28` removed sessions/initialisation and moved Tasks to an extension; Python SDK 2.0 has not implemented that extension. [cited] | EXP-63 for an authority-preserving tool boundary. [asserted] |
 | **Agent Client Protocol** | Apache-2.0; local newline-framed JSON-RPC over stdio needs no account unless the chosen agent does. [cited] | Protocol for a client controlling a coding agent while that agent retains its internal loop. It can replace vendor-specific transport code, not `Ticket`, `Outcome` or policy. [cited][asserted] | Core: 9 open issues; v1/schema releases shipped monthly in Jul–Aug while v2 remained draft. Python SDK `0.12.1` shipped 16 Aug and had 3 open issues, but its last explicit schema bump was v1.19 while core reached v1.21 on 20 Aug. [cited] | EXP-64. The existing 233-line Cursor ACP adapter proves feasibility; the SDK must prove parity and code deletion. [measured][asserted] |
+
+### Downstream user-repository check
+
+A bounded GitHub code search over the brief's named candidates excluded each candidate's own
+repository, sampled the five best-matching exact imports and then read the matching files at
+pinned commits. [cited] This is presence evidence, not a dependent count, production-quality
+claim or representative sample. [asserted]
+
+- The strongest execution evidence was
+  [Julep's Temporal worker](https://github.com/julep-ai/julep/blob/fc74d079a18c8124b2627ca4717f5a9c269267db/julep/execution/worker.py):
+  it registers deterministic workflows and a substantial activity set in the product's execution
+  package. [cited] [MLflow ships an AG2 tracing integration](https://github.com/mlflow/mlflow/blob/d37342a6987db4c13b9337aeb192fb2afaee5046/mlflow/ag2/__init__.py),
+  and [gptme ships an ACP agent implementation](https://github.com/gptme/gptme/blob/b36c05f418670df38ca1b956f4d041bb333cd2cf/gptme/acp/agent.py)
+  with session, permission, tool and protocol handling. [cited] These are reusable integration
+  modules in established projects, stronger evidence than an example application. [asserted]
+- Public application evidence exists for
+  [LangGraph in Tavily Chat](https://github.com/tavily-ai/tavily-chat/blob/5e7e4ac63738fef8ed2ecd4d51873b64dd82620d/backend/agent.py),
+  [Prefect in Data For Good's ODIS pipeline](https://github.com/dataforgoodfr/13_odis/blob/494ac5726bbc5b4e7586e168a1c358fb77a131a2/prefect_flow/flow.py), and
+  [Pydantic AI in a MongoDB RAG agent](https://github.com/coleam00/MongoDB-RAG-Agent/blob/b048eeab220e43b2b8f8c97508e4d6d2c134a468/src/agent.py).
+  [cited] They exercise graphs/checkpoints, flow/task orchestration and typed agent/tool state
+  respectively, but one repository each cannot establish migration safety. [cited][asserted]
+- The sampled
+  [ADK payment agent](https://github.com/Zen7-Labs/Zen7-Payment-Agent/blob/a1546be076c14d1f270b1109c1e055fd53b685c8/a2a_server/agent.py),
+  [local CrewAI example](https://github.com/heaversm/crew-llamafile/blob/c70270aaa62f453978608cd21da425f8f5f13056/ollama-app.py) and
+  [DSPy knowledge-graph script](https://github.com/chrisammon3000/dspy-neo4j-knowledge-graph/blob/2856b2dfe81fc801601c2a9c4b439429a4562a98/run.py)
+  are single-purpose applications rather than evidence of a maintained integration boundary.
+  [cited][asserted] The sampled
+  [OpenTelemetry consumer](https://github.com/traceloop/opentelemetry-mcp-server/blob/92ff4caf5302e3779c2050a3857b240dfc16324b/src/opentelemetry_mcp/models.py)
+  contains compatibility aliases across changing GenAI attribute names, which supports treating
+  the Development conventions as migration risk rather than a stable product schema. [cited][asserted]
+
+Microsoft Agent Framework was outside that downstream sample because it was not named in the
+brief; its maturity case here remains upstream release history. [asserted] LangSmith and AutoGen's
+documentary rejections do not depend on downstream popularity. [asserted]
 
 ## The three plausible gains
 
