@@ -47,6 +47,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0044](0044-openrouter-is-the-only-metered-vendor-and-budgets-are-a-capability.md) | **OpenRouter is the only metered vendor**; subscriptions cover everything else; weekly and monthly budgets are a required capability | ✅ |
 | [0045](0045-give-gate-b2-and-b3-success-criteria-they-never-had.md) | **Gate B2 and B3 get success criteria they never had** — B2 measures the critic's own β; B3 needs a dated, machine-readable fallback result | ✅ |
 | [0046](0046-gate-b3-is-evidenced-by-a-dated-result-not-by-a-schedule-trigger.md) | **Gate B3 is evidenced by a dated result, not a schedule trigger** — no secret may reach a public repository, so the exercise runs locally | ✅ |
+| [0047](0047-promote-the-adapter-contract-and-retire-adapter-count-as-evidence.md) | **Promote the adapter contract; retire adapter count as evidence** — seven backends fit unchanged, but the newest adapter is 3.8× the smallest | ✅ |
 
 ## Behaviour and safety
 

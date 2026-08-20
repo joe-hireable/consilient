@@ -2125,3 +2125,69 @@ def test_capture_health_records_what_it_found(tmp_path, monkeypatch):
     assert data["healthy"] is True
     assert data["state_digest"], "the check must record the digest it verified"
     assert data["checked_by"] == "scripts/capture_health.py"
+
+
+# ---------------------------------------------------------------- ADR-0047
+ADAPTERS = Path("docs/10-research/experiments/exp05")
+
+
+def _adapter_lines() -> dict[str, int]:
+    return {
+        path.stem.replace("adapter_", ""): sum(
+            1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+        )
+        for path in sorted(ADAPTERS.glob("adapter_*.py"))
+    }
+
+
+def test_the_adapter_contract_is_asserted_not_counted():
+    """ADR-0047 retired "N adapters fit" as evidence. This is what replaces it.
+
+    Seven backends fitting the boundary told us it was stable; an eighth tells us nothing.
+    What the count was really guarding — that nobody quietly redesigns the boundary — is
+    guarded here instead, by naming the fields.
+    """
+    outcome_fields = {
+        "ticket_id", "agent", "domain", "harness", "provider", "model",
+        "ok", "diff", "tokens_in", "tokens_out", "cost_usd", "duration_s", "raw_tail",
+    }
+    ticket_fields = {"id", "goal", "repo_dir", "timeout_s"}
+
+    # The canonical declaration lives in the FIRST adapter's module docstring, where it was
+    # written before any second runtime existed. That is the text seven backends were built
+    # against, so it is the text worth pinning.
+    canonical = (ADAPTERS / "adapter_claude_code.py").read_text(encoding="utf-8")
+    missing = {name for name in outcome_fields | ticket_fields if f'"{name}"' not in canonical}
+    assert not missing, (
+        f"the adapter contract lost {sorted(missing)}; ADR-0047 promoted this boundary and a "
+        "redesign must be argued in an ADR, not absorbed"
+    )
+
+    # And every adapter must still speak it. A contract only the first adapter remembers is
+    # documentation, not a boundary.
+    for path in sorted(ADAPTERS.glob("adapter_*.py")):
+        text = path.read_text(encoding="utf-8")
+        absent = {name for name in ("ticket_id", "ok", "diff", "raw_tail") if name not in text}
+        assert not absent, f"{path.name} does not speak {sorted(absent)} of the outcome contract"
+
+
+def test_a_new_adapter_may_not_silently_exceed_the_largest_one():
+    """A boundary that never moves while what sits behind it grows is not obviously right.
+
+    Measured 20 Aug 2026 across eight adapter modules: 78, 90, 107, 124, 130, 148, 233, and
+    **295** for Grok — the newest is 3.8x the smallest. The contract held; that is not the
+    same as adapters being cheap, and conflating the two is the easy mistake ADR-0047 exists
+    to prevent.
+
+    This does not forbid a larger adapter. It forces the excess to be argued in the commit
+    rather than absorbed silently, which is the ratchet shape used for `append()` bypass and
+    the A3 refusal baseline. Raising the constant is the permitted edit; doing it without a
+    reason in the message is not.
+    """
+    lines = _adapter_lines()
+    assert lines, "no adapters found; the path in ADR-0047's check is wrong"
+    worst = max(lines.values())
+    assert worst <= 295, (
+        f"an adapter now exceeds the recorded maximum: {max(lines, key=lines.get)} at {worst} "
+        "lines. Say in the commit what forced it — contract, vendor, platform or policy."
+    )
