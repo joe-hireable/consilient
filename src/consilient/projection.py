@@ -19,11 +19,11 @@ import sqlite3
 from pathlib import Path
 
 from .events import (
-    Event,
     OUTCOME_KIND,
-    Rejection,
     VERDICT_CORRECTION_KIND,
     VERDICT_KIND,
+    Event,
+    Rejection,
     read_all,
 )
 
