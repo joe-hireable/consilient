@@ -13,10 +13,14 @@ identifiers, hook filenames and a verbatim quotation from a private assessment d
 sitting in two tracked files. [measured]
 
 It was found by a paid cross-family audit, not by this repository. The orchestrator's own
-sweep searched for paths PREFIXED with a repository name (`jobboard-v2/src/...`) and the
-leak was the same path written bare (`src/lib/db/...`), so that angle could not have found
-it however carefully it was run. This script encodes the angle that worked: take the paths
-that actually exist in the private repositories and look for them here.
+sweep searched for paths PREFIXED with a repository name -- `<repo>/src/...` -- and the leak
+was the same path written bare, with no prefix to search for. That angle could not have
+found it however carefully it was run. This script encodes the angle that worked: take the
+paths that actually exist in the private repositories and look for them here.
+
+It also caught itself on first run: the docstring below originally used a real private path
+as its example of a distinctive one. That is the correct behaviour and it is left recorded
+rather than tidied away.
 
 WHY THIS IS NOT A CI JOB. The private repositories are not present on a CI runner, so this
 cannot run there, and a check that silently no-ops is worse than none. It is a local
@@ -44,7 +48,7 @@ CORPORA = [
 ]
 
 # A path segment has to be distinctive to be evidence. `src/index.ts` appears in half the
-# repositories on earth; `src/lib/agent/tools` does not. Require depth and length, and skip
+# repositories on earth; a deeply nested product path does not. Require depth and length, and skip
 # anything this repository would legitimately contain.
 MIN_DEPTH = 3
 MIN_LEN = 12
@@ -92,7 +96,7 @@ def corpus_paths(repo: Path) -> set[str]:
 def needles(paths: set[str]) -> set[str]:
     """Distinctive path prefixes worth searching for, including directory prefixes.
 
-    A leak often names a directory (`src/lib/agent/tools/`) rather than a file, so every
+    A leak often names a directory (a nested directory) rather than a file, so every
     ancestor of a real file is a needle too.
     """
     found: set[str] = set()
