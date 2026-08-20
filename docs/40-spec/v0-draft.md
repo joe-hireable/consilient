@@ -27,6 +27,21 @@ admission, parallel worktrees and a critic tier, delivered in the sequence below
 months below ten trajectory-recorded hours per week reinstates the narrow β-meter-only
 provisional. [measured]
 
+## 1.1 Outcome reporting
+
+The product outcome is **verified human gain while preserving agency**. [asserted] Quality,
+speed, cost, review burden, learning, self-efficacy, stress and user-valued outcomes are
+recorded and reported **separately**, and are never combined into a single score, index or
+ranking. [asserted] This is not presentational. Satisfaction and quality are anti-correlated
+through a measured mechanism — sycophantic output was rated 9% higher in quality and 13% more
+likely to be reused while cutting the behaviour it was meant to support — so any composite
+would be pushed up by exactly what pushes β up. [cited] V0-21 carries the check.
+
+Agency is treated as a mechanism rather than a courtesy: the best-measured protective factor
+against developer burnout under generative AI was autonomy, and mandated adoption sat on the
+demands side of the same model. [cited] An orchestrator that mandates a workflow, or that
+becomes a management metric, is a cost regardless of its output quality. [asserted]
+
 ## 2. Non-goals
 
 - A learned routing policy is excluded from v0; EXP-07 has reopened ADR-0003 for
@@ -167,6 +182,22 @@ which the automated verifier accepts an artefact the human verdict rejects. [alg
 Self-reported model confidence or process exit success is diagnostic only and cannot accept
 an artefact. [asserted]
 
+**β is conditional on an oracle that is itself a test.** The human verdict is error-prone,
+is not independent of the automated checks, and may not be stationary. [cited] Measured
+support: no complementarity was achieved between human and model where their error boundaries
+aligned; task completion coexists with an illusion of competence; and in-session performance
+rose while unaided performance fell. [cited] Every reported β therefore states that it is a
+**lower bound on a joint human-plus-checks error**, not a property of the checks alone.
+[asserted] `../10-research/human-success-and-the-human-side-of-beta.md` carries the evidence
+and Q30 carries the open question; EXP-32 measures the non-stationarity mechanism. [asserted]
+
+**No self-report is an acceptance signal, including the human's.** Working principle 5 bans
+gating on a model's claimed confidence; the same rule applies to user satisfaction, a
+thumbs-up, or an answer to "did that help?". [asserted] Measured support: developers reported
+a 20% speedup after a measured 19% slowdown, and sycophantic responses were rated higher in
+quality and more likely to be reused while degrading the outcome they described. [cited] A
+satisfaction signal that rises is a prompt to investigate, never evidence of gain. [asserted]
+
 The routing input is the directly measured composite-verifier β; per-check outcomes remain
 diagnostics because their dependence is unknown. [asserted] Every displayed or consumed β
 value includes task family, verifier version, sample count, observation window, interval
@@ -296,6 +327,13 @@ v0 has one CLI and no daemon-backed review UI. [asserted] Every command supports
 machine-readable `--json` form, and human output is a rendering of the same result rather
 than a second semantics. [asserted]
 
+Any surface that shows the agent's reasoning is treated as an **acceptance amplifier until
+measured otherwise**: explanations raised relative reliance on the model from 29.59% to 38.87%
+while leaving the ability to reject it statistically unchanged, and surfaced token-level
+uncertainty reduced over-reliance only by increasing under-reliance. [cited] v0 therefore
+displays evidence and verifier outcomes, not model rationale, and any future rationale surface
+ships with a measurement of its effect on acceptance. [asserted]
+
 `consil doctor` reports authentication, control-path readiness, headroom freshness,
 hardware-fit provider state, installed/runtime capability freshness, watched-source
 freshness, gate state, fallback health and reasons a composition is ineligible. [asserted]
@@ -332,6 +370,7 @@ not satisfy the invariant. [asserted]
 | V0-18 | A human approval, gate lift, spend authorisation or verdict is valid only when the human principal authored it. [asserted] | Fixtures reject an agent-authored event carrying a human decision, and reject a human decision inferred from the principal field. [asserted] | ADR-0020 proposal, EXP-16 |
 | V0-19 | Display name, title and persona are never an authority, capability, admission or routing input. [asserted] | Routing, admission and acceptance tests reject persona-derived inputs; a property test asserts that changing a display name changes no decision. [asserted] | ADR-0010, ADR-0025 |
 | V0-20 | Every convened or fanned-out structure carries hard budget, turn and depth caps, and exhaustion escalates. [asserted] | Loop test asserts an over-budget structure terminates and escalates rather than continuing; a recursion-depth assert fails closed. [asserted] | ADR-0020 proposal |
+| V0-21 | Outcome dimensions are reported separately and never composited; no self-report, human or model, is an acceptance or routing input. [asserted] | Contract test rejects any composite outcome score; routing and acceptance tests reject satisfaction, thumbs-up and confidence fields as inputs. [asserted] | Q30, working principle 5 |
 
 ## 12. Acceptance evidence and release decision
 
@@ -347,6 +386,10 @@ The first release candidate requires: [asserted]
 - exact adapter/runtime versions and control/accounting capabilities recorded; [asserted]
 - replay from the published fixture trajectory on Windows and one non-Windows environment;
   [asserted]
+- evidence drawn from repository history rather than curated tasks, because the sign of the
+  measured effect is set by task selection: +55.8% on a greenfield toy task against −19% on
+  real issues in a developer's own mature repository. [cited] A release evaluated on curated
+  tasks would measure the wrong regime; this is ADR-0013 with a sharper reason. [asserted]
 - documentation of every unsupported or unknown provider capability, without fallback to
   metered credits. [asserted]
 
@@ -356,7 +399,10 @@ not implied by shipping Stage 2. [asserted]
 ## 13. Decisions still requiring Joe
 
 1. Approve, reject or revise this specification; until then product implementation remains
-   forbidden. [asserted]
+   forbidden. [asserted] Approval means the sentence "I approve the v0 specification for
+   implementation", recorded as a first-party event under V0-18. [asserted] Instructing the
+   successor to revise, review or improve this draft is authorised work and is **not** that
+   approval; the gate is not lifted by inference from an ambiguous message. [asserted]
 2. Decide Q14: whether the Inquiry tier belongs in v0. [asserted]
 3. Approve or reject `llmfit` if EXP-21 work reaches the dependency boundary. [asserted]
 4. Resolve legal preference decisions before their gates: CLA versus DCO alone, and the
