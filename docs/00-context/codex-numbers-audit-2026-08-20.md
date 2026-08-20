@@ -5,6 +5,8 @@ repository. **382 quantitative claim bundles reviewed; 336 adjudicated — 184 r
 not, 139 untraceable; 46 could not be dynamically checked.** All 39 decision records examined.
 [measured]
 
+**Complete: all 33 findings.** Six of them (20–25) were initially lost to an output cap I set on the terminal, and were recovered by resuming the session. That is recorded because a report silently missing a fifth of its findings would look complete.
+
 **Preserved here because it existed only in a session temp directory.** The audit could not write
 its own report: I launched it with a sandbox flag that forbade file writes, so it delivered the
 report as terminal output and nothing else. That is the second time in one night that a
@@ -365,6 +367,98 @@ None validates the underlying event counts.
 
 **Number as quoted:** Three failures including a 30-minute/exit-0 case; approximately 180 seconds; 2–3× work; one-hour/30-minute and 120-second timeouts; a 32,768 process limit; 3/7 human catches; and a 2/9 bas
 
+## Finding 20 — Untraceable rank 7: ADR-0005’s 5–30× offload cliff and catalogue figures have no source
+
+**Where:** `docs/decisions/0005-local-model-library-with-hardware-gating.md:18-34,87-92,112-114`; `docs/10-research/bibliography.md:153-155`; `docs/10-research/local-model-fit-arithmetic.md:262-287,371-383`
+
+**Number as quoted:** Approximately 1.7k stars, 200+ models, a 165-entry/four-component catalogue, and 5–30× CPU-offload slowdown.
+
+**What the artefact says:** None of those figures has a named producing source in the fixed corpus. Later local metadata also requires KV-geometry wording: qwen3:8b uses 144 KiB per context token while gemma4:31b uses 80 KiB because of sliding-window attention.
+
+**Arithmetic:** Despite being smaller:
+
+`144 KiB/token > 80 KiB/token`
+
+The ratio is:
+
+`144 / 80 = 1.8×`
+
+Thus size alone is not a sufficient KV predictor.
+
+**Severity:** Material. The unsupported 5–30× range turns hardware feasibility into a binary policy, while the stale size rule can reject or admit the wrong model.
+
+## Finding 21 — Untraceable rank 8: ADR-0025’s probe intervals and correlation corrections have no stored result
+
+**Where:** `docs/decisions/0025-model-discovery-and-capability-probing.md:57-77,105-111,143-146`; `docs/10-research/experiments/probe_delta_ci.py`
+
+**Number as quoted:** At `n=20/100/200`, β* bands `[0.064,0.310]`, `[0.064,0.193]`, and `[0.077,0.164]`; correlation changes `0.112→0.028`; `SE(φ)≈0.07–0.10`; naive `Δ̂=0.34` versus true `0.27`; approximately 5,000 trajectories.
+
+**What the artefact says:** A named generator exists, but no results JSON or retained run output exists. The approximately 5,000 result is also wrongly attributed to registered EXP-03, which is a different, unrun experiment.
+
+**Arithmetic:** The quoted correlation change is a factor of:
+
+`0.112 / 0.028 = 4`
+
+But the simulated samples producing the endpoints and interval bands are absent, so the figures cannot be independently regenerated in this run.
+
+**Severity:** Material. These figures define the probe’s sample size and reopening conditions.
+
+## Finding 22 — Untraceable rank 9: ADR-0026’s provider-admission measurements are prose-only
+
+**Where:** `docs/decisions/0026-admit-only-budget-and-hardware-feasible-backends.md:53-54,182-197`
+
+**Number as quoted:** Three approximately £200/month subscriptions, one exhausted; locally inspected tool versions; eleven Antigravity model choices; zero reported tokens.
+
+**What the artefact says:** The fixed raw comparison has no Antigravity row, provider-headroom capture, or installed-version record. The values occur only in prose and bibliography descriptions.
+
+**Arithmetic:** The asserted subscription outlay is approximately:
+
+`3 × £200 = £600/month`
+
+But neither the three-account inventory nor the exhaustion event is captured in an artefact.
+
+**Severity:** Material to admission and budget feasibility, although it does not affect EXP-05’s raw coding-path arithmetic.
+
+## Finding 23 — Untraceable rank 10: EXP-05’s Antigravity/OpenCode readiness counts are absent from its JSON
+
+**Where:** `docs/10-research/experiments/exp05/findings-exp05.md:70-80,139-157`; `docs/10-research/experiments/exp05/backend-comparison.json`
+
+**Number as quoted:** Antigravity CLI 1.1.15 returned eleven models and zero tokens; OpenCode was version 1.18.18; four strengthened path tests passed.
+
+**What the artefact says:** `backend-comparison.json` contains seven coding-path rows but no Antigravity result, tool-version field, or four-test execution record. OpenCode’s tokens and cost are retained, but its version is not.
+
+**Arithmetic:** The JSON supports seven rows and six distinct compositions. It provides no denominator from which eleven discovered models or four executed tests can be counted.
+
+**Severity:** Moderate. The missing Antigravity evidence affects backend admission; the version gap is principally reproducibility metadata.
+
+## Finding 24 — Untraceable rank 11: per-check β is asserted near zero or one without a dataset
+
+**Where:** `docs/decisions/0012-composite-beta-with-per-check-diagnostics.md:11-14`
+
+**Number as quoted:** Type-checker β is near zero for type errors and near `1.0` for logic errors.
+
+**What the artefact says:** No per-check labelled dataset, accepted-bad denominator, or result artefact exists. EXP-03, which would measure dependence and per-check behaviour, remains unrun.
+
+**Arithmetic:** “Near zero” and “near 1.0” provide neither counts nor operational bounds, so no proportion or interval can be recomputed.
+
+**Severity:** Material as motivation for per-check diagnostics, though the decision to route only on the directly measured composite remains sound.
+
+## Finding 25 — Untraceable rank 12: EXP-27’s 1.3-second headline has no timing field
+
+**Where:** `docs/10-research/experiments/exp27/findings-exp27.md:7-10`; `docs/10-research/experiments/exp27/results-source-probe.json:1-54`
+
+**Number as quoted:** All six endpoints returned HTTP 200 in 1.3 seconds.
+
+**What the artefact says:** The JSON contains exactly six source rows and every status is 200. It contains `observed_at`, content type, and sample bytes, but no elapsed, duration, start, or end field.
+
+**Arithmetic:**
+
+- Row count: `6`
+- Status-200 count: `6`
+- Elapsed time: impossible to compute from the retained fields
+
+**Severity:** Modest. Reachability reproduces; the performance headline does not have provenance.
+8,348
 ## Finding 26 — Monte Carlo outputs are mistagged as algebra
 
 **Where:** `docs/decisions/0002-organise-around-beta-verifier-false-accept-rate.md:13-14,31-37,49-56`; `docs/10-research/experiments/q3_bimodal_and_q2_sample_complexity.py:38-53,69-105`
