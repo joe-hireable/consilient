@@ -1482,6 +1482,30 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Specification defects where tests and code agree on an incorrect invariant (oracle correctness);
 - Human cognitive error distributions (mutants simulate synthetic syntactic mutations, not real developer failure modes).
 
+### EXP-48 · Mechanical generation of the defective-guard catalogue via mutation survivor clustering `READY` (registered 20 Aug 2026)
+**Decides:** whether EXP-47's 743 `pytest` mutation survivors mechanically regenerate the 25 hand-curated inert/defective guards from `docs/50-publications/P2-guards.md` (turning an $n=1$ existence claim into an automatable prevalence method), or whether mutation survival and "guard-cannot-fail" are structurally distinct phenomena (because guard vacuity is a claim-vs-implementation mismatch requiring human/governance intent, whereas mutation testing only measures code-vs-test sensitivity).
+**Precondition:** EXP-47 mutation results file (`docs/10-research/experiments/exp47/results-exp47.json`) containing 1,931 mutants and 743 `pytest` survivors mapped to file, line, AST operator, and mutation details; `docs/50-publications/P2-guards.md` anchoring 25 hand-catalogued defective guards (A1–A11, A13, A14; A12, A15; B1–B10) plus 1 control (C1).
+**Procedure:**
+1. Parse the 743 `pytest` survivors from EXP-47 deterministically and cluster them by file, function/block, and code region (line ranges and AST context).
+2. Map each of the 25 hand-catalogued defects from P2 to its underlying source/artefact location: identify which are in-scope of Python source mutation (`src/consilient/`) versus out-of-scope governance/CI/workflow/design artefacts (ADR gates, CI yaml, docstrings, git metadata, external systems).
+3. Compute bidirectional correspondence:
+   - **Recall**: Proportion of P2's catalogued guards (overall and source-resident subset) recovered by survivor clusters.
+   - **Precision**: Proportion of mutation survivor clusters that correspond to real hand-found guards or newly identified unstated invariant failures vs noise/untested cosmetic helpers.
+4. Inspect the top unmatched survivor clusters: determine whether they represent genuine uncatalogued guards that cannot fail (with stated claims) or unasserted helper/formatting code.
+**Measures:**
+- Out-of-scope fraction of P2 catalogue (artefacts lacking Python mutants: ADRs, CI workflows, logs, external processes).
+- Recall on total P2 catalogue (out of 25) and recall on code-resident P2 subset.
+- Precision of survivor clusters (clusters matching real defective guards / total clusters).
+- Classification of top non-P2 survivor clusters (stated invariant defect vs cosmetic/helper code).
+**Stopping rules (fixed before the run):**
+- If recall on code-resident P2 guards $\ge 70\%$ AND precision of substantive non-cosmetic clusters $\ge 50\% \implies$ **Catalogue is mechanically automatable.** Mutation survivor clustering can regenerate the guard catalogue and scales to arbitrary repositories without manual audit. Update P2 positioning to claim automated prevalence. [asserted]
+- If recall on total P2 catalogue $< 35\%$ OR code-resident recall $< 50\% \implies$ **The correspondence is too weak to automate (Structural divergence).** Guard-cannot-fail is a claim-versus-implementation mismatch that mutation testing cannot see; P2's hand-audit method is structurally necessary rather than an artefact of early effort. [asserted]
+- If $\ge 50\%$ of P2's 25 guards live outside Python source (in ADRs, CI workflows, git metadata, external projections) $\implies$ **Domain boundary refutation.** Mutation testing over program code has no access to governance/orchestration layers where most vacuous checks live. [asserted]
+- If fewer than 100 survivors are parsed or data is missing location metadata $\implies$ **Insufficient evidence.** Do not extrapolate from corrupted or truncated survivor records. [asserted]
+**What it cannot decide:**
+- Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
+- Higher-order multi-point semantic failures not captured by single-mutant operators.
+
 ---
 
 ## Not experiments
