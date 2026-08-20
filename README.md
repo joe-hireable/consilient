@@ -1,4 +1,4 @@
-# Consilience
+# Consilient
 
 > **"The Consilience of Inductions takes place when an Induction, obtained from one class of
 > facts, coincides with an Induction obtained from another different class. Thus Consilience

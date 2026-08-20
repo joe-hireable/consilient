@@ -3,7 +3,7 @@
 **Status:** primary-source synthesis, 20 August 2026. Sixty-five sources were read across
 eight disjoint topics by readers who did not see each other's material; 44 were read in full,
 19 at abstract or landing page, and 2 are `[2ND]` vendor reports which are named here only to
-be excluded. [measured] Nothing in this file is a Consilience measurement. [asserted]
+be excluded. [measured] Nothing in this file is a Consilient measurement. [asserted]
 
 This exists because the programme's stated outcome — verified human gain while preserving
 agency — assumed instruments that mostly do not survive contact with the literature.
@@ -21,7 +21,7 @@ Three findings reshape the outcome definition, and the first is the one that mat
    β-drift hypothesis — which is the most publishable thing in this synthesis. [asserted]
 3. **Every self-report in the outcome list is a broken sensor in exactly this population.**
    [cited] Speed, learning, self-efficacy and satisfaction are each wrong in sign under the
-   conditions Consilience targets.
+   conditions Consilient targets.
 
 ## 1. The correlated-oracle problem
 
@@ -127,7 +127,7 @@ that assistance is inherently corrosive. [asserted]
   than benchmarks. [asserted]
 - **The cleanest metric in the literature does not survive this product.** METR states that
   time-spent measurement becomes unreliable for developers running multiple agents
-  concurrently. [cited] That is Consilience's own design point, so wall-clock-per-task cannot
+  concurrently. [cited] That is Consilient's own design point, so wall-clock-per-task cannot
   be the primary outcome. [asserted]
 
 ## 5. What a CLI harness can actually measure

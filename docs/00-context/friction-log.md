@@ -1,6 +1,6 @@
 # Friction log
 
-**Every manual step in the bootstrap harness that Consilience should automate.**
+**Every manual step in the bootstrap harness that Consilient should automate.**
 This is the v0 backlog, derived from use rather than imagination. See ADR-0017.
 
 ## How to keep it
@@ -13,7 +13,7 @@ the frequent ones are what matter.
 | date | what I had to do by hand | how often | what would automate it |
 ```
 
-**Never delete a line.** When Consilience automates something, add the commit reference in
+**Never delete a line.** When Consilient automates something, add the commit reference in
 the last column. The log is a record of what the tool is *for*; deleting satisfied entries
 erases the justification for features that exist.
 
@@ -25,7 +25,7 @@ to inflate the backlog.
 
 ADR-0017 states it plainly: if this log stays short for a month, one of two things is true.
 
-1. **Claude Code is already sufficient**, and Consilience solves a problem Joe does not
+1. **Claude Code is already sufficient**, and Consilient solves a problem Joe does not
    personally have. That is a serious finding for ADR-0004's premise that "the smallest
    thing worth a stranger's install and the smallest thing that improves my week are the
    same artefact" — and it should be reported, not buried.
@@ -116,7 +116,7 @@ to; neither source states a rate.
 ## What does not belong here
 
 - Bugs in Claude Code. Those go upstream.
-- Things that are annoying but that Consilience should not do. Scope creep enters through
+- Things that are annoying but that Consilient should not do. Scope creep enters through
   this file more easily than anywhere else, because every friction feels like a feature
   request.
 - Frictions with no plausible automation. Log them if you like, but mark them

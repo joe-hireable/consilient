@@ -7,7 +7,7 @@ This document proposes falsifiable design hypotheses; it is not an approved spec
 
 ## Verdict
 
-Consilience should give agents stable, understandable identities, but it must not confuse
+Consilient should give agents stable, understandable identities, but it must not confuse
 identity with a persona prompt. [asserted] The stable unit is an accountable logical actor
 with provenance, authority, role history and runtime bindings; personality is an optional
 presentation and interaction layer. [asserted] Until EXP-24's promotion rule fires this

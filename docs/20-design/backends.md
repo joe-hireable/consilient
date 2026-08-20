@@ -141,7 +141,7 @@ adapter boundary, closes stdin and passes the provider key only through `WSLENV`
 
 **Cursor's native external-control surface is ACP, not MCP.** The measured ACP client used
 newline-delimited JSON-RPC over stdio and retained both allow-once execution requests.
-[measured] Cursor remains an MCP client for tool access. [cited] A future Consilience MCP
+[measured] Cursor remains an MCP client for tool access. [cited] A future Consilient MCP
 façade should submit a delegation intent to the coordinator; only the coordinator should
 drive Cursor through ACP, so MCP cannot bypass authority, admission or trajectory logging.
 [asserted]

@@ -84,7 +84,7 @@ becomes a management metric, is a cost regardless of its output quality. [assert
   working arrangement in
   [`../10-research/agent-identity-and-collaboration.md`](../10-research/agent-identity-and-collaboration.md)
   is a working convenience, not v0 scope, and no check enforces it. [asserted]
-- Consilience does not distribute model weights or reproduce content from the private
+- Consilient does not distribute model weights or reproduce content from the private
   measurement corpora. [asserted]
 
 ## 3. Delivery sequence and irreversible gates
@@ -92,7 +92,7 @@ becomes a management metric, is a cost regardless of its output quality. [assert
 ### Stage 1 — bootstrap without dependence
 
 Existing agents may produce research instruments, adapters, ADRs and this draft, but
-Consilience is not on the critical path and may not route work. [asserted] Experimental
+Consilient is not on the critical path and may not route work. [asserted] Experimental
 adapter outcomes remain measurements, not product interfaces. [asserted]
 
 Three boundaries bind who performs that work. They belong to this draft because they are the
@@ -139,7 +139,7 @@ override: [asserted]
 
 ### Stage 3 — route, criticise and orchestrate, after Gate B
 
-Control begins on a project other than Consilience only after Gate B. [asserted]
+Control begins on a project other than Consilient only after Gate B. [asserted]
 
 1. EXP-05 is complete and a second adapter did not force a shared-interface redesign.
    [measured]
@@ -150,7 +150,7 @@ Control begins on a project other than Consilience only after Gate B. [asserted]
 4. Twenty non-Consilient tickets complete without intervention in the harness itself.
    [asserted]
 
-The bare-agent fallback remains permanent; Consilience must never become the only way to
+The bare-agent fallback remains permanent; Consilient must never become the only way to
 work on its own repository. [asserted]
 
 ## 4. Required records
@@ -288,7 +288,7 @@ their scarcity and failure modes differ. [asserted]
 Provider-native quota windows are recorded without conversion into a fictional shared
 token unit. [asserted] Fresh authoritative headroom is preferred; local trajectory
 accounting can lower an availability estimate but cannot promote it to provider truth
-because usage may occur outside Consilience. [asserted]
+because usage may occur outside Consilient. [asserted]
 
 Resource records are keyed by account, provider, plan, native bucket and native window;
 concurrent or nested windows remain separate. [asserted] A current user attestation may
@@ -317,7 +317,7 @@ An installed fit provider must decide model-revision, quantisation, context, eng
 hardware compatibility before the harness transfers model bytes. [asserted] Infeasible or
 unknown means no harness-initiated download or execution. [asserted]
 
-Consilience wraps rather than builds this capability; `llmfit` is the current candidate in
+Consilient wraps rather than builds this capability; `llmfit` is the current candidate in
 [ADR-0026](../decisions/0026-admit-only-budget-and-hardware-feasible-backends.md), but adding
 it remains a separate dependency-approval decision. [cited] EXP-21 must validate
 the constraint case on a real 16 GB machine; replaying the RTX 5090/64 GB measurements is

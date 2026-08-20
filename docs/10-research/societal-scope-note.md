@@ -4,7 +4,7 @@
 close it: can this project say anything about societal or macro-scale outcomes that is not
 advocacy? [asserted] Nine primary sources were fetched and read at source for this note;
 five further leads were seen only through an indexing API and are listed at the end so that
-nobody re-imports them. [measured] Nothing in this file is a Consilience measurement.
+nobody re-imports them. [measured] Nothing in this file is a Consilient measurement.
 [measured]
 
 Companion to [`human-success-and-the-human-side-of-beta.md`](human-success-and-the-human-side-of-beta.md),

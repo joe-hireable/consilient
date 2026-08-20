@@ -278,7 +278,7 @@ measures the mechanism, not β itself, and is n=1. See
 **Q31. What is the honest counterfactual for a meta-harness?**
 
 The field's positive results compare AI against no AI. The realistic comparison for
-Consilience is against a well-configured Claude Code, and the one matched study of that
+Consilient is against a well-configured Claude Code, and the one matched study of that
 transition measured +3.1% commits and −6.3% lines for repositories that had already adopted
 AI IDEs. [cited] Meanwhile the effect's sign is set by task selection — +55.8% on a greenfield
 toy task, −19% on real issues in a developer's own mature repository — so a harness that

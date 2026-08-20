@@ -2,7 +2,7 @@
 
 **Date:** 20 August 2026  
 **Status:** `[asserted]` for study architecture, identification strategy, and protocol choices; `[cited]` for literature findings; `[measured]` for baseline internal corpus metrics; `[algebra]` for sample size and power calculations.  
-**Author:** Consilience Research Programme (`fleet-public-corpus`)  
+**Author:** Consilient Research Programme (`fleet-public-corpus`)  
 **Experiment ID:** EXP-44  
 
 ---

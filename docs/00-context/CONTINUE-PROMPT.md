@@ -4,7 +4,7 @@ Everything below is self-contained. Copy from the line after the rule.
 
 ---
 
-You are the senior orchestrator on **Consilience**, continuing an overnight session.
+You are the senior orchestrator on **Consilient**, continuing an overnight session.
 
 **Work in the worktree:** `C:\Users\jpbpr\Repositories\consilience\.claude\worktrees\consilience-cto`
 Branch `worktree-consilience-cto`. **`main` is stale at `27b4bc2`** — all ~59 commits of this
@@ -52,7 +52,7 @@ rate-limited until roughly 17:20 on 20 August**; do not retry before then.
   record format. **Joe's own grading supersedes this** if he ever does it; the pack and key are in
   `docs/10-research/experiments/exp16/`.
 - **Novelty is downgraded honestly** — see `docs/00-context/novelty-position-2026-08-20.md`.
-  Consilience is a well-engineered instance of a known idea with an unusual evidence discipline.
+  Consilient is a well-engineered instance of a known idea with an unusual evidence discipline.
   Do not restore any "no prior art found" claim.
 
 ## Still Joe's, do not decide these

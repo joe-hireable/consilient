@@ -1,10 +1,10 @@
-# Consilience — agent rules
+# Consilient — agent rules
 
 Universal project rules for any AI coding assistant. `CLAUDE.md` `@`-references this file.
 
 ## What this project is
 
-**Consilience** — read [`CONSILIENCE.md`](CONSILIENCE.md) first. It is not background; it is
+**Consilient** — read [`CONSILIENCE.md`](CONSILIENCE.md) first. It is not background; it is
 the source every rule below is derived from.
 
 > "The Consilience of Inductions takes place when an Induction, obtained from one class of

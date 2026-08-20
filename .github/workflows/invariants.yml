@@ -23,6 +23,8 @@ jobs:
         run: python -m ruff check .
       - name: Invariant checks
         run: python -m pytest tests -q
+      - name: Rename safety invariant check
+        run: python .github/scripts/check_rename_safety.py --check
       - name: Replay invariant on the real trajectory
         # Build the projection first so that `replay` has a subject to compare against.
         # Before 20 Aug 2026 this step ran `replay` on a fresh checkout with no state on

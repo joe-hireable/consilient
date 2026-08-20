@@ -1,7 +1,7 @@
 # Manufacturing oracles: what works without a human writing the expected output
 
 **Intended location:** `docs/10-research/manufactured-oracles.md`
-**Status:** survey and pre-registration. No Consilience measurement of any technique below
+**Status:** survey and pre-registration. No Consilient measurement of any technique below
 exists yet. [asserted]
 **Date:** 20 August 2026.
 
@@ -425,7 +425,7 @@ are listed so the next session can spend its search budget well, in priority ord
 
 ## 12. Limitations and negative results
 
-This note surveys techniques; it measures none of them. [asserted] No Consilience number for
+This note surveys techniques; it measures none of them. [asserted] No Consilient number for
 any oracle class exists, and the ranking in §5 is an argument from evidence class and
 authoring cost, not from measured yield. [asserted]
 

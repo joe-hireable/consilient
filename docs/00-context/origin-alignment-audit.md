@@ -3,7 +3,7 @@
 ## Verdict
 
 The earliest recoverable Cowork, Claude Code and Codex records remain aligned with the
-current repository: Consilience is still an open meta-harness organised around provenance,
+current repository: Consilient is still an open meta-harness organised around provenance,
 genuinely different classes of facts and measurement of verifier false acceptance.
 [measured] No broad rewrite is warranted. [asserted]
 
@@ -97,7 +97,7 @@ each verifier's β is below the pre-fixed ADR-0002 threshold. [asserted] Equal o
 admission rate at matched throughput disconfirms convergence as a safety gain and narrows
 the novelty claim to the β-meter. [asserted]
 
-**Consilience measuring its own delegates as verifiers.** [asserted] Treat each delegated
+**Consilient measuring its own delegates as verifiers.** [asserted] Treat each delegated
 agent's recommendation as a verdict and estimate its false-accept rate over 100 bounded
 delegations with independently checked outcomes. [asserted] Stop at 100 or when three
 agents' intervals separate by more than 0.15. [asserted] Indistinguishable intervals leave

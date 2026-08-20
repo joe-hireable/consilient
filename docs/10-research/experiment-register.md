@@ -536,7 +536,7 @@ not redistributed unless their licence permits it.
   false admits in the held-out cells. [asserted]
 - If benchmark provenance or `as_of` is absent for more than 20% of records used, the feed
   remains discovery-only regardless of predictive result. [asserted]
-- If OpenRouter's automatic router produces any unattended false admit that Consilience's
+- If OpenRouter's automatic router produces any unattended false admit that Consilient's
   β-gated route rejects, it remains advisory; if it matches every verdict and uses at least
   20% less cost or elapsed time, ADR-0027's prohibition reopens. [asserted]
 - Hitting the run or spend cap without satisfying a promotion condition is an honest
@@ -634,7 +634,7 @@ adherence as a diagnostic only.
 
 ### EXP-26 · Typed native control versus transcript injection `BLOCKED: coordinator event prototype + three live adapters`
 **Decides:** the real-time control section of `agent-identity-and-collaboration.md` — whether
-Consilience needs typed `context_next`/`steer`/`interrupt` commands and staged ACKs in v0.
+Consilient needs typed `context_next`/`steer`/`interrupt` commands and staged ACKs in v0.
 **Precondition:** a coordinator inbox/outbox prototype; Codex app-server plus at least two
 of Cursor ACP, OpenCode server and a subscription-safe Claude Code control path; 30 fixture
 runs whose next invalid action is observable; no metered fallback.
@@ -727,7 +727,7 @@ resource-ledger mutation originating from change intelligence.
   lower the threshold. [asserted]
 
 ### EXP-28 · Prompt detail, feedback tone and resistance to false correction `BLOCKED: frozen fixtures + three admitted runtimes`
-**Decides:** whether Consilience should default to a lean task contract, whether calibrated
+**Decides:** whether Consilient should default to a lean task contract, whether calibrated
 constructive feedback changes verified outcomes, and whether generic praise or scathing
 correction earns any performance role.
 **Precondition:** six immutable synthetic fixtures with deterministic external verifiers —
