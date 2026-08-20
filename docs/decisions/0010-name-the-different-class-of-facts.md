@@ -72,7 +72,7 @@ echo.**
 - `[cited]` *The Illusion of Multi-Agent Advantage* (arXiv:2606.13003): audit of six
   automatic MAS-design frameworks found architectural bloat and functional collapse back to
   a single agent.
-- `[measured]` Joe's own `CODEBASE_ASSESSMENT.md` pipeline already satisfies this rule and
+- `[measured]` Joe's own prior codebase assessment pipeline already satisfies this rule and
   works: 12 discovery agents on separate sources → independent verification of all 197 leads
   → 1 fabrication caught → fabrication audit, 0 failures in 50 sampled citations.
 

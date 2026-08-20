@@ -94,10 +94,11 @@ invariant, and it is directly testable.
   object itself.
 - `[cited]` There is no git analogue of `SELECT … FOR UPDATE SKIP LOCKED`. SQLite under WAL
   gives an atomic claim in a single `UPDATE … RETURNING`.
-- `[measured]` The claim pattern already exists and is proven in `jobboard-v2`
-  (`src/lib/db/claim-rows.ts`, `FOR UPDATE SKIP LOCKED` in the cron drainers) — see
+- `[measured]` The claim pattern already exists and is proven in `jobboard-v2`, as
+  transactional row claiming in its queue drainers — see
   `../30-source-material/prior-repo-assets.md`. Porting a known-good primitive beats
-  inventing one.
+  inventing one. (The file path and identifier that were here are private-corpus content and
+  were removed on 20 August 2026 by a pre-publication leak audit.)
 - `[cited]` DeepSeek Harness's runtime invariant — everything reaching a model request must
   be rebuildable from an append-only log — is the pattern `../20-design/architecture-sketch.md`
   already commits to adopting. This ADR is that adoption, with a queryable index on top.

@@ -176,7 +176,7 @@ Practical constraints:
 - `[cited]` The MIT result measured interface form: structured posterior-style relay lost
   2.8 points per stage, prose relay 8.5. **Meeting exchanges should be structured, not
   prose.** `[2ND] — verify.`
-- `[measured]` Joe's own `CODEBASE_ASSESSMENT.md` is this structure already: discovery agents
+- `[measured]` Joe's own prior codebase assessment is this structure already: discovery agents
   as Evidence holders on separate sources, an orchestrator as Owner, independent verification
   as a distinct class, one fabrication caught in 197 leads.
 - `[cited]` Gödel Agent's pre-application verification agent is the same pattern at a

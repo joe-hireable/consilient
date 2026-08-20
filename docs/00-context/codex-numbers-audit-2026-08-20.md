@@ -349,7 +349,7 @@ But the `10.3 seconds` operand itself is not preserved outside the ADR.
 
 **Number as quoted:** 12 agents, 197 leads, one fabrication caught, 0/50 citation failures, 991 commits in 36 days, approximately 20 CI ratchets, 44 probes, five Major findings in 12 days, 1,693/1,350-file PRs, and 110 call sites.
 
-**What the artefact says:** The original private repositories and `CODEBASE_ASSESSMENT.md` are absent by policy. The snapshot contains prose summaries but no publishable aggregate manifest with corpus range, definitions, commands, and outputs.
+**What the artefact says:** The original private repositories and prior codebase assessment are absent by policy. The snapshot contains prose summaries but no publishable aggregate manifest with corpus range, definitions, commands, and outputs.
 
 **Arithmetic:** The surviving prose permits only superficial calculations:
 

@@ -317,5 +317,5 @@ Joe has asked for a multi-agent approach to research → brainstorm → spec →
 The theorem in `literature-review.md` §3 constrains that: parallel *discovery* over
 independent sources adds exogenous signal and is justified; parallel *deliberation* over the
 same shared context is provably lossy. The pattern that worked in his own
-`CODEBASE_ASSESSMENT.md` — independent discovery agents, then independent verification of
+prior codebase assessment — independent discovery agents, then independent verification of
 every lead, then a fabrication audit — respects the theorem. Reuse that shape.

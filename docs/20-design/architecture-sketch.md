@@ -133,7 +133,7 @@ From `literature-review.md`, these are solved elsewhere and should be taken whol
   This is what `/learn` should be.
 - **Trajectory log invariant** — DeepSeek Harness's rule that everything reaching a model
   request must be rebuildable from an append-only log.
-- **The verification pipeline shape** — Joe's own `CODEBASE_ASSESSMENT.md` method:
+- **The verification pipeline shape** — Joe's own prior codebase assessment method:
   independent discovery → independent verification of every lead → fabrication audit.
   Measured ~0.5% fabrication rate, caught — one fabrication among 197 leads, 1/197 =
   0.5076%. `[measured]` See `30-source-material/prior-repo-assets.md`.

@@ -49,7 +49,7 @@ Rename and re-gate it. There is no "meeting". There is an **evidence merge**:
 - `[cited]` The MIT result recasts optimising a multi-agent DAG under a finite
   communication budget as "choosing how to compress and pass along the shared signal" —
   i.e. a lossy channel design problem. A merge of *different* evidence is not that problem.
-- `[measured]` Joe's `CODEBASE_ASSESSMENT.md` is an evidence merge that worked, and it
+- `[measured]` Joe's prior codebase assessment is an evidence merge that worked, and it
   passed rule 2 without anyone stating the rule: discovery agents read different sources,
   verifiers re-derived from primary evidence.
 - `[cited]` Budget primitives are not optional: 63 confirmed production budget-overrun

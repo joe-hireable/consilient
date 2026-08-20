@@ -84,7 +84,7 @@ and CI re-runs it.
 
 ## Verification is mandatory
 
-Joe's own `CODEBASE_ASSESSMENT.md` pipeline caught **one fabricated lead in 197** through
+Joe's own prior codebase assessment pipeline caught **one fabricated lead in 197** through
 independent verification, plus a 5-citation fabrication audit per scorer (0 failures in 50
 sampled). An inquiry tier without that gate will manufacture numbers with the same fluency.
 
