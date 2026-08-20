@@ -33,7 +33,7 @@ DEFAULT_LOG = Path(".harness/log")
 DEFAULT_DB = Path(".harness/state.db")
 EXPERIMENT_REGISTER = Path("docs/10-research/experiment-register.md")
 GATE_B2_ADR = Path(
-    "docs/decisions/0037-replace-gate-b2-with-measured-critic-throughput-gain.md"
+    "docs/decisions/0045-give-gate-b2-and-b3-success-criteria-they-never-had.md"
 )
 GATE_B_CIRCULARITY = Path(
     "docs/00-context/gate-b-cannot-be-passed-2026-08-20.md"
@@ -44,12 +44,19 @@ WORKFLOWS = Path(".github/workflows")
 # log is append-only. A3 tolerates these and only these. This number may only ever go DOWN,
 # and it cannot go down by editing the log — only by the log's history being superseded.
 CAPTURE_REFUSAL_BASELINE = 3
+FALLBACK_RESULT = Path(".harness/fallback-result.json")
+# Two cycles of a weekly schedule (ADR-0045). One missed run is tolerated, two are not.
+FALLBACK_MAX_AGE_DAYS = 14
+# The machine-readable critic measurement ADR-0045 requires in EXP-08's register entry.
+CRITIC_BETA = re.compile(
+    r"critic-beta-measured:\s*([0-9.]+)\s*\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]"
+)
 REQUIREMENTS = {
     "A1": "EXP-01 complete on two differently verified repositories with an interval",
     "A2": "Replay reproduces an identical canonical state digest",
     "A3": "Seven consecutive days of trajectory capture with no data loss",
     "B1": "EXP-05 complete and adapter two required no shared-interface redesign",
-    "B2": "EXP-08 measured critic throughput gain is at least 20%",
+    "B2": "The critic tier's own beta is measured, with an interval",
     "B3": "A one-command bare-Claude-Code fallback is exercised weekly",
     "B4": "Twenty non-Consilient tickets complete without harness intervention",
 }
@@ -182,9 +189,7 @@ def _experiment_entry(identifier: str) -> tuple[str | None, str]:
     return status, entry
 
 
-def _experiment_conditions(
-    beta: CommandResult, log: Path
-) -> tuple[CommandResult, CommandResult, CommandResult]:
+def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResult]:
     register = EXPERIMENT_REGISTER.as_posix()
     a1_status, _ = _experiment_entry("EXP-01")
     a1 = _condition(
@@ -211,24 +216,27 @@ def _experiment_conditions(
     else:
         b1 = _condition("B1", "fail", f"EXP-05 is recorded as {b1_status}.", register)
 
-    b2_status, _ = _experiment_entry("EXP-08")
-    b2_evidence = (register, GATE_B2_ADR.as_posix(), f"{log.as_posix()}/*.jsonl")
+    b2_status, b2_entry = _experiment_entry("EXP-08")
+    b2_evidence = (register, GATE_B2_ADR.as_posix())
+    measurement = CRITIC_BETA.search(b2_entry)
     if b2_status is None:
         b2 = _condition("B2", "unknown", "No EXP-08 result is recorded.")
-    elif not b2_status.startswith("DONE") or beta["verdict"] != "measured":
+    elif measurement is None:
         b2 = _condition(
             "B2",
-            "unknown",
-            f"EXP-08 is {b2_status}; beta is {beta['verdict']} from "
-            f"{beta['n_rejected']} human rejections, so the 0.6296 threshold cannot be evaluated.",
+            "fail",
+            f"EXP-08 is {b2_status}; its entry records no `critic-beta-measured: p [lo, hi]` "
+            "measurement, which ADR-0045 requires.",
             *b2_evidence,
         )
     else:
+        point, low, high = (float(value) for value in measurement.groups())
         b2 = _condition(
             "B2",
-            "unknown",
-            "No machine-readable EXP-08 outcome exists; repository-wide beta is not "
-            "critic-recall evidence for the 0.6296 threshold.",
+            "pass" if low <= point <= high else "fail",
+            f"Critic beta is measured at {point} [{low}, {high}]."
+            if low <= point <= high
+            else f"Recorded critic beta {point} lies outside its own interval [{low}, {high}].",
             *b2_evidence,
         )
     return a1, b1, b2
@@ -336,9 +344,41 @@ def _fallback_condition() -> CommandResult:
         status = "fail"
         reason = f"All {len(files)} workflows were checked; none has a schedule trigger."
     else:
-        status = "unknown"
-        reason = "A scheduled workflow exists, but no machine-readable fallback result exists."
-    return _condition("B3", status, reason, WORKFLOWS.as_posix())
+        status, reason = _fallback_result()
+    return _condition("B3", status, reason, WORKFLOWS.as_posix(), FALLBACK_RESULT.as_posix())
+
+
+def _fallback_result() -> tuple[str, str]:
+    """Read the dated fallback result ADR-0045 requires. Absent or stale is a FAIL.
+
+    B3 asks whether the bare-agent fallback is *exercised weekly*. A result with no date, or
+    an old one, is evidence about some other week. Fourteen days is two cycles: one missed
+    run is tolerated, two are not.
+    """
+    raw = _read_text(FALLBACK_RESULT)
+    if raw is None:
+        return "fail", (
+            f"No fallback result at {FALLBACK_RESULT.as_posix()}; the scheduled workflow has "
+            "never recorded one."
+        )
+    try:
+        result = json.loads(raw)
+        stamped = datetime.fromisoformat(str(result["ts"]))
+        outcome = str(result["outcome"])
+        command = str(result["command"])
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        return "fail", f"The fallback result is unreadable: {exc}."
+    if stamped.tzinfo is None:
+        return "fail", "The fallback result timestamp carries no offset."
+    age = (datetime.now(timezone.utc) - stamped).days
+    if age > FALLBACK_MAX_AGE_DAYS:
+        return "fail", (
+            f"The fallback result is {age} days old, over the {FALLBACK_MAX_AGE_DAYS}-day "
+            "limit; that is evidence about a different week."
+        )
+    if outcome != "pass":
+        return "fail", f"The fallback ran {age} day(s) ago and reported {outcome!r}."
+    return "pass", f"`{command}` ran {age} day(s) ago and passed."
 
 
 def _structural_condition() -> CommandResult:
@@ -378,15 +418,12 @@ def _gate(conditions: list[CommandResult]) -> CommandResult:
 
 def cmd_doctor(args: argparse.Namespace) -> CommandResult:
     log, db = Path(args.log), Path(args.db)
-    # Replay must inspect prior state before beta reads the rebuilt projection. Rebuilding
-    # first would recreate the tautological A2 check repaired on 20 August 2026.
+    # Replay must inspect prior state before anything rebuilds the projection; rebuilding
+    # first would recreate the tautological A2 check repaired on 20 August 2026. The beta
+    # read that used to follow here fed Gate B2's throughput threshold, withdrawn by
+    # ADR-0045.
     replay = cmd_replay(args)
-    conn = sqlite3.connect(db)
-    try:
-        beta = beta_mod.from_connection(conn).as_dict()
-    finally:
-        conn.close()
-    a1, b1, b2 = _experiment_conditions(beta, log)
+    a1, b1, b2 = _experiment_conditions()
     gates = {
         "A": _gate([a1, _replay_condition(replay, log, db), _capture_condition(log)]),
         "B": _gate([b1, b2, _fallback_condition(), _structural_condition()]),

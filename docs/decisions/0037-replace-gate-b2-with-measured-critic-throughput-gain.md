@@ -1,6 +1,9 @@
 # 0037. Replace Gate B2 with measured critic review-throughput gain — supersedes 0015 Gate B2
 
-- **Status:** ACCEPTED
+- **Status:** **SUPERSEDED by [0045](0045-give-gate-b2-and-b3-success-criteria-they-never-had.md) on 20 August 2026.** Its 0.6296 throughput threshold is withdrawn: it could never be
+  evaluated, because doing so needs a measured repository β, which needs human rejections, of
+  which there have been zero. The body below is retained unchanged as history — the audit it
+  records, that the ORIGINAL B2 could never fail, still stands and is why this ADR existed.
 - **Date:** 2026-08-20
 - **Deciders:** Cursor / Gemini 3.7 Flash High (dispatched agent, technical authority), Joe Brown (intent)
 - **Supersedes:** [0015](0015-dogfooding-gate.md) Gate B condition 2

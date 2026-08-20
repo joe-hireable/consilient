@@ -1526,6 +1526,35 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
 - Higher-order multi-point semantic failures not captured by single-mutant operators.
 
+### EXP-51 · Probe OpenRouter's spend controls before any spend is authorised `READY`
+**Pre-registered 20 Aug 2026 in ADR-0044, before any credential exists. Not run.**
+**Decides:** whether the capabilities ADR-0044 relies on are real. Everything in that ADR's
+capability table is `[cited]` from OpenRouter's documentation and **none of it has been run here**,
+because running it needs the principal's key. No figure from it may be quoted as measured until this
+reports.
+**Precondition:** an OpenRouter key supplied by the principal, and the refuse-only budget primitive
+already shipped. **The probe must not perform a completion it has not been authorised to pay for.**
+**Questions, fixed now:**
+1. Does `limit_reset` accept `weekly` and `monthly`, or only `daily`? The provisioning documentation
+   demonstrates only `daily`. **Joe's stated requirement is weekly and monthly.**
+2. Does every completion response carry a `usage` object with a cost — on every model, and on
+   streamed and errored requests? Per-run attribution rests entirely on this.
+3. Does the account-level cap surface through `GET /api/v1/key`, or is it invisible to the API?
+4. What happens at exhaustion — a clean 402, or a partial charge?
+**Stopping rules (fixed before the probe):**
+- If (1) fails, the weekly and monthly ceilings cannot be enforced vendor-side. They must then be
+  enforced harness-side and **declared as the weaker guarantee they are** — a boundary anything can
+  route around, which is the failure working principle 3 exists to prevent. [asserted]
+- If (2) fails on any tested model, per-run attribution is unavailable and **ADR-0044 must be reduced
+  to ADR-0019 condition 3** — metered calls permitted only with a human present for each one, with
+  the ceiling as an addition rather than a replacement. [asserted]
+- If (3) shows the account cap is invisible, the harness must never reason about the principal's
+  £100 and must say so wherever a budget is displayed. [asserted]
+**What it cannot decide:** whether OpenRouter's routing keeps a fixed model string pointing at a
+fixed model. That is a reproducibility hazard for any measurement taken through a broker and needs
+its own experiment.
+
+
 ### EXP-49 · Mutation testing on the research instruments themselves `DONE (partial) 20 Aug 2026 — see experiments/exp49/findings-exp49.md`
 **Pre-registered at `7b6ada0`. Two runs, 20 Aug 2026. Verdict under the fixed stopping rules:
 `insufficient_evidence` — the census did not complete, twice.**

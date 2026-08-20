@@ -1043,8 +1043,13 @@ def test_doctor_does_not_substitute_repository_beta_for_exp08(
     payload = doctor_payload(tmp_path, capsys)
     condition = payload["gates"]["B"]["conditions"][1]
 
-    assert condition["id"] == "B2" and condition["status"] == "unknown"
-    assert "not critic-recall evidence" in condition["reason"]
+    # Amended by ADR-0045. The intent is unchanged and now stronger: thirty repository-wide
+    # human rejections are not critic-recall evidence and must not satisfy B2. Previously the
+    # condition read the repository beta and reported `unknown`; it no longer reads it at all
+    # and requires an explicit `critic-beta-measured:` marker, so the substitution the test
+    # guards against is now structurally impossible rather than merely refused.
+    assert condition["id"] == "B2" and condition["status"] == "fail"
+    assert "records no `critic-beta-measured" in condition["reason"]
     assert payload["routing_orchestration_enabled"] is False
 
 
@@ -1575,6 +1580,7 @@ def _reachable_statuses() -> dict[str, set[str]]:
         if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         assigned: dict[str, set[str]] = {}
+        delegated = _delegated_calls(function)
         for node in ast.walk(function):
             if isinstance(node, ast.Assign):
                 names = {t.id for t in node.targets if isinstance(t, ast.Name)}
@@ -1607,9 +1613,50 @@ def _reachable_statuses() -> dict[str, set[str]]:
             }
             if isinstance(status, ast.Name):
                 found |= assigned.get(status.id, set())
+                found |= _returned_literals(tree, delegated.get(status.id, set()))
             reachable.setdefault(identifier.value, set()).update(found)
 
     return reachable
+
+
+def _delegated_calls(function) -> dict[str, set[str]]:
+    """Local helper names a status variable was assigned from, e.g. `s, r = _helper()`."""
+    import ast
+
+    out: dict[str, set[str]] = {}
+    for node in ast.walk(function):
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
+            continue
+        callee = node.value.func
+        if not isinstance(callee, ast.Name):
+            continue
+        names: set[str] = set()
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                names.add(target.id)
+            elif isinstance(target, ast.Tuple):
+                names |= {e.id for e in target.elts if isinstance(e, ast.Name)}
+        for name in names:
+            out.setdefault(name, set()).add(callee.id)
+    return out
+
+
+def _returned_literals(tree, callees: set[str]) -> set[str]:
+    """String literals any of the named module-level functions can return."""
+    import ast
+
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name not in callees:
+            continue
+        for inner in ast.walk(node):
+            if isinstance(inner, ast.Return) and inner.value is not None:
+                found |= {
+                    c.value
+                    for c in ast.walk(inner.value)
+                    if isinstance(c, ast.Constant) and isinstance(c.value, str)
+                }
+    return found
 
 
 def test_every_gate_condition_has_a_reachable_pass_state():
@@ -1622,11 +1669,10 @@ def test_every_gate_condition_has_a_reachable_pass_state():
     `_experiment_conditions` returns `unknown` or `fail`, so no artefact anyone could build
     would make them pass.
 
-    B4 is grandfathered for a different and honest reason: it reports
-    `structurally_unsatisfiable`, which is an accurate description of a circular condition
-    and is exactly what the status exists for. B2 and B3 are the failure this test is
-    written against — a condition whose success path was never written at all, reporting
-    FAIL or UNKNOWN as though the work simply had not been done yet.
+    B2 and B3 were given success criteria by ADR-0045 on the day this test was written, so
+    the set has already shrunk from three to one. B4 remains, for a different and honest
+    reason: it reports `structurally_unsatisfiable`, which is an accurate description of a
+    circular condition and is exactly what that status exists for. FAIL and UNKNOWN are not.
 
     The three are grandfathered BY NAME and the set may only SHRINK. Adding an identifier
     here is not permitted; removing one is the whole point.
@@ -1639,7 +1685,7 @@ def test_every_gate_condition_has_a_reachable_pass_state():
         f"REQUIREMENTS {sorted(REQUIREMENTS)}"
     )
 
-    known_unpassable = {"B2", "B3", "B4"}
+    known_unpassable = {"B4"}
     unpassable = {key for key, statuses in reachable.items() if "pass" not in statuses}
     assert unpassable <= known_unpassable, (
         f"a gate condition lost its pass state: {sorted(unpassable - known_unpassable)}. "
@@ -1728,3 +1774,116 @@ def test_the_capture_refusal_baseline_may_only_fall():
     assert CAPTURE_REFUSAL_BASELINE <= 3, (
         "the A3 refusal tolerance was raised; ADR-0043 permits it to fall only"
     )
+
+
+# ---------------------------------------------------------------- ADR-0045
+def _gate_b(tmp_path, capsys):
+    return {c["id"]: c for c in doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"]}
+
+
+def _b3_world(tmp_path, result, *, scheduled=True):
+    """A workspace with a scheduled workflow and a given fallback result."""
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    trigger = "  schedule:\n    - cron: '0 6 * * 1'\n" if scheduled else "  push:\n"
+    (workflows / "fallback.yml").write_text(
+        f"on:\n{trigger}jobs:\n  run:\n    runs-on: ubuntu-latest\n", encoding="utf-8"
+    )
+    if result is not None:
+        harness = tmp_path / ".harness"
+        harness.mkdir(parents=True, exist_ok=True)
+        (harness / "fallback-result.json").write_text(
+            result if isinstance(result, str) else json.dumps(result), encoding="utf-8"
+        )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+
+def _fallback(days_old, outcome="pass"):
+    stamped = datetime.now(timezone.utc) - timedelta(days=days_old)
+    return {
+        "ts": stamped.isoformat(),
+        "command": "claude -p 'fix the failing test'",
+        "outcome": outcome,
+        "run": "https://example.invalid/run/1",
+    }
+
+
+def test_b3_passes_on_a_recent_passing_fallback(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _b3_world(tmp_path, _fallback(2))
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "pass", condition["reason"]
+    assert "2 day(s) ago and passed" in condition["reason"]
+
+
+def test_b3_fails_on_a_stale_fallback(tmp_path, capsys, monkeypatch):
+    """Fifteen days is two missed weekly cycles. ADR-0045 names this case explicitly.
+
+    A green result from a month ago is evidence about a month ago. The failure mode this
+    guards is a workflow that silently stopped running while its last result stayed green.
+    """
+    monkeypatch.chdir(tmp_path)
+    _b3_world(tmp_path, _fallback(15))
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "fail", condition["reason"]
+    assert "15 days old" in condition["reason"]
+
+
+def test_b3_fails_when_the_fallback_itself_failed(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _b3_world(tmp_path, _fallback(1, outcome="fail"))
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "fail" and "'fail'" in condition["reason"]
+
+
+def test_b3_fails_on_an_unreadable_or_undated_fallback(tmp_path, capsys, monkeypatch):
+    """Malformed evidence FAILS rather than reporting unknown.
+
+    `unknown` was the status that made B2 and B3 unpassable in the first place: a placeholder
+    that reads like outstanding work. A result nobody can parse is not an open question.
+    """
+    monkeypatch.chdir(tmp_path)
+    _b3_world(tmp_path, "{not json}")
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "fail" and "unreadable" in condition["reason"]
+
+
+def test_b3_fails_when_the_result_timestamp_has_no_offset(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    payload = _fallback(1)
+    payload["ts"] = "2026-08-20T06:00:00"
+    _b3_world(tmp_path, payload)
+    condition = _gate_b(tmp_path, capsys)["B3"]
+    assert condition["status"] == "fail" and "offset" in condition["reason"]
+
+
+def test_b2_passes_on_a_recorded_critic_beta(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    register = tmp_path / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True)
+    register.write_text(
+        "### EXP-08 · Critic recall `DONE 21 Aug 2026`\n"
+        "critic-beta-measured: 0.31 [0.29, 0.33]\n",
+        encoding="utf-8",
+    )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    condition = _gate_b(tmp_path, capsys)["B2"]
+    assert condition["status"] == "pass", condition["reason"]
+    assert "0.31" in condition["reason"]
+
+
+def test_b2_fails_when_the_recorded_point_is_outside_its_own_interval(
+    tmp_path, capsys, monkeypatch
+):
+    """A transcription error in the register must not become a passing gate."""
+    monkeypatch.chdir(tmp_path)
+    register = tmp_path / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True)
+    register.write_text(
+        "### EXP-08 · Critic recall `DONE 21 Aug 2026`\n"
+        "critic-beta-measured: 0.91 [0.29, 0.33]\n",
+        encoding="utf-8",
+    )
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    condition = _gate_b(tmp_path, capsys)["B2"]
+    assert condition["status"] == "fail" and "outside its own interval" in condition["reason"]
