@@ -506,7 +506,7 @@ def test_the_cli_exposes_no_routing_or_blocking_surface():
     )
     assert subparsers is not None
     commands = set(subparsers.choices)
-    for name, sub in subparsers.choices.items():
+    for sub in subparsers.choices.values():
         actions |= {a.dest for a in sub._actions}
 
     assert commands == {"record", "replay", "beta"}, commands
@@ -838,3 +838,137 @@ def test_replay_preserves_state_that_is_both_stale_and_drifted(tmp_path, capsys)
         "the drifted state was destroyed, not preserved"
     )
     assert Path(payload["preserved_stale_state"]).exists()
+
+
+# ---------------------------------------------------------------- V0-26
+# ADR-0010 and CONSILIENCE.md clause 2: every multi-agent structure must name the distinct
+# class of facts it introduces. Two agents declaring the same evidence class is echo, not
+# consilience, and must be refused by validate(). Single-actor events remain unaffected.
+
+
+def multi_event(contributors, **over):
+    data = {"contributors": contributors}
+    over_data = over.pop("data", {})
+    data.update(over_data)
+    return ev(data=data, **over)
+
+
+def test_multi_contributor_event_with_duplicate_evidence_class_is_refused():
+    bad = multi_event(
+        [
+            {"logical_identity": "reader-a", "evidence_class": "literature"},
+            {"logical_identity": "reader-b", "evidence_class": "literature"},
+        ]
+    )
+    with pytest.raises(EventError, match="duplicate evidence_class 'literature'"):
+        validate(bad)
+
+
+def test_multi_contributor_event_with_case_variant_duplicate_is_refused():
+    """Case and whitespace variation must not disguise identical evidence classes."""
+    bad = multi_event(
+        [
+            {"logical_identity": "analyst-1", "evidence_class": "Primary Sources"},
+            {"logical_identity": "analyst-2", "evidence_class": "  primary sources  "},
+        ]
+    )
+    with pytest.raises(EventError, match="duplicate evidence_class"):
+        validate(bad)
+
+
+def test_multi_contributor_event_with_missing_evidence_class_is_refused():
+    bad = multi_event(
+        [
+            {"logical_identity": "worker-1", "evidence_class": "test execution"},
+            {"logical_identity": "worker-2"},
+        ]
+    )
+    with pytest.raises(EventError, match="requires a non-empty evidence_class"):
+        validate(bad)
+
+
+def test_multi_contributor_event_with_empty_or_whitespace_evidence_class_is_refused():
+    bad = multi_event(
+        [
+            {"logical_identity": "worker-1", "evidence_class": "test execution"},
+            {"logical_identity": "worker-2", "evidence_class": "   "},
+        ]
+    )
+    with pytest.raises(EventError, match="requires a non-empty evidence_class"):
+        validate(bad)
+
+
+def test_multi_contributor_event_with_non_dict_contributor_is_refused():
+    bad = multi_event(["agent-1", "agent-2"])
+    with pytest.raises(EventError, match="contributor must be an object"):
+        validate(bad)
+
+
+def test_multi_contributor_event_with_non_list_contributors_is_refused():
+    bad = ev(data={"contributors": "invalid-string"})
+    with pytest.raises(EventError, match="contributors must be a list"):
+        validate(bad)
+
+
+def test_multi_contributor_event_with_distinct_evidence_classes_is_accepted():
+    good = multi_event(
+        [
+            {"logical_identity": "tester", "evidence_class": "execution output"},
+            {"logical_identity": "auditor", "evidence_class": "static inspection"},
+        ]
+    )
+    assert validate(good) == good
+
+
+def test_many_contributors_with_partial_duplicate_is_refused():
+    bad = multi_event(
+        [
+            {"logical_identity": "c1", "evidence_class": "algebra"},
+            {"logical_identity": "c2", "evidence_class": "simulation"},
+            {"logical_identity": "c3", "evidence_class": "literature"},
+            {"logical_identity": "c4", "evidence_class": "algebra"},
+        ]
+    )
+    with pytest.raises(EventError, match="duplicate evidence_class 'algebra'"):
+        validate(bad)
+
+
+def test_single_contributor_event_is_unaffected():
+    """An event with a single contributor does not require evidence_class."""
+    single = multi_event([{"logical_identity": "single-worker"}])
+    assert validate(single) == single
+
+
+def test_single_actor_ordinary_event_is_unaffected():
+    """The overwhelming majority of events carry no contributors and must pass."""
+    ordinary = ev(data={"task": "t1", "note": "ordinary event"})
+    assert validate(ordinary) == ordinary
+
+
+def test_duplicate_evidence_class_is_quarantined_at_read_without_breaking_log(tmp_path):
+    """Refused multi-contributor events are quarantined rather than crashing reader."""
+    log = tmp_path / "2026-08-20.jsonl"
+    valid = multi_event(
+        [
+            {"logical_identity": "a", "evidence_class": "source a"},
+            {"logical_identity": "b", "evidence_class": "source b"},
+        ]
+    )
+    append(log, valid)
+
+    smuggled_bad = canonical(
+        multi_event(
+            [
+                {"logical_identity": "a", "evidence_class": "same class"},
+                {"logical_identity": "b", "evidence_class": "same class"},
+            ]
+        )
+    )
+    with log.open("a", encoding="utf-8") as fh:
+        fh.write(smuggled_bad + "\n")
+
+    events, rejected = read(log)
+    assert len(events) == 1, "the valid event must survive"
+    assert len(rejected) == 1, "the duplicate class event must be quarantined"
+    assert rejected[0].line == 2
+    assert "duplicate evidence_class" in rejected[0].reason

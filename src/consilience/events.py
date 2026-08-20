@@ -5,6 +5,7 @@ The append-only JSONL log is the record; everything else is a projection of it (
 Invariants enforced here, each with a test in the same commit:
   V0-01  every event is schema-versioned and append-only.
   V0-18  a human decision is valid only when the human principal authored it.
+  V0-26  multi-contributor events must declare a distinct evidence_class per contributor.
 """
 
 from __future__ import annotations
@@ -110,7 +111,53 @@ def validate(event: dict) -> dict:
         raise EventError("data must be an object")
 
     _check_human_authority(event)
+    _check_evidence_class(event)
     return event
+
+
+def _check_evidence_class(event: dict) -> None:
+    """V0-26: multi-contributor events must declare a distinct evidence_class per contributor.
+
+    ADR-0010 and CONSILIENCE.md clause 2: agreement between agents that share evidence
+    is echo, not consilience. A multi-contributor event must name a different class of
+    facts per contributor (Ao, Gao & Simchi-Levi 2026, arXiv:2603.26993).
+    """
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return
+    contributors = data.get("contributors")
+    if contributors is None and "contributors" in event:
+        contributors = event.get("contributors")
+    if contributors is None:
+        return
+
+    if not isinstance(contributors, list):
+        raise EventError("contributors must be a list")
+
+    if len(contributors) <= 1:
+        return
+
+    seen_classes: set[str] = set()
+    for contributor in contributors:
+        if not isinstance(contributor, dict):
+            raise EventError("contributor must be an object")
+        ec = contributor.get("evidence_class")
+        if not isinstance(ec, str) or not ec.strip():
+            identity = (
+                contributor.get("logical_identity")
+                or contributor.get("runtime_identity")
+                or "contributor"
+            )
+            raise EventError(
+                f"multi-contributor event requires a non-empty evidence_class for {identity!r} (V0-26)"
+            )
+        normalized = ec.strip().casefold()
+        if normalized in seen_classes:
+            raise EventError(
+                f"multi-contributor event must name distinct evidence classes; duplicate "
+                f"evidence_class {ec.strip()!r} (V0-26)"
+            )
+        seen_classes.add(normalized)
 
 
 def _check_human_authority(event: dict) -> None:
