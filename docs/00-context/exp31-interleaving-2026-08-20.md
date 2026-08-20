@@ -203,3 +203,86 @@ difference between knowing and being able to act.
 **Recorded rather than done**, because the ten lines belong in `run_exp31.py`, and changing an
 instrument during its own run is the tampering this project has now refused three times in one
 night.
+
+
+---
+
+# Correction 05:05 — two of my claims on this page were wrong, and the instrument is better than I said
+
+One of the two runners finished while I was writing the closing summary, and what it wrote
+refutes two things asserted above. Both corrections are against me. [measured]
+
+## Wrong claim 1: "each runner will write `complete: true` and look finished"
+
+**It did not.** The runner carries a pre-registered `wall_clock_cap_s` of 10,800 seconds, hit it
+at `elapsed_s: 10799.354`, and wrote:
+
+```
+"complete": false,
+"stop_reason": "wall_clock_cap"
+```
+
+It stopped at **38 of 50 cells**, said so, and named why. It also emitted a `protocol` block
+recording its fixtures, attempt budget and timeout, and a `summary` whose registered verdicts read
+`insufficient_evidence` on both axes. [measured]
+
+**That is an honest instrument behaving well**, and the "trap" I described — a file that would
+shortly stop advertising its own problem — did not materialise for this writer. I predicted a
+failure mode from the code shape without checking whether a cap existed. The interleaving defect
+is real; this particular consequence I invented.
+
+## Wrong claim 2: "`gemma4`'s timeout rate rose from ~17% to 41%, so contention is degrading the run"
+
+**It is not degradation. It is fixture composition, and I misread a rising aggregate as a trend.**
+
+| fixture | `qwen3:8b` | `gemma4:31b` |
+|---|---|---|
+| `duration-parser` | 3 rejected, 2 timeout | **5 passed** |
+| `event-replay` | 3 rejected, 2 timeout | **5 passed** |
+| `windows-wsl-path` | 4 rejected, 1 timeout | **5 timeout** |
+| `wilson-verdict` | 2 rejected, 1 timeout | **5 timeout** |
+
+`gemma4` is **5/5 or 0/5 on every fixture**. Not one mixed result. [measured] If GPU contention
+were driving the timeouts they would scatter within fixtures; instead they partition perfectly by
+fixture. The aggregate rate climbed because the run advanced into two fixtures where `gemma4`
+times out deterministically — not because conditions worsened over time.
+
+**This is the more interesting finding, and I nearly buried it under a contention story.**
+`gemma4:31b` is bimodal by fixture: it either solves the task every single attempt, or exceeds the
+240-second timeout every single attempt. That is a capability-or-latency boundary sitting inside
+the fixture set, and it is exactly the kind of structure a median multiplier would hide.
+
+## What stands
+
+The interleaving itself, and its evidence: the probe fingerprint alternating across seven commits,
+and **5 disagreements in 22 independently repeated cells**. Two writers did run concurrently and
+did overwrite each other. [measured]
+
+And the attribution is now clearer, which is worse for me: the finishing writer ran as a
+background task **in this session's own task directory**, labelled *"Relaunch EXP-31"*. **I
+started the second runner.** The page above described "two runners, started hours apart" without
+saying whose. They were mine.
+
+## What EXP-31 actually found, with its own stopping rule applied
+
+Registered verdicts, from the runner's own summary: **`pass_rate: insufficient_evidence`**
+(`qwen 0/5 vs gemma 2/5` fixtures) and **`latency: insufficient_evidence`** (median ratio 1.222,
+signs not all the same, 3 censored pairs). The rule fired as written and the honest answer is
+insufficient evidence. [measured]
+
+**The observation underneath it is not weak, and it is the one EXP-07 asked for:**
+
+| | attempts | passes | **produced an edit** |
+|---|---|---|---|
+| `qwen3:8b` | 18 | 0 | **0** |
+| `gemma4:31b` | 20 | 10 | **10** |
+
+EXP-07 found `qwen3:8b` produced no file edit in 25 attempts and asked whether that was the model
+or the tier. On a **new fixture set**, across four fixtures, `qwen3:8b` again produced **zero**
+edits in 18 attempts while a 31B model on the same rig, same harness, same timeout produced ten.
+[measured]
+
+**That points at model-specific, not tier-wide** — which was the better outcome and the less
+interesting one. It is *not* a registered result: the verdicts say insufficient evidence, the run
+is capped at 38 of 50, and it was contaminated by my own second runner. **It should be re-run
+clean before it is cited**, and the register entry stays `COMPROMISED`.
