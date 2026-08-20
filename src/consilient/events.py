@@ -17,6 +17,11 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, cast
+
+# Event shapes vary by kind at this JSON boundary, so values cannot be narrowed further
+# without changing the runtime validation contract. Every consumed value is checked below.
+EventPayload = dict[str, Any]
 
 SCHEMA_VERSION = 1
 
@@ -74,22 +79,22 @@ class Rejection:
 
 @dataclass(frozen=True)
 class Event:
-    raw: dict
+    raw: EventPayload
 
     @property
     def kind(self) -> str:
-        return self.raw["event"]
+        return cast(str, self.raw["event"])
 
     @property
     def actor(self) -> str:
-        return self.raw["actor"]
+        return cast(str, self.raw["actor"])
 
     @property
-    def data(self) -> dict:
-        return self.raw["data"]
+    def data(self) -> EventPayload:
+        return cast(EventPayload, self.raw["data"])
 
 
-def validate(event: dict) -> dict:
+def validate(event: object) -> EventPayload:
     """Reject anything that must never reach the log. Returns the event unchanged."""
     if not isinstance(event, dict):
         raise EventError("event must be an object")
@@ -122,7 +127,7 @@ def validate(event: dict) -> dict:
     return event
 
 
-def _check_evidence_class(event: dict) -> None:
+def _check_evidence_class(event: EventPayload) -> None:
     """V0-26: multi-contributor events must declare a distinct evidence_class per contributor.
 
     ADR-0010 and CONSILIENCE.md clause 2: agreement between agents that share evidence
@@ -167,7 +172,7 @@ def _check_evidence_class(event: dict) -> None:
         seen_classes.add(normalized)
 
 
-def _check_attempt_identity(event: dict) -> None:
+def _check_attempt_identity(event: EventPayload) -> None:
     """Attempt records carry the stable identity that later records reference."""
     if event["event"] not in (
         OUTCOME_KIND,
@@ -180,7 +185,7 @@ def _check_attempt_identity(event: dict) -> None:
         raise EventError(f"{event['event']} must carry a non-empty string attempt_id")
 
 
-def _check_attempt_contract(event: dict) -> None:
+def _check_attempt_contract(event: EventPayload) -> None:
     """Keep verifier outcomes and human judgements on distinct event paths."""
     kind = event["event"]
     data = event["data"]
@@ -215,7 +220,7 @@ def _check_attempt_contract(event: dict) -> None:
         raise EventError(f"{VERDICT_CORRECTION_KIND} must carry a non-empty reason")
 
 
-def _check_human_authority(event: dict) -> None:
+def _check_human_authority(event: EventPayload) -> None:
     """V0-18: an agent may never author a human's decision.
 
     `principal` names whose authority is being exercised. It is not itself an authority
@@ -268,7 +273,7 @@ def _check_human_authority(event: dict) -> None:
         )
 
 
-def canonical(event: dict) -> str:
+def canonical(event: EventPayload) -> str:
     """One event, one line, stable key order so a replay hash is reproducible."""
     return json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -276,7 +281,7 @@ def canonical(event: dict) -> str:
 MAX_CLOCK_SKEW_S = 15 * 60
 
 
-def _check_clock(event: dict) -> None:
+def _check_clock(event: EventPayload) -> None:
     """An appended event must be stamped from a clock, not from an author's belief.
 
     Added 20 Aug 2026 after the orchestrator wrote six consecutive trajectory events with
@@ -303,7 +308,7 @@ def _check_clock(event: dict) -> None:
         )
 
 
-def append(path: Path, event: dict) -> dict:
+def append(path: Path, event: EventPayload) -> EventPayload:
     """Validate and append. The only writer of the log."""
     validate(event)
     _check_clock(event)

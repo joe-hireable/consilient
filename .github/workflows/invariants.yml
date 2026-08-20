@@ -18,7 +18,7 @@ jobs:
       - name: Static checks
         # Added after mypy found a reachable crash in beta.render() that 24 passing tests
         # missed. A stronger check is a lower beta; this is the ratchet applied to us.
-        run: python -m mypy src/consilient
+        run: python -m mypy --strict src/consilient
       - name: Invariant checks
         run: python -m pytest tests -q
       - name: Replay invariant on the real trajectory
