@@ -6,9 +6,11 @@ the check that bans bypassing it, in the same commit.
 
 import argparse
 import json
+import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -2524,3 +2526,45 @@ def test_historical_refusal_digests_pin_real_log_rejections():
         digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
         assert digest in HISTORICAL_REFUSAL_DIGESTS, f"digest {digest} not in baseline"
 
+
+
+# ------------------------------------------- publication safety, after the 21 Aug 2026 block
+def test_foreign_commit_identifiers_may_only_decrease():
+    """A pre-publication audit blocked a public push over identifiers no path-matcher can see.
+
+    `check_private_corpus.py` matches FILE PATHS from the private corpora and passed. What it
+    could not see: `results-exp43.json` carries **71 forty-character commit SHAs**, none of
+    which resolves in this repository. They are commits from a private commercial repository.
+
+    `AGENTS.md` permits the corpora's names and AGGREGATE measured metrics. A list of specific
+    commits is neither — it is a list of incidents.
+
+    The count below is the measured state at the moment of discovery and may only ever go DOWN.
+    Lowering it is the permitted edit; the fix for EXP-43 is to aggregate the identifiers, not
+    to raise this number.
+    """
+    import subprocess
+
+    script = Path(".github/scripts/check_foreign_identifiers.py")
+    if not script.exists():  # pragma: no cover - repository-only check
+        pytest.skip("checker not present in this checkout")
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+    )
+    # One reported line per offending file, plus the header and the two-line explanation.
+    offenders = [line for line in result.stdout.splitlines() if line.startswith("- ")]
+    total = 0
+    for line in offenders:
+        match = re.search(r": (\d+) identifier", line)
+        if match:
+            total += int(match.group(1))
+
+    assert total <= 85, (
+        f"foreign commit identifiers rose to {total}; publishing them would put another "
+        "repository's commit history into a public one. Aggregate them instead."
+    )
