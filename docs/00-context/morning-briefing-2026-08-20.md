@@ -1,7 +1,7 @@
 # Morning briefing — 20 August 2026
 
-Written for Joe to read over coffee. 28 commits landed overnight across Claude Code, Codex
-and Cursor. This page orders what you have to decide; everything else is detail you can reach from
+Written for Joe to read over coffee. Around 31 commits landed overnight across Claude Code,
+Codex and Cursor. This page orders what you have to decide; everything else is detail you can reach from
 here.
 
 **The short version.** The night was mostly spent finding out that several things we believed
@@ -242,6 +242,15 @@ them.
   classifier blocked it. It was right: `AGENTS.md` says ask first before touching
   `docs/10-research/`, and I had rationalised that a policy-required section was exempt. Those
   four dispositions are still owed and are yours to authorise.
+- **I said the Ollama upstream reports were "drafted, not sent" three times, and they were not
+  drafted.** They existed only as a two-sentence description inside ADR-0036 § 5. I checked
+  precisely because I had been asserting it repeatedly. They are drafted now —
+  `upstream-drafts-2026-08-20.md` — and still not sent.
+- **I could not stop EXP-31 when I judged that I should.** No tool on this machine returns a
+  process command line — `Get-CimInstance` fails on a OneDrive config read, `wmic` is absent,
+  `psutil` is not installed — and `tasklist /v` shows twelve unnamed `python.exe`, some of them
+  my own. A blind kill risked taking down the monitor watching the experiment. The finding is
+  better than the stop would have been: **detection without identification is half a control.**
 - **ClickUp is rate-limited to me for ~13 hours**, so the board stops partway. Worth noting
   against the record: EXP-16 concluded rate limits did *not* bite, and sustained low-concurrency
   use overnight contradicted that.
@@ -252,13 +261,14 @@ them.
 
 | Runtime | Did | State |
 |---|---|---|
-| Claude Code | 14-agent β attack; 9-agent documentation-debt batch with review; same-family control; the fixes and commits | idle, awaiting you |
-| Cursor (Gemini) | ADR contradictions; invariant-enforcement audit that found the V0-18 hole; independent β attack; runner exposure audit; verification pass | running |
-| Codex (GPT) | numbers-traceability audit — 382 claim bundles, 336 adjudicated, **184 reproduce, 13 do not, 139 untraceable** | report being emitted |
-| Ollama / local | EXP-31, compromised | running, results not to be believed |
+| Claude Code | 14-agent β attack; 9-agent documentation-debt batch with review; same-family control; every fix and commit | idle, awaiting you |
+| Cursor (Gemini) | ADR contradictions; the invariant audit that found the V0-18 hole; an independent β attack; runner exposure; three claim verifications; triage of nine audit findings | triaging the remaining twenty |
+| Codex (GPT) | numbers-traceability audit — 382 claim bundles, 336 adjudicated, **184 reproduce, 13 do not, 139 untraceable** | complete, preserved in the repo |
+| Ollama / local | EXP-31 | **compromised and degrading** — `gemma4` timeouts up from ~17% to 41%; results not to be believed |
 
-Codex's report is preserved at `codex-numbers-audit-2026-08-20.md` — 26 of its 33 findings; six
-were lost to an output cap I set, which is recorded there rather than papered over.
+Codex's report is preserved complete at `codex-numbers-audit-2026-08-20.md` — all 33 findings.
+Six were briefly lost to an output cap I set and were recovered by resuming the session, which is
+recorded there rather than papered over.
 
 **The one already acted on, because it is a safety claim.** ADR-0002 said *"the false-safe rate
 is **0** at every sample size tested"*. Running the script the ADR names as its own executable
