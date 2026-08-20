@@ -1396,7 +1396,14 @@ size ratio between bad-and-red and bad-and-green cells.
 *proxy reliability*, not code quality); whether closed-source commercial workflows match open-source
 GitHub practices; and $\beta$ for unverified local environments. [asserted]
 
-### EXP-45 · Condensation retention and consequential loss in longitudinal transcripts `READY` (registered 20 Aug 2026)
+### EXP-45 · Condensation retention and consequential loss in longitudinal transcripts `DONE 20 Aug 2026 — see experiments/exp45/findings-exp45.md`
+**Run 20 Aug 2026 across 1,495 transcripts (535.7 MB, 203 unique sessions).** Evaluated 48 condensation
+and away-summary boundaries across 317,625 pre-boundary entity instances.
+**Headline:** Multi-week sessions are rare outliers (median 2.7 minutes, max 8.37 days); condensation
+is lossy ($R = 40.71\%$ [32.50%, 48.83%]), but **loss does not bite** (file re-read rate 0.50% (5/992),
+re-discovery rate 0.00% (0/599), aggregate $L_{\text{bite}} = 0.00\% < 1.0\%$).
+**Stopping rule 2 FIRED:** Condensation discards freely and safely; the perpetual memory / GNN harness
+architecture is **RETIRED** as solving a non-existent problem.
 **Decides:** whether condensation operates as a noisy verifier with measurable false-accept rate
 ($\beta$ analogue: retention loss and consequential loss), and whether perpetual memory architecture
 is required or refutable.
