@@ -417,3 +417,33 @@ may be no point afterwards at which it can be recalled or stopped.** [asserted]
 Concretely, for this repository's own tooling: no `taskkill` or `kill` may target a process by
 **image name or a resource filter**. It targets a specific pid, obtained from a lock file the
 target itself wrote — which is precisely the artefact `run_exp31.py` now creates.
+
+
+---
+
+## Postscript 05:32 — the monitor was doing the thing ADR-0034 forbids
+
+The overnight heartbeat reported `EXP-31 running: 28 runs, 27238B` at check-ins 4 and 5, after
+both runners had exited. It had ten more of those to emit over the next seven hours. [measured]
+
+It inferred *running* from a byte count it could read, not from whether the work was progressing —
+and the byte count was frozen precisely **because** the work had stopped. **A stalled artefact and
+a finished one look identical to a monitor that only reads the artefact.** ADR-0034 chose artefact
+progress over PID liveness because PIDs recycle and zombies hold pipes; this is the cost on the
+other side, and the ADR does not name it.
+
+The fix is not to go back to PIDs. It is that a monitor must read the **terminal state the work
+writes for itself** — here, `complete` and `stop_reason`, both present in the results file and both
+saying the run had ended under its wall-clock cap. The heartbeat read the file's size and ignored
+its contents.
+
+Stopped, rather than left to repeat a false statement ten more times into the maintainer's morning.
+The same reasoning as the replay check: **a signal that reports a state it did not verify is worse
+than no signal, because it is read as verification.**
+
+**A near-miss in the same breath.** The check-in also showed VRAM going from 29,436 to 3,489, and I
+read that as *"something is now holding 26 GB"* and went looking for what to free. It is the
+opposite: the heartbeat reports **used** VRAM, so the number falling means the model unloaded and
+the card is idle. `nvidia-smi` says 3,489 used against 28,699 free at 1% utilisation. [measured]
+I checked before acting, which is the only reason this is a postscript and not another incident —
+**a monitor that does not label its units invites exactly this, and mine did not label them.**
