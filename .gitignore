@@ -55,3 +55,6 @@ brief-*.md
 data/
 *-prs.json
 red-cells-evidence.json
+
+# Pseudonym maps back to private-corpus identifiers. Local only, never published.
+*.local.json

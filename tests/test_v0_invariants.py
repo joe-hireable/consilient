@@ -2564,7 +2564,11 @@ def test_foreign_commit_identifiers_may_only_decrease():
         if match:
             total += int(match.group(1))
 
-    assert total <= 85, (
+    # Lowered from 85 to 14 on 21 Aug 2026 after EXP-43's 71 private-corpus commit identifiers
+    # were pseudonymised. The 14 that remain are benign and identified: ten are GitHub permalinks
+    # citing upstream projects (julep-ai/julep, mlflow/mlflow), three reference EXP-49's
+    # pre-registration commit, one is EXP-05's. A ratchet only goes down.
+    assert total <= 14, (
         f"foreign commit identifiers rose to {total}; publishing them would put another "
         "repository's commit history into a public one. Aggregate them instead."
     )
