@@ -215,6 +215,53 @@ as they are, and the instrument is what changes. `mine_beta.py` should retain th
 conclusion list. **It is not amended here** — EXP-01's recorded outputs must not be altered
 under a live audit — and it is filed as the next instrument repair.
 
+## 7.5 A cancelled check is not a rejection, and 18 of them are counted as one
+
+The check identities discarded in §7.4 were **recovered by re-fetching them** — 98 of 98 red
+PRs on `jobboard-v2`, into the same gitignored directory the per-PR records already live in.
+`mine_beta.py` and its recorded outputs were not touched.
+
+`mine_beta.py` calls a rollup green when every check is in `{SUCCESS, NEUTRAL, SKIPPED, None}`
+and red otherwise. **`CANCELLED` is not in that set, so a cancelled run counts as a
+rejection.** A cancelled run produced no verdict at all. This is the same error the code was
+careful to avoid for PRs with no checks — those were excluded as `_ci == "none"` — arriving
+through a conclusion value nobody enumerated. [measured]
+
+| cell | n | failing only on cancelled runs |
+|---|---|---|
+| bad-and-red | 75 | **15 (20.0%)** |
+| good-and-red | 23 | **3 (13.0%)** |
+
+Moving them out of "red", because no decision was taken on them:
+
+| | as recorded | cancelled excluded |
+|---|---|---|
+| β = P(green \| bad) | 128/203 = 0.6305 [0.5623, 0.6939] | **128/188 = 0.6809** [0.6112, 0.7433] |
+| α = P(red \| good) | 23/97 = 0.2371 [0.1635, 0.3307] | **20/94 = 0.2128** [0.1422, 0.3059] |
+
+**Both move, in opposite directions, from one corrected classification.** β rises — the checks
+accepted a larger share of the bad artefacts they actually ruled on. α falls — fewer good
+artefacts were genuinely rejected. The optimistic reading of the verifier gets worse while its
+flakiness gets better. α remains an order of magnitude above the assumed 0.03 under either
+treatment.
+
+**What this does not settle.** It is mechanical, not adjudicated. Whether a genuine `FAILURE`
+on any particular suite means the artefact was bad still needs per-PR judgement. Two things
+found while gathering the evidence say that judgement is still worth buying:
+
+- The failing-check profile differs sharply between the two cells. One end-to-end suite
+  accounts for 91% of bad-and-red failures against 52% of good-and-red, which is evidence that
+  the red *is* discriminating in the bad cell — the opposite of what a pure-noise story
+  predicts, and a point against the audit overturning much.
+- Several failures come from **live-model evaluation suites**, which are nondeterministic by
+  construction, and one is explicitly labelled *informational* — a non-blocking check being
+  counted as a rejection. [measured]
+
+Check names are internal CI identifiers from a private repository and are therefore not
+recorded here, only their counts and classes. Note that
+`.github/scripts/check_private_corpus.py` matches file paths and would **not** have caught a
+leaked check name; that is a known gap in the net.
+
 ## 8. Reversal and falsifier
 
 **Reversal:** `git revert` the commit carrying this file and the two scripts. Nothing else
