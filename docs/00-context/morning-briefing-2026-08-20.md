@@ -1,7 +1,7 @@
 # Morning briefing — 20 August 2026
 
-Written for Joe to read over coffee. Ten commits landed overnight across Claude Code, Codex and
-Cursor. This page orders what you have to decide; everything else is detail you can reach from
+Written for Joe to read over coffee. Twenty-four commits landed overnight across Claude Code,
+Codex and Cursor. This page orders what you have to decide; everything else is detail you can reach from
 here.
 
 **The short version.** The night was mostly spent finding out that several things we believed
@@ -25,12 +25,36 @@ It hid behind a coincidence: on `jobboard-v2` the denominators are 202 and 203, 
 the number by 0.49%. On `hireable-platform`, in the corpus the whole time, it is 0.4286 against
 0.8182.
 
-**Time-critical:** the ~146-pair audit is the largest block of agent-hours queued against EXP-01
-and would sharpen an interval on the wrong axis. **Recommend it waits for your answer.**
+**Settled overnight against the raw labels.** EXP-01's mining output is still on disk in the
+main checkout, gitignored as the privacy rule requires — which is why two independent auditors
+reported it absent. Recomputing both conditionals from it reproduces every predicted figure to
+four decimal places. Aggregate counts only:
 
-Nothing in `docs/10-research/` was repaired. Which quantity you want is a design decision, not a
-bug fix — P(accept|bad) is what the architecture rests on; P(bad|accept) is arguably what a
-practitioner wants from a green build; carrying both roughly doubles the sample-size problem.
+| | `jobboard-v2` | `hireable-platform` |
+|---|---|---|
+| as recorded, P(bad \| green) | 128/202 = **0.6337** | 18/42 = **0.4286** |
+| on β's axis, P(green \| bad) | 128/203 = **0.6305** | 18/22 = **0.8182** |
+| ratio | 0.9951 | **1.9091** |
+
+**And the number that changes what to do next: 75 bad artefacts on `jobboard-v2` were rejected by
+the checks — 37% of every bad artefact in the corpus.** That is the cell EXP-01 discarded as a
+nuisance, and it is more than a third of the denominator β actually needs. The material was never
+missing; it was excluded by a filter.
+
+**So the correct axis is computable today, from data you already have.** The ~146-pair audit was
+only ever about sharpening an interval — it is not needed to answer the axis question, and it
+would sharpen the wrong one. **Recommend it waits.**
+
+I deliberately did **not** produce a corrected β̂ on the new axis. The published 0.12 and 0.14
+apply label corrections audited on the bad-and-green cell specifically — 15 bad pairs and 5 cleans
+per repository. Propagating them to a denominator that now includes 75 unexamined bad-and-red PRs
+would assume the label noise is the same in a cell nobody audited, and a PR that was reverted
+*and* had red CI is a different population from one that was reverted and passed. **Auditing that
+cell is smaller, cheaper and more decision-relevant than the audit currently queued.**
+
+Nothing in `docs/10-research/` was repaired. Which quantity you want remains a design decision —
+P(accept|bad) is what the architecture rests on; P(bad|accept) is arguably what a practitioner
+wants from a green build; carrying both roughly doubles the sample-size problem.
 
 ### 🔴 B. ADR-0019 forbids standing spend caps. Four later documents assume them.
 `cross-family-audit-2026-08-20.md` § 4
