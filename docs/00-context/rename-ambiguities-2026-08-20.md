@@ -70,6 +70,35 @@ These files record package name reservations across npm and PyPI. Modifying the 
 | `packages/consil/README.md` | 3 | `Reserved short name for **Consilience** (see the `consilience` package). Pre-release;` | Keep as-is or adjust when npm package publication occurs. |
 | `packages/consilient/README.md` | 3 | `Name reserved for **Consilience** — an open-source meta-harness for agentic work,` | Update to `**Consilient**` if this package represents the primary distribution. |
 
+### 3. The package *identity*, which is a one-way door and is not prose (added by review)
+
+*Found by reading the manifests rather than the README text the classifier scanned.* The
+classifier flagged the two package READMEs, which is right, but the load-bearing string is in
+`package.json`, not in prose:
+
+| File | Field | Current value |
+|---|---|---|
+| `packages/consilient/package.json` | `"name"` | **`"consilience"`** |
+| `packages/consilient/package.json` | `"description"` | `Reserved: Consilience — …` |
+| `packages/consil/package.json` | `"description"` | `Reserved short name for Consilience (the consilience package) …` |
+
+**The directory is `consilient/` and the package it declares is `consilience`.** That is a
+half-swept state in the one place where the two halves have different consequences: a directory
+name is free to change and a *published* package name is not.
+
+**Deliberately not changed.** `AGENTS.md` reserves naming to Joe, and a registry name is the
+strongest form of that — once published it cannot be recalled, only deprecated. The README
+asserts nothing is published yet, which is exactly the window in which the decision is still
+free.
+
+**The question for Joe, and it is one question:** should the published packages be `consilient`
+(+ `consil`), matching the project, with `consilience` left as a redirect or abandoned? If yes,
+both manifests change in one commit and the reservation READMEs follow. If the `consilience`
+name is already claimed on npm or PyPI, say so — that changes the answer from "rename" to
+"which one points at which".
+
+---
+
 ---
 
 ## Reversal and Next Steps
