@@ -1,0 +1,268 @@
+{
+  "experiment_id": "EXP-48",
+  "sample_size": 586,
+  "total_clusters": 61,
+  "p2_defects_total": 25,
+  "p2_code_resident_count": 8,
+  "p2_non_code_count": 17,
+  "matched_p2_guard_ids": [
+    "A1",
+    "A3",
+    "A6",
+    "A8",
+    "A14"
+  ],
+  "unmatched_code_guard_ids": [
+    "A4",
+    "A5",
+    "A11"
+  ],
+  "overall_recall": 0.2,
+  "code_resident_recall": 0.625,
+  "cluster_precision_p2_matched": 0.2459016393442623,
+  "top_unmatched_clusters": [
+    {
+      "id": "CLUST-31",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        370,
+        393
+      ],
+      "mutant_count": 59,
+      "operators": [
+        "arithmetic_binary_op",
+        "comparison_swap",
+        "constant_literal_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "if command == \"record\":",
+      "sample_mut": "if command == \"XXrecordXX\":"
+    },
+    {
+      "id": "CLUST-32",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        399,
+        422
+      ],
+      "mutant_count": 54,
+      "operators": [
+        "boolean_logical_swap",
+        "comparison_swap",
+        "constant_literal_mutation",
+        "control_flow_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "task_family=result[\"task_family\"],",
+      "sample_mut": "task_family=None,"
+    },
+    {
+      "id": "CLUST-20",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        194,
+        212
+      ],
+      "mutant_count": 43,
+      "operators": [
+        "boolean_logical_swap",
+        "comparison_swap",
+        "expression_mutation"
+      ],
+      "sample_orig": "b1 = _condition(\"B1\", \"unknown\", \"No EXP-05 result is recorded.\")",
+      "sample_mut": "b1 = _condition(\"B1\", \"XXunknownXX\", \"No EXP-05 result is recorded.\")"
+    },
+    {
+      "id": "CLUST-29",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        329,
+        339
+      ],
+      "mutant_count": 34,
+      "operators": [
+        "comparison_swap",
+        "constant_literal_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "if \"structurally_unsatisfiable\" in statuses:",
+      "sample_mut": "if \"XXstructurally_unsatisfiableXX\" in statuses:"
+    },
+    {
+      "id": "CLUST-22",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        227,
+        238
+      ],
+      "mutant_count": 26,
+      "operators": [
+        "arithmetic_binary_op",
+        "comparison_swap",
+        "control_flow_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
+      "sample_mut": "status = \"XXpassXX\" if identical is True else \"fail\" if identical is False else \"unknown\""
+    },
+    {
+      "id": "CLUST-08",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        38,
+        44
+      ],
+      "mutant_count": 21,
+      "operators": [
+        "boolean_logical_swap",
+        "comparison_swap",
+        "constant_literal_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "\"A1\": \"EXP-01 complete on two differently verified repositories with an interval\",",
+      "sample_mut": "\"A1\": \"XXEXP-01 complete on two differently verified repositories with an intervalXX\","
+    },
+    {
+      "id": "CLUST-26",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        292,
+        303
+      ],
+      "mutant_count": 20,
+      "operators": [
+        "comparison_swap",
+        "control_flow_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "return _condition(\"B3\", \"unknown\", \"No workflow evidence source exists.\")",
+      "sample_mut": "return _condition(\"B3\", \"XXunknownXX\", \"No workflow evidence source exists.\")"
+    },
+    {
+      "id": "CLUST-30",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        357,
+        361
+      ],
+      "mutant_count": 19,
+      "operators": [
+        "comparison_swap",
+        "expression_mutation"
+      ],
+      "sample_orig": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "sample_mut": "expected = {\"A\": {\"XXA1XX\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}"
+    },
+    {
+      "id": "CLUST-09",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        52,
+        55
+      ],
+      "mutant_count": 18,
+      "operators": [
+        "arithmetic_binary_op",
+        "boolean_logical_swap",
+        "comparison_swap"
+      ],
+      "sample_orig": "raise EventError(f\"--event is not valid JSON: {exc}\") from exc",
+      "sample_mut": "raise EventError(None) from exc"
+    },
+    {
+      "id": "CLUST-19",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        177,
+        188
+      ],
+      "mutant_count": 16,
+      "operators": [
+        "comparison_swap",
+        "constant_literal_mutation"
+      ],
+      "sample_orig": "a1_status, _ = _experiment_entry(\"EXP-01\")",
+      "sample_mut": "a1_status, _ = _experiment_entry(\"XXEXP-01XX\")"
+    },
+    {
+      "id": "CLUST-55",
+      "file": "src/consilient/projection.py",
+      "lines": [
+        108,
+        111
+      ],
+      "mutant_count": 15,
+      "operators": [
+        "boolean_logical_swap",
+        "constant_literal_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "event.data.get(\"principal\"),",
+      "sample_mut": "event.data.get(None),"
+    },
+    {
+      "id": "CLUST-23",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        249,
+        261
+      ],
+      "mutant_count": 13,
+      "operators": [
+        "comparison_swap",
+        "control_flow_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "if day <= datetime.now(timezone.utc).date() and matching:",
+      "sample_mut": "if day <= datetime.now(timezone.utc).date() or matching:"
+    },
+    {
+      "id": "CLUST-52",
+      "file": "src/consilient/events.py",
+      "lines": [
+        375,
+        385
+      ],
+      "mutant_count": 13,
+      "operators": [
+        "comparison_swap",
+        "constant_literal_mutation",
+        "control_flow_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "for path in sorted(directory.glob(\"*.jsonl\")):",
+      "sample_mut": "for path in sorted(directory.glob(\"XX*.jsonlXX\")):"
+    },
+    {
+      "id": "CLUST-28",
+      "file": "src/consilient/cli.py",
+      "lines": [
+        316,
+        321
+      ],
+      "mutant_count": 10,
+      "operators": [
+        "expression_mutation"
+      ],
+      "sample_orig": "\"structurally_unsatisfiable\" if established else \"unknown\",",
+      "sample_mut": "\"structurally_unsatisfiable\" if established else \"XXunknownXX\","
+    },
+    {
+      "id": "CLUST-61",
+      "file": "src/consilient/projection.py",
+      "lines": [
+        239,
+        246
+      ],
+      "mutant_count": 10,
+      "operators": [
+        "arithmetic_binary_op",
+        "boolean_logical_swap",
+        "constant_literal_mutation",
+        "expression_mutation"
+      ],
+      "sample_orig": "hasher.update((\"|\".join(columns) + \"\\x00\").encode())",
+      "sample_mut": "hasher.update((\"XX|XX\".join(columns) + \"\\x00\").encode())"
+    }
+  ]
+}
