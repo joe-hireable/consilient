@@ -72,7 +72,25 @@ The failed local attempt took 5.6 times as long as the Codex success, 4.5
 times as long as the Claude success and 2.4 times as long as the Cursor
 success. [measured] This n=1 result crosses
 EXP-07's pre-registered 2× investigation threshold, but it does not estimate a
-population wasted-work multiplier. [asserted] Cursor's selected model identity
+population wasted-work multiplier. [asserted]
+
+**Superseded 20 August 2026 — the caution above was vindicated and the crossing did not
+replicate.** EXP-07 ran the pre-registered replication at n=30. The **single-attempt median
+multiplier is 1.69×**, which does **not** cross the 2× threshold; three of the five fixtures sit
+between 1.20× and 1.69×. Only best-of-five crosses, at 17.95× (16.75× when every censored duration
+is clamped to its applied timeout). ADR-0003 was **not** reopened, and the registered finding is
+that the *retry scaffolding* creates the wasted work rather than the raw local attempt.
+[measured]
+
+So the 5.6× above was one draw from a wide distribution, and this paragraph's own hedge — *"does
+not estimate a population wasted-work multiplier"* — was the correct reading at the time. Retained
+rather than deleted because a pilot that prompted a replication and was then contradicted by it is
+worth being able to find.
+
+**Read alongside a defect in the same instrument:** EXP-07's agent timeout overruns by 10–269 s,
+and EXP-31 later showed that the timeout can convert a run that would have *passed* into a
+censored one. [measured] Durations from either run should be treated as censored-above rather than
+exact. See `../00-context/exp31-interleaving-2026-08-20.md`. Cursor's selected model identity
 was not recorded, so its 2.4× ratio is supplementary and not a third identified
 frontier comparison. [measured]
 
