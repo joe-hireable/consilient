@@ -1,6 +1,6 @@
 # Decision index
 
-36 ADRs, 20 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+37 ADRs, 20 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED
@@ -58,7 +58,8 @@ Read these before anything else. Everything downstream depends on them.
 | [0008](0008-name-the-project-consilience.md) | Name the project **Consilience** | ✅ |
 | [0013](0013-evaluate-on-repo-history-not-benchmarks.md) | Evaluate on repository history, not benchmarks | ✅ |
 | [0014](0014-portable-skills-agents-md.md) | SKILL.md + AGENTS.md; `.agents/` is source of truth | ✅ |
-| [0015](0015-dogfooding-gate.md) | **Dogfooding gate** — three stages, measured gates | ✅ |
+| [0015](0015-dogfooding-gate.md) | **Dogfooding gate** — three stages, measured gates (Gate B2 superseded by 0037) | ✅ |
+| [0037](0037-replace-gate-b2-with-measured-critic-throughput-gain.md) | **Replace Gate B2 with measured critic review-throughput gain**; supersedes 0015 Gate B2 | ✅ |
 | [0016](0016-skill-distribution-mcp-plugins.md) | Skill distribution, MCP, plugins — and the supply-chain rule | 📋 |
 | [0017](0017-bootstrap-harness.md) | Bootstrap harness — Claude Code as a working prototype | 📋 |
 | [0023](0023-pr-review-gates.md) | PR review gates by blast radius; admin bypass is logged | 📋 |
