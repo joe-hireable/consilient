@@ -1,0 +1,24 @@
+name: v0 invariants
+# Every invariant the observe-only increment declares ships with its check (I1).
+# Gate A condition 2 requires the replay invariant to hold in CI specifically.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install pytest
+      - name: Invariant checks
+        run: python -m pytest tests -q
+      - name: Replay invariant on the real trajectory
+        run: |
+          PYTHONPATH=src python -m consilience.cli --json replay > replay.json
+          cat replay.json
+          python -c "import json,sys; r=json.load(open('replay.json')); sys.exit(0 if r['identical'] else 1)"

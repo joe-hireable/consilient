@@ -88,13 +88,22 @@ gate, not the staffing; the assignment itself is recorded in
    `claude-opus-5` audit then found four further defects, and the replication was aborted
    before a verdict. [measured]
 
-### Stage 2 — observe only, after Gate A
+### Stage 2 — observe only, entered on approval, exited through Gate A
 
 The first product increment records versioned trajectory events, verifier outcomes and
 human verdicts; it computes β with sample count and uncertainty, but never blocks or routes
 a task. [asserted]
 
-Gate A requires all of the following, with no manual override: [asserted]
+**Corrected 2026-08-20.** This section previously read "after Gate A", which is circular:
+Gate A requires seven days of trajectory capture and a replay invariant green in CI, and
+neither can exist until the recorder does. [measured] Stage 2 is therefore *entered* when Joe
+approves the specification and *exited* through Gate A, which matches ADR-0015's ordering of
+instrumentation before control. [asserted] Nothing about the safety properties changes: the
+increment records and reports, and cannot route, block or accept at any point. [asserted]
+
+Gate A must hold before any routing or blocking behaviour is built or enabled, and before β
+is consumed for anything beyond display. It requires all of the following, with no manual
+override: [asserted]
 
 1. EXP-01 complete on at least two repositories with different verification quality and a
    reported confidence interval. [asserted]

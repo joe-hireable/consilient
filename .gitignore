@@ -24,3 +24,8 @@ graphify-out/
 # MemPalace per-project files (issue #185)
 mempalace.yaml
 entities.json
+
+# derived: the SQLite projection is rebuildable from the trajectory (V0-02)
+.harness/state.db
+.harness/state.db-wal
+.harness/state.db-shm
