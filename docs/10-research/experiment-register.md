@@ -1512,6 +1512,84 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
 - Higher-order multi-point semantic failures not captured by single-mutant operators.
 
+### EXP-50 · Do LLM-emitted faults evade the checks at the same rate as synthetic mutants? `READY`
+**Pre-registered 20 Aug 2026, before any fault was generated. Not yet run.**
+**Decides:** the one residual empirical question that both `P1-proxy.md` §2.4 and `P3-echo.md`
+§falsifier-5 name and neither answers — *"whether a check suite's false-negative rate against the
+faults an LLM agent actually emits differs from its rate against synthetic mutants."* If it does
+not, EXP-47's $\beta = 0.3132$ transfers, mutation testing was already the instrument, and this
+programme's contribution shrinks to orchestration. If it does, every $\beta$ quoted from EXP-47 is
+a floor rather than an estimate, and P2 §7's "competence-difficulty gap" objection is confirmed
+rather than conceded.
+**Precondition:** EXP-47's census complete on the same source tree and the same three checks
+(`pytest`, `mypy --strict`, `ruff`), so the comparison arm already exists and is not re-run.
+`src/consilient/` unchanged between arms, pinned by SHA-256 manifest as EXP-49 does.
+
+**Design — three arms, one of which is already measured.**
+
+| arm | fault source | sees `tests/`? |
+|---|---|---|
+| **S** (control) | EXP-47's 1,871 non-equivalent first-order mutants | n/a — syntactic |
+| **B** (blind) | model asked to inject a defect given `src/consilient/` and the v0 spec only | **no** |
+| **A** (aware) | model asked to inject a defect given source, spec **and** the test suite | **yes** |
+
+Arm A is not a nuisance condition. It is the harness's actual operating regime: an agent that can
+read the gate it must pass. Separating A from B separates *"LLM faults are different in kind"*
+from *"LLM faults are adversarial to this particular suite"*, and only the second is Goodhart.
+
+**Generation protocol (fixed):** each injected fault must (i) change `src/consilient/` only,
+(ii) name the invariant or documented behaviour it violates, and (iii) be a single self-contained
+diff. Two model families generate in **both** arms — family is a recorded covariate, not confounded
+with arm — target $n = 100$ per arm, minimum 60 for a verdict.
+
+**Ground truth by cross-family adjudication.** A model told to inject a bug frequently injects a
+no-op. Every candidate is adjudicated by a **different family from the one that generated it**, and
+by one that never saw the injection prompt, into: (a) real behavioural defect, (b) semantic no-op,
+(c) ambiguous. $\beta$ is computed over (a) only; (b) is discarded exactly as an equivalent mutant
+is; (c) is reported as residual uncertainty. The adjudicator is never the orchestrator — a
+self-adjudicated corpus is echo (ADR-0010).
+
+**Measures:**
+- $\hat{\beta}_B$ and $\hat{\beta}_A$ with Wilson 95% intervals, and each per-check.
+- The interval on $\hat{\beta}_B - 0.3132$, and on $\hat{\beta}_A - \hat{\beta}_B$.
+- No-op rate per arm and per family — the instrument's own $\alpha$-analogue.
+- Diff size and files-touched distribution per arm, against arm S's one-token profile.
+- Family main effect, to detect a generator that is simply better at hiding.
+
+**Stopping rules (fixed before the run):**
+- If $\hat{\beta}_B$'s interval lies entirely **above** 0.3132 $\implies$ **synthetic mutants
+  understate $\beta$.** Every EXP-47 figure is a floor; say so in P1, P2 and P3 and stop quoting
+  0.3132 as an estimate. [asserted]
+- If $\hat{\beta}_B$'s interval **contains** 0.3132 $\implies$ **mutation testing is an adequate
+  proxy for non-adversarial LLM faults.** The residual question is answered against us: the
+  instrument was free, off-the-shelf and decades old. Record it plainly in the novelty assessment
+  rather than burying it. [asserted]
+- If $\hat{\beta}_A$ and $\hat{\beta}_B$ intervals do **not** overlap, with $\hat{\beta}_A$ higher
+  $\implies$ **suite-aware generation raises $\beta$.** A $\beta$ measured on faults that could not
+  see the gate understates the $\beta$ of an agent optimising against it. This is Goodhart's law
+  with an interval on it, and it bears directly on ADR-0015: routing on a gate an agent can read
+  is not the same decision as routing on one it cannot. [asserted]
+- If the adjudicated no-op rate is $\ge 40\%$ in either arm $\implies$ **insufficient evidence.**
+  The instrument is measuring prompt compliance, not fault distribution. Do not report a $\beta$.
+  [asserted]
+- If the two adjudicating families disagree on $\ge 25\%$ of candidates $\implies$ **the oracle is
+  the finding**, as it was on 20 Aug 2026 when two families differed on 16 of 75 labels. Report
+  the disagreement rate and withhold the $\beta$. [asserted]
+
+**What it cannot decide — and this is the load-bearing limitation, stated first rather than last:**
+- **A model told to inject a defect is not a model that made one.** Deliberate injection and
+  unintentional error may have entirely different distributions, and nothing in this design
+  measures the second. Partial mitigation, pre-registered: compare the injected corpus's diff-size
+  and operator profile against the real agent-authored defects this repository has recorded — P2's
+  A-catalogue, the five dead assignments in `run_exp43.py`, the line-ending mismatch that made an
+  edit silently no-op. **If the profiles differ sharply, the arm is measuring something else and
+  the verdict must say so.**
+- Whether either $\beta$ generalises beyond a ~1,100-line Python tree with an unusually
+  invariant-heavy suite.
+- Specification defects, where the code and the tests agree on the wrong thing. No arm here can
+  see those; only P2's hand audit found any.
+
+
 ---
 
 ## Not experiments
