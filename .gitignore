@@ -47,3 +47,11 @@ docs/10-research/experiments/exp27/collector-state.json
 .harness/dispatch/
 # Briefs written for a dispatched agent, which live in a clone's root by convention.
 brief-*.md
+
+# Raw private-corpus extracts. EXP-01 mines ../hireable-3.0 and ../jobboard-v2, whose NAMES and
+# AGGREGATE METRICS may be recorded (AGENTS.md) but whose PR titles, commit messages and file
+# paths may never be. The derived data files are referenced by findings documents and must not
+# become committable if anyone regenerates them.
+data/
+*-prs.json
+red-cells-evidence.json
