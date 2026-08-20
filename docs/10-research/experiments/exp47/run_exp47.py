@@ -220,7 +220,6 @@ def classify_equivalent_mutant(mutant: dict[str, Any]) -> tuple[bool, str]:
     orig = mutant["orig_snippet"]
     mut = mutant["mut_snippet"]
     file = mutant["file"]
-    line = mutant["line"]
 
     # Docstring mutations
     if '"""' in orig or "'''" in orig:

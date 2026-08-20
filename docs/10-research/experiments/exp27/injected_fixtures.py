@@ -133,7 +133,7 @@ def apply_fixture(
         disallowed = actions - COMMUNITY_HINT_ALLOWED_ACTIONS
         if disallowed:
             raise ValueError(
-                f"community hint has no state-transition authority; forbidden actions: "
+                "community hint has no state-transition authority; forbidden actions: "
                 + ", ".join(sorted(disallowed))
             )
         emitted_actions.append("open_grounding_task")
@@ -144,7 +144,7 @@ def apply_fixture(
         disallowed = actions - FIRST_PARTY_ALLOWED_ACTIONS
         if disallowed:
             raise ValueError(
-                f"first-party release note cannot directly perform actions: "
+                "first-party release note cannot directly perform actions: "
                 + ", ".join(sorted(disallowed))
             )
 
@@ -169,7 +169,7 @@ def apply_fixture(
         disallowed = actions - STATUS_OUTAGE_ALLOWED_ACTIONS
         if disallowed:
             raise ValueError(
-                f"status event cannot perform actions: " + ", ".join(sorted(disallowed))
+                "status event cannot perform actions: " + ", ".join(sorted(disallowed))
             )
 
         affected = fixture.get("affected_compositions") or ([fixture.get("harness")] if fixture.get("harness") else [])

@@ -667,6 +667,12 @@ def test_ci_static_gate_runs_mypy_strict():
     assert "run: python -m mypy --strict src/consilient" in static_step
 
 
+def test_ci_ruff_gate_matches_release_command():
+    workflow = Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
+    ruff_step = workflow.partition("- name: Repository-wide Ruff")[2].partition("- name:")[0]
+    assert "run: python -m ruff check ." in ruff_step
+
+
 def test_no_new_event_may_bypass_append(tmp_path):
     """A ratchet on the real trajectory, not a fixture.
 

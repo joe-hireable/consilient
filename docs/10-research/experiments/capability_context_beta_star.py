@@ -42,10 +42,17 @@ claim 1's feasibility cliff (structural zero); above it you ride claim 2's
 competence slope. The optimum is simply "exactly the required set".
 """
 
+from math import comb
+
 import numpy as np
 
 ALPHA, K, S_C, S_F = 0.03, 8.0, 0.45, 0.72
-sig = lambda x: 1 / (1 + np.exp(-x))
+
+
+def sig(x):
+    return 1 / (1 + np.exp(-x))
+
+
 D = np.linspace(1e-6, 1 - 1e-6, 4001)
 
 
@@ -147,8 +154,6 @@ if __name__ == "__main__":
 #     not beta. Retry loops on the cheap tier inflate effective beta roughly
 #     n-fold at small beta. "Best-of-n plus tests" is not free safety.
 # ---------------------------------------------------------------------------
-from math import comb
-
 def majority(p, n=5):
     p = np.asarray(p)
     return sum(comb(n, j) * p**j * (1 - p)**(n - j) for j in range((n // 2) + 1, n + 1))

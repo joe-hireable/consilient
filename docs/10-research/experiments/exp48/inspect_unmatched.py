@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 from run_exp48 import P2_CATALOGUE, cluster_mutants
 
@@ -63,25 +62,18 @@ def inspect_clusters() -> None:
         file_lines = full_path.read_text(encoding="utf-8").splitlines()
         code_slice = "\n".join(f"{i+1:4d}| {line}" for i, line in enumerate(file_lines[max(0, s-2):min(len(file_lines), e+2)], start=max(0, s-2)))
 
-        category = "other"
         if f == "src/consilient/cli.py":
             if any(term in code_slice.lower() for term in ["print(", "render", "table", "formatter", "header", "format"]):
-                category = "cli_human_rendering"
                 cli_format_clusters.append((cl, code_slice))
             elif any(term in code_slice for term in ["_condition", "REQUIREMENTS", "gate", "_experiment_entry", "EXPERIMENT_REGISTER"]):
-                category = "cli_gate_evaluation"
                 cli_gate_logic_clusters.append((cl, code_slice))
             else:
-                category = "cli_other"
                 cli_format_clusters.append((cl, code_slice))
         elif f == "src/consilient/events.py":
-            category = "events_validation"
             events_validation_clusters.append((cl, code_slice))
         elif f == "src/consilient/projection.py":
-            category = "projection_indexing"
             projection_indexing_clusters.append((cl, code_slice))
         elif f == "src/consilient/beta.py":
-            category = "beta_stats"
             beta_stats_clusters.append((cl, code_slice))
         else:
             other_clusters.append((cl, code_slice))

@@ -62,10 +62,9 @@ def run_replication():
         for p in ds:
             bad = p.get("_bad")
             ci = p.get("_ci")
-            why = p.get("_why")
             counts[(bad, ci)] = counts.get((bad, ci), 0) + 1
         
-        print(f"Contingency grid (bad, ci):")
+        print("Contingency grid (bad, ci):")
         for bad in [False, True]:
             for ci in ["green", "red", "none"]:
                 print(f"  bad={bad:<5} ci={ci:<5}: {counts.get((bad, ci), 0)}")
@@ -97,7 +96,7 @@ def run_replication():
         alpha_all = good_red / denom_all_good if denom_all_good else 0
         w_all = wilson_196(good_red, denom_all_good)
 
-        print(f"\nCLAIM 1 (Alpha):")
+        print("\nCLAIM 1 (Alpha):")
         print(f"  Good & Red = {good_red}, Good & Green = {good_green}, Good & None = {good_none}")
         print(f"  Treatment A (Verdict only, excl none): {good_red}/{denom_verdicts_only} = {alpha_verdicts:.4f} {list(w_verdicts)}")
         print(f"  Treatment B (All good, incl none in denom): {good_red}/{denom_all_good} = {alpha_all:.4f} {list(w_all)}")
@@ -107,7 +106,7 @@ def run_replication():
         for p in ds:
             if p.get("_bad"):
                 whys[p.get("_why")] = whys.get(p.get("_why"), 0) + 1
-        print(f"\nCLAIM 2 (Bad labels proxy decomposition):")
+        print("\nCLAIM 2 (Bad labels proxy decomposition):")
         print(f"  Total bad = {n_bad}")
         print(f"  Breakdown by _why: {whys}")
         print(f"  Reverted count: {whys.get('reverted', 0)}, Hotfixed count: {whys.get('hotfixed', 0)}")
@@ -122,7 +121,7 @@ def run_replication():
         mean_bad_green = statistics.mean(bad_green_files) if bad_green_files else 0
         ratio_med = med_bad_red / med_bad_green if med_bad_green else 0
         
-        print(f"\nCLAIM 3 (File counts):")
+        print("\nCLAIM 3 (File counts):")
         print(f"  Bad & Red count: {len(bad_red_files)}, Median files: {med_bad_red}, Mean: {mean_bad_red:.2f}")
         print(f"  Bad & Green count: {len(bad_green_files)}, Median files: {med_bad_green}, Mean: {mean_bad_green:.2f}")
         print(f"  Median ratio (Red/Green): {ratio_med:.2f}")
@@ -139,9 +138,6 @@ def run_replication():
     # Check structure of red-cells-evidence
     # Check if entries correspond to jobboard-v2 (or also hireable-platform)
     # Let's see PR numbers, conclusions, etc.
-    
-    # Map PRs in jobboard-v2
-    jb_by_num = {p["number"]: p for p in jb}
     
     bad_red_prs = [p for p in jb if p.get("_bad") and p.get("_ci") == "red"]
     good_red_prs = [p for p in jb if not p.get("_bad") and p.get("_ci") == "red"]
@@ -165,7 +161,6 @@ def run_replication():
         # checks rollup
         checks = entry.get("checks", [])
         # Look at conclusions of failed checks
-        conclusions = set()
         failed_conclusions = set()
         has_failure = False
         has_cancelled = False
@@ -222,7 +217,7 @@ def run_replication():
         else:
             print(f"Warning: Good & Red PR {num} not in red-cells-evidence")
 
-    print(f"\nClaim 4 Breakdown:")
+    print("\nClaim 4 Breakdown:")
     print(f"  Bad & Red: Total={len(bad_red_prs)}, Cancelled-only={len(bad_red_cancelled_only)}, Other-failed={len(bad_red_other)}")
     print(f"    Cancelled-only bad PRs: {bad_red_cancelled_only}")
     print(f"  Good & Red: Total={len(good_red_prs)}, Cancelled-only={len(good_red_cancelled_only)}, Other-failed={len(good_red_other)}")
@@ -239,7 +234,7 @@ def run_replication():
     total_green = bad_green + good_green
     beta_base = bad_green / total_green
     
-    print(f"\nBaseline Beta & Alpha on jobboard-v2:")
+    print("\nBaseline Beta & Alpha on jobboard-v2:")
     print(f"  Bad & Green: {bad_green}, Good & Green: {good_green}, Total Green: {total_green}")
     print(f"  Baseline Beta = {bad_green}/{total_green} = {beta_base:.4f} {list(wilson_196(bad_green, total_green))}")
     
@@ -271,10 +266,10 @@ def run_replication():
     # Alpha = 20 / 94 = 0.212765... = 0.2128!
     
     print("\nVerification of Claim 4 arithmetic:")
-    print(f"  P(accept | bad) = bad_green / (bad_green + bad_red)")
+    print("  P(accept | bad) = bad_green / (bad_green + bad_red)")
     print(f"  Baseline: {bad_green} / ({bad_green} + {len(bad_red_prs)}) = {bad_green / (bad_green + len(bad_red_prs)):.4f}")
     print(f"  Post-removal of 15 cancelled bad: {bad_green} / ({bad_green} + {len(bad_red_prs) - 15}) = {bad_green / (bad_green + len(bad_red_prs) - 15):.4f}")
-    print(f"  P(reject | good) = good_red / (good_red + good_green)")
+    print("  P(reject | good) = good_red / (good_red + good_green)")
     print(f"  Baseline: {len(good_red_prs)} / ({len(good_red_prs)} + {good_green}) = {len(good_red_prs) / (len(good_red_prs) + good_green):.4f}")
     print(f"  Post-removal of 3 cancelled good: ({len(good_red_prs)} - 3) / ({len(good_red_prs)} - 3 + {good_green}) = {(len(good_red_prs) - 3) / (len(good_red_prs) - 3 + good_green):.4f}")
 

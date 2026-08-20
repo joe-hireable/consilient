@@ -65,11 +65,11 @@ def main() -> None:
     print("1. PROOF OF ADR-0015 TAUTOLOGY (n_max > 1 for all beta in [0, 1])")
     print("=" * 70)
     print(f"Parameters: T_a = {T_a} min, T_r = {T_r} min, p_good = {p_good}")
-    print(f"Minimum possible n_max occurs at beta = 1.0 (recall = 0.0):")
+    print("Minimum possible n_max occurs at beta = 1.0 (recall = 0.0):")
     min_n = n_max(T_a, T_r, p_good, beta=1.0)
     print(f"  n_max(beta=1.0) = T_a / T_r = {T_a} / {T_r} = {min_n:.4f}")
-    print(f"  Since 3.125 > 1.0, condition n_max > 1 holds for ALL beta in [0, 1].")
-    print(f"  Conclusion: ADR-0015 Gate B2 is non-discriminating by construction.\n")
+    print("  Since 3.125 > 1.0, condition n_max > 1 holds for ALL beta in [0, 1].")
+    print("  Conclusion: ADR-0015 Gate B2 is non-discriminating by construction.\n")
 
     print("=" * 70)
     print("2. REPLACEMENT CONDITION: THROUGHPUT GAIN G(beta) >= 20%")
@@ -78,7 +78,7 @@ def main() -> None:
     b_crit = critical_beta(p_good, target_gain=0.20)
     r_crit = 1.0 - b_crit
     print(f"Unassisted baseline (beta=1.0, recall=0.0): M_0 = {m0:.3f} good merges/hr")
-    print(f"Target threshold: +20.0% throughput gain (gamma = 0.20)")
+    print("Target threshold: +20.0% throughput gain (gamma = 0.20)")
     print(f"Exact critical beta* = {b_crit:.4f} (critic recall R* = {r_crit:.4f})")
     print(f"Condition: Gate B2 passes iff beta <= {b_crit:.4f} (R >= {r_crit:.4f})\n")
 

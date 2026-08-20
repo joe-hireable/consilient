@@ -1,7 +1,5 @@
 """Regression checks for OpenCode × OpenRouter composition #6."""
 
-import os
-
 from adapter_opencode import (
     OPENCODE_WSL,
     WSL,

@@ -235,9 +235,9 @@ def collect() -> int:
 
     days = len(
         {
-            json.loads(l)["ts"][:10]
-            for l in LOG.read_text(encoding="utf-8").splitlines()
-            if l.strip()
+            json.loads(line)["ts"][:10]
+            for line in LOG.read_text(encoding="utf-8").splitlines()
+            if line.strip()
         }
     )
     ok = sum(1 for o in observations if o["http_status"] in (200, 304))

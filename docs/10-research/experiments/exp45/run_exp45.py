@@ -19,10 +19,9 @@ import math
 import random
 import re
 import statistics
-import sys
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -580,7 +579,6 @@ def run_exp45_analysis(
     retention_rates_away = [ba.retention_rate for ba in away_analyses]
 
     # Consequential loss metrics
-    reread_rates_all = [ba.reread_rate for ba in boundary_analyses if ba.pre_read_files_count > 0]
     consequential_loss_rates_all = [ba.consequential_loss_rate for ba in boundary_analyses]
 
     total_pre_read = sum(ba.pre_read_files_count for ba in boundary_analyses)

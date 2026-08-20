@@ -2,12 +2,10 @@
 
 import json
 from pathlib import Path
-import pytest
 
 from run_exp45 import (
     BoundaryEvent,
     analyze_boundary_retention,
-    analyze_transcript_file,
     bootstrap_ci,
     extract_record_entities,
     normalize_path,
@@ -191,8 +189,8 @@ def test_run_exp45_analysis_synthetic(tmp_path: Path):
             },
         ]
         with open(sess_file, "w", encoding="utf-8") as fp:
-            for l in lines:
-                fp.write(json.dumps(l) + "\n")
+            for line in lines:
+                fp.write(json.dumps(line) + "\n")
 
     out_json = tmp_path / "results.json"
     results = run_exp45_analysis(tmp_path, out_json)

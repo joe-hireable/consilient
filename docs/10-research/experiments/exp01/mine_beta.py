@@ -106,13 +106,14 @@ def main(repo, clone, days=14, limit=300):
         text=True,
         encoding="utf-8",
     ).stdout.splitlines()
-    revert_lines = [l for l in log if re.search(r"\brevert", l, re.I)]
+    revert_lines = [line for line in log if re.search(r"\brevert", line, re.I)]
 
     n_bad = 0
     for i, p in enumerate(prs):
         sha = (p.get("mergeCommit") or {}).get("oid", "")
         reverted = any(
-            f"#{p['number']}" in l or (sha and sha[:8] in l) for l in revert_lines
+            f"#{p['number']}" in line or (sha and sha[:8] in line)
+            for line in revert_lines
         )
         hotfixed = False
         if not reverted:

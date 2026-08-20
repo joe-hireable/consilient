@@ -355,12 +355,11 @@ def main() -> None:
 
     # 1. P2 Scope and Guard Mapping
     total_p2_defects = 25  # A1-A11, A13, A14 (13) + A12, A15 (2) + B1-B10 (10)
-    total_p2_entries = 26  # including positive control C1
     
     code_resident_guards = [g for g in P2_CATALOGUE if g["layer"] == "code"]
     non_code_guards = [g for g in P2_CATALOGUE if g["layer"] != "code" and g["id"] != "C1"]
 
-    print(f"\nP2 Catalogue Breakdown:")
+    print("\nP2 Catalogue Breakdown:")
     print(f"  Total Defective Guards in P2: {total_p2_defects}")
     print(f"  - In-Scope Python Code-Resident (`src/consilient/`): {len(code_resident_guards)} ({len(code_resident_guards)/total_p2_defects*100:.1f}%)")
     print(f"  - Out-of-Scope (ADRs, CI Workflows, Governance, Harness, Scripts): {len(non_code_guards)} ({len(non_code_guards)/total_p2_defects*100:.1f}%)")
@@ -394,7 +393,7 @@ def main() -> None:
     overall_recall = len(matched_guards) / total_p2_defects
     code_recall = len(matched_guards) / len(code_resident_guards)
 
-    print(f"\nRECALL ANALYSIS:")
+    print("\nRECALL ANALYSIS:")
     print(f"  Overall Catalogue Recall: {len(matched_guards)}/{total_p2_defects} = {overall_recall*100:.2f}%")
     print(f"  In-Scope Code-Resident Recall: {len(matched_guards)}/{len(code_resident_guards)} = {code_recall*100:.2f}%")
     print(f"  Matched Guards: {matched_guards}")

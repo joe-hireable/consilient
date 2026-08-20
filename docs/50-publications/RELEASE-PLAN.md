@@ -281,7 +281,7 @@ Measured from worktree HEAD `99457d5` on 20 August 2026; this is not a release a
 | Secret history plus self-test | **PASS** |
 | Product suite | **PASS:** 92 tests |
 | `mypy --strict src/consilient` | **FAIL:** 32 errors in 3 files. *Post-anchor: repaired at `9fc6120`; see the checklist below. The anchored measurement is not refreshed.* |
-| Repository-wide Ruff | **FAIL:** 48 findings. *Re-measured 20 August 2026 after the anchor: **54**, so this blocker has grown rather than shrunk.* |
+| Repository-wide Ruff | **FAIL:** 48 findings. *Post-anchor: **54** at `34ea23f`; repaired to zero in this commit, with `python -m ruff check .` enforced in CI. The anchored measurement is not refreshed.* [measured] |
 | Forward-replay instrument checks | **PASS:** 13 tests, including refused and stale lock paths |
 | Arithmetic-cancellation script | **PASS:** 0.0085 reported spread, 0.1192 cross spread, 14.0 ratio |
 | Source-depth audit | **BLOCKED:** P1 38, P2 26, P3 21 `[SNIP]`/`[2ND]`/`[STD]` markers |
@@ -328,8 +328,8 @@ git -C "$release_root" diff --check
 - [ ] Add and run a negative self-test for the private-corpus gate; it currently has no self-test
   mode. The test must demonstrate a known private-derived marker is rejected without printing it.
 - [x] Resolve every strict-mypy error; resolved at `9fc6120` with zero `type: ignore` across `src/consilient/` and `--strict` enforced in CI.
-- [ ] Resolve or explicitly scope every Ruff finding; a repository-wide failing command cannot be
-  presented as a release gate that passed.
+- [x] Resolve every Ruff finding; repaired from 54 at `34ea23f` to zero in this commit, with the
+  repository-wide release command enforced in CI and a source test preventing scope drift.
 - [ ] Replace every load-bearing `[SNIP]`, `[2ND]` or unfetched `[STD]` citation with an admissible
   primary source, or remove the claim.
 
