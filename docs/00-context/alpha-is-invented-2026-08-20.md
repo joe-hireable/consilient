@@ -109,3 +109,76 @@ points at the wrong denominator.
 3. **What replaces `α = 0.03`** in the interim — the invented value, the measured override rate
    with its caveat, or an explicit "unmeasured, do not evaluate the closed form" until it is?
    Continuing to evaluate β\* at an invented α is the option I would not choose.
+
+
+---
+
+# Correction — I conditioned α on the wrong thing, in the document about conditioning on the wrong thing
+
+The figure above, **0.327**, is not α. It is `red / all merged PRs` — the **marginal** rejection
+rate. α is defined as `P(verifier rejects | artefact is good)`, which needs the **conditional**:
+the good-and-red cell over all good artefacts. [measured]
+
+Found by an adversarial run this morning; recomputed here from the raw labels before recording.
+
+## The full 2×2, which nobody had ever built
+
+Aggregate counts only, as the privacy rule permits.
+
+**`jobboard-v2`** (300 merged PRs)
+
+| | green (accepted) | red (rejected) |
+|---|---|---|
+| **good** | 74 | **23** |
+| **bad** | 128 | 75 |
+
+**`hireable-platform`** (56 merged PRs, 7 with no recorded checks)
+
+| | green (accepted) | red (rejected) |
+|---|---|---|
+| **good** | 24 | **4** |
+| **bad** | 18 | 3 |
+
+## What α actually is
+
+| | `jobboard-v2` | `hireable-platform` |
+|---|---|---|
+| **α = P(reject \| good)** | **23/97 = 0.2371**, Wilson [0.1635, 0.3307] | **4/34 = 0.1176**, Wilson [0.0467, 0.2662] |
+| what I wrote — `red / all` | 98/300 = 0.3267 | 7/56 = 0.1250 |
+| β = P(accept \| bad) | 128/203 = 0.6305 | 18/22 = 0.8182 |
+
+## What that does to the claim
+
+The direction survives and the magnitude does not.
+
+| α | β\*(k=8, Δ=0.27) |
+|---|---|
+| 0.03, assumed and invented | 0.1119 |
+| **0.2371, the correct proxy** | **0.0880** |
+| 0.327, what I wrote | 0.0777 |
+
+The scale factor against the assumed value is **0.7865**, not the 0.6938 recorded above. So the
+honest statement is that thresholds are roughly **21% tighter**, not 31%. [measured] **α is still
+an order of magnitude above the invented 0.03, still measured, and still moves every threshold in
+the optimistic direction.** The overstatement was mine and it was material.
+
+## The part worth keeping
+
+**I made the same class of error I had spent the night documenting.** The β axis defect is that
+`mine_beta.py` conditions on "accepted" where the definition needs "bad". My α figure conditioned
+on "all PRs" where the definition needs "good". Both substitute a marginal for a conditional; both
+survive casual reading because the numbers are plausible; and mine appeared in the very document
+correcting the other. [measured]
+
+That is not a coincidence to be noted and moved past. **A 2×2 table has four cells and this
+project keeps reaching for the wrong denominator**, which suggests the defence is not care but
+structure: *build the table first, then read quantities off it.* The table above took minutes
+from labels that had been on disk since 19 August, and neither error would have survived it.
+
+**And building it closed the first item of the measurement order for free.** The good-and-red cell
+— 23 artefacts the checks rejected and the human then merged anyway — is the material α needs, and
+it was always there.
+
+**One caveat that does not change with the arithmetic.** These are proxy labels with 1/15 audited
+precision, and "the human merged it" stands in for "the artefact is good". This is `[measured]`
+evidence that α is far from 0.03 and which way. It is still not an estimate of α.
