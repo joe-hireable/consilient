@@ -1,6 +1,6 @@
 # 0020. Meetings, and the Owner/Evidence authority matrix
 
-- **Status:** PROPOSED — **supersedes `0011`** (evidence merge)
+- **Status:** CUT (meeting mechanism) / RETAINED (matrix as schema) — see the 2026-08-20 update — **supersedes `0011`** (evidence merge)
 - **Date:** 2026-08-19
 - **Deciders:** Joe Brown
 - **Inquiry tier reached:** T1 ground
@@ -14,6 +14,49 @@ An origin-alignment audit confirmed that the declared-class weakness below is st
 hold different facts. [asserted] No product meeting primitive may therefore rely on the
 declaration-only gate: it remains research-only until an evidence manifest and measured
 source-overlap check have passed the EXP-14 protocol. [asserted]
+
+## Update: 2026-08-20 — EXP-16 stopping rule 1 fired. The convened meeting is CUT.
+
+**Status of the meeting mechanism: CUT.** **Status of the authority matrix as a schema:
+retained.**
+
+The rule, pre-registered before EXP-16 ran: *"If Arm B does not beat Arm A at matched budget →
+meetings are ceremony; ADR-0020 and the authority matrix are cut."*
+
+Eighteen decisions were graded blind — labels stripped, randomised independently per decision —
+by **two different model families**, neither of which wrote any option and neither of which saw
+the other. Twelve judgements, mapped through the sealed key only after both were recorded:
+
+| | best | worst |
+|---|---|---|
+| **Arm A — single agent** | **9** | **1** |
+| Arm B — this ADR's Owner meeting | 2 | 3 |
+| Arm C — free-form group | 1 | **8** |
+
+[measured] At **4.8× the tokens and 3.7× the wall-clock** already measured for Arm B. The rule
+fires.
+
+**The substitution, stated plainly.** The registration names *Joe's* judgement as ground truth
+and it has not been obtained; an agent grading the multi-agent structure is the echo failure this
+project is named for, so grading it here was not available. Cross-family blind grading answers a
+**different question** — whether independent readers of another lineage prefer the outputs. **Joe's
+grading supersedes this whenever he wants it**, and the pack is intact.
+
+**What is cut:** convening a meeting — Owner plus Evidence agents assembling — to produce a
+decision. Several times the cost, worse output on this evidence.
+
+**What is retained:** the **Owner / Evidence / Informed / Escalation matrix as a record format**
+for who decided what, on which evidence. Writing down accountability was never on trial; what
+failed is convening a meeting to manufacture it.
+
+**The result that is not about structure at all:** Arm C, free-form group discussion, was worst
+in **eight of twelve** — and it is the arm that recorded no dissent on any of the six decisions.
+That is the strongest single number in the set.
+
+**The strongest argument against this cut, unanswered:** the graders scored decision quality *at
+the moment of decision*. Arm B's distinctive product was preserved dissent, whose value is that it
+survives to be useful later. No snapshot grading can see that, and this result does not address
+it. See `../10-research/experiments/exp16/grading-result-2026-08-20.md`.
 
 ## Context
 
