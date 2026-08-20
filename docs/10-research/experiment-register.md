@@ -1396,6 +1396,57 @@ size ratio between bad-and-red and bad-and-green cells.
 *proxy reliability*, not code quality); whether closed-source commercial workflows match open-source
 GitHub practices; and $\beta$ for unverified local environments. [asserted]
 
+### EXP-45 · Condensation retention and consequential loss in longitudinal transcripts `DONE 20 Aug 2026 — see experiments/exp45/findings-exp45.md`
+**Run 20 Aug 2026 across 1,495 transcripts (535.7 MB, 203 unique sessions).** Evaluated 48 condensation
+and away-summary boundaries across 317,625 pre-boundary entity instances.
+**Headline:** Multi-week sessions are rare outliers (median 2.7 minutes, max 8.37 days); condensation
+is lossy ($R = 40.71\%$ [32.50%, 48.83%]), but **loss does not bite** (file re-read rate 0.50% (5/992),
+re-discovery rate 0.00% (0/599), aggregate $L_{\text{bite}} = 0.00\% < 1.0\%$).
+**Stopping rule 2 FIRED:** Condensation discards freely and safely; the perpetual memory / GNN harness
+architecture is **RETIRED** as solving a non-existent problem.
+**Decides:** whether condensation operates as a noisy verifier with measurable false-accept rate
+($\beta$ analogue: retention loss and consequential loss), and whether perpetual memory architecture
+is required or refutable.
+**Precondition:** `~/.claude/projects/` longitudinal transcript corpus (1,495 JSONL sessions, ~654 MB);
+deterministic local parser; scratch directory in `/tmp`. Strictly zero external API/model calls.
+**Procedure:**
+1. Ingest all JSONL session transcripts in `/mnt/c/Users/jpbpr/.claude/projects/` deterministically.
+2. Measure session longevity distributions (turn counts, record counts, wall-clock duration in days)
+   and condensation frequency (sessions containing `compact_boundary`, `isCompactSummary`/`compactMetadata`,
+   or `away_summary`). Test user claim of multi-week continuous sessions against measured corpus.
+3. For each condensation boundary $B_k$, extract the pre-boundary entity set $E_{\text{pre}}$ (file paths,
+   command signatures, code identifiers, constraint phrases) and post-boundary entity set $E_{\text{post}}$.
+4. Compute item retention rate: $R = |E_{\text{pre}} \cap E_{\text{post}}| / |E_{\text{pre}}|$.
+   - False-positive mode: incidental lexical matching of generic identifiers across distinct contexts.
+   - False-negative mode: synonymy/paraphrase where the concept survives but specific surface tokens differ.
+5. Compute consequential loss rate $L_{\text{bite}}$: fraction of dropped entities $E_{\text{pre}} \setminus E_{\text{post}}$
+   whose absence forces observable post-boundary re-reading (file re-read that was already read pre-boundary)
+   or re-discovery (re-running identical discovery commands/queries). Report un-needed loss and consequential loss separately.
+6. Compute survival correlations against pre-boundary features: recency (turn distance to boundary),
+   repetition frequency, origin channel (tool result vs user prompt vs assistant text), and whether the entity
+   was acted upon before condensation.
+**Measures:**
+- Condensation boundary frequency (% sessions, boundaries per session).
+- Session lifespan distribution (p50, p90, p99, max in records and days).
+- Overall entity retention rate $R$ with bootstrap 95% confidence interval.
+- Consequential loss rate $L_{\text{bite}}$ (re-read / re-query fraction among lost entities).
+- Rank correlation coefficients between survival and recency, frequency, and tool vs prose origin.
+**Stopping rules (fixed before the run):**
+- If retention rate $R \ge 98\%$ across all boundaries $\implies$ **Condensation is near-lossless.**
+  Condensation does not behave as an error-prone verifier; $\beta$ does not usefully generalise to it;
+  retire perpetual memory / GNN harness direction. [asserted]
+- If retention rate $R < 98\%$ but consequential loss $L_{\text{bite}} < 1.0\%$ $\implies$ **Loss does not bite.**
+  Condensation discards safely; subsequent work is not defect-inducing; retire dedicated memory layer
+  as unneeded complexity. [asserted]
+- If retention rate $R < 98\%$ and $L_{\text{bite}} \ge 1.0\%$ $\implies$ **Condensation is an error-prone verifier with bite.**
+  Admit condensation loss as an empirical $\beta$ domain; promote feature correlation profile to design baseline. [asserted]
+- If fewer than 10 sessions contain identifiable condensation boundaries or pre-boundary history is
+  structurally missing from transcripts, record **insufficient evidence** — do not extrapolate from single-digit sessions. [asserted]
+**What it cannot decide:**
+- Silent semantic errors where the model proceeds erroneously without emitting an observable re-read or tool check;
+- Paraphrased entity retention not captured by mechanical tokenization;
+- Non-Claude Code condensation mechanisms (Cursor, Codex, or native open-model contexts). [asserted]
+
 ---
 
 ## Not experiments
