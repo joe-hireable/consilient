@@ -249,3 +249,84 @@ re-run was given an explicit boundary note and an instruction never to report ab
 
 **What would overturn it:** a scoped agent correctly establishing absence within a corpus whose
 boundary it was told, which is a different and legitimate claim.
+
+
+---
+
+# Four corrections from an audit of this document
+
+The same GPT family that audited the repository was pointed at **these findings** instead. Four
+of its objections hold. Each is against me.
+
+## 1. My forged event does not move β — the demonstration was wrong, the hole was not
+
+I wrote that this event *"validated. That projected. That moved β."*
+
+```json
+{"event":"attempt.outcome","actor":"claude-code-agent",
+ "data":{"task":"t1","verifier_accept":true,"human_verdict":"accept"}}
+```
+
+The first two clauses are right. **The third is false.** `compute()` takes its denominator from
+rows where `human_verdict == "reject"`:
+
+```python
+rejected = [r for r in selected if r.get("human_verdict") == "reject"]
+n = len(rejected)
+false_accepts = sum(1 for r in rejected if r["verifier_accept"])
+```
+
+An **accept** row changes neither `n` nor `k`. It can only widen the reported observation window.
+[measured]
+
+**The vulnerability was real and is unchanged**: an agent could author a human verdict, and V0-18
+exists to forbid exactly that. But the example I chose to demonstrate it was the one variant that
+does not bite. **The event that actually attacks β is a forged `human_verdict: "reject"` with
+`verifier_accept: true`** — that lands in both numerator and denominator and inflates β directly,
+making the checks look worse than they are. A forged *accept* is the quieter attack: it suppresses
+nothing and moves nothing, but it does contaminate the window and the row count.
+
+Picking the harmless variant to illustrate a genuine hole is a species of overclaim I should name
+rather than quietly fix: **the fix was right, the severity argument was decorated with an example
+that does not support it.**
+
+## 2. "Four later documents assume the opposite" overcounts
+
+ADR-0026 and ADR-0033 do conflict with ADR-0019 — ADR-0026 permits unattended metered work, and
+ADR-0033 asks only when spend exceeds an authorised cap. [measured]
+
+But **ADR-0028 says only that metered calls retain hard caps, and says nothing about approval**;
+and `v0-draft.md` §7.2 requires an explicitly authorised per-task cap, **which can coexist with
+per-transaction approval**. Neither independently establishes the opposite policy.
+
+**The live contradiction is real and involves at least two documents, not four.** The decision Joe
+faces is unchanged; my count of who had quietly assumed a resolution was inflated.
+
+## 3. The ADR-0007 versus ADR-0024 contradiction is refuted
+
+I recorded, from the first cross-family pass, that ADR-0007's CLI-only rule contradicts ADR-0024's
+consent presentation. **It does not.**
+
+ADR-0007 **explicitly requires a single interactive CLI verdict prompt** and calls that prompt the
+entire review surface. Its `--json` requirement says every command must *also* work
+non-interactively; it does not ban interactive CLI use. ADR-0024's neutral, equal-weight wording is
+implementable in a CLI prompt without a TUI, web server or desktop dialog. [measured]
+
+**Withdrawn.** What survives is narrower and worth keeping: the exact consent mechanics are
+underspecified, and ADR-0024's *"silence is a decline"* rule still needs a stated behaviour under
+a non-TTY run.
+
+## 4. "Replay catches drift" is too strong
+
+When the projected event count differs from the log count, `cmd_replay` sets `stale=True` and
+`compared=False` — but by then `projection.build()` has already unlinked and rebuilt the database.
+**State that is simultaneously stale *and* independently drifted is destroyed without ever being
+compared.** [measured] The drift test covers the equal-count case only.
+
+**No false pass results** — `compared: false` fails closed, which is the property that matters. But
+the unqualified claim that replay *catches drift* is wrong, and the forensic guarantee I implied
+does not exist. The honest statement: **replay catches drift when the state is current, and
+reports honestly that it did not look when the state is behind.**
+
+Now improved: when the state is stale it is copied aside before the rebuild, so the drifted
+artefact survives for inspection instead of being destroyed by the check that noticed it.

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sqlite3
 import sys
 from pathlib import Path
@@ -64,10 +65,23 @@ def cmd_replay(args) -> dict:
         finally:
             existing.close()
 
+    events = len(read_all(log))
+
+    # State that is behind AND independently drifted would otherwise be destroyed by the
+    # rebuild before anything compared it, so the check that noticed the problem would also
+    # remove the evidence. Copy it aside first. Found by an external audit of this repair.
+    preserved: str | None = None
+    if prior is not None and projected != events:
+        keep = db.with_suffix(db.suffix + f".stale-{projected}-of-{events}")
+        try:
+            shutil.copy2(db, keep)
+            preserved = str(keep)
+        except OSError:
+            preserved = None
+
     rebuilt = projection.build(log, db)
     digest = projection.state_digest(rebuilt)
     rebuilt.close()
-    events = len(read_all(log))
 
     # Staleness is not drift, and conflating them makes the check cry wolf. Added hours after
     # the comparison itself was, because ordinary log growth reported DIVERGED on the real
@@ -82,6 +96,7 @@ def cmd_replay(args) -> dict:
         "digest": digest,
         "prior_digest": prior,
         "stale": stale,
+        "preserved_stale_state": preserved,
         "compared": compared,
         "identical": (prior == digest) if compared else None,
     }

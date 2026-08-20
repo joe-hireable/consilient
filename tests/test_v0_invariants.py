@@ -8,6 +8,7 @@ import argparse
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -693,3 +694,79 @@ def test_real_drift_is_still_caught_once_the_counts_match(tmp_path, capsys):
     assert payload["stale"] is False
     assert payload["compared"] is True
     assert payload["identical"] is False
+
+
+
+def test_a_forged_reject_is_the_variant_that_attacks_beta():
+    """Which forgery actually moves the number, recorded because I first showed the wrong one.
+
+    The V0-18 write-up demonstrated the bypass with a forged `human_verdict: "accept"`. That
+    validates and projects, but `compute()` draws its denominator from rows where the verdict
+    is "reject", so an accept row changes neither n nor k. The hole was real; the example did
+    not bite. The forgery that attacks beta is a **reject** paired with `verifier_accept: True`,
+    which lands in both numerator and denominator.
+    """
+    honest = [
+        {
+            "ts": now_ts(),
+            "task_family": "repair",
+            "verifier_version": "v1",
+            "verifier_accept": i < 3,
+            "human_verdict": "reject",
+        }
+        for i in range(30)
+    ]
+    base = beta_mod.compute(honest)
+    assert base.verdict == beta_mod.MEASURED
+    assert base.point == pytest.approx(3 / 30)
+
+    forged_accept = honest + [
+        {
+            "ts": now_ts(),
+            "task_family": "repair",
+            "verifier_version": "v1",
+            "verifier_accept": True,
+            "human_verdict": "accept",
+        }
+    ]
+    assert beta_mod.compute(forged_accept).point == pytest.approx(base.point), (
+        "a forged accept moved beta; the original write-up would have been right by accident"
+    )
+
+    forged_reject = honest + [
+        {
+            "ts": now_ts(),
+            "task_family": "repair",
+            "verifier_version": "v1",
+            "verifier_accept": True,
+            "human_verdict": "reject",
+        }
+    ]
+    attacked = beta_mod.compute(forged_reject)
+    assert attacked.point == pytest.approx(4 / 31)
+    assert attacked.point > base.point, "the forged reject failed to inflate beta"
+
+
+def test_replay_preserves_state_that_is_both_stale_and_drifted(tmp_path, capsys):
+    """The check must not destroy the evidence it just noticed.
+
+    When state is behind the log AND independently drifted, `projection.build` would unlink it
+    before anything compared it. Found by an external audit of the staleness repair.
+    """
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("t0", accept=True, verdict="reject"))
+    projection.build(log_dir, db).close()
+
+    drifted = sqlite3.connect(db)
+    drifted.execute("UPDATE outcomes SET human_verdict = 'accept'")
+    drifted.commit()
+    drifted.close()
+
+    append(path, outcome("t1", accept=False, verdict="reject"))  # now stale as well
+
+    assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["stale"] is True and payload["compared"] is False
+    assert payload["preserved_stale_state"], "the drifted state was destroyed, not preserved"
+    assert Path(payload["preserved_stale_state"]).exists()
