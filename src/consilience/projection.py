@@ -16,7 +16,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from .events import Event, read_all
+from .events import Event, Rejection, read_all
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -38,6 +38,12 @@ CREATE TABLE IF NOT EXISTS outcomes (
     human_verdict   TEXT
 );
 CREATE INDEX IF NOT EXISTS outcomes_family ON outcomes (task_family, verifier_version);
+CREATE TABLE IF NOT EXISTS rejections (
+    id     INTEGER PRIMARY KEY,
+    path   TEXT NOT NULL,
+    line   INTEGER NOT NULL,
+    reason TEXT NOT NULL
+);
 """
 
 # The one event kind that carries an acceptance observation. Anything else is context.
@@ -55,9 +61,31 @@ def build(log_dir: Path, db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA)
-    _apply(conn, read_all(log_dir))
+    events, rejected = read_all(log_dir)
+    _apply(conn, events)
+    _apply_rejections(conn, rejected)
     conn.commit()
     return conn
+
+
+def _apply_rejections(conn: sqlite3.Connection, rejected: list[Rejection]) -> None:
+    """Refused lines are part of the state, not something that vanished on the way in.
+
+    Putting them in a table rather than returning them out of band means three things
+    hold for free: `state_digest` covers them, so a change in what the log refuses changes
+    the digest and `replay` sees it; nothing can drop them by forgetting to unpack a
+    tuple; and the count is queryable by anything that reports a number derived from the
+    log. A quarantine nobody can see is the same as a silent skip.
+    """
+    for index, rejection in enumerate(rejected):
+        conn.execute(
+            "INSERT INTO rejections (id, path, line, reason) VALUES (?, ?, ?, ?)",
+            (index, rejection.path, rejection.line, rejection.reason),
+        )
+
+
+def rejection_count(conn: sqlite3.Connection) -> int:
+    return int(conn.execute("SELECT COUNT(*) FROM rejections").fetchone()[0])
 
 
 def _apply(conn: sqlite3.Connection, events: list[Event]) -> None:

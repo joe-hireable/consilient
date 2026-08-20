@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from . import beta as beta_mod
+from . import events as events_mod
 from . import projection
 from .events import EventError, append, read_all
 
@@ -65,7 +66,8 @@ def cmd_replay(args) -> dict:
         finally:
             existing.close()
 
-    events = len(read_all(log))
+    read_events, rejected = read_all(log)
+    events = len(read_events)
 
     # State that is behind AND independently drifted would otherwise be destroyed by the
     # rebuild before anything compared it, so the check that noticed the problem would also
@@ -99,14 +101,22 @@ def cmd_replay(args) -> dict:
         "preserved_stale_state": preserved,
         "compared": compared,
         "identical": (prior == digest) if compared else None,
+        "quarantined": [
+            {"path": r.path, "line": r.line, "reason": r.reason} for r in rejected
+        ],
+        "not_written_by_append": len(events_mod.bypassed(log)),
     }
 
 
 def cmd_beta(args) -> dict:
     conn = projection.build(Path(args.log), Path(args.db))
     result = beta_mod.from_connection(conn, args.task_family, args.verifier_version)
+    quarantined = projection.rejection_count(conn)
     conn.close()
-    return result.as_dict()
+    # β is a rate over a denominator, so anything the log refused has to be visible
+    # wherever the rate is. A β computed over a quietly shortened log is exactly the false
+    # confidence this project exists to measure.
+    return {**result.as_dict(), "quarantined": quarantined}
 
 
 def render(command: str, result: dict) -> str:
@@ -122,7 +132,20 @@ def render(command: str, result: dict) -> str:
             mark = "NOT COMPARED — no prior state on disk"
         else:
             mark = "identical" if result["identical"] else "DIVERGED"
-        return f"replayed {result['events']} events; state {mark} ({result['digest'][:12]})"
+        line = f"replayed {result['events']} events; state {mark} ({result['digest'][:12]})"
+        if result["quarantined"]:
+            line += (
+                f"\n  QUARANTINED {len(result['quarantined'])} line(s) the log refuses:"
+            )
+            for r in result["quarantined"]:
+                line += f"\n    {r['path']}:{r['line']}  {r['reason']}"
+        if result["not_written_by_append"]:
+            total = result["events"] + len(result["quarantined"])
+            line += (
+                f"\n  {result['not_written_by_append']} of {total} logged lines were not "
+                "written by append(), so validate() never ran on them"
+            )
+        return line
     if command == "beta":
         return beta_mod.Beta(
             verdict=result["verdict"],

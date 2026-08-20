@@ -41,6 +41,32 @@ class EventError(ValueError):
 
 
 @dataclass(frozen=True)
+class Rejection:
+    """A line the reader refused, kept so refusal is reported rather than fatal.
+
+    The log is append-only, so a line that should never have been written cannot be
+    removed. If the reader raises on it, one bad append destroys the readability of the
+    whole record — the instrument's failure mode becomes "stop working" instead of "report
+    the problem", and every downstream number disappears with it.
+
+    This project had already worked that out and then walked into it anyway.
+    `test_reading_a_historical_log_does_not_depend_on_when_it_is_read` says in as many
+    words that if `validate` enforced clock skew "every log would become unreadable as it
+    aged". The reasoning was applied to one rule and never generalised into a property of
+    the reader, so when V0-18 was tightened at 03:52 on 20 August 2026 and three events
+    were appended at 09:41-09:56 that it forbids, `replay` and `beta` both died on the
+    real trajectory. [measured]
+
+    A rejection is never silently dropped: it is excluded from the projection AND carried
+    back to the caller, and every CLI command reports the count.
+    """
+
+    path: str
+    line: int
+    reason: str
+
+
+@dataclass(frozen=True)
 class Event:
     raw: dict
 
@@ -184,11 +210,17 @@ def append(path: Path, event: dict) -> dict:
     return event
 
 
-def read(path: Path) -> list[Event]:
-    """Every valid event in file order. A malformed line is an error, never a skip."""
+def read(path: Path) -> tuple[list[Event], list[Rejection]]:
+    """Every valid event in file order, and every line that was refused.
+
+    A refused line is never silently skipped — it comes back in the second element, and
+    the caller must decide what to say about it. The two-tuple is deliberate: it makes the
+    quarantine impossible to ignore by accident, which a logged warning would not.
+    """
     if not path.exists():
-        return []
-    events = []
+        return [], []
+    events: list[Event] = []
+    rejected: list[Rejection] = []
     with path.open(encoding="utf-8") as fh:
         for number, line in enumerate(fh, start=1):
             line = line.strip()
@@ -197,21 +229,58 @@ def read(path: Path) -> list[Event]:
             try:
                 raw = json.loads(line)
             except json.JSONDecodeError as exc:
-                raise EventError(f"{path}:{number} is not valid JSON: {exc}") from exc
+                rejected.append(Rejection(str(path), number, f"not valid JSON: {exc}"))
+                continue
             try:
                 validate(raw)
             except EventError as exc:
-                raise EventError(f"{path}:{number} {exc}") from exc
+                rejected.append(Rejection(str(path), number, str(exc)))
+                continue
             events.append(Event(raw))
-    return events
+    return events, rejected
 
 
-def read_all(directory: Path) -> list[Event]:
+def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
     """Every event across every daily file, ordered by filename then position."""
     events: list[Event] = []
+    rejected: list[Rejection] = []
     for path in sorted(directory.glob("*.jsonl")):
-        events.extend(read(path))
-    return events
+        file_events, file_rejected = read(path)
+        events.extend(file_events)
+        rejected.extend(file_rejected)
+    return events, rejected
+
+
+def bypassed(directory: Path) -> list[tuple[str, int]]:
+    """Lines that did not come through `append()`.
+
+    `append` is documented as the only writer and is the only place `validate` runs. On
+    20 August 2026, 92 of the 93 events in the real trajectory — 98.9% — had been written
+    straight to the file by something else, which is how three events V0-18 forbids came
+    to be in an authoritative record whose sole writer rejects them. [measured]
+
+    That is `AGENTS.md` working principle 3 reproduced inside the artefact the principle
+    was written about: a documented single boundary fragments into several access paths
+    because no check bans the bypass.
+
+    ponytail: canonical form is a proxy, not a boundary. It catches hand-written JSON,
+    which is the failure that actually happened; it would not catch a writer that
+    formatted its output correctly. The upgrade path if that ever matters is a per-event
+    digest of the previous line, which cannot be applied retroactively to history.
+    """
+    out: list[tuple[str, int]] = []
+    for path in sorted(directory.glob("*.jsonl")):
+        with path.open(encoding="utf-8") as fh:
+            for number, line in enumerate(fh, start=1):
+                line = line.rstrip("\n")
+                if not line.strip():
+                    continue
+                try:
+                    if canonical(json.loads(line)) != line:
+                        out.append((str(path), number))
+                except json.JSONDecodeError:
+                    out.append((str(path), number))
+    return out
 
 
 def prefix_digest(path: Path, count: int) -> str:

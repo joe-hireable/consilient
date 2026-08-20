@@ -21,7 +21,7 @@ Read in this order before doing anything:
 2. `docs/decisions/index.md` — current decision state and supersession trail
 3. `docs/10-research/experiment-register.md` — runnable claims and stopping rules
 4. `docs/20-design/backends.md` — measured adapter and admission state
-5. `docs/40-spec/v0-draft.md` — the unapproved implementation boundary
+5. `docs/40-spec/v0-draft.md` — the approved implementation boundary, and § 3's gates
 6. `docs/00-context/conversation-summary.md` — origin and rejected alternatives
 
 ## Your job in the current phase
@@ -43,8 +43,9 @@ Brainstorm, adversarially. Specifically:
 
 ## What not to do
 
-- Don't write product implementation code before explicit approval. Experimental adapters,
-  research instruments and invariant checks remain permitted under `AGENTS.md`.
+- Don't write routing, blocking or orchestration behaviour. Those are Stage 3 and gated on
+  ADR-0015 Gate A/B, neither of which has passed. Observe-only increment work, experimental
+  adapters, research instruments and invariant checks are all authorised under `AGENTS.md`.
 - Don't treat the current draft or a multi-agent agreement as evidence.
 - Don't accept architecture in `docs/20-design/` as settled without a falsifiable claim and
   evidence-class-different challenge.

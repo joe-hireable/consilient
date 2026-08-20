@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from consilience import beta as beta_mod
+from consilience import events as events_mod
 from consilience import projection
 from consilience.cli import build_parser, main
 from consilience.events import (
@@ -22,6 +23,7 @@ from consilience.events import (
     canonical,
     prefix_digest,
     read,
+    read_all,
     validate,
 )
 
@@ -121,13 +123,23 @@ def test_in_place_edit_of_a_committed_position_is_detected(tmp_path):
     assert prefix_digest(log, 2) != before
 
 
-def test_a_malformed_line_is_an_error_not_a_skip(tmp_path):
+def test_a_malformed_line_is_quarantined_not_silently_skipped(tmp_path):
+    """The refusal is reported, and the rest of the log survives it.
+
+    This asserted `pytest.raises` until 20 Aug 2026. Raising made one bad line fatal to an
+    append-only file nobody can edit, which is how three events appended at 09:41-09:56
+    that day killed `replay` and `beta` on the real trajectory. The property that matters
+    is "never silently skipped", not "always fatal": the line is excluded AND named.
+    """
     log = tmp_path / "2026-08-20.jsonl"
     append(log, ev())
     with log.open("a", encoding="utf-8") as fh:
         fh.write("{not json}\n")
-    with pytest.raises(EventError, match="not valid JSON"):
-        read(log)
+    events, rejected = read(log)
+    assert len(events) == 1, "the valid event must survive its neighbour"
+    assert len(rejected) == 1
+    assert rejected[0].line == 2
+    assert "not valid JSON" in rejected[0].reason
 
 
 # ---------------------------------------------------------------- V0-18
@@ -260,6 +272,14 @@ def test_the_projection_still_fails_closed_on_an_unknown_verdict(tmp_path):
 
     A log written by an older version, or by hand, can carry a verdict that today's
     `validate` would refuse. The projection must not accept it either.
+
+    The mechanism changed on 20 Aug 2026 and the property did not. This used to assert
+    that `build` raised. Raising kept the bad verdict out of β and threw away the good
+    event beside it, and made any future tightening of `validate` retroactively fatal to
+    the whole record. It now asserts what actually has to hold: the refused verdict never
+    reaches the table β is computed from, and the refusal is visible rather than silent.
+    Asserting the mechanism instead of the property is what made the old test look like
+    protection it was not going to keep providing.
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
@@ -270,8 +290,56 @@ def test_the_projection_still_fails_closed_on_an_unknown_verdict(tmp_path):
     )
     with path.open("a", encoding="utf-8") as fh:
         fh.write(smuggled + "\n")
-    with pytest.raises(EventError, match="human_verdict must be"):
-        projection.build(log_dir, db)
+
+    conn = projection.build(log_dir, db)
+    verdicts = [r[0] for r in conn.execute("SELECT human_verdict FROM outcomes")]
+    assert verdicts == ["reject"], "the refused verdict must not reach β's table"
+
+    rejected = list(conn.execute("SELECT line, reason FROM rejections"))
+    assert len(rejected) == 1, "and its refusal must be recorded, not dropped"
+    assert rejected[0][0] == 2
+    assert "human_verdict must be" in rejected[0][1]
+    assert projection.rejection_count(conn) == 1
+    conn.close()
+
+
+def test_beta_reports_what_the_log_refused(tmp_path, capsys):
+    """A rate computed over a quietly shortened denominator is the failure this measures.
+
+    The quarantine is only not-a-silent-skip if it appears where the number appears.
+    """
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, ev())
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write("{not json}\n")
+    main(["--json", "--log", str(log_dir), "--db", str(db), "beta"])
+    assert json.loads(capsys.readouterr().out)["quarantined"] == 1
+
+
+def test_no_new_event_may_bypass_append(tmp_path):
+    """A ratchet on the real trajectory, not a fixture.
+
+    `append` is the documented sole writer and the only place `validate` runs. On
+    20 Aug 2026, 92 of 93 logged lines had been written straight to the file by something
+    else — which is how three events V0-18 forbids reached an authoritative record whose
+    only writer rejects them. That is working principle 3 (`AGENTS.md`) happening inside
+    the artefact the principle was written about.
+
+    History cannot be rewritten in an append-only log, so the counts below are the
+    measured legacy baseline and may only ever go DOWN. A new bypass raises the count and
+    fails here. Lowering these constants is the only permitted edit.
+    """
+    log = Path(".harness/log")
+    if not log.exists():  # pragma: no cover - repository-only check
+        pytest.skip("no repository trajectory in this checkout")
+    assert len(events_mod.bypassed(log)) <= 92, (
+        "a new event bypassed append(); write it with `consil record`"
+    )
+    _, rejected = read_all(log)
+    assert len(rejected) <= 3, (
+        "a new event was appended that the log refuses; see the quarantine in `consil replay`"
+    )
 
 
 # ---------------------------------------------------------------- V0-06
@@ -634,14 +702,14 @@ def test_an_invented_past_timestamp_is_refused_at_append(tmp_path):
 def test_a_truthful_timestamp_is_accepted(tmp_path):
     log = tmp_path / "2026-08-20.jsonl"
     append(log, ev(ts=_stamp(0)))
-    assert len(read(log)) == 1
+    assert len(read(log)[0]) == 1
 
 
 def test_ordinary_delay_within_tolerance_is_accepted(tmp_path):
     """The check must not punish a slow write, only an invented one."""
     log = tmp_path / "2026-08-20.jsonl"
     append(log, ev(ts=_stamp(-60)))
-    assert len(read(log)) == 1
+    assert len(read(log)[0]) == 1
 
 
 def test_reading_a_historical_log_does_not_depend_on_when_it_is_read():
@@ -651,7 +719,6 @@ def test_reading_a_historical_log_does_not_depend_on_when_it_is_read():
     aged - the same failure the explicit-offset rule exists to prevent.
     """
     validate(ev(ts="2026-08-19T01:00:00+01:00"))
-
 
 
 def test_a_log_that_has_grown_reads_as_stale_not_diverged(tmp_path, capsys):
@@ -694,7 +761,6 @@ def test_real_drift_is_still_caught_once_the_counts_match(tmp_path, capsys):
     assert payload["stale"] is False
     assert payload["compared"] is True
     assert payload["identical"] is False
-
 
 
 def test_a_forged_reject_is_the_variant_that_attacks_beta():
@@ -768,5 +834,7 @@ def test_replay_preserves_state_that_is_both_stale_and_drifted(tmp_path, capsys)
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["stale"] is True and payload["compared"] is False
-    assert payload["preserved_stale_state"], "the drifted state was destroyed, not preserved"
+    assert payload["preserved_stale_state"], (
+        "the drifted state was destroyed, not preserved"
+    )
     assert Path(payload["preserved_stale_state"]).exists()
