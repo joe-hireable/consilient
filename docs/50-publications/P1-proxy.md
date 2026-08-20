@@ -34,9 +34,16 @@ uncoupling. [measured] [asserted]
 
 The worst limitation: **the human-ground-truth fallback was unavailable.** The sole maintainer
 could not adjudicate entirely AI-orchestrated changes; no contemporaneous verdicts exist.
-[measured] (first-party) We display a diagnostic bracket and never pool. [asserted] We
-hypothesise that ground truth becomes unavailable as AI authorship rises. A dated search found
-no direct study; EXP-44 registers the unrun test. [cited] [asserted]
+[measured] (first-party) We display a diagnostic bracket and never pool. [asserted]
+
+We hypothesise that ground truth becomes unavailable as **agent-authored** commits rise, and we
+state that scope deliberately rather than claiming the broader one. A five-repository check
+across 293,846 commits found declared AI authorship **≤0.03% throughout 2023–2024** while
+behavioural indicators shifted markedly over the same window, then **13–61% in 2025–2026**,
+driven by agent trailer insertion rather than IDE assistance. [measured] **Declaration therefore
+measures autonomous agent authorship, not AI adoption**, so the general claim is not testable by
+this instrument and we do not make it. EXP-44 registers the narrowed, unrun test; a dated search
+found no direct prior study. [cited] [asserted]
 
 ---
 
