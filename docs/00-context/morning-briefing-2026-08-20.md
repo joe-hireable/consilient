@@ -144,6 +144,13 @@ a clean one. It is not condemned; it is *unverifiable*, and it decided ADR-0003.
 A single-instance guard alone would have prevented this. A `run_id` per record would have made it
 visible.
 
+**Both are now shipped** (`fb2cdda`), because both runs ended and the mid-run tampering objection
+lifted. `run_exp31.py` kills the whole process tree on timeout, takes a lock naming its pid and
+`run_id`, and stamps the `run_id` into the results. Five tests against real processes; one
+reproduces the defect deliberately and fails if it ever stops overrunning. **So D is no longer a
+decision about whether to fix it — it is a decision about whether to re-run EXP-31, which is now
+one command.** The other three runners still carry the exposure and are untouched.
+
 ### 🔴 D2. Gate B2 cannot fail, and it is the only gate β can move
 `gate-b2-and-the-unconnected-meter-2026-08-20.md`
 

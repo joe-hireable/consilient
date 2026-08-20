@@ -1079,8 +1079,15 @@ survives the specific model and harness tested, since ADR-0027 keeps composition
 > is worsening: `gemma4:31b`'s timeout rate has risen from ~17% to **41%**, censoring runs that
 > would have passed, against the model the experiment exists to qualify. [measured]
 >
-> Both partial datasets are preserved outside the evidence base. **The run must be repeated** once
-> the runner is append-only, carries a `run_id`, and takes a lock naming its PID.
+> Both partial datasets are preserved outside the evidence base. **The run must be repeated.**
+>
+> **Instrument repaired 20 Aug 2026, after both runs ended** (`fb2cdda`). `run_exp31.py` now kills
+> the whole process tree on timeout — the defect that turned a 240 s cap into a 2,011 s attempt —
+> takes a single-instance lock naming its pid, `run_id` and start time, and records the `run_id`
+> in the results payload so a future interleaving is visible rather than inferred. Five tests in
+> `test_run_exp31.py`, run against real processes; one deliberately reproduces the defect and
+> fails if it ever stops overrunning. **A clean re-run is now a single command.** The registration
+> below is unchanged and was not touched.
 **Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
 specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a
 free capability floor for the local tier and a zero-cost prior for EXP-29's scope question.
