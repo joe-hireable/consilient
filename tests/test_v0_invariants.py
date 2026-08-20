@@ -6,6 +6,7 @@ the check that bans bypassing it, in the same commit.
 
 import argparse
 import json
+import sqlite3
 
 import pytest
 
@@ -35,6 +36,9 @@ def ev(**over):
     return base
 
 
+HUMAN = "joe-brown"
+
+
 def outcome(
     task,
     accept,
@@ -43,15 +47,26 @@ def outcome(
     version="v1",
     ts="2026-08-20T01:00:00+01:00",
 ):
+    """An outcome event, authored by the human when it carries their verdict.
+
+    This helper used to attach a `human_verdict` to an event with `actor="agent"` and no
+    principal, and every test passed. That is precisely the forgery V0-18 forbids, so the
+    fixture was modelling an invalid event as valid — which is why no test caught the hole
+    in `_check_human_authority`. A fixture that can express a forbidden state will teach a
+    suite to accept it.
+    """
     data = {
         "task": task,
         "verifier_accept": accept,
         "task_family": family,
         "verifier_version": version,
     }
-    if verdict is not None:
-        data["human_verdict"] = verdict
-    return ev(ts=ts, event=projection.OUTCOME_KIND, data=data)
+    if verdict is None:
+        return ev(ts=ts, event=projection.OUTCOME_KIND, data=data)
+    data["human_verdict"] = verdict
+    data["principal"] = HUMAN
+    data["via"] = "cli"
+    return ev(ts=ts, actor=HUMAN, event=projection.OUTCOME_KIND, data=data)
 
 
 # ---------------------------------------------------------------- V0-01
@@ -211,12 +226,37 @@ def test_malformed_outcome_fails_closed(tmp_path):
         projection.build(log_dir, db)
 
 
-def test_unknown_human_verdict_fails_closed(tmp_path):
+def test_unknown_human_verdict_fails_closed_at_validation(tmp_path):
+    """Since 20 Aug 2026 this fails one layer earlier than it used to.
+
+    Closing the V0-18 hole meant `validate` had to look at `human_verdict`, so an unknown
+    verdict is now refused before it can be written to the log at all, rather than when the
+    projection is built from it. Stricter, and earlier.
+    """
+    with pytest.raises(EventError, match="human_verdict must be"):
+        append(
+            log_dir_unused := tmp_path / "log" / "2026-08-20.jsonl",
+            outcome("t", accept=True, verdict="probably fine"),
+        )
+    assert not log_dir_unused.exists(), "a refused event must not reach the log"
+
+
+def test_the_projection_still_fails_closed_on_an_unknown_verdict(tmp_path):
+    """Defence in depth is only defence if the second layer is tested too.
+
+    A log written by an older version, or by hand, can carry a verdict that today's
+    `validate` would refuse. The projection must not accept it either.
+    """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append(
-        log_dir / "2026-08-20.jsonl", outcome("t", accept=True, verdict="probably fine")
+    path = log_dir / "2026-08-20.jsonl"
+    good = outcome("t", accept=True, verdict="reject")
+    append(path, good)
+    smuggled = canonical(
+        {**good, "data": {**good["data"], "human_verdict": "probably fine"}}
     )
-    with pytest.raises(projection.ProjectionError, match="human_verdict must be"):
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(smuggled + "\n")
+    with pytest.raises(EventError, match="human_verdict must be"):
         projection.build(log_dir, db)
 
 
@@ -319,9 +359,40 @@ def test_replay_command_reports_a_stable_digest(tmp_path, capsys):
             log_dir / "2026-08-20.jsonl",
             outcome(f"t{i}", accept=True, verdict="reject"),
         )
+    # Nothing on disk yet: the comparison has no subject, and must not claim a pass.
+    assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
+    first = json.loads(capsys.readouterr().out)
+    assert first["compared"] is False and first["identical"] is None
+    assert first["events"] == 3
+
+    # The first call left state behind, so the second has something to compare against.
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["identical"] is True and payload["events"] == 3
+    assert payload["compared"] is True and payload["identical"] is True
+    assert payload["events"] == 3 and payload["prior_digest"] == payload["digest"]
+
+
+def test_replay_reports_divergence_when_the_state_on_disk_has_drifted(tmp_path, capsys):
+    """The check the old implementation could not perform.
+
+    It rebuilt from the log twice and compared the rebuilds -- identical by construction --
+    after unlinking the very state whose drift it was meant to detect.
+    """
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    projection.build(log_dir, db).close()
+
+    drifted = sqlite3.connect(db)
+    drifted.execute(
+        "INSERT INTO outcomes (position, ts, task, verifier_accept)"
+        " VALUES (999, '2026-08-20T02:00:00+01:00', 'out-of-band', 1)"
+    )
+    drifted.commit()
+    drifted.close()
+
+    assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["compared"] is True and payload["identical"] is False
 
 
 def test_cli_rejects_an_invalid_event_with_a_nonzero_exit(tmp_path, capsys):
@@ -370,6 +441,7 @@ def test_shared_options_survive_on_either_side_of_the_command(tmp_path, capsys):
     """
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    projection.build(log_dir, db).close()  # give `replay` something to compare against
 
     assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 0
     before = json.loads(capsys.readouterr().out)
@@ -412,3 +484,110 @@ def test_the_measured_render_path_is_exercised():
     line = beta_mod.compute(rows).render()
     assert "0.250" in line and "10/40" in line
     assert "lower bound on a joint" in line
+
+
+# ------------------------------------------------- V0-18, the second path (20 Aug 2026)
+# Beta is measured against the human verdict. If an agent can author that verdict, beta
+# measures nothing. `_check_human_authority` returned early whenever `human_decision` was
+# absent, while `projection._apply_outcome` read `human_verdict` directly -- a second path
+# to a guarded state, which is the `jobboard-v2` failure this project was founded on.
+
+
+def test_an_agent_cannot_author_a_human_verdict_by_omitting_human_decision():
+    forged = ev(
+        event=projection.OUTCOME_KIND,
+        actor="claude-code-agent",
+        data={"task": "t1", "verifier_accept": True, "human_verdict": "accept"},
+    )
+    with pytest.raises(EventError, match="must name its principal"):
+        validate(forged)
+
+
+def test_an_agent_cannot_author_a_human_verdict_by_naming_the_principal():
+    """Naming whose authority is exercised is not the same as holding it."""
+    forged = ev(
+        event=projection.OUTCOME_KIND,
+        actor="claude-code-agent",
+        data={
+            "task": "t1",
+            "verifier_accept": True,
+            "human_verdict": "accept",
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    )
+    with pytest.raises(EventError, match="only the principal may author"):
+        validate(forged)
+
+
+def test_a_human_verdict_must_record_the_channel_it_arrived_through():
+    no_via = ev(
+        event=projection.OUTCOME_KIND,
+        actor=HUMAN,
+        data={
+            "task": "t1",
+            "verifier_accept": True,
+            "human_verdict": "accept",
+            "principal": HUMAN,
+        },
+    )
+    with pytest.raises(EventError, match="must record"):
+        validate(no_via)
+
+
+def test_a_human_verdict_may_not_be_filed_as_a_different_decision():
+    mislabelled = ev(
+        event=projection.OUTCOME_KIND,
+        actor=HUMAN,
+        data={
+            "task": "t1",
+            "verifier_accept": True,
+            "human_verdict": "accept",
+            "human_decision": "approval",
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    )
+    with pytest.raises(EventError, match="may not be filed as anything else"):
+        validate(mislabelled)
+
+
+def test_the_human_authored_verdict_is_accepted():
+    """The guard must not also block the legitimate path."""
+    validate(outcome("t1", True, "accept"))
+
+
+# ------------------------------------------------------ V0-06, the constructor beneath
+# `compute` enforced the sample floor. A floor is not an invariant if the constructor
+# beneath it does not hold.
+
+
+def test_a_measured_beta_cannot_be_constructed_below_the_evidence_floor():
+    with pytest.raises(ValueError, match="at least 30 rejections"):
+        beta_mod.Beta(beta_mod.MEASURED, None, None, 0, 0, 0.0, (0.0, 0.0), None)
+
+
+def test_a_rate_outside_zero_to_one_is_refused():
+    with pytest.raises(ValueError, match=r"must lie in \[0, 1\]"):
+        beta_mod.Beta(beta_mod.MEASURED, None, None, 40, 10, 1.5, (0.0, 1.0), None)
+
+
+def test_an_inverted_interval_is_refused():
+    with pytest.raises(ValueError, match="0 <= low <= high <= 1"):
+        beta_mod.Beta(beta_mod.MEASURED, None, None, 40, 10, 0.25, (0.9, 0.1), None)
+
+
+def test_a_point_outside_its_own_interval_is_refused():
+    with pytest.raises(ValueError, match="outside its own interval"):
+        beta_mod.Beta(beta_mod.MEASURED, None, None, 40, 10, 0.9, (0.1, 0.4), None)
+
+
+def test_more_false_accepts_than_rejections_is_refused():
+    with pytest.raises(ValueError, match=r"must lie in \[0, n_rejected\]"):
+        beta_mod.Beta(beta_mod.INSUFFICIENT, None, None, 3, 9, None, None, None)
+
+
+def test_the_evidence_floor_can_be_raised_but_never_lowered():
+    """A knob that can lower a floor is a bypass path around it."""
+    with pytest.raises(ValueError, match="may only raise the floor"):
+        beta_mod.compute([], min_rejections=0)

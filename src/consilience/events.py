@@ -93,6 +93,29 @@ def _check_human_authority(event: dict) -> None:
     grant, so it can never convert an agent-authored event into the human's decision.
     """
     decision = event["data"].get("human_decision")
+    verdict = event["data"].get("human_verdict")
+
+    # A human verdict IS a human decision, and until 20 Aug 2026 it was the way round this
+    # check. `_check_human_authority` returned early whenever `human_decision` was absent,
+    # while `projection._apply_outcome` read `human_verdict` straight off an
+    # `attempt.outcome` event and wrote it to the table beta is computed from. So an agent
+    # could author the human verdict that beta is measured against, and V0-18 — the
+    # invariant that exists to prevent exactly that — never fired. Found by Cursor
+    # (Gemini 3.7 Flash) auditing code Claude wrote; a second path to a guarded state is
+    # the `jobboard-v2` failure this project was founded on.
+    if verdict is not None:
+        if verdict not in ("accept", "reject"):
+            raise EventError(
+                f"human_verdict must be 'accept' or 'reject', got {verdict!r}"
+            )
+        if decision is None:
+            decision = "verdict"
+        elif decision != "verdict":
+            raise EventError(
+                f"event carries a human_verdict but declares human_decision {decision!r}; "
+                "a human verdict is a verdict and may not be filed as anything else (V0-18)"
+            )
+
     if decision is None:
         return
     if decision not in HUMAN_ONLY:

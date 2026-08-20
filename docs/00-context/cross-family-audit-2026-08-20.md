@@ -54,6 +54,91 @@ document, which is a happier failure and just as much drift.
 
 ---
 
+## Round two — the auditor was pointed at the code, and found the oracle forgeable
+
+The first pass audited documents. The second staged `src/consilience/`, the test suite, the
+CI workflow, the specification and the ADRs, with an explicit boundary note, and asked one
+question of each numbered invariant: **would its check actually catch a violation, and is
+there a second path to the same state?** That is the `jobboard-v2` question — a documented
+"unified LLM boundary" fragmented into five access paths because no rule banned bypass, and
+it is why working principle 3 exists. [cited]
+
+Three defects, all confirmed by hand against the code before anything was changed, all now
+fixed with tests. [measured]
+
+### V0-18 was bypassable, and the thing it guards is β's oracle
+
+**This is the most serious defect this project could have had.**
+
+`_check_human_authority()` returned immediately unless `data["human_decision"]` was present.
+But `projection._apply_outcome()` read `data["human_verdict"]` straight off an
+`attempt.outcome` event and wrote it into the `outcomes` table — the table `beta.compute()`
+reads. `HUMAN_ONLY` contained `"verdict"` all along; the constant was simply never consulted
+on that path. [measured]
+
+So this event validated, projected, and moved β:
+
+```json
+{"v":1,"ts":"...","event":"attempt.outcome","actor":"claude-code-agent",
+ "data":{"task":"t1","verifier_accept":true,"human_verdict":"accept"}}
+```
+
+β is *defined* as the rate at which automated checks accept an artefact **the human
+rejected**. If an agent can author the human verdict, β is not a measurement of anything —
+it is the agents grading themselves, which is the echo failure `CONSILIENCE.md` exists to
+name, arriving through the data layer rather than through a meeting.
+
+**Why no test caught it.** The test fixture built outcome events with `actor="agent"` and a
+`human_verdict` attached, and every test passed. The fixture could express the forbidden
+state, so the suite had been taught to accept it. That is worth more than the bug: **a
+fixture that can construct a state the invariant forbids will train the suite to permit
+it.** [asserted] The helper now authors verdicts as the principal, with `via`, and five
+tests assert the forgery paths are closed while the legitimate path still works.
+
+### Gate A condition 2 was satisfied by a check that could not fail
+
+`cmd_replay` built the projection from the log **twice** and compared the two rebuilds. Two
+rebuilds from one log are identical by construction. Worse, `projection.build` unlinks the
+database first — so any drift the check existed to detect was destroyed before the
+comparison it was meant to feed. [measured]
+
+ADR-0015 records Gate A condition 2 as **satisfied**. It was satisfied by a tautology.
+
+`replay` now digests whatever state is on disk, rebuilds, and compares the two. Where there
+is no prior state it reports `compared: false` and `identical: null`, because **a check that
+did not run must not report a pass** — and CI now builds the projection before replaying, so
+the comparison has a subject. On the real trajectory it reports `compared: true`,
+`identical: true` over 51 events. [measured] A new test drifts the database out of band and
+asserts the divergence is caught, which the old implementation could not do at all.
+
+### A measured β could be constructed with no evidence behind it
+
+`Beta.__post_init__` asked only whether `point` and `interval` were *present*. A `measured`
+verdict could carry zero rejections, a rate outside [0, 1], an inverted interval, or a point
+outside its own interval, and would render without complaint. `compute()` enforced the
+sample floor, but **a floor is not an invariant if the constructor beneath it does not
+hold** — and `compute` also took a `min_rejections` argument that could lower it. [measured]
+
+The constructor now enforces the floor and the arithmetic, and `min_rejections` may only be
+raised, never lowered. A knob that can lower an evidence floor is a bypass path around it.
+
+### What this says about the method, which matters more than the three fixes
+
+All three were found by a **different model family reading code Claude wrote**, in about
+twelve minutes, after Claude's own 40-test suite passed and `mypy --strict` was clean.
+Neither the tests nor the types could find them, because both were written by the author of
+the defect and inherited its blind spots. [measured]
+
+That is Whewell's second clause doing real work on this project's own artefacts, and it is
+the first time the case for difference-of-class here rests on something measured rather than
+asserted. It also sharpens what the harness should do: **the auditor must not share an author
+with the artefact, and must be pointed at the invariant rather than at the diff.** Asking
+"would this check catch a violation, and is there a second path" found three holes; asking
+"review this code" would very likely have found none.
+
+**What would overturn it:** a cross-family audit that returns only false positives, or a
+same-family audit that finds defects of this severity. One run of each is not a rate.
+
 ## Gated on Joe — a live contradiction about money that no agent may resolve
 
 ### 4. ADR-0019 forbids standing spend authorisation. Four later documents assume it.

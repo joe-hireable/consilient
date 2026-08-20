@@ -66,6 +66,38 @@ class Beta:
                 "insufficient_data must not carry a point estimate or an interval"
             )
 
+        # The checks above were the whole guard until 20 Aug 2026, and they only asked
+        # whether the fields were present. A `measured` beta could therefore be constructed
+        # with zero rejections behind it, a point outside [0, 1], or an inverted interval,
+        # and it would render without complaint. `compute` enforced the sample floor, but
+        # the floor is not an invariant if the constructor beneath it does not hold.
+        # Found by Cursor auditing code Claude wrote.
+        if not 0 <= self.n_false_accept <= self.n_rejected:
+            raise ValueError(
+                f"n_false_accept must lie in [0, n_rejected]; got "
+                f"{self.n_false_accept} of {self.n_rejected}"
+            )
+        if self.point is not None and not 0.0 <= self.point <= 1.0:
+            raise ValueError(
+                f"beta is a rate and must lie in [0, 1]; got {self.point!r}"
+            )
+        if self.interval is not None:
+            low, high = self.interval
+            if not 0.0 <= low <= high <= 1.0:
+                raise ValueError(
+                    f"interval must satisfy 0 <= low <= high <= 1; got {self.interval!r}"
+                )
+            if self.point is not None and not low <= self.point <= high:
+                raise ValueError(
+                    f"point {self.point!r} lies outside its own interval {self.interval!r}"
+                )
+        if self.verdict == MEASURED and self.n_rejected < MIN_REJECTIONS:
+            raise ValueError(
+                f"a measured beta needs at least {MIN_REJECTIONS} rejections behind it; "
+                f"got {self.n_rejected}. Report insufficient_data instead — an underpowered "
+                "number presented as measured is the failure this project exists to catch"
+            )
+
     def as_dict(self) -> dict:
         d = asdict(self)
         d["interval"] = list(self.interval) if self.interval else None
@@ -122,7 +154,15 @@ def compute(
     no human verdict are excluded from both numerator and denominator: an unlabelled
     artefact is not evidence of agreement. No proxy label is accepted here — the caller
     must have resolved a real verdict before the row reaches this function.
+
+    `min_rejections` may only be raised. A knob that can lower an evidence floor is a
+    bypass path around it, which is the shape of failure principle 3 names.
     """
+    if min_rejections < MIN_REJECTIONS:
+        raise ValueError(
+            f"min_rejections may only raise the floor, never lower it; "
+            f"{min_rejections} is below MIN_REJECTIONS={MIN_REJECTIONS}"
+        )
     selected = [
         r
         for r in rows

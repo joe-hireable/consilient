@@ -22,7 +22,13 @@ jobs:
       - name: Invariant checks
         run: python -m pytest tests -q
       - name: Replay invariant on the real trajectory
+        # Build the projection first so that `replay` has a subject to compare against.
+        # Before 20 Aug 2026 this step ran `replay` on a fresh checkout with no state on
+        # disk, and `replay` compared two rebuilds from the same log — identical by
+        # construction. Gate A condition 2 was recorded as satisfied on a check that could
+        # not fail. `compared` must now be true, or the run failed to test anything.
         run: |
+          PYTHONPATH=src python -m consilience.cli --json beta > beta.json
           PYTHONPATH=src python -m consilience.cli --json replay > replay.json
           cat replay.json
-          python -c "import json,sys; r=json.load(open('replay.json')); sys.exit(0 if r['identical'] else 1)"
+          python -c "import json,sys; r=json.load(open('replay.json')); sys.exit(0 if r['compared'] and r['identical'] else 1)"

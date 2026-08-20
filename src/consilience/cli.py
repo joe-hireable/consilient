@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -34,19 +35,44 @@ def cmd_record(args) -> dict:
 
 
 def cmd_replay(args) -> dict:
-    """Rebuild the projection and report the digest. This is Gate A condition 2."""
+    """Compare the state on disk against a rebuild from the log. Gate A condition 2.
+
+    Until 20 Aug 2026 this built the projection from the log twice and compared the two
+    rebuilds. Two rebuilds from the same log are identical by construction, so the check
+    could not fail, and `projection.build` unlinks the database first — so any drift it
+    was meant to detect was destroyed before the comparison it was meant to feed. The gate
+    was recorded as satisfied on a check that proved nothing. Found by Cursor auditing
+    code Claude wrote.
+
+    The comparison now has a subject: whatever state was already on disk. Where there is
+    none, `compared` is False and `identical` is None, because a check that did not run
+    must not report a pass.
+    """
     log, db = Path(args.log), Path(args.db)
-    first = projection.build(log, db)
-    digest_one = projection.state_digest(first)
-    first.close()
-    second = projection.build(log, db)
-    digest_two = projection.state_digest(second)
+
+    prior: str | None = None
+    if db.exists():
+        existing = sqlite3.connect(db)
+        try:
+            prior = projection.state_digest(existing)
+        except sqlite3.DatabaseError as exc:
+            raise EventError(
+                f"state at {db} is not a readable database: {exc}"
+            ) from exc
+        finally:
+            existing.close()
+
+    rebuilt = projection.build(log, db)
+    digest = projection.state_digest(rebuilt)
+    rebuilt.close()
     events = len(read_all(log))
-    second.close()
+
     return {
         "events": events,
-        "digest": digest_one,
-        "identical": digest_one == digest_two,
+        "digest": digest,
+        "prior_digest": prior,
+        "compared": prior is not None,
+        "identical": None if prior is None else prior == digest,
     }
 
 
@@ -61,7 +87,10 @@ def render(command: str, result: dict) -> str:
     if command == "record":
         return f"recorded {result['event']} -> {result['file']}"
     if command == "replay":
-        mark = "identical" if result["identical"] else "DIVERGED"
+        if not result["compared"]:
+            mark = "NOT COMPARED — no prior state on disk"
+        else:
+            mark = "identical" if result["identical"] else "DIVERGED"
         return f"replayed {result['events']} events; state {mark} ({result['digest'][:12]})"
     if command == "beta":
         return beta_mod.Beta(
@@ -81,8 +110,12 @@ def build_parser() -> argparse.ArgumentParser:
     # Shared options are attached to the root and to every subcommand, so `--json` works
     # on either side of the command name. `consil beta --json` is the form people type.
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
-                        help="machine-readable output")
+    common.add_argument(
+        "--json",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="machine-readable output",
+    )
     common.add_argument("--log", default=argparse.SUPPRESS)
     common.add_argument("--db", default=argparse.SUPPRESS)
 
@@ -100,13 +133,15 @@ def build_parser() -> argparse.ArgumentParser:
     record.set_defaults(handler=cmd_record)
 
     replay = sub.add_parser(
-        "replay", parents=[common],
+        "replay",
+        parents=[common],
         help="rebuild the projection and check it is stable",
     )
     replay.set_defaults(handler=cmd_replay)
 
     b = sub.add_parser(
-        "beta", parents=[common],
+        "beta",
+        parents=[common],
         help="report beta with its sample count and interval",
     )
     b.add_argument("--task-family")
