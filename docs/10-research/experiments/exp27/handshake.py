@@ -51,7 +51,12 @@ def validate_capability_record(cap_record: dict[str, Any]) -> bool:
         if isinstance(details, dict):
             status = details.get("status", "unknown")
             usable = details.get("usable", False)
-            if usable and status in ("unknown", "unobservable", "unsupported", "missing"):
+            if usable and status in (
+                "unknown",
+                "unobservable",
+                "unsupported",
+                "missing",
+            ):
                 raise ValueError(
                     f"unobservable capability '{name}' cannot be marked usable: fail closed"
                 )
@@ -87,7 +92,7 @@ def probe_claude_code() -> dict[str, Any]:
 
     if claude_bin:
         exit_code, raw_version, err = _run_cmd([claude_bin, "--version"])
-    
+
     if exit_code != 0 or not raw_version:
         # Fallback via cmd.exe if running inside WSL pointing to Windows environment
         exit_code, raw_version, err = _run_cmd(["cmd.exe", "/c", "claude --version"])
@@ -196,15 +201,48 @@ def probe_codex() -> dict[str, Any]:
     }
 
 
+def _cursor_launcher() -> list[str] | None:
+    """How to invoke `cursor-agent` from wherever this is running, or None if it cannot be.
+
+    `cursor-agent` is installed inside WSL only, so a probe running on the Windows host
+    cannot see it: `CURSOR_WSL_BINARY` is a Linux path and `Path.exists()` on it is False
+    from Windows, and the binary is not on the Windows PATH either. The first version of
+    this probe therefore reported Cursor as not installed on the host, which is wrong — it
+    is installed, it is simply on the other side of a boundary.
+
+    That is EXP-05's measured finding arriving again: Cursor "forced host-to-WSL path
+    translation, which was contained inside the adapter and left the common interface
+    intact". Contained inside the adapter is the operative half. The boundary crossing
+    belongs here, not at each call site, and not in the tests.
+
+    Order matters. Native first, so a Linux or WSL caller never pays for a subprocess it
+    does not need; the `wsl` bridge only when the host cannot reach the binary directly.
+    """
+    if CURSOR_WSL_BINARY.exists():
+        return [str(CURSOR_WSL_BINARY)]
+    native = shutil.which("cursor-agent")
+    if native:
+        return [native]
+    bridge = shutil.which("wsl")
+    if bridge and os.name == "nt":
+        # `bash -lc` so the login shell resolves the binary the same way the user's own
+        # shell does, rather than hardcoding a second copy of the path.
+        return [bridge, "bash", "-lc"]
+    return None
+
+
 def probe_cursor() -> dict[str, Any]:
     """Zero-inference version and capability probe for Cursor CLI (cursor-agent)."""
-    cursor_bin = str(CURSOR_WSL_BINARY) if CURSOR_WSL_BINARY.exists() else (shutil.which("cursor-agent") or "")
-    if not cursor_bin or not os.path.exists(cursor_bin):
+    launcher = _cursor_launcher()
+    if launcher is None:
         return {
             "harness": "cursor",
             "installed": False,
             "version": None,
-            "error": f"cursor-agent binary not found at {CURSOR_WSL_BINARY}",
+            "error": (
+                "cursor-agent is not reachable: absent natively and no `wsl` bridge "
+                f"available (looked for {CURSOR_WSL_BINARY} and on PATH)"
+            ),
             "capabilities": {
                 "headless_print": {"status": "unobservable", "usable": False},
                 "models_listing": {"status": "unobservable", "usable": False},
@@ -212,8 +250,17 @@ def probe_cursor() -> dict[str, Any]:
             "probed_at": _now(),
         }
 
+    def cursor_cmd(*args: str) -> list[str]:
+        """One command, expressed correctly on whichever side of the boundary we are."""
+        if launcher[-1] == "-lc":
+            # Crossing into WSL: the login shell takes a single string, not an argv list.
+            return [*launcher, "cursor-agent " + " ".join(args)]
+        return [*launcher, *args]
+
     # Probe 1: about --format json
-    code_about, stdout_about, err_about = _run_cmd([cursor_bin, "about", "--format", "json"])
+    code_about, stdout_about, err_about = _run_cmd(
+        cursor_cmd("about", "--format", "json")
+    )
     about_data: dict[str, Any] = {}
     if code_about == 0 and stdout_about:
         try:
@@ -222,7 +269,7 @@ def probe_cursor() -> dict[str, Any]:
             pass
 
     # Probe 2: status --format json
-    code_status, stdout_status, _ = _run_cmd([cursor_bin, "status", "--format", "json"])
+    code_status, stdout_status, _ = _run_cmd(cursor_cmd("status", "--format", "json"))
     status_data: dict[str, Any] = {}
     if code_status == 0 and stdout_status:
         try:
@@ -231,12 +278,17 @@ def probe_cursor() -> dict[str, Any]:
             pass
 
     # Probe 3: models
-    code_models, stdout_models, _ = _run_cmd([cursor_bin, "models"])
+    code_models, stdout_models, _ = _run_cmd(cursor_cmd("models"))
     available_models: list[str] = []
     if code_models == 0 and stdout_models:
         for line in stdout_models.splitlines():
             line = line.strip()
-            if line and " - " in line and not line.startswith("Available") and not line.startswith("Tip:"):
+            if (
+                line
+                and " - " in line
+                and not line.startswith("Available")
+                and not line.startswith("Tip:")
+            ):
                 model_id = line.split(" - ")[0].strip()
                 available_models.append(model_id)
 
