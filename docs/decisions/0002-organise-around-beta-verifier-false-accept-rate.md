@@ -208,6 +208,21 @@ Refuse to cascade below the measured β\* for the capability gap in play.
   the design changes shape (Q3).
 - **β has never been measured on a real repository.** The entire ADR rests on a quantity
   whose measurability is unestablished (Q2).
+
+  > **Corrected 2026-08-20.** This is no longer true as written, and its replacement is worse
+  > rather than better. EXP-01 *did* measure β on two real repositories — proxy-labelled, with
+  > audited label precision of 1/15, and intervals spanning the decision threshold. [measured]
+  > So measurability is established in the weak sense that a number came out.
+  >
+  > What has since been found is that **the number is on the wrong axis**: `mine_beta.py`
+  > computes P(bad | accepted) where ADR-0002 and `beta.py` define P(accept | bad). See
+  > `../00-context/beta-axis-defect-2026-08-20.md`. And **the other factor in β\*, α, has never
+  > been measured at all** and is evaluated at an invented 0.03 against a measured override rate
+  > of 0.327 — see `../00-context/alpha-is-invented-2026-08-20.md`.
+  >
+  > The honest statement is therefore: β has been measured once, conditioned the wrong way, on
+  > proxy labels, on two repositories; and the threshold it is compared against rests on an
+  > invented parameter. That is a sharper indictment than "never measured", not a softer one.
 - The simulations were written by the same party that formed the hypothesis, with no
   independent review.
 
@@ -242,6 +257,16 @@ so the trajectory record and the review UI are now on the critical path, not opt
    dominant regime and the measurement is uninteresting.
 
 **Run test 3 first.** It is the cheapest and the most likely to be true.
+
+> **Superseded 2026-08-20.** Test 3 — that real difficulty distributions are bimodal and turn
+> thresholds into cliffs — **has been run and does not fire.** EXP-04 established that β\* is
+> invariant to the difficulty distribution, with the closed form `β* = (1 − α)·e^(−kΔ)` recorded
+> in this ADR's own update section. [measured] Bimodality is closed as a research priority.
+>
+> The residual EXP-04 named is **not** bimodality but a **non-logistic competence curve**, which
+> is registered separately and has not been swept. And on tonight's evidence the cheapest
+> remaining test is neither: it is **measuring α**, which is a `SELECT` over columns
+> `projection.py` already stores and which moves every threshold by roughly 31%.
 
 ## Publication candidate?
 

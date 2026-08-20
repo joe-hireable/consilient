@@ -57,7 +57,10 @@ escaped bugs) can substitute for human verdicts.
 Admit feasible resources → cheap → verify → mid → verify → frontier. Three capability
 tiers remain the starting hypothesis (`findings.md` §3). [asserted]
 Escalation on verifier failure, never on self-reported confidence (D12).
-No learned prior in v0 (D6) — revisit only if escalation wall-clock cost proves ≥2× (§4a).
+No learned prior in v0 (D6) — revisit only if escalation wall-clock cost proves ≥2×
+(§4a). `[simulated]` — the ≥2× trigger comes from the simulated wasted-work rule, not a
+measurement. EXP-07 has since tested it at n=30: the single-attempt median is 1.69× and
+does **not** cross; only best-of-five crosses, at 17.95×. `[measured]`
 Included subscriptions and metered providers use separate ledgers: reset-aware allocation
 maximises incremental verified value, while metered calls retain hard monetary caps
 (ADR-0026, ADR-0028). [asserted]
@@ -73,7 +76,9 @@ Optional one-way sync adapters out to Linear / ClickUp for humans who want to wa
 Across git worktrees on **independent work units**. This is the regime where the
 multi-agent literature says parallelism actually helps — genuinely independent contexts,
 no shared state to lose. Hard budget caps per session (63 documented production
-budget-overrun incidents; see `literature-review.md` §7).
+budget-overrun incidents across 21 subprojects and 18 ecosystems; see
+`literature-review.md` §7). `[cited]` — a convenience, failure-confirming sample, not a
+prevalence estimate.
 
 Bounded meetings only, never open-ended chat (D9). Each meeting must name its exogenous
 signal (D10) or it doesn't ship.
@@ -130,7 +135,8 @@ From `literature-review.md`, these are solved elsewhere and should be taken whol
   request must be rebuildable from an append-only log.
 - **The verification pipeline shape** — Joe's own `CODEBASE_ASSESSMENT.md` method:
   independent discovery → independent verification of every lead → fabrication audit.
-  Measured ~0.5% fabrication rate, caught. See `30-source-material/prior-repo-assets.md`.
+  Measured ~0.5% fabrication rate, caught — one fabrication among 197 leads, 1/197 =
+  0.5076%. `[measured]` See `30-source-material/prior-repo-assets.md`.
 
 ## Do not compete with
 

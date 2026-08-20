@@ -42,9 +42,12 @@ All four. Any one absent means no spend.
 
 ## Evidence
 
-- `[cited]` **63 confirmed production budget-overrun incidents across 21 orchestration
-  frameworks, 2023–2026**, each backed by a quoted issue and, where reported, a dollar loss
-  (arXiv:2606.04056). The paper's finding is that budget primitives are typically enforced
+- `[cited]` **63 confirmed production budget-overrun incidents across 21 subprojects and 18
+  ecosystems, 2023–2026**, each backed by a quoted issue and, where reported, a dollar loss
+  (arXiv:2606.04056). *Corrected 2026-08-20 from "21 orchestration frameworks": the source
+  counts subprojects, not frameworks, and it is a convenience failure-confirming sample rather
+  than a prevalence estimate — as this repository's own bibliography entry already recorded.*
+  The paper's finding is that budget primitives are typically enforced
   by ad-hoc wrappers rather than by the system's structure. Condition 4 is not
   belt-and-braces; it is the documented failure mode.
 - `[cited]` The same catalogue identifies retry loops as a common overrun mechanism — an

@@ -53,7 +53,10 @@ Rename and re-gate it. There is no "meeting". There is an **evidence merge**:
   passed rule 2 without anyone stating the rule: discovery agents read different sources,
   verifiers re-derived from primary evidence.
 - `[cited]` Budget primitives are not optional: 63 confirmed production budget-overrun
-  incidents across 21 orchestration frameworks, 2023–2026 (arXiv:2606.04056).
+  incidents across 21 **subprojects** and 18 ecosystems, 2023–2026 (arXiv:2606.04056).
+  *Corrected 2026-08-20: this read "21 orchestration frameworks". The source counts
+  subprojects, not frameworks, and it is a convenience failure-confirming sample rather
+  than a prevalence estimate — as the bibliography entry already recorded.*
 
 ## Evidence against
 
