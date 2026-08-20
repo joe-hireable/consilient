@@ -8,6 +8,49 @@
   on this system
 - **Executable model:** none. The thresholds are preferential and are named as such.
 
+## Update: 2026-08-20 — attribution corrected, and evidence that cuts against this ADR
+
+**The reversibility framing is Bezos, not Jobs.** [cited] Its primary source is Amazon's 2015
+letter to shareholders: *"Some decisions are consequential and irreversible or nearly
+irreversible — one-way doors … We can call these Type 1 decisions. But most decisions aren't
+like that — they are changeable, reversible — they're two-way doors."* The same letter names
+the failure mode this ADR exists to prevent: organisations applying the heavy Type 1 process
+to Type 2 decisions, producing *"slowness, unthoughtful risk aversion, failure to experiment
+sufficiently, and consequently diminished invention."* [cited]
+
+Two further corrections. "70% of the information" and "disagree and commit" are from the
+**2016** letter, not the 2015 one, and citing 2015 for them is a common error. [cited] And
+Bezos's Type 1 / Type 2 is his own coinage in that passage — it is **not** Kahneman's System 1
+and System 2 and must never be written as though it were. [cited]
+
+**A stopping rule this ADR lacked.** Kozyrkov's line restates the decision-analysis definition
+of a decision, whose foundations are Ronald Howard's. [cited] Howard supplies what §3's
+affordability test was reaching for without naming: the **expected value of clairvoyance** is
+the upper bound on what any information-gathering is worth, so **when no possible answer would
+change the chosen action, asking is strictly irrational, not merely expensive.** [cited] That
+is a sharper test than affordability and it subsumes it: an ask that cannot change the action
+fails before cost is considered.
+
+**The evidence against, and it is strong.** Preferring reversibility is a documented human
+bias, not only a heuristic. Shin & Ariely measured participants spending real money to keep
+options open where expected values were identical, and attribute it to loss aversion rather
+than any genuine value of flexibility. [cited] Gilbert & Ebert found that people who could
+change their minds about which photograph to keep **liked their result less** than those who
+could not — and most still preferred the changeable option, mispredicting their own cost.
+[cited]
+
+So a harness that maximises reversibility amplifies two measured errors: over-investment in
+keeping doors open, and reduced commitment to the result. It also compounds tonight's finding
+that earned trust reduces critical engagement (b = −0.69): **perpetually reversible output
+invites perpetual non-commitment.** [cited] Recording a reversal path is therefore a safety
+property, **not** a goal to maximise, and §1 should be read as "make the reversal available",
+never "prefer the reversible option". [asserted]
+
+**Reversibility is currently declared, not measured** — the same defect ADR-0020 records for
+evidence classes. [asserted] V0-24 closes it: a recorded reversal must be *executable*, and a
+sampler periodically executes recorded reversals in a scratch worktree and publishes the
+misclassification rate as a measured number. A reversal path nobody has ever run is a claim.
+
 ## Context
 
 Joe, 20 August 2026: *"We don't want to make users impotent by removing decision making

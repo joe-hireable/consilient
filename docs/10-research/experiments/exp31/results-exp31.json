@@ -1,0 +1,156 @@
+{
+ "complete": false,
+ "probe": {
+  "free_mib_before": 29126,
+  "models": {
+   "qwen3:8b": {
+    "load_and_reply_s": 2.33,
+    "returncode": 0,
+    "reply_head": "Thinking...\nOkay, the user wants me to reply with the single word \"ready\". Let me check\u001b[5D\u001b[K\ncheck the instructions ag",
+    "free_mib_while_loaded": 19126,
+    "identity": {
+     "requested": "qwen3:8b",
+     "show": "  Model\n    architecture        qwen3     \n    parameters          8.2B      \n    context length      40960     \n    embedding length    4096      \n    quantization        Q4_K_M    \n\n  Capabilities\n    completion    \n    tools         \n    thinking      \n\n  Parameters\n    stop              \"<|im_start|>\"    \n    stop              \"<|im_end|>\"      \n    temperature       0.6               \n    top"
+    }
+   },
+   "gemma4:31b": {
+    "load_and_reply_s": 25.24,
+    "returncode": 0,
+    "reply_head": "Thinking...\nThe user wants me to reply with the single word: \"ready\".\n\n    *   Constraint 1: Single word.\n    *   Constr",
+    "free_mib_while_loaded": 3180,
+    "identity": {
+     "requested": "gemma4:31b",
+     "show": "  Model\n    architecture        gemma4    \n    parameters          31.3B     \n    context length      262144    \n    embedding length    5376      \n    quantization        Q4_K_M    \n    requires            0.20.0    \n\n  Capabilities\n    completion    \n    vision        \n    tools         \n    thinking      \n\n  Parameters\n    top_p          0.95    \n    temperature    1       \n    top_k          6"
+    }
+   }
+  },
+  "free_mib_after": 29126
+ },
+ "limitations": [
+  "The estimand is substitution of one installed model for another in a fixed composition. It is NOT a size effect: family, training data, tokeniser, instruction tuning and quantisation all differ, and no same-family sibling pair is installed.",
+  "Reasoning modes are not matched; each model runs at its own Ollama default, inherited from EXP-07's limitation.",
+  "The frontier side is a historical control reused from EXP-07 and carries unmeasured version drift. No new frontier or metered call is made here.",
+  "beta is not measured: the fixture oracle's own false-accept rate is unknown, so a pass is verifier-accepted, not correct.",
+  "Five synthetic fixtures cannot generalise to real repositories."
+ ],
+ "runs": [
+  {
+   "fixture": "duration-parser",
+   "model": "qwen3:8b",
+   "attempt": 1,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 204.747,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.063,
+    "test_tail": "exp07-duration-parser-ljiyutwt\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-ljiyutwt\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 234373,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 13624,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "qwen3:8b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 157.49,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.061,
+    "test_tail": "exp07-duration-parser-7pm2m31a\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-7pm2m31a\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 137848,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 13871,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "qwen3:8b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 619.216,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 379.216,
+   "censored": true,
+   "outcome": "agent_timeout",
+   "return_code": null,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": true,
+    "scope_valid": false,
+    "scope_error": "agent timed out",
+    "changed_files": [],
+    "duration_s": 0,
+    "test_tail": "agent timeout"
+   },
+   "usage": {}
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "qwen3:8b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 75.657,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "rejected",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": false,
+    "tests_passed": false,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [],
+    "duration_s": 0.074,
+    "test_tail": "exp07-duration-parser-opydjy2f\\test_runner.py\", line 3, in <module>\n    assert parse_duration(\"0s\") == 0\n           ~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Users\\jpbpr\\AppData\\Local\\Temp\\exp07-duration-parser-opydjy2f\\solution.py\", line 2, in parse_duration\n    raise NotImplementedError\nNotImplementedError\n"
+   },
+   "usage": {
+    "input_tokens": 27010,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 7107,
+    "reasoning_output_tokens": 0
+   }
+  }
+ ]
+}

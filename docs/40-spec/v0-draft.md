@@ -390,6 +390,8 @@ not satisfy the invariant. [asserted]
 | V0-21 | Outcome dimensions are reported separately and never composited; no self-report, human or model, is an acceptance or routing input. [asserted] | Contract test rejects any composite outcome score; routing and acceptance tests reject satisfaction, thumbs-up and confidence fields as inputs. [asserted] | Q30, working principle 5 |
 | V0-22 | Every autonomous decision records a reversal path; one without it is an ask, not a decision. [asserted] | Schema test rejects an autonomous decision event lacking a reversal field. [asserted] | ADR-0033 |
 | V0-23 | The harness asks only in the classes ADR-0033 names, and an approval returned below the affordability floor is stored unread and cannot satisfy a human decision. [asserted] | Configuration-load test rejects an unlisted ask class; fixture proves a below-floor approval fails V0-18. [asserted] | ADR-0033 |
+| V0-24 | A recorded reversal is executable, and reversibility is measured rather than declared. [asserted] | Schema test rejects a reversal that is not a revert reference, a command or a named inverse; a sampler executes recorded reversals in a scratch worktree and publishes the misclassification rate. [asserted] | ADR-0033 |
+| V0-25 | Liveness is never resolved from a process identity, a terminal artefact record outranks a stale liveness signal, and detection escalates rather than terminating. [asserted] | Fixtures reject PID-only liveness, reproduce the Airflow completed-task-marked-failed regression, fail a configured-but-unfed progress channel at load, and reject termination without a standing authority. [asserted] | ADR-0034 |
 
 ## 12. Acceptance evidence and release decision
 

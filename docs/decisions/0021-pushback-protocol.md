@@ -70,6 +70,12 @@ relationship**, and it is the most likely way this protocol fails in practice.
 
 ## Evidence
 
+- `[cited]` **Lineage correction, 20 Aug 2026.** The reversibility framing belongs to Bezos
+  (Amazon 2015 shareholder letter, one-way/two-way doors, Type 1/Type 2), and the
+  change-your-mind-for-free line restates the decision-analysis definition of a decision
+  whose foundations are Howard's (*Information Value Theory*, 1966). Howard also supplies the
+  expected value of clairvoyance as an upper bound on what information gathering is worth.
+  Kozyrkov is a popularisation, and this ADR previously cited it as though it were the source.
 - `[2ND]` **Kozyrkov, C.** — "as long as you can change your mind for free, no decision has
   been made yet"; the **default action** as the starting point of any decision under
   uncertainty; **pre-committing to how information will drive the decision** as the antidote
