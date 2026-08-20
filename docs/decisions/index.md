@@ -62,6 +62,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0037](0037-replace-gate-b2-with-measured-critic-throughput-gain.md) | **Replace Gate B2 with measured critic review-throughput gain**; supersedes 0015 Gate B2 | ✅ |
 | [0038](0038-rename-the-project-consilient.md) | **Rename the project Consilient** — the predicate, not the phenomenon; supersedes 0008 | ✅ |
 | [0039](0039-stage-3-entered-on-approval-gate-b-gates-dependence.md) | **PROPOSED, Joe only** — Stage 3 entered on approval; Gate B gates dependence not construction; would supersede 0015 Gate B4 | ⏳ |
+| [0040](0040-decide-from-evidence-not-from-pretraining.md) | **PROVISIONAL** — the harness decides from evidence and runs the experiment when it has none; gated on four conditions; EXP-46 measures it | 🧪 |
 | [0016](0016-skill-distribution-mcp-plugins.md) | Skill distribution, MCP, plugins — and the supply-chain rule | 📋 |
 | [0017](0017-bootstrap-harness.md) | Bootstrap harness — Claude Code as a working prototype | 📋 |
 | [0023](0023-pr-review-gates.md) | PR review gates by blast radius; admin bypass is logged | 📋 |
