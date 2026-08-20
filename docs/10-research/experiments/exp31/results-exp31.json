@@ -275,6 +275,171 @@
     "output_tokens": 2677,
     "reasoning_output_tokens": 0
    }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "gemma4:31b",
+   "attempt": 4,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 147.396,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.052,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 143806,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2777,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "duration-parser",
+   "model": "gemma4:31b",
+   "attempt": 5,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 136.252,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.053,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 146749,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3676,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "gemma4:31b",
+   "attempt": 1,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 188.749,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.166,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 153050,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 4800,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "gemma4:31b",
+   "attempt": 2,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 156.657,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.056,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 163780,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2301,
+    "reasoning_output_tokens": 0
+   }
+  },
+  {
+   "fixture": "event-replay",
+   "model": "gemma4:31b",
+   "attempt": 3,
+   "provider": "ollama",
+   "reasoning_mode": "ollama-default",
+   "duration_s_including_verifier": 159.029,
+   "timeout_s_applied": 240,
+   "timeout_overrun_s": 0.0,
+   "censored": false,
+   "outcome": "passed",
+   "return_code": 0,
+   "oom_suspected": false,
+   "verifier": {
+    "passed": true,
+    "tests_passed": true,
+    "timeout": false,
+    "scope_valid": true,
+    "scope_error": null,
+    "changed_files": [
+     "solution.py"
+    ],
+    "duration_s": 0.056,
+    "test_tail": ""
+   },
+   "usage": {
+    "input_tokens": 156748,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 3339,
+    "reasoning_output_tokens": 0
+   }
   }
  ]
 }
