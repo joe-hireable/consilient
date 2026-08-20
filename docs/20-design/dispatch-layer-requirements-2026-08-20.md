@@ -263,21 +263,64 @@ written its first file.
 
 ---
 
+## R15 — Concurrent dispatches allocate the same identifier
+
+**Incident.** Six agents ran in parallel tonight, each dispatched from a clone cut at roughly the
+same commit. Each read `docs/10-research/experiment-register.md`, took the next free experiment
+number, and registered its work. **Five of them chose EXP-58.** [measured]
+
+Nothing was wrong with any individual agent. Each did exactly the right thing — read the current
+state, allocate the next free identifier — and the result is five distinct experiments sharing one
+number, in the document external contributors will read first.
+
+The same class produced a second defect the same night: resolving the resulting merge conflicts with
+"keep both sides" **duplicated** EXP-56 and EXP-57 rather than superseding them, so the register
+gained stale `READY` copies of experiments that had already run. The merge strategy was mine and it
+was wrong for a file whose entries are records rather than lines.
+
+**This is not a git problem.** Git merged the text correctly; the register has no allocation
+mechanism, and read-then-write from N concurrent workers on a shared counter is the oldest race
+there is. The trajectory log solved it — `append()` is the sole writer and holds a lock for budget
+events (R14's neighbour). The register did not, because nobody had run six agents at it before.
+
+**Requirement.** Any identifier a dispatched agent must allocate is allocated by the **layer**, not
+by the agent: the dispatch reserves the ID before the agent starts and passes it in the brief. An
+agent that needs an ID and was not given one **stops and asks**, rather than reading the current
+maximum and adding one.
+
+Where a shared document accumulates records rather than lines, the merge strategy is **supersede by
+key**, never "keep both sides". A conflict between two versions of the same record is a question
+about which is current, and the answer is not "both".
+
+**Check.** Two:
+
+1. A test asserting `docs/10-research/experiment-register.md` contains no duplicate `### EXP-NNN`
+   heading. `grep -oE '^### EXP-[0-9]+' … | sort | uniq -d` must print nothing. Cheap, and it would
+   have caught this the moment the second agent's work was harvested.
+2. The dispatch layer allocates and records experiment IDs, so two concurrent briefs cannot carry
+   the same one. Until that exists, the orchestrator assigns the number in the brief — which is a
+   process control, and process controls are what this document exists to replace with checks.
+
+**Cost of not having it, measured tonight:** five colliding registrations and two duplicated
+entries, discovered only because a duplicate-count was run by hand before inviting contributors.
+
+---
+
 ---
 
 ## What this adds up to
 
-Fourteen requirements, all measured in two days, and **not one is about model capability.** Every
+Fifteen requirements, all measured in two days, and **not one is about model capability.** Every
 failure was in the plumbing: permissions, workspaces, encodings, paths, process identity,
 delivery. The models did their work; the harness around them is what failed, repeatedly.
 
 That is the meta-harness thesis stated as an incident log rather than an argument, and it is the
 strongest evidence this project has produced for its own existence. It also sets the honest
 expectation for scaling: **increased AI workload is not gated on the agents. It is gated on
-fourteen boring things, each of which now has a check.**
+fifteen boring things, each of which now has a check.**
 
 ## Falsifier
 
-If a dispatch layer implementing all fourteen still shows the same rate of lost work over the next
+If a dispatch layer implementing all fifteen still shows the same rate of lost work over the next
 fifty dispatches, then the failures were not the plumbing and this analysis is wrong. The
 measurement is cheap: lost-work rate per dispatch, before and after, on the same task mix.
