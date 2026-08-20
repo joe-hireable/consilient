@@ -143,11 +143,17 @@ def ensure_scratch_clone(source: Path, target: Path) -> bool:
     return True
 
 
-def get_merge_commits(repo: Path, limit: int = 50) -> list[dict[str, str]]:
+def get_merge_commits(
+    repo: Path, limit: int = 50, merges_only: bool = True
+) -> list[dict[str, str]]:
     """Retrieve commit hash and first parent hash from repository."""
     env = clean_env()
+    cmd = ["git", "-C", str(repo), "log"]
+    if merges_only:
+        cmd.append("--merges")
+    cmd.extend(["--format=%H %P", f"-n{limit}", "main"])
     res = subprocess.run(
-        ["git", "-C", str(repo), "log", "--format=%H %P", f"-n{limit}"],
+        cmd,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -436,22 +442,24 @@ def main() -> int:
         print("No historical commits found in scratch clone.", file=sys.stderr)
         return 2
 
-    # Sample for pilot run
-    pilot_pairs = all_pairs[:5]
+    # Primary evaluation: N = 50 on subsystem suite
+    target_pairs = all_pairs[:50]
     test_ref = "HEAD"
-    test_target = "tests/unit"
+    test_target = "tests/unit/services"
 
     started = time.monotonic()
     records: list[dict] = []
     stop_reason = None
 
-    for idx, pair in enumerate(pilot_pairs, start=1):
+    for idx, pair in enumerate(target_pairs, start=1):
         elapsed = time.monotonic() - started
         if elapsed > MAX_WALL_CLOCK_S:
             stop_reason = "wall_clock_cap"
             break
 
-        print(f"Evaluating pair {idx}/{len(pilot_pairs)} (child {pair['child'][:8]} vs parent {pair['parent'][:8]})...")
+        print(
+            f"Evaluating pair {idx}/{len(target_pairs)} (child {pair['child'][:8]} vs parent {pair['parent'][:8]})..."
+        )
         rec = run_pair(
             SCRATCH_DIR,
             pair["child"],
@@ -476,7 +484,7 @@ def main() -> int:
     final_payload = {
         "run_id": run_id,
         "protocol": {
-            "sample_size": len(pilot_pairs),
+            "sample_size": len(target_pairs),
             "test_ref": test_ref,
             "test_target": test_target,
             "timeout_s": DEFAULT_TIMEOUT_S,
@@ -489,7 +497,7 @@ def main() -> int:
         "summary": summary,
     }
     RESULTS.write_text(json.dumps(final_payload, indent=1), encoding="utf-8")
-    print("\nEXP-43 Pilot Summary:")
+    print("\nEXP-43 Primary Summary:")
     print(json.dumps(summary, indent=1))
     return 0
 

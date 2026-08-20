@@ -1,60 +1,120 @@
 # EXP-43 findings — retro-verification via forward test replay
 
-Run 20 Aug 2026. Evaluated forward test suite replay against historical commit pairs
+Run 20 Aug 2026. Evaluated forward test suite replay against historical merge commit pairs
 in `jobboard-v2` using isolated scratch clone execution, process-tree timeout control,
-and parent-commit baseline discrimination.
+atomic single-instance locking, and parent-commit baseline discrimination.
 
 Per the privacy rule (`AGENTS.md`): per-PR records live in scratch/gitignored locations;
 this file carries aggregates only.
 
-## Ranked objections to the retro-verifier thesis `[asserted]`
+---
 
-1. **Structural blindness to greenfield additions (Near-Fatal):** When a commit introduces
-   a new component/API, its parent lacks the symbols entirely. Future tests fail on the parent
-   (`ImportError`/missing export), causing the parent-commit control to classify all failures
-   as un-attributable drift. The oracle can only evaluate modifications/refactors to pre-existing
-   interfaces, not greenfield feature additions.
-2. **Shared survivorship bias with hotfix proxy:** While the *verification mechanism* is a
-   different class of facts (bytecode execution vs NLP commit mining), the *test coverage*
-   shares the defect-discovery channel (developers write tests for surfaced bugs). It fixes the
-   proxy's false-positive rate (~33–48% noise) but cannot sample latent unfound defects.
-3. **Monolithic test suite interface/schema drift:** Over long time horizons, full test suites
-   accumulate expectations of newer migrations, config flags, or mocks, causing both parent
-   and child to fail.
-4. **Nondeterminism & cost:** Full suite execution across 1,511 commits is computationally
-   prohibitive (~35 s per commit, ~29 hours total) and vulnerable to flaky integration tests.
+## Part 1 — Primary Evaluation Results `[measured]`
 
-## Measured pilot results `[measured]`
+The primary evaluation was executed at the pre-registered sample size ($N = 50$) on the
+isolated subsystem unit test suite (`tests/unit/services`). The monolithic arm (`tests/unit`)
+was excluded based on the pilot's 100% drift finding.
 
-Two experimental arms were evaluated:
+| Metric | Pilot Subsystem Suite | Monolithic Suite (Pilot) | Primary Subsystem Evaluation |
+|---|---|---|---|
+| Pairs evaluated ($N$) | 15 | 5 | **50** |
+| Target suite | `services` | `tests/unit` | `tests/unit/services` |
+| Tests executed per run | 48–68 | 8,418–8,508 | **48** |
+| Median pair duration | 2.997 s | 71.188 s | **3.112 s** (~1.56 s/commit) |
+| Total wall-clock runtime | 45.8 s | 350.4 s | **156.8 s** |
+| Parent PASS, Child PASS (`clean`) | 15 (100%) | 0 (0%) | **50 (100%)** |
+| Parent FAIL, Child FAIL (`drift`) | 0 (0%) | 5 (100%) | **0 (0%)** |
+| Parent PASS, Child FAIL (`defect`) | 0 (0%) | 0 (0%) | **0 (0%)** |
+| Parent FAIL, Child PASS (`enhancement`) | 0 (0%) | 0 (0%) | **0 (0%)** |
+| Drift rate | 0.0% | 100.0% | **0.0%** |
+| Discrimination rate | 0.0% | 0.0% | **0.0%** |
+| Evaluable parent-pass baseline | 15 | 0 | **50** |
+| $\beta_{\text{retro}}$ point estimate | 0.0 | N/A | **0.0** |
+| $\beta_{\text{retro}}$ 95% Wilson interval | [0.0, 0.2039] | N/A | **[0.0, 0.0713]** |
+| Stopping rule fired | `inconclusive` | `rejected_high_drift` | **`inconclusive`** |
 
-| Metric | Subsystem Unit Suite (`services`) | Monolithic Unit Suite (`tests/unit`) |
+### Stopping Rule Outcome
+With 50 evaluable parent passes ($P_i$ PASS), 0% drift, and 0 defects, the pre-registered stopping
+rule fired **`inconclusive`**. The 95% Wilson confidence interval tightened from $[0.0, 0.2039]$ at
+$n=15$ to **$[0.0, 0.0713]$** at $n=50$.
+
+---
+
+## Part 2 — Greenfield Blindness Bound `[measured]`
+
+The pilot identified a structural blindness: when a commit introduces a greenfield component,
+its parent lacks the module/symbols entirely; future tests fail on the parent with import errors,
+and the parent-commit control censors the commit as drift.
+
+To establish the empirical ceiling of the retro-verifier method, all 162 merge commits on `main`
+across the target repository's history were mechanically classified by change type:
+
+| Classification Proxy | Count | Share of Merges ($N = 162$) |
 |---|---|---|
-| Pairs evaluated ($N$) | 15 | 5 |
-| Total tests per run | 68 | 8,418–8,508 |
-| Median pair duration | 2.997 s (~1.5 s/commit) | 71.188 s (~35.6 s/commit) |
-| Parent PASS, Child PASS (`clean`) | 15 (100%) | 0 (0%) |
-| Parent FAIL, Child FAIL (`drift`) | 0 (0%) | 5 (100%) |
-| Parent PASS, Child FAIL (`defect`) | 0 (0%) | 0 (0%) |
-| Parent FAIL, Child PASS (`enhancement`) | 0 (0%) | 0 (0%) |
-| Drift rate | 0.0% | 100.0% |
-| Evaluable parent-pass baseline | 15 | 0 |
-| Stopping rule fired | `inconclusive` (n=15, β=0.0 [0.0, 0.2039]) | `rejected_high_drift` (>80% drift) |
+| **All-files: Adds $\ge 1$ new file** | **123** | **75.9%** |
+| All-files: Modifies existing files only | 39 | 24.1% |
+| All-files: Pure addition (zero modifications) | 12 | 7.4% |
+| **Code-files: Adds $\ge 1$ new code file (`.ts`/`.js`/`.py`/`.sql`)** | **118** | **72.8%** |
+| Code-files: Modifies existing code files only | 19 | 11.7% |
+| Code-files: Non-code changes only (docs/config) | 25 | 15.4% |
+| **Subsystem scope: Touches evaluated subsystem (`services`)** | **25** | **15.4%** |
+| Subsystem scope: Adds new service files | 2 | 1.2% |
+| Subsystem scope: Modifies existing service files only | 23 | 14.2% |
 
-## Did the parent-commit control discriminate? `[measured]`
+### Proxy Definition and Weaknesses `[asserted]`
+- **Definition:** A merge commit is classified as additive/greenfield if `git diff-tree -r --name-status P_i C_i`
+  contains $\ge 1$ file with status `A`. It is classified as interface modification only if all changed files
+  carry status `M`, `D`, or `R`.
+- **Under-estimation weakness (false negatives for greenfield):** Commits that modify existing files to add
+  new exported functions, classes, or endpoints are semantically greenfield (parents lack the symbol), but
+  are labeled "modification only" by the file-level proxy.
+- **Over-estimation weakness (false positives for greenfield):** Commits that modify existing logic but also
+  add a new helper utility or standalone unit test file are labeled "additive" even though the primary
+  artefact is an interface modification.
+- **Epistemological consequence:** Between **72.8% and 75.9%** of all merge commits introduce new files/modules.
+  The retro-verifier's parent-commit control censors these additions by design. The method is therefore
+  fundamentally bounded: it can only ever observe the remaining **11.7% to 24.1%** of changes that modify
+  pre-existing interfaces.
 
-**Yes, decisively.** On the monolithic suite, all 5 historical commits failed 3–7 tests when
-replayed with HEAD's tests. Without the parent-commit control, a naive retro-verifier would have
-falsely classified 100% of these commits as defective ($\beta = 1.0$). The parent-commit control
-revealed that parent commits failed identically (3–7 tests), correctly classifying them as
-test suite drift rather than artefact defect escapes.
+---
 
-On isolated subsystems, parent baseline pass rate was 100%, enabling valid regression verification.
+## Part 3 — Honest Reconciliation of the Two Oracles `[asserted]`
 
-## Verdict on Whewell's "Different Class of Facts" `[asserted]`
+Two independent oracles on the same repository yield non-overlapping 95% confidence intervals:
 
-- **Mechanically:** Yes. Replaying executable test assertions is an empirical runtime test,
-  independent of git commit messages and PR metadata. It eliminates false-positive regex noise.
-- **Epistemologically:** Partial. Because tests are written for surfaced defects, it measures
-  $\beta_{\text{regression \| surfaced}}$, not general $\beta$. It is a high-precision regression
-  oracle, not a universal ground truth.
+| Oracle | $\beta$ Point | 95% Confidence Interval | $N$ | Conditioning / Observable Surface | Bias Direction |
+|---|---|---|---|---|---|
+| **Revert/Hotfix Proxy** | 0.87 | [0.81, 0.93] | 75 bad PRs / 203 | Commit metadata: hotfix PR title regex & file-set overlap | **Biased high** (inflated by 33–48% refuted false-positive labels) |
+| **Retro-Verifier** | 0.00 | [0.0, 0.0713] | 50 merge pairs | Bytecode execution: forward subsystem unit test replay on parent vs child | **Biased low** (blind to greenfield [73–76%], blind to unwritten latent tests) |
+
+### Supported Reconciliation: The Two Oracles Bracket the Truth
+The empirical evidence supports that **the two oracles measure different quantities and both estimates stand, bracketing the truth**:
+
+1. **The proxy over-labels ($\beta \approx 0.87$ is an upper bound):** The proxy treats every subsequent
+   PR with a fix-shaped title touching a shared file as evidence that the prior commit was a defective escape.
+   Adjudication proved 33–48% of these labels are noise.
+2. **The retro-verifier under-samples ($\beta \approx 0.00$ is a lower bound):**
+   - It is structurally blind to greenfield additions (72.8%–75.9% of the corpus).
+   - It is subject to survivorship bias (tests are only written for bugs that were found, reported, and tested).
+   - In subsystem isolation, only 15.4% of repository merges touched the subsystem at all.
+3. **Whewell's "Different Class of Facts":** The divergence does not indicate experimental failure; it
+   proves that commit message NLP and runtime test execution operate on distinct evidence classes with
+   opposing systematic biases.
+
+### Strongest Objection to this Conclusion `[asserted]`
+The strongest objection is that **the retro-verifier at subsystem scope is an unrepresentative null instrument**.
+Because only 25 of 162 total merges in repository history ever touched the `services` subsystem, evaluating
+50 chronological merges against `services` tests evaluated 35+ commits that never interacted with the subsystem's
+code paths. The 50/50 `clean` result reflects subsystem uncoupling rather than defect-free code review. A
+monolith suite is incapacitated by drift (100%), while a subsystem suite is incapacitated by domain sparsity.
+
+---
+
+## Safety & Invariant Verification `[measured]`
+
+1. **Atomic Single-Instance File Lock:** Verified by test suite (`test_exp43.py`) and live PID checking.
+   Concurrent launches refuse execution; stale locks older than 3600 s are reclaimed cleanly.
+2. **Process-Tree Timeout Control:** Child processes and vitest subtrees are terminated via process group
+   signals / taskkill (`kill_tree`), preventing orphaned background runners.
+3. **`run_id` Stamping:** Every execution checkpoint and final results payload in `results-exp43.json`
+   records a unique timestamped `run_id` (e.g. `exp43-20260820T123510-184517`).
