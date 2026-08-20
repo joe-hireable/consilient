@@ -1,6 +1,6 @@
 # Decision index
 
-34 ADRs, 20 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+36 ADRs, 20 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED
@@ -34,6 +34,8 @@ Read these before anything else. Everything downstream depends on them.
 | [0027](0027-compose-domain-harness-provider-and-model.md) | **Compose domain, execution harness, provider and model separately**; OpenRouter is a standalone provider | 🟡 |
 | [0028](0028-optimise-expiring-subscription-capacity-for-verified-value.md) | **Allocate expiring included subscription capacity by incremental verified value**; never burn quota for its own sake | 🟡 |
 | [0029](0029-separate-runtime-resource-state-from-change-intelligence.md) | **Separate authenticated resource state from first-party change intelligence**; change feeds invalidate but never create headroom | 🟡 |
+| [0036](0036-upstream-first-adopt-contribute-never-silently-fork.md) | **Upstream-first** — adopt over build, PR rather than fork, and outbound PRs meet the same bar as inbound | 📋 |
+| [0035](0035-user-controlled-visibility.md) | User-controlled visibility dial (draft, from the overnight design pass) | 📋 |
 | [0034](0034-detect-stalls-by-artefact-progress-and-default-to-diagnosis.md) | **Detect stalls by artefact progress**, never by process identity; escalate rather than kill | 🟡 |
 | [0033](0033-decide-by-default-ask-only-where-the-user-is-the-only-valid-decider.md) | **Decide by default**; ask only in seven named classes, and only when the user can afford to answer | 🟡 |
 | [0032](0032-single-language-python-for-the-orchestrator.md) | **Single-language Python for the orchestrator**; TypeScript/Node stays a spawned sidecar. Supersedes 0031 | ✅ |
