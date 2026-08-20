@@ -286,6 +286,33 @@ so the trajectory record and the review UI are now on the critical path, not opt
 > remaining test is neither: it is **measuring α**, which is a `SELECT` over columns
 > `projection.py` already stores and which moves every threshold by roughly 31%.
 
+## Update: 2026-08-20 — the prior-art search was conducted in the one field that could not contain the answer
+
+This ADR's *"no prior art found"* rests on a search of **eight LLM-routing papers**. β is a
+false-negative rate of a test, and the fields that own that quantity are software engineering and
+statistics — neither of which was searched. [measured]
+
+This repository's own bibliography contains **zero entries** for mutation testing, flaky tests,
+acceptance sampling, selective prediction or defect-removal efficiency. [measured] A novelty claim
+assembled from a bibliography missing the nearest field is **unsupported rather than false**, and
+the honest label is **"not searched"**, not "none found".
+
+What four adversarial searches then found, at abstract level `[cited-web — not read]`: acceptance
+sampling names this consumer's risk (Neyman–Pearson, 1933); **mutation testing already measures
+the same false-negative rate per repository, label-free, and fails your build on it** — PIT's
+`mutationThreshold`, Stryker's `thresholds.break`; and β has already been measured on
+agent-emitted artefacts, with SWE-Bench+ finding 31.08% of passed patches suspicious.
+
+**What survives** is narrower and is stated in full in
+`../00-context/novelty-position-2026-08-20.md`: the same quantity **per repository and per check
+class, against the fault distribution a coding agent actually emits, labelled by the person who
+bears the cost.** That is a measurement programme rather than an architecture, and it has not been
+run.
+
+**Owed before any of this enters a public claim:** fetch the named sources at full text. They are
+`[cited-web]` at abstract level here, which is exactly the read-depth this ADR's own discipline
+says may not carry a load.
+
 ## Publication candidate?
 
 **Yes, conditionally** — and only after T3. If β is measured on ≥3 real repositories and the

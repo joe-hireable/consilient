@@ -185,8 +185,8 @@ escalation that generalises to held-out domains.
 | Context/skill evolution | Solved by ACE. Adopt the Generator/Reflector/Curator shape. |
 | Trajectory logging substrate | Given away by DeepSeek Harness. |
 | Budget primitives | Documented need; implementations exist. |
-| **Measuring β per repository, and deriving routing depth + parallelism ceiling from it** | **No prior art found.** ← the only candidate novelty |
-| **The identity β ≡ 1 − critic recall as a single control parameter** | **No prior art found.** ← ditto |
+| **Measuring β per repository, and deriving routing depth + parallelism ceiling from it** | **Not searched, rather than none found — downgraded 2026-08-20.** The parallelism-ceiling half is dead: `n_max ≥ T_a/T_r = 3.125` for every β including 1.0, so the ceiling never depended on β. `[measured]` The routing-depth half has at least four 2026 preprints deriving routing depth or repair-loop stopping from an imperfect verifier's measured error rate. `[cited-web — abstract level, not read]` See `../00-context/novelty-position-2026-08-20.md`. |
+| **The identity β ≡ 1 − critic recall as a single control parameter** | **Withdrawn 2026-08-20.** ADR-0002 tags this identity `[algebra]` itself. **Absence of prior art for a definition proves nothing** — one cannot fail to find prior art for `1 − x = 1 − x`. The row claimed novelty for a restatement. |
 
 Two candidate contributions, both unverified. The first job of the brainstorm is to try
 hard to kill them — starting with `Affordance agent harness: verification-gated skill
