@@ -51,10 +51,12 @@ def cmd_replay(args) -> dict:
     log, db = Path(args.log), Path(args.db)
 
     prior: str | None = None
+    projected: int | None = None
     if db.exists():
         existing = sqlite3.connect(db)
         try:
             prior = projection.state_digest(existing)
+            projected = existing.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         except sqlite3.DatabaseError as exc:
             raise EventError(
                 f"state at {db} is not a readable database: {exc}"
@@ -67,12 +69,21 @@ def cmd_replay(args) -> dict:
     rebuilt.close()
     events = len(read_all(log))
 
+    # Staleness is not drift, and conflating them makes the check cry wolf. Added hours after
+    # the comparison itself was, because ordinary log growth reported DIVERGED on the real
+    # trajectory. State built from fewer events than the log now holds is simply behind. The
+    # defect V0-02 exists to catch is state that disagrees about events it already covers.
+    stale = prior is not None and projected != events
+    compared = prior is not None and not stale
+
     return {
         "events": events,
+        "events_projected": projected,
         "digest": digest,
         "prior_digest": prior,
-        "compared": prior is not None,
-        "identical": None if prior is None else prior == digest,
+        "stale": stale,
+        "compared": compared,
+        "identical": (prior == digest) if compared else None,
     }
 
 
@@ -87,7 +98,12 @@ def render(command: str, result: dict) -> str:
     if command == "record":
         return f"recorded {result['event']} -> {result['file']}"
     if command == "replay":
-        if not result["compared"]:
+        if result["stale"]:
+            mark = (
+                f"STALE — state covers {result['events_projected']} of {result['events']} "
+                "events; rebuilt"
+            )
+        elif not result["compared"]:
             mark = "NOT COMPARED — no prior state on disk"
         else:
             mark = "identical" if result["identical"] else "DIVERGED"

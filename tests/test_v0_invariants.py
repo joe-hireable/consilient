@@ -650,3 +650,46 @@ def test_reading_a_historical_log_does_not_depend_on_when_it_is_read():
     aged - the same failure the explicit-offset rule exists to prevent.
     """
     validate(ev(ts="2026-08-19T01:00:00+01:00"))
+
+
+
+def test_a_log_that_has_grown_reads_as_stale_not_diverged(tmp_path, capsys):
+    """Staleness is not drift.
+
+    The first version of this comparison reported DIVERGED whenever the log had grown since
+    the projection was last built, which on the real trajectory meant every ordinary run. A
+    check that cries wolf is worse than no check, because it trains its reader to ignore it.
+    """
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("t0", accept=True, verdict="reject"))
+    projection.build(log_dir, db).close()
+
+    append(path, outcome("t1", accept=False, verdict="accept"))
+
+    # Exit 0 means the check ran AND passed. A stale run verified nothing, so it is not a
+    # pass - but it is reported as STALE rather than DIVERGED, which is the distinction.
+    assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["stale"] is True
+    assert payload["compared"] is False
+    assert payload["identical"] is None
+    assert payload["events_projected"] == 1 and payload["events"] == 2
+
+
+def test_real_drift_is_still_caught_once_the_counts_match(tmp_path, capsys):
+    """The narrowing must not have blunted the check it narrows."""
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    append(log_dir / "2026-08-20.jsonl", outcome("t0", accept=True, verdict="reject"))
+    projection.build(log_dir, db).close()
+
+    drifted = sqlite3.connect(db)
+    drifted.execute("UPDATE outcomes SET human_verdict = 'accept'")
+    drifted.commit()
+    drifted.close()
+
+    assert main(["--log", str(log_dir), "--db", str(db), "replay", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["stale"] is False
+    assert payload["compared"] is True
+    assert payload["identical"] is False
