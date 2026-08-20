@@ -647,7 +647,27 @@ elapsed time; recovery after restart.
 - Unsupported native semantics are recorded as `unsupported`, not scored as a failed
   approximation. Fewer than two eligible adapters is “insufficient evidence”. [asserted]
 
-### EXP-27 · First-party change intelligence versus dispatch-time discovery `IN PROGRESS: phase A PASS; 30-day phase blocked on collector`
+### EXP-27 · First-party change intelligence versus dispatch-time discovery `IN PROGRESS: phase A PASS; 30-day phase STARTED 20 Aug 2026, day 1 of 30`
+
+> **The clock is running.** Joe authorised the collector on 20 August ("YES PROCEED") after the
+> register recorded that every day of delay costs a day off a window that cannot be made up.
+> `collector.py` ran at 09:39 and recorded **day 1: all six fixed sources reachable, 31 events
+> frozen.** [measured] Earliest possible promotion of ADR-0029 is therefore **19 September 2026**.
+>
+> The collector polls conditionally (ETag / If-Modified-Since), freezes each event by upstream id
+> or content hash, and appends one observation per source per run to `collector-log.jsonl`. A
+> second run within the same day returned 304 on every source and zero new events, so the day
+> count cannot be inflated by re-running it. [measured]
+>
+> **Every emitted record is passed through `validate_change_record`**, which raises on any record
+> claiming to increase headroom, decrease usage, move a reset window or mark unknown headroom
+> usable. That is the registered stopping rule enforced in code rather than promised, with eleven
+> tests including one per forbidden action. A change feed may only *invalidate*; only an
+> authenticated account read may ever credit resource state.
+>
+> **Owed and not yet built:** the dispatch-time version/capability handshake (procedure step 4)
+> and the three injected fixtures (step 5). Neither blocks the clock, and both must land before
+> the window closes or the run cannot answer its own question.
 **Decides:** ADR-0029 — whether vendor change monitoring earns v0 scope as an early-warning
 and invalidation layer, while authenticated resource state remains a separate authority.
 **Phase-A result:** all six fixed endpoints returned HTTP 200 and the resource-mutation
