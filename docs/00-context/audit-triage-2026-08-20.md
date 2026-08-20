@@ -1,4 +1,4 @@
-# Triaging the audit: nine findings checked, and not one changes a decision
+# Triaging the audit: 29 of 33 findings checked, and not one of the first nine changes a decision
 
 **20 August 2026.** Codex produced 33 findings on numeric provenance. Its own header says every
 one is `[asserted]` until independently checked. Four were checked and acted on directly. Nine
@@ -72,9 +72,8 @@ checked.
 already handled: ADR-0002 states that the closed form supersedes the simulated table and records
 the exact recomputation on the same page.
 
-**Still unchecked: 20 of the 33.** They are in `codex-numbers-audit-2026-08-20.md` and remain
-`[asserted]`. On this sample the base rate is roughly two-thirds real, one-third overstated or
-wrong — which is a useful prior for reading the rest, and not a substitute for checking them.
+**The remaining twenty were triaged in a second round** — see below. Four findings are still
+unchecked and remain `[asserted]`.
 
 ## The method note
 
