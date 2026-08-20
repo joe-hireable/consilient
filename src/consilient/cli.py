@@ -18,11 +18,16 @@ import sqlite3
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 from . import beta as beta_mod
 from . import events as events_mod
 from . import projection
 from .events import EventError, append, read_all
+
+# Each CLI command has a different nested JSON result shape. Any is confined to this
+# rendering boundary, where the command selects the corresponding schema before access.
+CommandResult = dict[str, Any]
 
 DEFAULT_LOG = Path(".harness/log")
 DEFAULT_DB = Path(".harness/state.db")
@@ -45,7 +50,7 @@ REQUIREMENTS = {
 }
 
 
-def cmd_record(args) -> dict:
+def cmd_record(args: argparse.Namespace) -> CommandResult:
     try:
         event = json.loads(args.event)
     except json.JSONDecodeError as exc:
@@ -55,7 +60,7 @@ def cmd_record(args) -> dict:
     return {"recorded": True, "file": str(path), "event": event["event"]}
 
 
-def cmd_replay(args) -> dict:
+def cmd_replay(args: argparse.Namespace) -> CommandResult:
     """Compare the state on disk against a rebuild from the log. Gate A condition 2.
 
     Until 20 Aug 2026 this built the projection from the log twice and compared the two
@@ -127,7 +132,7 @@ def cmd_replay(args) -> dict:
     }
 
 
-def cmd_beta(args) -> dict:
+def cmd_beta(args: argparse.Namespace) -> CommandResult:
     conn = projection.build(Path(args.log), Path(args.db))
     result = beta_mod.from_connection(conn, args.task_family, args.verifier_version)
     quarantined = projection.rejection_count(conn)
@@ -140,7 +145,7 @@ def cmd_beta(args) -> dict:
 
 def _condition(
     identifier: str, status: str, reason: str, *evidence: str
-) -> dict:
+) -> CommandResult:
     return {
         "id": identifier,
         "requirement": REQUIREMENTS[identifier],
@@ -172,7 +177,9 @@ def _experiment_entry(identifier: str) -> tuple[str | None, str]:
     return status, entry
 
 
-def _experiment_conditions(beta: dict, log: Path) -> tuple[dict, dict, dict]:
+def _experiment_conditions(
+    beta: CommandResult, log: Path
+) -> tuple[CommandResult, CommandResult, CommandResult]:
     register = EXPERIMENT_REGISTER.as_posix()
     a1_status, _ = _experiment_entry("EXP-01")
     a1 = _condition(
@@ -222,7 +229,7 @@ def _experiment_conditions(beta: dict, log: Path) -> tuple[dict, dict, dict]:
     return a1, b1, b2
 
 
-def _replay_condition(replay: dict, log: Path, db: Path) -> dict:
+def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResult:
     identical = replay["identical"]
     status = "pass" if identical is True else "fail" if identical is False else "unknown"
     if identical is None:
@@ -238,7 +245,7 @@ def _replay_condition(replay: dict, log: Path, db: Path) -> dict:
     return _condition("A2", status, reason, f"{log.as_posix()}/*.jsonl", db.as_posix())
 
 
-def _capture_condition(log: Path) -> dict:
+def _capture_condition(log: Path) -> CommandResult:
     days: list[date] = []
     issues: dict[date, int] = {}
     for path in log.glob("*.jsonl"):
@@ -287,7 +294,7 @@ def _capture_condition(log: Path) -> dict:
     )
 
 
-def _fallback_condition() -> dict:
+def _fallback_condition() -> CommandResult:
     if not WORKFLOWS.is_dir():
         return _condition("B3", "unknown", "No workflow evidence source exists.")
     files = sorted((*WORKFLOWS.glob("*.yml"), *WORKFLOWS.glob("*.yaml")))
@@ -304,7 +311,7 @@ def _fallback_condition() -> dict:
     return _condition("B3", status, reason, WORKFLOWS.as_posix())
 
 
-def _structural_condition() -> dict:
+def _structural_condition() -> CommandResult:
     text = _read_text(GATE_B_CIRCULARITY)
     if text is None:
         return _condition("B4", "unknown", "The structural analysis is unavailable.")
@@ -324,7 +331,7 @@ def _structural_condition() -> dict:
     )
 
 
-def _gate(conditions: list[dict]) -> dict:
+def _gate(conditions: list[CommandResult]) -> CommandResult:
     statuses = {condition["status"] for condition in conditions}
     if "structurally_unsatisfiable" in statuses:
         status = "structurally_unsatisfiable"
@@ -339,7 +346,7 @@ def _gate(conditions: list[dict]) -> dict:
     return {"status": status, "passed": status == "pass", "conditions": conditions}
 
 
-def cmd_doctor(args) -> dict:
+def cmd_doctor(args: argparse.Namespace) -> CommandResult:
     log, db = Path(args.log), Path(args.db)
     # Replay must inspect prior state before beta reads the rebuilt projection. Rebuilding
     # first would recreate the tautological A2 check repaired on 20 August 2026.
@@ -366,7 +373,7 @@ def cmd_doctor(args) -> dict:
     return {"gates": gates, "routing_orchestration_enabled": enabled}
 
 
-def render(command: str, result: dict) -> str:
+def render(command: str, result: CommandResult) -> str:
     if command == "record":
         return f"recorded {result['event']} -> {result['file']}"
     if command == "replay":

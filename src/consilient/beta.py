@@ -27,9 +27,10 @@ file against its own defect record.
 from __future__ import annotations
 
 import math
+import sqlite3
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
-from typing import Literal, assert_never
+from typing import Literal, assert_never, cast
 
 # Below this many human rejections there is no interval worth showing. ADR-0002 puts verifier
 # calibration at 50-200 labels; 30 is the floor for reporting anything at all and is
@@ -116,7 +117,7 @@ class Beta:
                 "number presented as measured is the failure this project exists to catch"
             )
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, object]:
         d = asdict(self)
         d["interval"] = list(self.interval) if self.interval else None
         d["window"] = list(self.window) if self.window else None
@@ -169,7 +170,7 @@ def wilson(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:
 
 
 def compute(
-    rows: Iterable[dict],
+    rows: Iterable[dict[str, object]],
     task_family: str | None = None,
     verifier_version: str | None = None,
     min_rejections: int = MIN_REJECTIONS,
@@ -200,7 +201,7 @@ def compute(
     n = len(rejected)
     false_accepts = sum(1 for r in rejected if r["verifier_accept"])
 
-    stamps = sorted(r["ts"] for r in selected if r.get("ts"))
+    stamps = sorted(cast(str, r["ts"]) for r in selected if r.get("ts"))
     window = (stamps[0], stamps[-1]) if stamps else None
 
     if n < min_rejections:
@@ -230,7 +231,7 @@ def compute(
 
 
 def from_connection(
-    conn,
+    conn: sqlite3.Connection,
     task_family: str | None = None,
     verifier_version: str | None = None,
     min_rejections: int = MIN_REJECTIONS,
