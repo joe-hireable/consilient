@@ -87,3 +87,61 @@ That said the same caution applies here as everywhere tonight: **n = 1**, the ar
 under matched conditions, and the earlier attempt to claim difference-of-class was doing the work
 did not survive its own control. This is a description of what happened, not evidence that the
 chain is better than one careful reader would have been.
+
+
+---
+
+# Round two — the remaining twenty, and the pattern behind the auditor's errors
+
+The other twenty findings went back to the same third family. Verdicts: **7 confirmed, 5 partial,
+3 refuted, 3 already resolved, 2 unevaluable.** [measured]
+
+Across both rounds, **29 of 33 findings triaged: 13 confirmed, 7 partial, 4 refuted, 3 already
+resolved, 2 unevaluable.** Roughly 45% confirmed outright — which happens to match Codex's own
+headline count of 13 non-reproducing claims, though the sets are not identical.
+
+## What the auditor systematically got wrong
+
+This is worth more than any individual verdict, because it tells us how to brief the next audit.
+Four patterns, all recurring:
+
+**1. Conflating a corpus boundary with non-existence.** Repeatedly reported items as absent or
+untraceable when they were excluded from the staging snapshot *by design* — EXP-01's raw labels in
+gitignored `data/`, the private repository histories, the raw session logs. **An agent in a partial
+snapshot cannot distinguish "outside this snapshot by privacy policy" from "missing from the
+universe".** This is the same failure that made an earlier auditor report `src/consilience/` as
+phantom code, and it is the orchestrator's fault both times for not declaring the boundary.
+
+**2. Confusing its own sandbox limits with artefact absence.** When its execution sandbox blocked
+Python, it classified deterministic, committed, correctly-`[simulated]`-tagged simulation scripts
+as untraceable claims with no results artefact. The script was right there.
+
+**3. Penalising honest labelling.** It treated deliberate, transparent tags — `[ABS]`, `[2ND]`,
+`[asserted]` — and problem statements in Context sections as evidence failures. **Honest labelling
+is this project's core discipline, not a defect**, and an auditor that scores it as one teaches
+precisely the wrong lesson. This is the same category error that produced the refutation in round
+one.
+
+**4. Mistaking preserved historical context for an active contradiction.** It read an explicit
+supersession notice — old pilot retained alongside the new replication, both drawing the same
+conclusion — and reported a contradiction.
+
+## How to brief the next audit
+
+Three things the prompt must carry, none of which the first one did:
+
+1. **The privacy boundaries and the gitignored paths**, explicitly, with the instruction that
+   absence within them is unevaluable rather than a finding.
+2. **That a blocked execution sandbox is a limit on the auditor, not a provenance failure in the
+   repository** — and that saying so is the correct response, as this auditor did honestly about
+   its Python substitution.
+3. **The distinction between a documentation-level rounding or stale note and a
+   decision-invalidating error**, since the decision-impact column turned out to be the most
+   useful output and no auditor supplied it unprompted.
+
+## The standing figure
+
+**Four findings remain untriaged**, and everything untriaged stays `[asserted]`. On 29 triaged the
+base rate is roughly 45% confirmed outright, 24% partial, and 31% refuted, already resolved or
+unevaluable. That is a useful prior for reading an unaudited claim in this file — and not a
+substitute for checking it.

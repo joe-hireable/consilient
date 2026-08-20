@@ -56,6 +56,27 @@ Nothing in `docs/10-research/` was repaired. Which quantity you want remains a d
 P(accept|bad) is what the architecture rests on; P(bad|accept) is arguably what a practitioner
 wants from a green build; carrying both roughly doubles the sample-size problem.
 
+### 🔴 A2. The other half of β\* is invented, and it is cheap to fix
+`alpha-is-invented-2026-08-20.md`
+
+`β* = (1 − α) · e^(−kΔ)`. The sweep said the converse of β "has no name" — it does: **α**, the
+flaky-test rate, `P(verifier rejects | artefact is good)`. It is in ADR-0002, ADR-0026 and twice
+in the spec. **Its only value anywhere in the repository is `α = 0.03`, invented.**
+
+`jobboard-v2` merged **98 of 300** PRs over red CI — 0.3267 [0.2761, 0.3816]. Substituting it,
+β\* at gap 0.27 moves from **0.1119 to 0.0776**; the scale factor is exactly **0.6938 at every
+gap**, since β\* is linear in (1 − α). **Every threshold may be ~31% tighter than assumed, and the
+error is optimistic.** [measured]
+
+**0.327 is not α** and must not be quoted as such — it is selected on the merge decision. It
+establishes that the assumption is wrong and which way, not the replacement.
+
+**Why it is the cheapest item on this page:** α and β are the two off-diagonal cells of one 2×2
+table, and their denominators partition the labelled set. **α does not need its own verdicts — it
+needs the ones β discards**, and `projection.py` already stores both columns. The scarcity even
+inverts: β wants 30 human *rejections*; α wants 30 human *accepts*, which any merge-mined corpus
+has in abundance. **α is measurable today on the corpus where β is not.**
+
 ### 🔴 B. ADR-0019 forbids standing spend caps. Four later documents assume them.
 `cross-family-audit-2026-08-20.md` § 4
 
