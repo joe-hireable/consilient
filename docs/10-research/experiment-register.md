@@ -2321,6 +2321,316 @@ to write.
   diversity permits it in multi-version software; nothing here selects checks adversarially to try.
 - Specification defects, where code and tests agree on the wrong thing — invisible to mutation
   testing at any $k$.
+External candidate facts, versions and licence readings for EXP-58–EXP-64 are anchored in
+[`orchestration-dependencies-2026-08-20.md`](../20-design/orchestration-dependencies-2026-08-20.md).
+[cited]
+
+### EXP-59 · Does durable execution survive the crash window without displacing the trajectory? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether LangGraph, Temporal or Prefect should replace hand-built crash recovery in the
+orchestrator. The existing JSONL is durable evidence, but it cannot distinguish “the adapter never
+ran” from “the adapter completed and the process died before recording that fact.” This experiment
+tests that exact ambiguity rather than accepting a framework's “durable” label. [measured]
+
+**Arms:** a minimal trajectory-only recovery state machine; LangGraph with its local SQLite
+checkpointer; Temporal Python SDK with a local persisted development server; Prefect with a local
+persisted server. Pin every package, server binary and transitive lock before the run. After
+installation, all arms run with outbound networking denied and telemetry disabled.
+
+**Fixture:** one run with two deterministic activities. Activity A writes a run-scoped idempotency
+token. Activity B writes one externally visible side effect to a separate SQLite oracle and returns
+an `Outcome`. Barriers make these six kill points exact:
+
+1. before dispatch intent is appended;
+2. after intent append and before worker launch;
+3. after worker launch and before the side effect;
+4. after the side effect and before outcome append;
+5. after outcome append and before worker acknowledgement;
+6. during retry after a synthetic transient failure.
+
+Kill the complete process group at each barrier, restart from disk, and run each arm five times per
+barrier: 30 recoveries per arm. The side-effect oracle is not available to recovery code; it exists
+only to score duplicates and losses. After every terminal run, delete derived projections and
+rebuild them from JSONL. At every non-terminal kill point, repeat once after deleting the
+framework's private store: recovery may create a new runtime instance, but it must be able to do so
+from the trajectory without guessing.
+
+**Measures:**
+- duplicate and lost side effects;
+- missing, duplicated or contradictory trajectory transitions;
+- equality of canonical terminal `Outcome` and `state_digest()` after replay;
+- whether recovery needs facts present only in a framework database;
+- Consilient-owned recovery branches and production lines in the spike;
+- added processes, direct/transitive packages, cold start and idle memory.
+
+**Stopping rules (fixed before the run):**
+- One duplicate, one lost side effect, one contradictory terminal event or one replay-digest
+  mismatch in 30 recoveries $\implies$ **reject that arm.** “Usually durable” is not the property
+  being bought. [asserted]
+- If deleting the framework store makes recovery impossible from the trajectory at any cut
+  $\implies$ **reject that candidate.** It has displaced the source of truth rather than projected
+  it. [asserted]
+- If the trajectory-only arm passes all cuts, a dependency is eligible only if it reduces both
+  Consilient-owned recovery branches and production lines by at least 30% while passing every
+  correctness and authority check. Otherwise keep the in-house state machine. [asserted]
+- If the trajectory-only arm fails and exactly one candidate passes, that candidate is the
+  provisional adoption choice. If several pass, choose lexicographically: fewest non-projection
+  stores, then fewest additional processes, then least Consilient glue, then fewest transitive
+  packages. Record every value; do not substitute a popularity judgement. [asserted]
+- If no arm completes 30 recoveries, or a kill barrier cannot be placed deterministically, report
+  **insufficient evidence** and adopt nothing. [asserted]
+
+**What it cannot decide:** production-cluster operability, recovery from loss of the machine holding
+all local state, or whether the same engine is appropriate outside this repository.
+
+### EXP-58 · Can an agent framework be embedded without becoming the coordinator? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether LangGraph, Google ADK, CrewAI, AG2 or Microsoft Agent Framework supplies a
+smaller implementation of the approved coordinator while preserving Consilient's authority.
+AutoGen is excluded because its upstream is maintenance-only; no execution result can reverse that
+maintainer decision. [cited]
+
+**Reference workflow:** a dependency-free Python coordinator receives a fixed `Ticket`, selects one
+of two deterministic fake adapters under a supplied policy, runs it once, asks a deterministic
+critic that sees a different fixture class, and appends the route, delegation, evidence-class and
+terminal events through the existing chokepoint. The framework arms must implement the same
+workflow. Model calls, framework routing heuristics, memory, hosted tracing and self-reported
+confidence are disabled.
+
+**Corpus:** 24 fixtures: six routes × accepted/rejected outcomes × normal/exceptional completion.
+Add eight hostile fixtures covering duplicate completion, callback reordering, unknown adapter,
+critic timeout, malformed outcome, direct verdict injection, direct trajectory-write attempt and
+framework-state deletion. Run each fixture once with networking available only to localhost and
+once with outbound networking denied.
+
+**Measures:**
+- canonical event-sequence equality with the reference, excluding timestamps;
+- route, `Ticket`, `Outcome`, evidence-class and fail-closed equality;
+- unlogged framework state transitions or direct framework decisions;
+- Consilient glue branches and lines, import time, idle memory, direct/transitive packages and
+  processes;
+- network attempts with all documented telemetry opt-outs set.
+
+**Stopping rules (fixed before the run):**
+- Any framework-selected route, model-derived acceptance, unlogged decision, independent
+  trajectory writer or need for shared-evidence voting $\implies$ **reject that candidate.**
+  Those are violations of the product, not integration inconveniences. [asserted]
+- Any mismatch on the 32 fixtures, or any outbound attempt in the denied phase $\implies$ **reject
+  that candidate.** [asserted]
+- A passing candidate is eligible only if it deletes at least 30% of the reference coordinator's
+  branches and production lines and does not add an authoritative store. If the framework merely
+  wraps each existing callback, it has no job and is rejected. [asserted]
+- If several candidates pass, select only a strict Pareto winner on Consilient glue, additional
+  processes, transitive packages, import time and idle memory. If none dominates, adopt none;
+  preference among agent programming models is not evidence. [asserted]
+- If the reference itself fails a hostile fixture, repair the fixture or reference and restart all
+  arms. Do not let a framework win against a defective control. [asserted]
+
+**What it cannot decide:** whether one of these frameworks is a good way to build a different agent
+product, or whether its own agents outperform existing coding agents. Neither question belongs to
+this meta-harness.
+
+### EXP-60 · Does Pydantic AI beat Pydantic Core at a native model-I/O seam? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether Pydantic AI belongs at a future native-model boundary, or whether
+dependency-free validation or Pydantic Core supplies all of the value without an agent framework.
+It does not compare agent quality; it compares parsing, validation and control ownership.
+[asserted]
+
+**Fixture provider:** a local fake OpenAI-compatible server emits 120 pinned responses: 40 valid
+complete outputs, 20 valid streamed outputs, and 60 invalid cases covering missing fields, wrong
+types, unknown enum values, extra fields, duplicate tool calls, truncated streams, invalid UTF-8
+replacement, non-finite numbers, integers beyond interoperable JSON range, provider error frames
+and tool/output interleaving. A hand-written JSON Schema and expected `Outcome` or rejection for
+every fixture are frozen before any arm runs.
+
+**Arms:** current-style explicit validation; Pydantic Core models/`TypeAdapter`; Pydantic AI
+structured output. Every arm must return the same project `Outcome`, call only the local fixture
+provider, append through the same event writer, and expose no route or acceptance decision to the
+package.
+
+**Measures:**
+- false accepts and false rejects against the frozen fixture labels;
+- canonical `Outcome` and trajectory equality on accepted fixtures;
+- static-checker result for every adapter;
+- Consilient parsing/validation branches and production lines;
+- transitive packages, import time, global mutable configuration, caches and outbound attempts.
+
+**Stopping rules (fixed before the run):**
+- Any false accept, false reject, trajectory mismatch or package-owned route/verdict $\implies$
+  **reject that candidate.** [asserted]
+- If the dependency-free arm has zero classification errors, add neither dependency: there is no
+  validation defect for a dependency to repair. [asserted]
+- If Pydantic Core corrects every reference error and Pydantic AI catches no additional case,
+  **reject Pydantic AI as overbroad.** A decision to add base Pydantic remains separate and still
+  needs approval. [asserted]
+- Pydantic AI is eligible only if it uniquely corrects every remaining reference/Core false accept
+  without introducing a false reject, passes static checking, reduces both validation branches and
+  production lines by at least 30%, and leaves orchestration outside the package. [asserted]
+- If the fake provider cannot reproduce at least 20 valid streaming and 50 invalid cases, report
+  **insufficient evidence**; a happy-path demo cannot decide a boundary dependency. [asserted]
+
+**What it cannot decide:** behaviour of an untested provider, model instruction-following quality,
+or whether a native model path should exist. The experiment becomes obsolete if external-agent
+adapters remain the only execution path.
+
+### EXP-61 · Does DSPy optimisation reduce held-out β without buying it through α or leakage? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether DSPy's actual proposition — optimising an LM programme against a metric —
+earns a place in a future native-model path. Typed signatures alone are not the adoption claim.
+[asserted]
+
+**Corpus:** stratify EXP-47's non-equivalent mutants by file, function and mutation operator, then
+freeze disjoint optimisation and held-out partitions. The optimisation set contains 60 mutants and
+60 unmutated controls; the held-out set contains 120 of each. No file/function/operator cluster may
+occur in both partitions. Ground truth is mechanical and held-out labels are unavailable to the
+optimiser. Cap optimisation at 500 model calls.
+
+**Arms, with the same pinned local model and output schema:** a hand-written fixed prompt/programme;
+the equivalent unoptimised DSPy signature/module; and that DSPy module optimised on the training
+partition. Token and wall-clock ceilings are equal for scoring. Cache state is cleared between arms,
+and outbound networking is denied after installation.
+
+**Measures:** held-out β and α with Wilson intervals; the intervals on each difference from the
+fixed-program arm; refusal/invalid-output rate; input/output tokens; wall-clock; programme and prompt
+diffs produced by the optimiser; and any overlap between optimiser inputs and held-out material.
+
+**Stopping rules (fixed before the run):**
+- Any held-out item, label, verifier outcome or semantically equivalent cluster entering the
+  optimisation context $\implies$ **invalidate the run as leakage.** [asserted]
+- If the optimised arm's β interval does not lie wholly below the fixed-program arm's, **reject
+  DSPy:** optimisation did not improve the target error rate. [asserted]
+- If β improves but α rises by more than 5 percentage points, invalid/refusal rate rises, or median
+  tokens exceed 2× the fixed arm, **reject:** the gain was bought by a different failure or cost.
+  [asserted]
+- If the unoptimised DSPy arm's interval does not overlap the fixed arm's, first attribute that
+  adapter effect. The optimised arm is eligible only if its improvement also clears the unoptimised
+  arm with non-overlapping intervals. [asserted]
+- DSPy is eligible only if all preceding checks pass on all 240 held-out items and the optimised
+  programme re-runs deterministically from a pinned serialised artefact. [asserted]
+
+**What it cannot decide:** open-ended work without a mechanical oracle, transfer to another model
+family, or whether the optimisation corpus remains representative as the code changes.
+
+### EXP-62 · Can OpenTelemetry be a disposable projection without losing Consilient semantics? `READY`
+**Pre-registered 20 Aug 2026. Not run.**
+
+**Decides:** whether OpenTelemetry GenAI semantic conventions should back an optional local
+observability projection. The conventions repository has no release and no schema URL on the
+registration date, so a passing run establishes semantic fit but adoption additionally requires a
+tagged release with a usable schema identifier. [cited]
+
+**Procedure:**
+1. Freeze one fixture for every trajectory event type and at least 40 events in total.
+2. Map committed events, never live decisions, to OTel spans/events using a pinned conventions
+   commit. Prompt, response, tool-argument, tool-result and file content capture are disabled.
+3. Export first to the in-memory SDK and then to a local OTel Collector plus Jaeger with outbound
+   networking denied.
+4. Delete all telemetry and prove that trajectory replay and `state_digest()` are unchanged.
+5. Answer eight fixed queries: run timeline; adapter duration/status; route event; tool failures;
+   model/token use where present; verifier result and evidence class; budget refusal; and
+   span-to-immutable-trajectory-event correlation.
+
+The first, second, fourth and fifth queries must use standard OTel fields where a convention
+exists. Project-only facts use a documented `consilient.*` namespace and carry the source event ID.
+
+**Measures:** fixture coverage, the eight query results, fields requiring custom attributes,
+captured sensitive-content bytes, trajectory digest before/after, exporter failures and added
+packages/processes.
+
+**Stopping rules (fixed before the run):**
+- Any trajectory mutation, decision input from telemetry, missing event correlation, or captured
+  sensitive content $\implies$ **reject OTel.** [asserted]
+- If any of the eight queries cannot be answered from the local backend, or fewer than the four
+  designated queries use standard fields, the standard buys too little and is rejected. [asserted]
+- If all checks pass and a tagged GenAI-conventions release with a schema URL exists, adopt OTel as
+  an optional content-off projection. If the repository is still untagged or lacks a schema URL,
+  record **compatible but not adoptable** and keep the trajectory-only implementation. [asserted]
+- If the local collector cannot run without an account or outbound access, reject the deployment
+  path even if the in-memory mapping passes. [asserted]
+
+**What it cannot decide:** a hosted backend, long-term storage cost, or whether future conventions
+will preserve today's fields.
+
+### EXP-63 · Does MCP standardise tools without creating a route around the coordinator? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether the MCP Python SDK should implement the future tool boundary reserved by
+ADR-0016. MCP is not tested as durable execution: the 2.0 SDK does not implement the tasks
+extension. [cited]
+
+**Arms:** a minimal hand-written local JSON-RPC tool bridge and MCP Python SDK 2.x over stdio. Both
+expose only two deterministic capabilities: read a pinned context fixture and compute a pure
+digest. The coordinator validates input, invokes the bridge and appends the result.
+
+**Corpus:** 32 fixed calls: eight valid, eight malformed protocol/schema cases, and sixteen hostile
+authority attempts including route selection, adapter dispatch, verdict submission, direct event
+append, arbitrary path access, duplicate request ID, protocol downgrade, capability spoofing and
+post-cancellation completion. Run under denied outbound networking.
+
+**Measures:** accepted/rejected call equality, protocol error equality, complete audit correlation,
+authority bypasses, production parser/transport lines, transitive packages and process cleanup on
+timeout/cancellation.
+
+**Stopping rules (fixed before the run):**
+- One successful route, dispatch, verdict, trajectory-write or out-of-bound path attempt
+  $\implies$ **reject the SDK boundary.** [asserted]
+- One unaudited valid call, duplicate terminal result, leaked child process or outbound attempt
+  $\implies$ **reject.** [asserted]
+- If no real tool integration exists at run time, record **no present job** and add no dependency,
+  regardless of protocol conformance. [asserted]
+- Once a real integration exists, the SDK is eligible only if all 32 fixtures pass and it deletes
+  at least 30% of the hand-written protocol/transport branches and lines. Otherwise keep the direct
+  Python boundary. [asserted]
+
+**What it cannot decide:** remote untrusted MCP servers, registry supply-chain safety, or using MCP
+as an agent/task protocol.
+
+### EXP-64 · Does the ACP Python SDK delete adapter protocol code without changing outcomes? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether ACP should become the transport inside adapters for backends that expose it.
+Only stable ACP v1 is in scope. ACP v2 is draft and dual-version support is not accepted merely for
+future-proofing. [cited]
+
+**Precondition:** the existing 233-line Cursor ACP v1 client in
+`docs/10-research/experiments/exp05/adapter_cursor_acp.py`, its transcript fixtures, and the measured
+Cursor ACP run. [measured] Pin the official Python SDK and schema before the comparison.
+
+**Arms:** the existing custom client and an `agent-client-protocol` SDK client against the same
+deterministic local fake agent. Replay 40 transcripts covering initialization and capability
+negotiation, authentication, session creation, prompt streaming, tool approval, plan update, normal
+completion, agent error, malformed frame, unknown union variant, oversized frame, cancellation,
+timeout, EOF and process-tree shutdown. Then repeat the valid bounded task against Cursor ACP using
+the existing subscription composition; no credential is written to the repository.
+
+**Measures:** transcript accept/reject equality, canonical project `Outcome`, trajectory sequence,
+capability downgrade behaviour, cancellation latency, surviving descendant processes,
+Consilient-owned parser/session branches and lines, and transitive packages.
+
+**Stopping rules (fixed before the run):**
+- Any transcript mismatch, changed `Outcome`, unaudited update, capability accepted without
+  negotiation, process surviving timeout or outbound attempt $\implies$ **reject the SDK.**
+  [asserted]
+- If all fake and Cursor fixtures pass and the SDK deletes at least 30% of the custom
+  parser/session branches and production lines, adopt it for ACP-capable adapters only. Otherwise
+  retain the measured custom client. `Ticket`, `Outcome` and coordinator policy remain outside ACP.
+  [asserted]
+- Do not implement ACP v2 until it is stable and an admitted backend requires it. If that occurs,
+  register a separate v1/v2 negotiation experiment; this result does not transfer. [asserted]
+
+**What it cannot decide:** adoption by agents that do not expose ACP, the safety of editor-side
+resource access, or v2's eventual stable surface.
 
 
 ---
