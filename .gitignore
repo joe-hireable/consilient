@@ -29,6 +29,9 @@ entities.json
 .harness/state.db
 .harness/state.db-wal
 .harness/state.db-shm
+# `replay` sets aside a stale projection before rebuilding; it is a local artefact,
+# reproducible from the log, and not part of the record.
+.harness/state.db.stale-*
 
 # Transient runner state: a pid and a run id, meaningful only while a run is live.
 # Committing it would assert a lock that is not held.
