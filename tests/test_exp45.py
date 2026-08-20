@@ -118,7 +118,7 @@ def test_extract_record_entities():
             ]
         },
     }
-    entities_b, read_files_b, disc_b = extract_record_entities(rec_bash, turn_idx=2)
+    entities_b, _read_files_b, disc_b = extract_record_entities(rec_bash, turn_idx=2)
     assert "grep" in {e.name for e in entities_b}
     assert "grep -rn 'compact_boundary' docs/" in disc_b
 
@@ -223,8 +223,7 @@ def test_run_exp45_analysis_synthetic(tmp_path: Path):
             },
         ]
         with open(sess_file, "w", encoding="utf-8") as fp:
-            for record in lines:
-                fp.write(json.dumps(record) + "\n")
+            fp.writelines(json.dumps(record) + "\n" for record in lines)
 
     out_json = tmp_path / "results.json"
     results = run_exp45_analysis(tmp_path, out_json)

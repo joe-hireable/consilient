@@ -6,6 +6,10 @@
 - **Inquiry tier reached:** T1 ground
 - **Executable model:** none — but see EXP-03 in the experiment register.
 
+## Update: 2026-08-20 — EXP-47 measured check dependence directly ($\chi^2 = 187.28, p < 10^{-15}$); the decision stands
+
+EXP-47 evaluated 1,931 first-order mutants across `src/consilient/` against `pytest`, `mypy`, and `ruff`. Mutants that survived `pytest` survived `mypy` at **87.89%** (vs 58.50% for mutants killed by `pytest`), yielding $\chi^2 = 187.28$ ($p < 10^{-15}$). The observed joint survival $P(\text{pytest} \land \text{mypy}) = 33.82\%$ was materially higher than the independent expectation ($26.86\%$). ADR-0012's warning that the product of per-check error rates underestimates composite error and fails in the dangerous direction is empirically vindicated. `[measured]`
+
 ## Context
 
 Q10. Different checks have very different false-accept rates. A type checker is near-zero β

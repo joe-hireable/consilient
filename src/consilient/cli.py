@@ -16,7 +16,7 @@ import re
 import shutil
 import sqlite3
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -253,7 +253,7 @@ def _capture_condition(log: Path) -> CommandResult:
             day = date.fromisoformat(path.stem)
             events, rejected = events_mod.read(path)
             matching = [event for event in events if event.raw["ts"][:10] == path.stem]
-            if day <= date.today() and matching:
+            if day <= datetime.now(timezone.utc).date() and matching:
                 days.append(day)
                 issues[day] = len(rejected) + len(events) - len(matching)
         except (OSError, ValueError):
