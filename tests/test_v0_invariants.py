@@ -1012,7 +1012,7 @@ def test_doctor_unknown_evidence_cannot_enable_control(tmp_path, capsys, monkeyp
     assert payload["routing_orchestration_enabled"] is False
 
 
-def test_doctor_fails_the_unbuilt_weekly_fallback(tmp_path, capsys):
+def test_doctor_fails_the_unbuilt_weekly_fallback(tmp_path, capsys, monkeypatch):
     """Amended by ADR-0046. The evidence path changed; the assertion did not weaken.
 
     This used to assert the condition cites `.github/workflows`. Under Joe's no-secrets rule
@@ -1020,6 +1020,10 @@ def test_doctor_fails_the_unbuilt_weekly_fallback(tmp_path, capsys):
     about GitHub Actions and reads the dated result instead. An absent result still FAILS —
     never `unknown`, which is the status that made B3 a wall in the first place.
     """
+    # Isolate from the repository's own result file. Since 20 Aug 2026 a real passing result
+    # exists at the repository root, so without this the test reads it and B3 passes — the
+    # test was only ever green because the artefact did not exist yet.
+    monkeypatch.chdir(tmp_path)
     write_capture_days(tmp_path / "log", "2026-08-20")
 
     condition = doctor_payload(tmp_path, capsys)["gates"]["B"]["conditions"][2]
@@ -2055,3 +2059,69 @@ def test_the_fallback_runner_records_a_failure_rather_than_crashing(
     recorded = json.loads(result_path.read_text(encoding="utf-8"))
     assert recorded["outcome"] == "fail"
     assert "not on PATH" in recorded["detail"]
+
+
+# ------------------------------------------------- A3's evidence source
+def _capture_health_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "capture_health", Path("scripts/capture_health.py").resolve()
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_capture_health_reports_a_healthy_trajectory_and_a_broken_one(tmp_path, monkeypatch):
+    """A3's evidence must be a check, not a heartbeat.
+
+    Until 20 Aug 2026 nothing wrote A3's trajectory daily. The log had files for two days
+    because work happened on them; the only scheduled task on the machine writes a different
+    file entirely. **A quiet day would have broken the consecutive run and reset A3 to one**,
+    silently, while the gate looked like it was progressing.
+
+    The fix must not be a heartbeat. A heartbeat proves a writer ran and says nothing about
+    the record, which would turn A3 into a check that cannot fail — the exact defect this
+    repository catalogued four times today. This asserts the opposite property: a corrupted
+    log produces `healthy: false` rather than a cheerful line.
+    """
+    module = _capture_health_module()
+    log = tmp_path / "log"
+    monkeypatch.setattr(module, "LOG", log)
+    monkeypatch.setattr(module, "DB", tmp_path / "state.db")
+
+    write_capture_days(log, "2026-08-20")
+    healthy = module.inspect()
+    assert healthy["healthy"] is True
+    assert healthy["events"] == 1
+    assert healthy["state_digest"]
+
+    # A line the reader refuses is reported, not fatal — the trajectory is still intact.
+    with (log / "2026-08-20.jsonl").open("a", encoding="utf-8") as stream:
+        stream.write("{not json}\n")
+    refused = module.inspect()
+    assert refused["healthy"] is True
+    assert refused["refused"] == 1, "a refused line must be counted, not hidden"
+
+
+def test_capture_health_records_what_it_found(tmp_path, monkeypatch):
+    """The recorded event must carry the digest, or it is a heartbeat after all."""
+    module = _capture_health_module()
+    log = tmp_path / "log"
+    monkeypatch.setattr(module, "LOG", log)
+    monkeypatch.setattr(module, "DB", tmp_path / "state.db")
+    monkeypatch.setattr("sys.argv", ["capture_health.py"])
+    write_capture_days(log, "2026-08-20")
+
+    assert module.main() == 0
+
+    events, rejected = read_all(log)
+    assert not rejected
+    recorded = [event for event in events if event.kind == module.CHECK_KIND]
+    assert len(recorded) == 1
+    data = recorded[0].raw["data"]
+    assert data["healthy"] is True
+    assert data["state_digest"], "the check must record the digest it verified"
+    assert data["checked_by"] == "scripts/capture_health.py"
