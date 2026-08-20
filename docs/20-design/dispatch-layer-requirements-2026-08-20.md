@@ -180,21 +180,61 @@ is more valuable than one that produces something.
 the refusal rate per runtime is reported — it is a measure of the layer's own quality, not the
 agent's.
 
+## R13 — A runtime's interactive default will hang forever, and it hangs *quietly*
+
+**Incident.** A Cursor dispatch was launched as `cursor-agent --force --model ...` with stdin at
+`/dev/null`. Twelve minutes later: the process was alive, the log file was **0 bytes**, and the
+clone was untouched. `cursor-agent --help` shows why — `-p, --print` is documented as *"for
+scripts or non-interactive use"*, and without it the tool starts a TUI that waits for a terminal
+that will never arrive. [measured]
+
+Three details make this worse than an ordinary mistake. The process was **alive**, so a liveness
+check passed (R1 again, from the other side). The exit code was **0** when it was finally killed.
+And the same runtime had completed dispatches earlier in the day, so the invocation *looked*
+proven. **A flag that worked in one invocation is not a flag that works in this one.**
+
+This is the third silent launch failure recorded on this machine in two days: a launcher that
+exited 0 while the work never started; three log redirects that resolved to a stale directory; and
+now an interactive default. They share one property — **the absence of output was the only
+symptom, and absence is exactly what a busy orchestrator reads as "still working".**
+
+**Requirement.** The layer holds, per runtime, the **verified** non-interactive invocation, and
+never composes one from memory. Before a dispatch is considered launched, the layer requires a
+first artefact — any byte on the result channel — within a bounded window, and treats silence past
+that window as a launch failure rather than as progress. The window is per-runtime and measured,
+not guessed.
+
+**Check.** Two, because one is not enough here:
+
+1. `exp27/handshake.py` — which already probes the installed harnesses at zero inference — records
+   the non-interactive flag for each runtime and fails the dispatch if the flag it holds is absent
+   from that runtime's `--help`. A flag the tool no longer documents is a flag that no longer
+   works.
+2. A first-output deadline per dispatch. **Zero bytes at the deadline is a failure, not a wait.**
+   This is R1's requirement — verify by artefact — applied to the moment of launch rather than to
+   completion, which is where all three of these incidents actually happened.
+
+**Cost of not having it, measured today:** twelve minutes of wall clock and one wasted dispatch
+slot. Cheap this time only because something else was being worked on in parallel; a serial
+orchestrator would have waited on it indefinitely.
+
+---
+
 ---
 
 ## What this adds up to
 
-Twelve requirements, all measured in one day, and **not one is about model capability.** Every
+Thirteen requirements, all measured in two days, and **not one is about model capability.** Every
 failure was in the plumbing: permissions, workspaces, encodings, paths, process identity,
 delivery. The models did their work; the harness around them is what failed, repeatedly.
 
 That is the meta-harness thesis stated as an incident log rather than an argument, and it is the
 strongest evidence this project has produced for its own existence. It also sets the honest
 expectation for scaling: **increased AI workload is not gated on the agents. It is gated on
-twelve boring things, each of which now has a check.**
+thirteen boring things, each of which now has a check.**
 
 ## Falsifier
 
-If a dispatch layer implementing all twelve still shows the same rate of lost work over the next
+If a dispatch layer implementing all thirteen still shows the same rate of lost work over the next
 fifty dispatches, then the failures were not the plumbing and this analysis is wrong. The
 measurement is cheap: lost-work rate per dispatch, before and after, on the same task mix.
