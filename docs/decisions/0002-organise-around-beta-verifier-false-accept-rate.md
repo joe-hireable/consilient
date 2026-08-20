@@ -51,8 +51,36 @@ intervals at true β = 0.05: n=50 → [0.011, 0.135]; n=100 → [0.022, 0.112];
 n=200 → [0.027, 0.090].
 
 Under a conservative decision rule (declare routing safe only if the upper 95% bound clears
-β*), the **false-safe rate is 0 at every sample size tested** — the rule is safe, just
-underpowered near the threshold. At true β = 0.04 against β* = 0.111, n≈200 declares safe
+β*), the **false-safe rate is near zero but not zero** — the rule is conservative, just
+underpowered near the threshold.
+
+> **Corrected 2026-08-20.** This sentence read *"the false-safe rate is **0** at every sample
+> size tested"*. It is contradicted by the executable model this ADR names as its own source.
+> Running `q3_bimodal_and_q2_sample_complexity.py` unchanged prints, for a genuinely unsafe
+> repository at true β = 0.15: **0.003 at n = 50** and **0.001 at n = 100**. [measured] The
+> script's own column note says the rate *"must be ~0"* — which is true, and is a different
+> claim from *"is 0"*. A tilde was dropped in transcription and an approximation became a
+> guarantee, on a safety property.
+>
+> The exact binomial confirms the simulation rather than the prose. At n = 50 the rule declares
+> safe for k ≤ 1, and P(X ≤ 1 | n = 50, β = 0.15) = **0.0029055**; at n = 100 it declares safe
+> for k ≤ 5, and P(X ≤ 5 | n = 100, β = 0.15) = **0.0015527**. Over the 8,000 draws the script
+> uses, those predict 23.2 and 12.4 false-safes — and observing none at n = 50 would have
+> probability 8 × 10⁻¹¹. [measured]
+>
+> **It is worse just above the threshold, which is the regime that matters.** At true β = 0.12,
+> barely above β\* = 0.1119, the false-safe rate at n = 50 is **0.0131** — about 105 in 8,000.
+> [measured] The rule is weakest exactly where a repository is marginally unsafe, which is
+> precisely where a wrong answer is most likely and least detectable.
+>
+> **What is unchanged:** the decision rule itself, and the conclusion that it is conservative
+> and underpowered near the threshold. What is withdrawn is the claim of a *zero* error rate.
+> A conservative rule with a small, quantified error rate is honest; a rule advertised as
+> having none is not, and this project's whole thesis is that tests have error rates.
+>
+> Found by Codex auditing numeric provenance across the decision records; the arithmetic was
+> reproduced independently and against the script's own output before this correction was
+> written. At true β = 0.04 against β* = 0.111, n≈200 declares safe
 97% of the time. At true β = 0.08, even n=800 only reaches 84%.
 
 **Operational rule:** 50–200 accepted diffs suffice when β is far from β*; near it, report
