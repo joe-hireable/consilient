@@ -116,8 +116,26 @@ and timeout. EXP-07 asked whether the capability floor was the model or the tier
 at the model.** Not a registered result: capped, and contaminated by my own second runner. Re-run
 clean before citing.
 
-**`gemma4` is bimodal by fixture** — 5/5 passes on two fixtures, 5/5 timeouts on the other two,
-not one mixed result. A boundary a median multiplier would hide entirely.
+**Both runners have now finished, and the timing is void.** Reading durations against the caps
+the runner itself applied: **26 of 66 attempts — 39% — ran past the timeout meant to stop them**,
+worst by **1,771.7 s over a 240 s cap, 8.4×**. One `gemma4` attempt ran **2,011.7 s** against
+240 s. EXP-07 recorded this defect at 10–269 s. [measured]
+
+So **`agent_timeout` does not mean "exceeded the cap and was stopped" — it means the stop
+failed.** Durations are not bounded by the cap and are not model latency; they measure how long a
+runaway process survived. **Every duration-derived figure from this run is void.**
+
+**What survives, and it is the useful half.** Edit production does not depend on timing and
+replicates across both writers: **`qwen3:8b` — 33 attempts, 0 edits, 0 passes. `gemma4:31b` — 33
+attempts, 19 edits, 19 passes.** With EXP-07's 25, that is **58 `qwen3:8b` attempts across two
+fixture sets and two runs with no file edit at all.** Both writers independently reported the
+identical verdict detail, `qwen 0/5 vs gemma 2/5`, from different cell subsets under different
+contention. [measured]
+
+**The design lesson is bigger than the experiment:** with this rig, the capability floor is
+measurable and the latency multiplier is not. **Count what the model produced, never how long it
+took, until the process tree is killed properly.** That makes the process-tree kill a
+precondition for any duration-dependent registration, not a tidy-up.
 
 All four runners that write a results file have the same exposure. **EXP-07 cannot be cleared** —
 it has no run id, no PID, no per-attempt timestamp, so an interleaved run would look identical to
@@ -284,12 +302,18 @@ them.
   `psutil` is not installed — and `tasklist /v` shows twelve unnamed `python.exe`, some of them
   my own. A blind kill risked taking down the monitor watching the experiment. The finding is
   better than the stop would have been: **detection without identification is half a control.**
-- **I got EXP-31 wrong twice, in the document about EXP-31 being wrong.** I predicted each
-  runner would write `complete: true` and look finished — it hit a pre-registered wall-clock cap
-  and reported honestly. And I read `gemma4`'s rising timeout rate as contention degrading the
-  run when it was fixture composition: 5/5 or 0/5 per fixture, never mixed. **I predicted a
-  failure mode from code shape without checking for a cap, and read a trend into a composition
-  change.** Both corrected in `exp31-interleaving-2026-08-20.md`.
+- **I got EXP-31 wrong three times, in the document about EXP-31 being wrong.** (1) I predicted
+  each runner would write `complete: true` and look finished — both hit a pre-registered
+  wall-clock cap and reported honestly. (2) I read `gemma4`'s rising timeout rate as contention
+  degrading the run, when it was fixture composition. (3) I then called that composition
+  "bimodal by fixture" and glossed it as a capability boundary — but those "timeouts" ran up to
+  2,011 s against a 240 s cap, so it is the instrument losing control, not a model failing to
+  finish. **I predicted a failure mode from code shape without checking for a cap, read a trend
+  into a composition change, and then read a capability boundary into an instrument failure.**
+  All three corrected in `exp31-interleaving-2026-08-20.md`.
+- **And both runners were mine.** This session's task list holds "Run EXP-31 in the background"
+  and "Relaunch EXP-31". I launched the same experiment twice, then spent three hours diagnosing
+  the consequence as though it were someone else's.
 - **ClickUp is rate-limited to me for ~13 hours**, so the board stops partway. Worth noting
   against the record: EXP-16 concluded rate limits did *not* bite, and sustained low-concurrency
   use overnight contradicted that.
@@ -303,7 +327,7 @@ them.
 | Claude Code | 14-agent β attack; 9-agent documentation-debt batch with review; same-family control; every fix and commit | idle, awaiting you |
 | Cursor (Gemini) | ADR contradictions; the invariant audit that found the V0-18 hole; an independent β attack; runner exposure; three claim verifications; triage of nine audit findings | triaging the remaining twenty |
 | Codex (GPT) | numbers-traceability audit — 382 claim bundles, 336 adjudicated, **184 reproduce, 13 do not, 139 untraceable** | complete, preserved in the repo |
-| Ollama / local | EXP-31 | **compromised** — two writers, one of them mine. One hit its 3-hour cap honestly at 38/50 and reported `insufficient_evidence`; the other is still running. Re-run clean before citing |
+| Ollama / local | EXP-31 | finished. **Both writers were mine.** Each hit its 3-hour cap honestly (38/50 and 28/50) and reported `insufficient_evidence`. Timing void — 39% of attempts overran their timeout, worst 8.4×. Edit-production result replicates. Re-run clean before citing |
 
 Codex's report is preserved complete at `codex-numbers-audit-2026-08-20.md` — all 33 findings.
 Six were briefly lost to an output cap I set and were recovered by resuming the session, which is
