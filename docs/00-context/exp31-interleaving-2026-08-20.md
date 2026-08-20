@@ -1,12 +1,12 @@
 # EXP-31 has been running twice, into one file, all night
 
-**Found 20 August 2026, 06:20.** The run is compromised. Nothing about it should be believed
+**Found 20 August 2026, 04:05.** The run is compromised. Nothing about it should be believed
 without reading this page first. [measured]
 
 ## How it surfaced
 
-A routine progress check showed the run count going **backwards** — 28 runs at 05:00, 25 runs at
-06:15. A count that decreases is not slow progress; it is a different file.
+A routine progress check showed the run count going **backwards** — 28 runs, then 25 about
+seventy minutes later. A count that decreases is not slow progress; it is a different file.
 
 ## What is actually happening
 

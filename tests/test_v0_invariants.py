@@ -7,6 +7,7 @@ the check that bans bypassing it, in the same commit.
 import argparse
 import json
 import sqlite3
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -24,10 +25,21 @@ from consilience.events import (
 )
 
 
+def now_ts(offset_s=0):
+    """A timestamp from the clock, which is what an appended event must carry.
+
+    The fixtures used to hardcode "2026-08-20T01:00:00+01:00". That is exactly the shape
+    `_check_clock` now forbids — a timestamp asserted rather than read — so hardcoding it
+    here would have taught the suite that the forbidden thing is normal, which is the same
+    mistake the `outcome()` helper made about human verdicts.
+    """
+    return (datetime.now(timezone.utc) + timedelta(seconds=offset_s)).isoformat()
+
+
 def ev(**over):
     base = {
         "v": SCHEMA_VERSION,
-        "ts": "2026-08-20T01:00:00+01:00",
+        "ts": now_ts(),
         "event": "test.event",
         "actor": "agent",
         "data": {},
@@ -45,7 +57,7 @@ def outcome(
     verdict=None,
     family="repair",
     version="v1",
-    ts="2026-08-20T01:00:00+01:00",
+    ts=None,
 ):
     """An outcome event, authored by the human when it carries their verdict.
 
@@ -55,6 +67,7 @@ def outcome(
     in `_check_human_authority`. A fixture that can express a forbidden state will teach a
     suite to accept it.
     """
+    ts = ts or now_ts()
     data = {
         "task": task,
         "verifier_accept": accept,
@@ -591,3 +604,49 @@ def test_the_evidence_floor_can_be_raised_but_never_lowered():
     """A knob that can lower a floor is a bypass path around it."""
     with pytest.raises(ValueError, match="may only raise the floor"):
         beta_mod.compute([], min_rejections=0)
+
+
+# ---------------------------------------------- V0-01, the clock (20 Aug 2026)
+# `validate` checked the FORMAT of `ts` and its offset, both impeccable, and never asked
+# whether the value was true. The orchestrator wrote six consecutive trajectory events with
+# invented timestamps, drifting to 2h15m ahead of the wall clock, while documenting
+# instrument-integrity defects in other people's work. A format check on a timestamp is not
+# a check on a timestamp.
+
+
+_stamp = now_ts
+
+
+def test_an_invented_future_timestamp_is_refused_at_append(tmp_path):
+    log = tmp_path / "2026-08-20.jsonl"
+    with pytest.raises(EventError, match="from the current clock"):
+        append(log, ev(ts=_stamp(3 * 3600)))
+    assert not log.exists(), "a refused event must not reach the log"
+
+
+def test_an_invented_past_timestamp_is_refused_at_append(tmp_path):
+    log = tmp_path / "2026-08-20.jsonl"
+    with pytest.raises(EventError, match="from the current clock"):
+        append(log, ev(ts=_stamp(-3 * 3600)))
+
+
+def test_a_truthful_timestamp_is_accepted(tmp_path):
+    log = tmp_path / "2026-08-20.jsonl"
+    append(log, ev(ts=_stamp(0)))
+    assert len(read(log)) == 1
+
+
+def test_ordinary_delay_within_tolerance_is_accepted(tmp_path):
+    """The check must not punish a slow write, only an invented one."""
+    log = tmp_path / "2026-08-20.jsonl"
+    append(log, ev(ts=_stamp(-60)))
+    assert len(read(log)) == 1
+
+
+def test_reading_a_historical_log_does_not_depend_on_when_it_is_read():
+    """The clock check belongs to append alone.
+
+    `validate` runs on read. If it enforced skew, every log would become unreadable as it
+    aged - the same failure the explicit-offset rule exists to prevent.
+    """
+    validate(ev(ts="2026-08-19T01:00:00+01:00"))

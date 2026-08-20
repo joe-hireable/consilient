@@ -13,6 +13,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = 1
@@ -143,9 +144,40 @@ def canonical(event: dict) -> str:
     return json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+MAX_CLOCK_SKEW_S = 15 * 60
+
+
+def _check_clock(event: dict) -> None:
+    """An appended event must be stamped from a clock, not from an author's belief.
+
+    Added 20 Aug 2026 after the orchestrator wrote six consecutive trajectory events with
+    invented timestamps, drifting to 2h15m ahead of the wall clock, while documenting
+    instrument-integrity defects in other people's work. Nothing caught it: `validate`
+    checked the *format* of `ts` and its offset, which were impeccable, and never asked
+    whether the value was true.
+
+    A format check on a timestamp is not a check on a timestamp.
+
+    This runs at append only, never in `validate`, because reading a historical log must
+    not depend on when it is read — which is the same reason `ts` requires an explicit
+    offset in the first place.
+    """
+    stamped = datetime.fromisoformat(event["ts"])
+    skew = abs((datetime.now(timezone.utc) - stamped).total_seconds())
+    if skew > MAX_CLOCK_SKEW_S:
+        raise EventError(
+            f"event ts {event['ts']} is {skew / 60:.0f} minutes from the current clock, "
+            f"beyond the {MAX_CLOCK_SKEW_S // 60}-minute tolerance. Stamp events from the "
+            "clock rather than writing the time you believe it to be. To record something "
+            "that happened earlier, put the occurrence time in `data` and let `ts` record "
+            "when it was written."
+        )
+
+
 def append(path: Path, event: dict) -> dict:
     """Validate and append. The only writer of the log."""
     validate(event)
+    _check_clock(event)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="\n") as fh:
         fh.write(canonical(event) + "\n")
