@@ -1,6 +1,9 @@
 # 0041. Transports are lossy projections, not coordination authority — and untrusted channels cannot deliver human verdicts
 
-- **Status:** PROPOSED
+- **Status:** **ACCEPTED 20 August 2026.** Accepted by Joe Brown, 20 August 2026, in the orchestration chat: *"I accept all the recommendations."* Recorded in the trajectory at `.harness/log/2026-08-20.jsonl` as a `decision.*` event authored by the principal.
+  V0-28 (the channel refusal) already ships. The cryptographic half remains unbuilt:
+  `via` is self-reported, so this protects **declared** provenance, not authenticated
+  authorship.
 - **Date:** 2026-08-20
 - **Deciders:** Joe Brown (transport channel policy and security boundaries), Gemini 3.7 Flash (mechanism, proof boundaries, and invariant definitions)
 - **Extends:** [`0006`](0006-ticket-store-sqlite-plus-git-log.md), [`0007`](0007-cli-only-no-review-surface.md), [`0020`](0020-meetings-and-authority-matrix.md), [`0033`](0033-decide-by-default-ask-only-where-the-user-is-the-only-valid-decider.md), [`0035`](0035-user-controlled-visibility.md)

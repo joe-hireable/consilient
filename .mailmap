@@ -1,0 +1,17 @@
+# Authorship correction, not concealment.
+#
+# `EXP-07 <exp07@local>` is the identity EXP-07 stamps on the throwaway repositories it
+# builds. It was also present in this repository's own git config, which every worktree
+# shares, so 51 of the commits on this branch were authored and committed by a test fixture
+# rather than by the person accountable for them.
+#
+# The config is repaired and a ratchet stops it recurring
+# (`test_no_new_commit_may_be_authored_by_a_fixture_identity`). The commit objects are
+# deliberately NOT rewritten: doing so would move every SHA, including the anchor commits
+# that P1, P2 and P3 cite. This file corrects what `git log`, `git shortlog` and forge
+# contributor views display; the underlying objects still say what they always said.
+#
+# The full account, including the options not taken:
+#   docs/00-context/fixture-identity-in-the-record-2026-08-20.md
+
+Joe Brown <joe@gethireable.com> EXP-07 <exp07@local>

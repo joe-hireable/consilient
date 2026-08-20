@@ -1,7 +1,8 @@
 # 0043. Gate A3 counts new refusals, not historical ones
 
-- **Status:** PROPOSED 20 August 2026. Amends ADR-0015 Gate A condition 3. **Only Joe may accept
-  this**, because it changes when this project is permitted to route and orchestrate.
+- **Status:** **ACCEPTED 20 August 2026.** Accepted by Joe Brown, 20 August 2026, in the orchestration chat: *"I accept all the recommendations."* Recorded in the trajectory at `.harness/log/2026-08-20.jsonl` as a `decision.*` event authored by the principal.
+  Amends ADR-0015 Gate A condition 3. The three checks named in Enforcement ship with
+  this acceptance, as that section required.
 - **Date:** 2026-08-20
 - **Deciders:** proposed by Claude Opus 5; ADR-0015 belongs to Joe Brown
 - **Inquiry tier reached:** T1 ground — one measured defect, exact arithmetic, no controlled

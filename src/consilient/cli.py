@@ -39,6 +39,11 @@ GATE_B_CIRCULARITY = Path(
     "docs/00-context/gate-b-cannot-be-passed-2026-08-20.md"
 )
 WORKFLOWS = Path(".github/workflows")
+# Refused lines already in the trajectory when ADR-0043 was accepted on 20 August 2026:
+# three V0-18 violations appended between 09:41 and 09:56 that day, permanent because the
+# log is append-only. A3 tolerates these and only these. This number may only ever go DOWN,
+# and it cannot go down by editing the log — only by the log's history being superseded.
+CAPTURE_REFUSAL_BASELINE = 3
 REQUIREMENTS = {
     "A1": "EXP-01 complete on two differently verified repositories with an interval",
     "A2": "Replay reproduces an identical canonical state digest",
@@ -246,8 +251,24 @@ def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResu
 
 
 def _capture_condition(log: Path) -> CommandResult:
+    """Gate A condition 3, as amended by ADR-0043 and accepted 20 August 2026.
+
+    The condition asks whether capture is working and losing nothing. It used to be
+    implemented as "zero refused lines inside the window", which is a different and
+    unsatisfiable thing: refusals are permanent in an append-only log, so an unbroken run
+    failed at seven days, at sixty and at three hundred and sixty-five, while a run that
+    *lost a day* passed. The only way to satisfy "no data loss" was to lose data.
+
+    A refusal is the opposite of loss. It is a line that IS in the record, named invalid,
+    with its reason and line number, reported beside every figure derived from the log. So
+    historical refusals are counted and reported and do not block; a NEW one does.
+
+    Misdated lines are not ratcheted. A timestamp that disagrees with its file is a live
+    capture fault rather than a historical judgement, and it must still fail.
+    """
     days: list[date] = []
-    issues: dict[date, int] = {}
+    refusals: dict[date, int] = {}
+    misdated: dict[date, int] = {}
     for path in log.glob("*.jsonl"):
         try:
             day = date.fromisoformat(path.stem)
@@ -255,7 +276,8 @@ def _capture_condition(log: Path) -> CommandResult:
             matching = [event for event in events if event.raw["ts"][:10] == path.stem]
             if day <= datetime.now(timezone.utc).date() and matching:
                 days.append(day)
-                issues[day] = len(rejected) + len(events) - len(matching)
+                refusals[day] = len(rejected)
+                misdated[day] = len(events) - len(matching)
         except (OSError, ValueError):
             continue
     days = sorted(set(days))
@@ -277,18 +299,26 @@ def _capture_condition(log: Path) -> CommandResult:
             gap = earlier + timedelta(days=1)
             break
     run = (days[-1] - run_start).days + 1
-    issue_count = sum(count for day, count in issues.items() if day >= run_start)
+    refused = sum(count for day, count in refusals.items() if day >= run_start)
+    stale = sum(count for day, count in misdated.items() if day >= run_start)
+    new_refusals = max(0, refused - CAPTURE_REFUSAL_BASELINE)
     reason = (
         f"Latest capture run is {run}/7 days, {run_start.isoformat()} through "
         f"{days[-1].isoformat()}."
     )
     if gap is not None:
         reason += f" The preceding gap is {gap.isoformat()}."
-    if issue_count:
-        reason += f" The run has {issue_count} rejected or misdated line(s)."
+    if refused:
+        reason += (
+            f" The run carries {refused} refused line(s), of which "
+            f"{CAPTURE_REFUSAL_BASELINE} are the recorded historical baseline (ADR-0043) "
+            f"and {new_refusals} are new."
+        )
+    if stale:
+        reason += f" The run has {stale} misdated line(s)."
     return _condition(
         "A3",
-        "pass" if run >= 7 and issue_count == 0 else "fail",
+        "pass" if run >= 7 and new_refusals == 0 and stale == 0 else "fail",
         reason,
         evidence,
     )

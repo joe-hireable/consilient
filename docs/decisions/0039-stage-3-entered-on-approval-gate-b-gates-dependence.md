@@ -1,7 +1,9 @@
 # 0039. Stage 3 is entered on approval; Gate B gates dependence, not construction
 
-- **Status:** **PROPOSED** — not accepted. Lifting or altering a gate is reserved to Joe by
-  ADR-0033 §2 and by `v0-draft.md` §3.1. **No agent may treat this as in force.**
+- **Status:** **ACCEPTED 20 August 2026.** Accepted by Joe Brown, 20 August 2026, in the orchestration chat: *"I accept all the recommendations."* Recorded in the trajectory at `.harness/log/2026-08-20.jsonl` as a `decision.*` event authored by the principal.
+  Supersedes ADR-0015's Stage 3 entry condition and Gate B condition 4.
+  **Entering Stage 3 is a separate act and has not been taken.** This ADR establishes
+  that entry is on the principal's approval; it is not itself that approval.
 - **Date:** 2026-08-20
 - **Proposer:** Claude Opus 5. **Decider: Joe Brown, and only Joe.**
 - **Would supersede:** [`0015`](0015-dogfooding-gate.md) Stage 3 and Gate B condition 4 only.

@@ -1,6 +1,8 @@
 # 0042. Admit connectors by zero-inference capability probing, credential isolation, and fail-closed spend caps
 
-- **Status:** PROPOSED
+- **Status:** **ACCEPTED 20 August 2026.** Accepted by Joe Brown, 20 August 2026, in the orchestration chat: *"I accept all the recommendations."* Recorded in the trajectory at `.harness/log/2026-08-20.jsonl` as a `decision.*` event authored by the principal.
+  The spend half is further specified by ADR-0044: OpenRouter is the only permitted
+  metered vendor, and weekly and monthly caps are a required capability.
 - **Date:** 2026-08-20
 - **Deciders:** Joe Brown (credential, monetary spend, and network egress policy), Gemini 3.7 Flash (admission predicates, handshake mechanics, and failure invariants)
 - **Extends:** [`0019`](0019-paid-capability-acquisition.md), [`0026`](0026-admit-only-budget-and-hardware-feasible-backends.md), [`0027`](0027-compose-domain-harness-provider-and-model.md), [`0029`](0029-separate-runtime-resource-state-from-change-intelligence.md), [`0033`](0033-decide-by-default-ask-only-where-the-user-is-the-only-valid-decider.md)

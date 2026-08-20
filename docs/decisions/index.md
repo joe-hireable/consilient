@@ -14,7 +14,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0002](0002-organise-around-beta-verifier-false-accept-rate.md) | **Organise the system around β**, the verifier false-accept rate. Contains the closed form β\* = (1−α)·e^(−kΔ) and the distribution-free result. | 🟡 |
 | [0010](0010-name-the-different-class-of-facts.md) | **Every multi-agent structure must name its different class of facts.** The theorem. | ✅ |
 | [0027](0027-compose-domain-harness-provider-and-model.md) | **Compose domain, execution harness, provider and model separately**; public benchmarks are priors, local outcomes decide. | 🟡 |
-| [0018](0018-self-modification-gated-by-measured-verifier.md) | **Self-modification gated by measured verifier reliability.** The project's likely novel contribution. | 📋 |
+| [0018](0018-self-modification-gated-by-measured-verifier.md) | **Self-modification gated by measured verifier reliability.** The project's likely novel contribution. | ✅ |
 
 ## Architecture
 
@@ -41,15 +41,16 @@ Read these before anything else. Everything downstream depends on them.
 | [0032](0032-single-language-python-for-the-orchestrator.md) | **Single-language Python for the orchestrator**; TypeScript/Node stays a spawned sidecar. Supersedes 0031 | ✅ |
 | [0031](0031-implement-v0-in-python-with-a-stdlib-only-core.md) | Implement v0 in Python with a stdlib-only core (superseded by 0032) | ⛔ |
 | [0030](0030-size-orchestration-by-usable-context-and-measured-outcomes.md) | **Size orchestration roles by usable context and measured outcomes**; Opus 5 senior default, Gemini 3.7 Flash High candidate | 🟡 |
-| [0041](0041-transports-are-projections-not-authority-and-untrusted-channels-cannot-deliver-verdicts.md) | **Transports are lossy projections, not coordination authority**; untrusted third-party channels cannot deliver human verdicts | 📋 |
-| [0042](0042-admit-connectors-by-capability-probing-credential-isolation-and-fail-closed-boundaries.md) | **Admit connectors by zero-inference capability probing, credential isolation, and fail-closed spend caps** | 📋 |
-| [0043](0043-gate-a3-counts-new-refusals-not-historical-ones.md) | **Gate A3 counts new refusals, not historical ones** — A3 is unpassable as written; the only way to satisfy it is to lose a day of capture | 📋 |
+| [0041](0041-transports-are-projections-not-authority-and-untrusted-channels-cannot-deliver-verdicts.md) | **Transports are lossy projections, not coordination authority**; untrusted third-party channels cannot deliver human verdicts | ✅ |
+| [0042](0042-admit-connectors-by-capability-probing-credential-isolation-and-fail-closed-boundaries.md) | **Admit connectors by zero-inference capability probing, credential isolation, and fail-closed spend caps** | ✅ |
+| [0043](0043-gate-a3-counts-new-refusals-not-historical-ones.md) | **Gate A3 counts new refusals, not historical ones** — A3 is unpassable as written; the only way to satisfy it is to lose a day of capture | ✅ |
+| [0044](0044-openrouter-is-the-only-metered-vendor-and-budgets-are-a-capability.md) | **OpenRouter is the only metered vendor**; subscriptions cover everything else; weekly and monthly budgets are a required capability | ✅ |
 
 ## Behaviour and safety
 
 | # | Decision | Status |
 |---|---|---|
-| [0019](0019-paid-capability-acquisition.md) | Paid capability acquisition — off by default, four conditions | 📋 |
+| [0019](0019-paid-capability-acquisition.md) | Paid capability acquisition — off by default, four conditions. **Condition 3 superseded in part by 0044** | ⛔ |
 | [0021](0021-pushback-protocol.md) | **Pushback protocol** — decision hygiene, two challenges then comply | 📋 |
 | [0022](0022-safety-floor-and-moderation.md) | Safety floor, maximal configurability above it, honest moderation limits | 📋 |
 
@@ -64,7 +65,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0015](0015-dogfooding-gate.md) | **Dogfooding gate** — three stages, measured gates (Gate B2 superseded by 0037) | ✅ |
 | [0037](0037-replace-gate-b2-with-measured-critic-throughput-gain.md) | **Replace Gate B2 with measured critic review-throughput gain**; supersedes 0015 Gate B2 | ✅ |
 | [0038](0038-rename-the-project-consilient.md) | **Rename the project Consilient** — the predicate, not the phenomenon; supersedes 0008 | ✅ |
-| [0039](0039-stage-3-entered-on-approval-gate-b-gates-dependence.md) | **PROPOSED, Joe only** — Stage 3 entered on approval; Gate B gates dependence not construction; would supersede 0015 Gate B4 | ⏳ |
+| [0039](0039-stage-3-entered-on-approval-gate-b-gates-dependence.md) | Stage 3 entered on approval; Gate B gates dependence not construction; would supersede 0015 Gate B4 | ✅ |
 | [0040](0040-decide-from-evidence-not-from-pretraining.md) | **DEPRECATED 20 Aug 2026** — no mechanically complete decision-and-provenance discriminator exists for the proposed EXP-46 [algebra] | ⛔ |
 | [0016](0016-skill-distribution-mcp-plugins.md) | Skill distribution, MCP, plugins — and the supply-chain rule | 📋 |
 | [0017](0017-bootstrap-harness.md) | Bootstrap harness — Claude Code as a working prototype | 📋 |

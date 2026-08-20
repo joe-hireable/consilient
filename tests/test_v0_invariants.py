@@ -669,7 +669,9 @@ def test_ci_static_gate_runs_mypy_strict():
 
 def test_ci_ruff_gate_matches_release_command():
     workflow = Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
-    ruff_step = workflow.partition("- name: Repository-wide Ruff")[2].partition("- name:")[0]
+    ruff_step = workflow.partition("- name: Repository-wide Ruff")[2].partition(
+        "- name:"
+    )[0]
     assert "run: python -m ruff check ." in ruff_step
 
 
@@ -959,7 +961,20 @@ def test_doctor_passes_seven_clean_consecutive_capture_days(tmp_path, capsys):
     assert condition["id"] == "A3" and condition["status"] == "pass"
 
 
-def test_doctor_rejects_a_quarantined_line_in_the_seven_day_run(tmp_path, capsys):
+def test_doctor_reports_a_quarantined_line_in_the_seven_day_run(tmp_path, capsys):
+    """Amended by ADR-0043, accepted 20 August 2026. This test used to assert FAIL.
+
+    It asserted that a single quarantined line inside the window fails A3. That was the
+    behaviour which made A3 unsatisfiable: refusals are permanent in an append-only log, so
+    the condition could only ever be met by breaking capture — losing a day of data in order
+    to satisfy "no data loss".
+
+    The half of the old assertion that survives, and the half worth pinning, is the
+    REPORTING. ADR-0043 says pre-existing refusals are "counted, reported, and non-blocking".
+    Non-blocking is covered by `test_a3_tolerates_the_recorded_historical_refusals`, blocking
+    on a new one by `test_a3_still_fails_on_one_new_refusal`. This one guards the failure mode
+    neither of those would catch — the count going quiet.
+    """
     write_capture_days(
         tmp_path / "log",
         "2026-08-14",
@@ -975,8 +990,10 @@ def test_doctor_rejects_a_quarantined_line_in_the_seven_day_run(tmp_path, capsys
 
     condition = doctor_payload(tmp_path, capsys)["gates"]["A"]["conditions"][2]
 
-    assert condition["id"] == "A3" and condition["status"] == "fail"
-    assert "rejected" in condition["reason"]
+    assert condition["id"] == "A3"
+    assert "1 refused line(s)" in condition["reason"], (
+        "a tolerated refusal must still be named in the verdict, never silently absorbed"
+    )
 
 
 def test_doctor_unknown_evidence_cannot_enable_control(tmp_path, capsys, monkeypatch):
@@ -1578,7 +1595,10 @@ def _reachable_statuses() -> dict[str, set[str]]:
             if len(call.args) < 2:
                 continue
             identifier, status = call.args[0], call.args[1]
-            if not (isinstance(identifier, ast.Constant) and isinstance(identifier.value, str)):
+            if not (
+                isinstance(identifier, ast.Constant)
+                and isinstance(identifier.value, str)
+            ):
                 continue
             found = {
                 n.value
@@ -1624,4 +1644,87 @@ def test_every_gate_condition_has_a_reachable_pass_state():
     assert unpassable <= known_unpassable, (
         f"a gate condition lost its pass state: {sorted(unpassable - known_unpassable)}. "
         "A condition that cannot report pass is a wall, not a gate."
+    )
+
+
+# ---------------------------------------------------------------- ADR-0043
+def _a3(tmp_path, capsys):
+    gate_a = doctor_payload(tmp_path, capsys)["gates"]["A"]
+    return {c["id"]: c for c in gate_a["conditions"]}["A3"]
+
+
+def test_a3_passes_seven_clean_days(tmp_path, capsys):
+    """The amended condition is satisfiable at all, which the original was not."""
+    log = tmp_path / "log"
+    write_capture_days(log, *[f"2026-08-{day:02d}" for day in range(10, 17)])
+    condition = _a3(tmp_path, capsys)
+    assert condition["status"] == "pass", condition["reason"]
+
+
+def test_a3_tolerates_the_recorded_historical_refusals(tmp_path, capsys):
+    """ADR-0043's whole content: a permanent refusal must not block forever.
+
+    Before the amendment, unbroken capture failed A3 at 7 days, at 60 and at 365, while a run
+    that LOST a day passed. The only way to satisfy "no data loss" was to lose data.
+    """
+    from consilient.cli import CAPTURE_REFUSAL_BASELINE
+
+    log = tmp_path / "log"
+    days = [f"2026-08-{day:02d}" for day in range(10, 17)]
+    write_capture_days(log, *days)
+    with (log / f"{days[0]}.jsonl").open("a", encoding="utf-8") as fh:
+        for _ in range(CAPTURE_REFUSAL_BASELINE):
+            fh.write("{not json}\n")
+
+    condition = _a3(tmp_path, capsys)
+    assert condition["status"] == "pass", condition["reason"]
+    assert "historical baseline" in condition["reason"]
+    assert "0 are new" in condition["reason"]
+
+
+def test_a3_still_fails_on_one_new_refusal(tmp_path, capsys):
+    """The amendment is not a removal. One refusal above the baseline still fails."""
+    from consilient.cli import CAPTURE_REFUSAL_BASELINE
+
+    log = tmp_path / "log"
+    days = [f"2026-08-{day:02d}" for day in range(10, 17)]
+    write_capture_days(log, *days)
+    with (log / f"{days[0]}.jsonl").open("a", encoding="utf-8") as fh:
+        for _ in range(CAPTURE_REFUSAL_BASELINE + 1):
+            fh.write("{not json}\n")
+
+    condition = _a3(tmp_path, capsys)
+    assert condition["status"] == "fail", condition["reason"]
+    assert "1 are new" in condition["reason"]
+
+
+def test_a3_still_fails_on_a_misdated_line(tmp_path, capsys):
+    """Misdated lines are deliberately NOT ratcheted.
+
+    A refusal is a historical judgement about a line that is present. A timestamp that
+    disagrees with its own file is a live capture fault, and the amendment must not quietly
+    tolerate it alongside the refusals.
+    """
+    log = tmp_path / "log"
+    days = [f"2026-08-{day:02d}" for day in range(10, 17)]
+    write_capture_days(log, *days)
+    with (log / f"{days[0]}.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(canonical(ev(ts="2026-07-01T12:00:00+00:00")) + "\n")
+
+    condition = _a3(tmp_path, capsys)
+    assert condition["status"] == "fail", condition["reason"]
+    assert "misdated" in condition["reason"]
+
+
+def test_the_capture_refusal_baseline_may_only_fall():
+    """A ratchet on the tolerance itself, in the shape used for `append()` bypass.
+
+    ADR-0043's own Evidence-against names the hazard: a ratchet with a non-zero floor can
+    normalise its floor. The number below is the measured past and raising it is the way this
+    amendment would quietly become "count nothing".
+    """
+    from consilient.cli import CAPTURE_REFUSAL_BASELINE
+
+    assert CAPTURE_REFUSAL_BASELINE <= 3, (
+        "the A3 refusal tolerance was raised; ADR-0043 permits it to fall only"
     )
