@@ -447,3 +447,61 @@ opposite: the heartbeat reports **used** VRAM, so the number falling means the m
 the card is idle. `nvidia-smi` says 3,489 used against 28,699 free at 1% utilisation. [measured]
 I checked before acting, which is the only reason this is a postscript and not another incident —
 **a monitor that does not label its units invites exactly this, and mine did not label them.**
+
+
+---
+
+# Clean re-run started 08:59, and the fix is verified on the real workload
+
+The register said the run must be repeated. The instrument is repaired, the repair is tested, and
+the run takes about three hours — so it is started rather than parked. Under ADR-0033 that is the
+harness's call: the registration is unchanged, the execution is reversible, and the alternative is
+a COMPROMISED experiment sitting untouched.
+
+## Pre-flight, because a three-hour run that crashes on attempt 1 is worse than not starting
+
+The repaired `run_attempt` was called once against the **real workload** — an actual Codex/Ollama
+invocation on `duration-parser` with `qwen3:8b` — under a deliberately short 45-second cap. A
+synthetic sleeper would not have tested the thing that broke.
+
+```
+outcome            agent_timeout
+duration recorded  45.186s
+timeout applied    45s
+overrun recorded   0.186s
+```
+
+**0.186 seconds past a 45-second cap.** [measured] The same code path previously overran by up to
+**1,771.7 seconds against a 240-second cap**. From 8.4× the cap to 1.004×.
+
+## The lock, verified in production rather than only in tests
+
+With the run under way, a second launch was attempted deliberately:
+
+```
+REFUSING TO START: run.lock is held by pid 21636 (run exp31-20260820T085909-21636),
+started 0.3 min ago, within the 180 min wall-clock cap. Two concurrent runners
+overwrite each other's results.
+```
+
+[measured] That is the exact failure of 20 August, refused at the door, naming the holder. The
+lock file carries `pid`, `run_id` and `started_epoch`, and the `run_id` is stamped into the
+results payload — so if an interleaving ever does happen again it will be visible in the data
+rather than inferred from an alternating VRAM probe.
+
+## What this run can and cannot settle
+
+**Can:** whether `gemma4:31b` clears the capability floor `qwen3:8b` has failed in 58 attempts
+across two fixture sets; and whether the fixture-level partition seen before was real or an
+artefact of the broken timeout. That second question is only askable now — with the timeout
+bounded, a censored run genuinely means "did not finish in 240 s" rather than "the instrument lost
+control".
+
+**Cannot:** anything the registration does not already cover. The protocol, fixtures, attempt
+budget and stopping rules are unchanged and were not touched. If the verdicts come back
+`insufficient_evidence` again, that is the answer.
+
+**One honest caveat.** This is a re-run of a registered experiment whose previous execution this
+same session voided. The instrument changed between them, which is exactly why the earlier data
+cannot be pooled with this — and pooling it would be the outcome-aware move the project has
+refused three times. The two capped datasets stay outside the evidence base.

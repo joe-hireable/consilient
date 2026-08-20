@@ -29,3 +29,7 @@ entities.json
 .harness/state.db
 .harness/state.db-wal
 .harness/state.db-shm
+
+# Transient runner state: a pid and a run id, meaningful only while a run is live.
+# Committing it would assert a lock that is not held.
+docs/10-research/experiments/*/run.lock
