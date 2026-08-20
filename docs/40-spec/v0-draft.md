@@ -52,8 +52,11 @@ becomes a management metric, is a cost regardless of its output quality. [assert
 
 ## 2. Non-goals
 
-- A learned routing policy is excluded from v0; EXP-07 has reopened ADR-0003 for
-  investigation but n=1 has not overturned it. [measured]
+- A learned routing policy is excluded from v0. EXP-07 has since run the pre-registered
+  replication at n=30 and **ADR-0003 was not reopened**: the single-attempt median multiplier is
+  1.69×, which does not cross the 2× trigger, and only best-of-five crosses at 17.95× (16.75×
+  clamped). The registered finding is that scaffolding creates the wasted work, not the raw local
+  attempt. [measured] See § 8 and `../decisions/0003-no-learned-routing-policy-in-v0.md`.
 - The Inquiry tier is excluded unless Joe resolves Q14 in its favour. [asserted]
 - A graphical review surface, TUI, web server, model engine, model catalogue, benchmark
   leaderboard, autonomous model purchase and unbounded chat are excluded. [asserted]
@@ -115,8 +118,12 @@ override: [asserted]
 
 1. EXP-01 complete on at least two repositories with different verification quality and a
    reported confidence interval. [asserted]
-2. Deleting SQLite and replaying the trajectory produces byte-identical state in CI.
-   [asserted]
+2. Deleting SQLite and replaying the trajectory reproduces an **identical canonical state
+   digest** in CI. Not a byte comparison of the database file: SQLite files are not byte-stable
+   across rebuilds, because the header carries a change counter and a schema cookie, the freelist
+   and page allocation depend on insertion history, and WAL adds a random salt. `state_digest()`
+   hashes a canonical ordered dump of the rows instead, which is what "the database is a
+   projection" actually means. [measured]
 3. Seven consecutive days of trajectory capture complete with no data loss. [asserted]
 
 ### Stage 3 — route, criticise and orchestrate, after Gate B
@@ -378,7 +385,7 @@ not satisfy the invariant. [asserted]
 | ID | Required invariant | Same-commit check | Source |
 |---|---|---|---|
 | V0-01 | Every event is schema-versioned and append-only. [asserted] | Fixture rejects unversioned events and mutation of committed positions. [asserted] | ADR-0006 |
-| V0-02 | SQLite is only a projection of JSONL. [asserted] | Delete/replay produces byte-identical state; lint bans state-only writes. [asserted] | ADR-0006 |
+| V0-02 | SQLite is only a projection of JSONL. [asserted] | Delete/replay reproduces an identical `state_digest()` over a canonical row dump — **not** a byte comparison of the database file, which SQLite does not make stable; lint bans state-only writes. [measured] | ADR-0006 |
 | V0-03 | A task fixes goal, verifier, authority, artefact boundary and caps before dispatch. [asserted] | Schema and transition tests reject incomplete dispatch and silent rebaseline. [asserted] | working principles, ADR-0021 |
 | V0-04 | Exactly one route decision exists per attempt. [asserted] | State-machine property test rejects zero or duplicate decisions. [asserted] | ADR-0009 |
 | V0-05 | Only verifier/human outcomes accept artefacts. [asserted] | Seeded successful-process/bad-artefact fixture is rejected. [asserted] | working principle 5, EXP-05 |

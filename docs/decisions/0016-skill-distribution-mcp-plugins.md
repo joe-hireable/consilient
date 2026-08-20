@@ -80,10 +80,18 @@ Not `skillfish`: AGPL-3.0 (a licence question we do not need next to `0004`), tw
 without a push, and a third-party quality score of 51/100. Its multi-agent install is a
 convenience we can live without.
 
-### 2. Publishing Consilience's own skills → bundled inside the npm package
+### 2. Publishing Consilience's own skills → bundled inside the distributed package
 
-Follow the `skills-npm` convention: ship `skills/` inside the `consilience` package.
-`npm i consilience` brings the skills, **version-locked to the tool that reads them**.
+**Corrected 2026-08-20.** This section originally said npm, and specified
+`npm i consilience`. That was written while the orchestrator was assumed to be a Node CLI.
+ADR-0032 subsequently chose **single-language Python**, and nobody came back to this file — so
+for a day the project's own decision record told it to publish its skills in a package manager
+it does not use. A different model family found it, which is the point of using one. [measured]
+
+The *reasoning* below is unaffected and stands: the skills must travel with the tool version.
+Only the vehicle changes. Ship `skills/` as package data inside the `consilience` wheel and
+sdist, so `pip install consilience` brings them, **version-locked to the tool that reads them**,
+exactly as `skills-npm` achieves for Node.
 
 This is the right shape specifically for us: our skills are *tool-coupled*. A `beta-verdict`
 skill that describes the verdict prompt must match the verdict schema, and a
@@ -157,7 +165,8 @@ written here.
 - A skills registry publishes credible provenance and vetting — signed skills, reproducible
   content hashes, a documented threat model — at which point live resolution becomes
   defensible and the manual read can be relaxed.
-- `skills-npm` stalls and `skillpm` or another convention wins; switch the publish path.
+- `skills-npm` stalls and `skillpm` or another convention wins; switch the publish path. Note
+  this now bears only on the *consumption* path in § 1, since § 2 no longer publishes to npm.
 
 ## Publication candidate?
 
