@@ -2,7 +2,7 @@
 
 *Intended path: `docs/decisions/0035-visibility-is-a-rendering-of-the-record.md`. Draft — not written to the repository.*
 
-- **Status:** PROVISIONAL — the mechanism is forced by ADR-0006; every threshold in it is preferential and unmeasured. EXP-36 decides whether the dial earns more than a `--quiet` flag.
+- **Status:** PROVISIONAL — the mechanism is forced by ADR-0006; every threshold in it is preferential and unmeasured. EXP-42 decides whether the dial earns more than a `--quiet` flag.
 - **Date:** 2026-08-20
 - **Deciders:** Joe Brown (the requirement), Claude Opus 5 (the mechanism)
 - **Inquiry tier reached:** T1 ground — a construction plus published measurements, none of them on this system
@@ -111,9 +111,9 @@ It introduces no agent and no new agent structure, so it introduces no echo. It 
 
 ## Evidence against
 
-**This ADR may be over-engineering a stdout formatter, and that is the most likely way it is wrong.** ADR-0007 decided to *"emit to the reviewer the user already has: git worktrees, branches, pull requests, their editor"*. If acceptance is actually formed in the user's own diff viewer, then the harness's stdout is not where β is decided, the dial moves nothing, and everything here reduces to `--quiet`. That outcome is pre-registered as a stopping rule in EXP-36 rather than left as a caveat. `[asserted]`
+**This ADR may be over-engineering a stdout formatter, and that is the most likely way it is wrong.** ADR-0007 decided to *"emit to the reviewer the user already has: git worktrees, branches, pull requests, their editor"*. If acceptance is actually formed in the user's own diff viewer, then the harness's stdout is not where β is decided, the dial moves nothing, and everything here reduces to `--quiet`. That outcome is pre-registered as a stopping rule in EXP-42 rather than left as a caveat. `[asserted]`
 
-**The level is self-selected, never randomised, so the β stratification can never establish causation.** The requirement is explicitly mood-driven — *"depending on how they feel"* — which confounds level with task difficulty, fatigue, time of day and how much the user already trusts the run. A user who picks `silent` on easy tasks and `firehose` on hard ones will produce a β difference by level that says nothing about visibility. This is the central weakness of §6, it is not fixable by instrumentation, and no result from EXP-36 may be reported as "visibility affects acceptance". `[asserted]`
+**The level is self-selected, never randomised, so the β stratification can never establish causation.** The requirement is explicitly mood-driven — *"depending on how they feel"* — which confounds level with task difficulty, fatigue, time of day and how much the user already trusts the run. A user who picks `silent` on easy tasks and `firehose` on hard ones will produce a β difference by level that says nothing about visibility. This is the central weakness of §6, it is not fixable by instrumentation, and no result from EXP-42 may be reported as "visibility affects acceptance". `[asserted]`
 
 **The takeover-time and resumption-lag literature is named but not held.** It does not appear in `docs/10-research/bibliography.md` and has not been fetched and read here, so under that file's own rule it cannot appear on a `[cited]` line. Everything in §5 that depends on it — the 20-minute threshold, the raised affordability multiplier, the premise that re-entry needs a procedure at all — is `[asserted]`. `[measured]` that the gap exists; `[asserted]` that the design is right. `[asserted]`
 
@@ -158,7 +158,7 @@ Check 8 is the weakest of the nine and is known to be so: it constrains wording 
 
 ## What would overturn this
 
-**EXP-36 · Does the visibility dial change acceptance, and does anyone use it?** `BLOCKED: ADR-0015 Gate A trajectory capture + the dial shipped`
+**EXP-42 · Does the visibility dial change acceptance, and does anyone use it?** *(drafted as EXP-36 on 20 Aug 2026; renumbered the same day — that number had already been issued in the register, and by two other drafts besides. Numbers are allocated in `../10-research/experiment-register.md` and nowhere else.)* `BLOCKED: ADR-0015 Gate A trajectory capture + the dial shipped`
 
 **Decides:** whether the dial earns its configuration surface, or reduces to `--quiet` plus the floor.
 

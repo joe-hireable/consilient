@@ -249,7 +249,7 @@ lowering *true* joint error — which is `ADR-0012`'s dangerous direction, one l
 **(e) A version-differential oracle's true-positive rate is dominated by intended changes.**
 Every real diff produces divergence; that is what a diff *is*. Unless the harness can bound
 the intended blast radius, the oracle degenerates into "this commit changed something",
-which is noise. This is the most likely way the §5 recommendation fails, and EXP-36 is
+which is noise. This is the most likely way the §5 recommendation fails, and EXP-40 is
 designed to fire on it.
 
 **(f) I could not verify most of the numbers I wanted.** §0 and §11.
@@ -323,7 +323,7 @@ Stopping rules and "what it cannot decide" are written here **before any result 
 required. Both are `BLOCKED` on ADR-0015 Gate A — neither may run while the increment is
 observe-only, and neither routes, blocks or accepts anything.
 
-### EXP-36 · Does differential-against-parent-revision produce usable signal, or just "this commit changed something"?
+### EXP-40 · Does differential-against-parent-revision produce usable signal, or just "this commit changed something"?
 
 **Decides:** whether the §5 rank-1 recommendation survives contact with a real diff, and
 whether it can supply β labels. If it fails, the cheapest manufactured oracle available to
@@ -360,7 +360,7 @@ declaration; anything about repositories other than the ones measured; and β it
 the divergence oracle's own false-accept rate is unmeasured — the label yield is a lower
 bound on β, per §8.
 
-### EXP-37 · Does mutation testing rank the checks the same way measured per-check β does?
+### EXP-41 · Does mutation testing rank the checks the same way measured per-check β does?
 
 **Decides:** whether mutation score is usable as a **label-free proxy** for verifier
 strength, which would let this project estimate oracle weakness without waiting for 30 human
@@ -404,7 +404,7 @@ are listed so the next session can spend its search budget well, in priority ord
 3. **Knight & Leveson on correlated failures in N-version programming** — the load-bearing
    citation for the "differential testing cannot catch common faults" column. Unverified.
    [asserted]
-4. **Just et al., FSE 2014, mutant/real-fault coupling** — decides whether EXP-37 is worth
+4. **Just et al., FSE 2014, mutant/real-fault coupling** — decides whether EXP-41 is worth
    running at all. Unverified. [asserted]
 5. **Papadakis et al. on mutation score vs. real fault detection with suite size controlled**
    — the counter-evidence to (4), and must be fetched *with* it. Unverified. [asserted]
@@ -436,7 +436,7 @@ availability", never as a general result. [asserted]
 
 Three ways this note is wrong that I would bet on, in order:
 
-1. **Version-differential drowns in intended change.** EXP-36 is built to detect exactly this
+1. **Version-differential drowns in intended change.** EXP-40 is built to detect exactly this
    and reports it as the primary failure mode rather than a footnote. [asserted]
 2. **The whole framing over-rates automation.** EXP-01's unplanned finding — that a third of
    merges overrode red CI, so the human is the real acceptance gate [measured] — suggests the
@@ -446,7 +446,7 @@ Three ways this note is wrong that I would bet on, in order:
    blind spots correlate with the suite's. §6(c). This is the failure mode that would make the
    project's headline number *look* like it is improving while nothing has. [algebra]
 
-If EXP-36 returns a null, the honest conclusion is that the cheap manufactured oracles are
+If EXP-40 returns a null, the honest conclusion is that the cheap manufactured oracles are
 not available to this repository and β's label supply stays human-bound — which makes
 EXP-01's audit cost, not the harness, the project's binding constraint. That verdict is
 recorded here in advance so it cannot later be narrated as something else. [asserted]
@@ -457,7 +457,24 @@ recorded here in advance so it cannot later be narrated as something else. [asse
 metamorphic testing, differential testing and invariant mining each have mature literature. A
 plausible narrow contribution exists and is not established here: **ranking oracle classes by
 exogeneity of evidence and reporting the resulting β as an explicitly class-restricted lower
-bound.** [asserted] That needs EXP-36 and EXP-37 to return non-null, a primary-source novelty
+bound.** [asserted] That needs EXP-40 and EXP-41 to return non-null, a primary-source novelty
 matrix, and the entire §11 queue promoted to `[FULL]` before it clears G1. [asserted] Under
 the §0 verification state this note cannot be published outside the repository as it stands.
 [asserted]
+
+
+---
+
+## Renumbering note, 20 August 2026
+
+The two experiments drafted above were written as **EXP-36** and **EXP-37**. Both numbers had
+already been taken in `experiment-register.md` — EXP-36 by the behavioural-plugin experiment and
+EXP-37 by the β* competence-curve sweep — so each identifier named two different experiments at
+once, and two cross-references in this file resolved to the wrong one. Found by the review pass
+over the overnight batch. [measured]
+
+They are now **EXP-40** and **EXP-41**. Nothing about either design changed; only the labels.
+
+The rule that prevents a recurrence is in the register: **numbers are allocated in the register
+and nowhere else.** A draft in a research note is a proposal for an experiment, not a claim on an
+identifier — which is exactly the mistake made here, twice, in a single file. [asserted]

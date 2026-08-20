@@ -7,6 +7,31 @@
 - **Executable model:** `../10-research/experiments/probe_delta_ci.py` (probe CI),
   `../10-research/experiments/capability_context_beta_star.py` (correlation correction)
 
+## Update: 2026-08-20 — EXP-07 measured the wasted-work multiplier; nothing here reopens
+
+EXP-07 ran at n=30 and closed (`../10-research/experiments/exp07/findings-exp07.md`). Two
+clauses below rested on it and have been corrected in place: the *Honest counterweight* bullet
+under "Considered and rejected: graph neural networks", and reopen condition 1.
+
+The measured split: single-attempt median **1.69×**, which does not cross the pre-registered
+2× threshold and returns `insufficient_evidence` because two of five pairs are censored;
+best-of-five median **17.95×**, 16.75× when every censored duration is clamped to its applied
+timeout, which does cross. `[measured]` Only the scaffolded arm crosses, so the registered
+finding is that *scaffolding* creates the wasted work rather than the raw local attempt.
+ADR-0003 was **not** reopened. `[measured]`
+
+**Reopen condition 1 still does not fire.** It is conjunctive with roughly 5,000 labelled
+routing outcomes, and `.harness/log/` holds 50 events — 27 in `2026-08-19.jsonl` and 23 in
+`2026-08-20.jsonl` as of 20 August 2026. `[measured]` No part of this ADR's decision changes.
+
+Cutting the other way, and recorded because the counterweight below names it as a condition of
+the rejection: EXP-07's local tier produced **no file edit in any of 25 attempts**, so the
+"non-trivial cheap-tier solve rate" that condition depends on measured zero. `[measured]` That
+is composition-specific — `qwen3:8b` through the Codex `--oss` control path on five fixtures —
+and EXP-31 is running to establish whether it is the model or the composition. It is recorded
+here as a live threat to the counterweight, not generalised, and its placement in the admission
+and β records is owed elsewhere. `[asserted]`
+
 ## Context
 
 New models appear weekly across OpenRouter, Ollama, vLLM, Hugging Face and lab
@@ -118,8 +143,15 @@ the best bandit baseline. Read honestly, it does not fit here:
 - Honest counterweight, so the rejection is not overclaimed: the structural-cost
   argument survives a perfect verifier — a cascade pays the wasted cheap attempt on
   every escalated task, a pre-generation router does not. **The rejection is therefore
-  conditional on cheap verification AND a non-trivial cheap-tier solve rate**, and on
-  EXP-07's wasted-work multiplier staying under 2×.
+  conditional on cheap verification AND a non-trivial cheap-tier solve rate.** The third
+  condition this bullet carried — EXP-07's wasted-work multiplier staying under 2× — has
+  since been measured at n=30 and it splits: single attempt median **1.69×**, which does
+  not cross and returns `insufficient_evidence` because two of five pairs are censored;
+  best-of-five median **17.95×** (16.75× with every censored duration clamped to its
+  applied timeout), which does cross. `[measured]` Only the scaffolded arm crosses, so
+  the wasted work is created by the retry layer rather than by the raw local attempt, and
+  ADR-0003 was **not** reopened. The condition holds for the cheap attempt and fails for
+  the layer above it, which is why it is no longer stated as a single threshold.
 
 **Memory.** ADR-0017's stack (Graphify AST graph; MemPalace temporal entity graph) is
 already graphs — structural, local, training-free. A GNN adds learned embeddings over
@@ -143,7 +175,14 @@ structurally, not from neural machinery.
 **Reopen conditions, concrete:**
 
 1. The trajectory log passes ~5,000 labelled routing outcomes (EXP-03's break-even) —
-   and EXP-07 shows a wasted-work multiplier ≥2×, so prediction starts paying.
+   **and** EXP-07 shows a wasted-work multiplier ≥2×, so prediction starts paying.
+   **This has not fired.** The condition is conjunctive and only its second half is
+   satisfied, and only in part: at n=30 best-of-five measured a median 17.95× (16.75×
+   clamped), which crosses, while the single unscaffolded attempt measured 1.69× and
+   returned `insufficient_evidence`. `[measured]` The first half is three orders of
+   magnitude away — `.harness/log/` holds 50 events (27 in `2026-08-19.jsonl`, 23 in
+   `2026-08-20.jsonl`, 20 August 2026), and they are decision-granularity events, not
+   labelled routing outcomes. `[measured]`
 2. Measured evidence that *retrieval* (not structure) is the memory bottleneck — a
    recall/precision measurement on the user's own log, not a benchmark.
 3. A published learned-router result beating cascade-with-oracle in a domain with cheap

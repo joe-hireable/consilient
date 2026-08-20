@@ -99,6 +99,20 @@ rented PM tools:**
 | 2026-08-20 | The EXP-07 regression suite wrote checkpoints to the production result path and deleted the completed untracked result during test cleanup | once on first post-run verification; general risk per research instrument | isolate every test output in a temporary path and verify the retained result hash before and after the suite |
 | 2026-08-20 | A read-only Opus review consumed about 15,600 reported tokens and six minutes before producing a compact actionable memo | once in the reviewed session; general risk when a reviewer keeps exploring after its evidence delta is already bounded | request a fixed-size decision memo up front and interrupt after two no-delta rounds; reviewer intelligence does not justify unbounded context use |
 
+**Back-filled 20 Aug 2026 from `docs/10-research/exp16-results.md` (Linear leg) and
+`docs/10-research/experiments/exp05/findings-exp05.md`.** These four bit on 19 August and were
+written up a day later, so they are dated when they bit, not when they were written — which is
+precisely the reconstruction § *How to keep it* warns against, and they are marked so a reader
+weights them accordingly. Frequency is the observed count plus the mechanism the risk attaches
+to; neither source states a rate.
+
+| date | manual step | frequency | would be automated by |
+|---|---|---|---|
+| 2026-08-19 | Read a Linear issue back to discover its MCP surface had accepted a write of the nonexistent state `decided` with no error and left the issue at `Done` — ClickUp rejects the identical write loudly, so on Linear the divergence is invisible until something re-reads the record, and a trajectory log would have carried the write as true | once observed on the Linear leg; risk per silently coercing write surface | harness-owned status vocabulary plus a write-then-read-back check; an external projection that cannot fail loudly is not a state store |
+| 2026-08-19 | Hand-encoded "parked awaiting user evidence" as the label `parked-awaiting-user` on HIR-50, because Linear's vocabulary (Backlog / Todo / In Progress / In Review / Done / Canceled / Duplicate) has no such state and its MCP surface exposes no status creation — semantics-in-labels, the same structure theatre as ClickUp's RACI-in-markdown | per decision state the rented tool's vocabulary lacks | typed decision states in the native store (ADR-0006); a label is not a schema |
+| 2026-08-19 | Authenticated the Cursor CLI by hand inside the WSL namespace, separately from the host-side install, before the composition could be exercised at all — `run_all.py` admits Cursor only once `cursor-agent status` reports logged in, so it was absent from the first comparable coding run until that was done | once for Cursor; risk per harness whose login lives in a namespace other than the host's | login state probed per composition *and* per namespace, with installed and authenticated held as separate states (ADR-0027) |
+| 2026-08-19 | Supplied the OpenRouter API key by hand before either OpenRouter composition could be admitted at all, then carried it across the Windows/WSL boundary through the inherited environment for OpenCode, because neither a command-line flag nor a stored OpenCode credential was used | once per provider account per namespace | a broker holding provider credentials once and injecting them per composition and namespace (ADR-0019 territory) — never the command line, never chat |
+
 ## What does not belong here
 
 - Bugs in Claude Code. Those go upstream.

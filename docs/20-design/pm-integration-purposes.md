@@ -91,7 +91,9 @@ recording — that is a calibration datum, not a null.*
   returned to a single writer and serialised — ADR-0006's "SQLite for concurrent
   coordination, single-writer log for the record" reproduced itself in miniature before
   the experiment even ran. `[measured]`
-- (run) The rate-limit half of ADR-0006's case **did not materialise**: 24 concurrent
+- (run) The rate-limit half of the external-tool case **did not materialise** — note that this
+  half was never ADR-0006's, the attribution having been corrected on 20 August 2026 to
+  `../30-source-material/gemini-session-critique.md`: 24 concurrent
   ClickUp writers, ~470 API calls across the run, zero rate-limit responses, zero write
   conflicts. The state-machine half over-delivered: 6/6 Owners hit `Status does not
   exist`. `[measured]`

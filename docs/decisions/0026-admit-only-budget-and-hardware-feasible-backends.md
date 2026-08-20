@@ -44,6 +44,43 @@ that exceeds its recorded cap is a defect in the cap, and is logged as one. [ass
 **What would overturn this.** A bounded task exhausting an allowance despite its cap, which
 would mean the bound was never real and the original blanket exclusion was right. [asserted]
 
+## Update: 2026-08-20 — EXP-07 replicated, and a composition can pass admission and still emit nothing
+
+EXP-07 ran at n=30 on 20 August and settled three things this ADR asserted. [measured]
+
+**The n=1 caution in § *Evidence against* was right, and is recorded as vindicated.** The
+19 August pilot's 5.6× single-attempt wasted-work multiplier did not reproduce: the
+single-attempt median over 30 attempts is 1.69×, three of the five fixtures sit between 1.20×
+and 1.69×, and the pre-registered verdict is `insufficient_evidence` rather than a crossing.
+[measured] The 2× trigger crosses only with the serial best-of-five retry layer, at a clamped
+median of 16.75×. [measured] The bullet has been rewritten to say so rather than to repeat a
+caution that has since been tested.
+
+**ADR-0003 was not reopened.** The § *Consequences* sentence asserting that it "remains reopened
+for EXP-07" is false and has been corrected in place.
+
+**A composition satisfied every admission term in this ADR and produced no artefact at all.**
+The new § *Evidence* bullet records it. The local composition was hardware-feasible, spent
+nothing metered and consumed no subscription headroom — `available(m, x, t)` as written in
+§ *Decision* would have admitted it on all 25 attempts, and it returned no file edit on any of
+them while consuming real tokens throughout. [measured]
+
+That is an admission observation, not a routing one. Routing chooses among candidates; a
+candidate that cannot emit a diff should not be in the set to choose from, and no β-centred
+choice rescues one that is. [asserted]
+
+**What this ADR does not do about it yet, stated rather than implied.** `available(m, x, t)`
+gains no capability term here and no check enforces one, because two inputs are missing:
+whether the floor belongs to the model or to the composition is unestablished — EXP-31 is
+running to decide it — and there is no measured rate at which admitted compositions emit
+nothing, so any threshold set now would be invented. The admission reading above holds under
+either EXP-31 outcome, because the thing admission would exclude is the composition, which is
+what was observed. [asserted]
+
+**What would close it.** EXP-31's result, plus an emit/no-emit outcome recorded per dispatch in
+the trajectory log, which would supply the rate a threshold needs. Until both exist, this is a
+named gap in the admission predicate and not a rule. [asserted]
+
 ## Context
 
 The first comparable backend run produced two frontier successes in 20.4–25.6 seconds and
@@ -179,6 +216,16 @@ formats, and verify a published content hash when one is available. [asserted]
 
 - `[measured]` EXP-05 separated backend process completion from verifier acceptance and
   measured a 4.5–5.6× latency penalty for one failed local attempt.
+- `[measured]` EXP-07 (n=30, 20 August) recorded a composition that satisfied every admission
+  term in this ADR and still produced nothing. `qwen3:8b` served by Ollama through the Codex
+  `--oss --local-provider ollama` control path, at its Ollama default reasoning mode, against
+  the five frozen EXP-07 fixtures and the functional-plus-changed-file verifier, returned
+  `changed_files: []` on all 25 attempts; one rejected run spent 30,243 input and 10,664 output
+  tokens to change nothing. This is recorded as a property of **that composition**, not of a
+  tier or a parameter count: which component carries the floor — the model, the `--oss` control
+  path, the reasoning mode or the fixtures — is not established by EXP-07, and EXP-31
+  substitutes `gemma4:31b` into the identical composition to decide it. The admission reading
+  in the 20 August update does not depend on that answer.
 - `[measured]` Claude Code 2.1.235, Codex 0.148.0 and Cursor CLI 2026.08.11 were inspected
   locally. Codex's authenticated app-server returned structured rate-limit windows; Cursor
   exposed no individual-usage field in its installed command surface.
@@ -223,8 +270,12 @@ formats, and verify a published content hash when one is available. [asserted]
 - `[cited]` Hardware estimators are predictions. CPU offload can make a model technically
   runnable when a GPU-resident policy rejects it, and new architectures can invalidate
   catalogue assumptions.
-- `[measured]` The backend wasted-work result is n=1 on one trivial ticket. It raises
-  EXP-07's priority but does not establish a general 5× multiplier.
+- `[measured]` The n=1 caution recorded here — one trivial ticket, no general 5× multiplier —
+  was vindicated. EXP-07 replicated at n=30 on 20 August and the pilot's headline figure did
+  not reproduce: the single-attempt median is 1.69×, with three of five fixtures between 1.20×
+  and 1.69×, and the pre-registered verdict is `insufficient_evidence`. The trigger crosses only
+  with the serial best-of-five retry layer, so the wasted work is created by the scaffolding
+  rather than by the raw local attempt being slow.
 - `[asserted]` Failing closed can strand paid subscription capacity and reject a local
   model that would have run.
 
@@ -241,8 +292,11 @@ exposes an individual quota API or EXP-21 validates the fallback. [asserted] Fai
 behaviour can leave useful capacity idle. [asserted]
 
 **Neutral but load-bearing** — ADR-0002 still decides which feasible backend is safe;
-ADR-0026 decides which backends are feasible. [asserted] ADR-0003 remains reopened for
-EXP-07 rather than being overturned by one comparison. [asserted]
+ADR-0026 decides which backends are feasible. [asserted] ADR-0003 was **not** reopened by
+EXP-07: the pre-registered rule was applied at n=30 and the single-attempt multiplier did not
+cross its trigger, so ADR-0003 stands unchanged. [measured] Neither outcome would have moved
+this ADR, which removes actions before ADR-0002's safety surface is evaluated at all.
+[asserted]
 
 ## Enforcement
 

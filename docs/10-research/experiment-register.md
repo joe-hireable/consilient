@@ -10,6 +10,21 @@ decision. An experiment with no stopping rule is not an experiment, it is data c
 
 Status: `READY` (runnable now) · `BLOCKED` (needs harness component X) · `DONE`.
 
+**Numbers are allocated here and nowhere else.** A design drafted in a research note or an ADR
+is a proposal for an experiment, not a claim on an identifier.
+
+On 20 August 2026 **EXP-36 named three different experiments at once** — the behavioural-plugin
+sweep registered here, a differential-against-parent-revision design drafted in
+`manufacturing-oracles.md`, and the visibility-dial experiment drafted in ADR-0035 — and EXP-37
+named two. All five were written the same night by the same author, hours apart, each taking the
+next number that looked free from wherever it happened to be reading. Two cross-references
+resolved to the wrong experiment. [measured] The drafts are now EXP-40, EXP-41 and EXP-42; the
+register's own entries were not moved.
+
+**The check, before writing any new entry:** take the highest number in this file, then run
+`grep -rn "EXP-[0-9]" docs/` and confirm the next one is genuinely unused. The first step alone
+is what produced all three collisions — it is the step that feels sufficient and is not.
+
 ---
 
 ## Runnable today — no harness required
@@ -44,9 +59,13 @@ size 1, pinned model revision by hash, pinned engine version.
 **Stopping rule:** either direction is publishable. **A null result is the expected outcome
 and is the more valuable paper** — see `../publications/README.md` C2.
 
-### EXP-03 · Are per-check β values independent? `READY`
+### EXP-03 · Are per-check β values independent? `BLOCKED: EXP-01 label quality`
 **Decides:** whether ADR-0012's lower-bound product is usable as a prior at low sample size.
-**Precondition:** EXP-01 output.
+**Precondition:** EXP-01 **label quality**, not EXP-01 output. Audited hotfix-label precision
+is 1/15 on both repositories [measured], so pairwise dependence computed on those labels
+measures the labelling heuristic and not the checks. The precondition is therefore the
+reference-based relabelling and the full audit of all flagged pairs named in
+`experiments/exp01/findings-exp01.md` § *Next steps*, not EXP-01's first pass.
 **Procedure:** on artefacts with known-bad outcomes, compute pairwise conditional
 dependence between check verdicts.
 **Stopping rule:** near-independence → the product becomes a usable prior; strong dependence
@@ -58,7 +77,50 @@ Closed Q3. β* invariant to the difficulty distribution; closed form
 `experiments/q3_bimodal_and_q2_sample_complexity.py`.
 **Residual:** the closed form assumes logistic (Rasch/1PL) competence. **Not yet tested
 under a non-logistic competence curve** — that is the remaining exposure and is worth one
-more sweep.
+more sweep. **Registered 20 Aug 2026 as EXP-37**, below; until then the residual was an
+intention with no stopping rule, which this register's opening rule calls data collection.
+
+### EXP-37 · Does β* survive a non-logistic competence curve? `READY` (registered 20 Aug 2026)
+**Decides:** the residual EXP-04 left open — whether ADR-0002's closed form
+β* = (1−α)·e^(−kΔ) is safe to use as the routing threshold when competence is *not*
+Rasch/1PL, and whether ADR-0002's headline consequence (β* invariant to the difficulty
+distribution) is a property of the cascade or an artefact of the link function. ADR-0002 says
+so itself: *"the result is exact given logistic competence … not free of functional-form
+assumptions, only free of distributional ones."*
+**Precondition:** none. Extends `experiments/q3_bimodal_and_q2_sample_complexity.py`; no GPU,
+no provider, no metered call.
+**Procedure:** hold EXP-04's difficulty distributions fixed (unimodal Beta(2,2) and the
+bimodal mixtures from 30% to 90% easy) and its Δ grid fixed, and recompute the zero-advantage
+threshold numerically from Δ(d) = p_c(1−α)(1−p_f) − p_f(1−p_c)β under four competence
+curves that are not 1PL: (a) a normal-ogive/probit link; (b) 2PL with **unequal slopes**
+between the cheap and frontier tiers — the case in which *d does not cancel*, and the decisive
+one; (c) 3PL with a guessing floor c > 0, i.e. a cheap tier that sometimes passes the checks by
+luck; (d) a heavy-tailed link. Fixed seed; the curve parameters and the grid are written into
+the script **before** it is run and are not tuned afterwards.
+**Measures:** β*_true minus β*_closed at every grid point, with its sign; the fraction of the
+grid on which β*_closed **exceeds** β*_true, which is the unsafe direction (the closed form
+would licence routing that is not in fact advantageous); and the spread of β*_true across the
+difficulty distributions at fixed Δ, which is the invariance claim itself.
+**Stopping rules (fixed before the run):**
+- Tolerance is **0.01 absolute**, chosen because EXP-04 measured β* moving by ≤ 0.003 across
+  distributions, so 0.01 is comfortably above the wobble that sweep already showed and below
+  the smallest β* on the grid. It is fixed now so that a marginal excursion cannot be argued
+  down afterwards.
+- If max(β*_closed − β*_true) ≤ 0.01 across all four curves, the closed form is safe as
+  written, the EXP-04 residual is **closed**, and ADR-0002 gains a dated update saying so.
+- If it exceeds 0.01 anywhere, ADR-0002 must either carry a stated safety margin equal to the
+  measured worst case or state logistic competence as a **precondition on use** rather than a
+  remaining exposure. Which of the two is a judgement; that it must do one is not.
+- If β*_true varies by more than 0.01 across the difficulty distributions at fixed Δ under any
+  curve, then distribution-invariance is conditional on Rasch and ADR-0002's most important
+  sentence must be restated that way. **This is the result that would change a decision.**
+- A null result — all four curves inside tolerance — is the expected outcome and closes the
+  residual. Record it; do not add curves until one breaks.
+**What it cannot decide:** which competence curve real models actually follow — that needs
+measured success-versus-difficulty data per model, which is EXP-17 and EXP-20 territory and no
+simulation can supply it; the value of β on any repository; and whether α is itself
+difficulty-dependent, which is a separate assumption this sweep does not touch. Every number
+this produces is `[simulated]` and answers "does the answer flip, and where?" only.
 
 ---
 
@@ -170,6 +232,25 @@ is the registered next step. Synthetic fixtures can replicate the latency mechan
 that a learned router improves real work; that requires a separate policy comparison on
 real trajectories. [asserted]
 
+**Instrument repair owed, added 2026-08-20 — a precondition of the next duration-dependent
+registration.** The agent timeout overran its 240 s deadline by 9.8, 20.6, 21.6, 50.5, 53.2 and
+269.3 seconds across the six censored runs, because `subprocess.run(timeout=…)` kills the direct
+child while Codex descendants hold the pipes open; a censored duration is therefore inflated by an
+unbounded amount. [measured] Withholding the fix after seeing this run's result was correct and
+stays correct. It is now **owed**: no experiment whose stopping rule depends on a measured
+duration may be registered until the runner kills the whole process tree. The defect is shared by
+`experiments/exp07/run_exp07.py` (~line 329) and `experiments/exp31/run_exp31.py` (~line 157).
+EXP-31 is exempt because it was already under way when this was written, and it mitigates by rule
+— only a crossing may be concluded from censored data, and `timeout_overrun_s` is recorded
+explicitly. Mitigation is not repair. [asserted]
+
+**The check that would enforce this does not exist, and this is recorded rather than implied.**
+The repair ships with it in the same commit or not at all: a test in
+`experiments/exp07/test_run_exp07.py` that runs an agent command which spawns a descendant
+outliving its parent, drives the timeout path, and asserts both that the descendant is dead
+afterwards and that the recorded duration is within a fixed tolerance of the applied timeout.
+Until that test exists this paragraph is a promise, not an invariant. [asserted]
+
 ### EXP-08 · Critic recall `BLOCKED: critic tier`
 **Decides:** the parallelism ceiling in ADR-0007, and whether CLI-only survives.
 **Procedure:** run a local 14B as a diff critic over historical PRs with known outcomes.
@@ -267,10 +348,16 @@ points rejects the fixed count/form as habituating; fewer than 20 outcome-known 
 insufficient data. [asserted] Any third challenge or second challenge without a new fact is
 an invariant failure, not an experiment outcome. [asserted]
 
-### EXP-16 · Prototype the meeting layer on external PM tools; measure their friction directly `READY`
-**Decides:** two live claims at once. (1) ADR-0006's grounds for a *native* ticket store —
-that external PM tools "impose human-shaped state machines, human-shaped rate limits, and a
-webhook round-trip on every state change" — currently `[asserted]`, never measured. (2)
+### EXP-16 · Prototype the meeting layer on external PM tools; measure their friction directly `DONE 19 Aug 2026 — see exp16-results.md; rules 3 and 4 applied, rule 1 parked on Joe's blind grading, rule 2 undecidable in this design`
+**Decides:** two live claims at once. (1) The grounds for a *native* ticket store — that
+external PM tools "impose human-shaped state machines, human-shaped rate limits, and a webhook
+round-trip on every state change" — at the time `[asserted]` and never measured.
+**Attribution corrected 20 August 2026:** that sentence was attributed here to ADR-0006, and
+ADR-0006 does not contain it and never did. It originates in
+`../30-source-material/gemini-session-critique.md` lines 105–106, describing the Gemini
+"Symphony" Linear-polling design. [measured] The experiment was worth running and its result
+stands; the claim it tested simply belonged to a different document. ADR-0006 may not be cited
+for a rate-limit or webhook argument. (2)
 ADR-0020's claim that Owner-led meetings beat both a single agent and free-form group
 discussion. This is **EXP-14 run early and cheaply on rented infrastructure**, with arm (c)
 changed from consensus-vote to free-form Slack discussion — the relay structure the MIT
@@ -727,7 +814,7 @@ verified success and accepted different-class facts per additional session.
 - The pilot can authorise a larger cross-model/cross-harness replication, not a universal
   paper claim. [asserted]
 
-### EXP-30 · Usable context for senior and middle-management orchestration `BLOCKED: frozen fixtures + OpenRouter hard cap`
+### EXP-30 · Usable context for senior and middle-management orchestration `BLOCKED: frozen fixtures. The hard cap gates the OpenRouter arm only — the 20 Aug 2026 Cursor probe unblocks the middle-management arm without one`
 **Decides:** ADR-0030 — whether Opus 5 earns the senior-orchestrator default, whether
 OpenRouter Gemini 3.7 Flash at high effort earns a bounded middle-management role and
 whether full-history context beats a compact manifest with retrieval.
@@ -975,7 +1062,7 @@ not measured here; whether it helps on tasks unlike the fixtures; and whether an
 survives the specific model and harness tested, since ADR-0027 keeps compositions separate.
 [asserted]
 
-### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `READY: blocked only while EXP-07 holds the GPU`
+### EXP-31 · Local 30B-class qualification against the frozen EXP-07 fixtures `IN PROGRESS 20 Aug 2026 — EXP-07 exited and released the GPU; results-exp31.json records complete: false`
 **Decides:** whether EXP-07's wasted-work multiplier and its reopening of ADR-0003 are
 specific to `qwen3:8b`, or survive substituting the largest installed local model. Supplies a
 free capability floor for the local tier and a zero-cost prior for EXP-29's scope question.
@@ -1055,6 +1142,106 @@ unmeasured and a passed artefact is only *verifier-accepted*; anything about fro
 since none is called; generalisation to real repositories from five synthetic fixtures; and
 whether a learned router improves real work, which EXP-07's own limitation already excludes.
 [asserted]
+
+### EXP-38 · Shared context at three or more relay stages, free-form versus structured `BLOCKED: Slack workspace + a held-out question bank` (registered 20 Aug 2026)
+**Decides:** EXP-16 stopping rule 2, in the regime that rule was actually about. EXP-16 recorded
+that it **cannot** decide the rule as run: with evidence partitioned across participants, Arm C
+was never the structure the delegation theorem (Ao, Gao & Simchi-Levi, arXiv:2603.26993)
+punishes. `exp16-results.md` § *Recommended follow-ups* is explicit that this must precede any
+ADR-0020 supersession, so ADR-0020 stays PROPOSED until this runs or is struck.
+**Why one entry and not two.** This merges follow-ups 2 (shared-context Arm C′) and 4
+(structured-relay Slack, the paper's Bpost analogue) from `exp16-results.md`. They share a
+setup, and neither can conclude alone: a shared-context free-form arm with no structured
+comparator **at the same relay depth** cannot attribute a difference to structure, which is the
+only thing ADR-0020 claims.
+**Precondition:** the `consilience-exp16` Slack **channel** (`C0BRCQY2MED`), connected (it is,
+19 Aug 2026) — a channel in the Hireable workspace, not a workspace of its own; and a
+**held-out question bank** — 12 questions about this repository's own evidence base that have a
+recorded, checkable answer (which stopping rule fired, which ADR a result supersedes, which
+figure replicated), with the answers withheld from every participant. This substitutes decidable
+questions for the open design decisions EXP-16 used, deliberately: the theorem is about accuracy
+under relay, not preference, and Joe's blind grading budget is already committed to the EXP-16
+pack and must not be spent twice.
+**Procedure:** three arms over the same 12 questions, presentation order randomised, context
+reset per question, every event to the append-only trajectory JSONL (a turn absent from the log
+does not count). **A′** one agent holding the whole evidence pack — the theorem's centralised
+comparator. **B′** structured relay: the same pack shared to all participants, answers passed
+through at least three relay stages in the ADR-0020 format (declared class, provenance, dissent
+preserved), Owner decides alone. **C′** the same shared pack, same relay depth, free-form Slack
+threads, no chair, decision by whatever emerges. Hard turn and token caps per arm; the caps are
+recorded, and coordination overhead is reported rather than equalised, as in EXP-16.
+**Measures:** per-arm accuracy against the withheld answers, paired by question; measured relay
+depth (distinct agents an answer actually passed through before the decision); new-information
+versus restatement fraction; tokens; wall-clock; and, in B′, declared-evidence-class violations.
+Self-reported confidence is excluded.
+**Stopping rules (fixed before the run):**
+- **Primary, C′ against A′, n=12 paired.** A′ ahead by **≥ 3 of 12** reproduces the punished
+  regime and resolves EXP-16 rule 2 in favour of ADR-0020's premise. C′ **level with or ahead
+  of** A′ (within 1) means the theorem does not punish this structure as ADR-0020 claims; the
+  ADR's justification is wrong and must be restated or cut — say so, do not soften it. Any
+  other split is `insufficient evidence`, fixed now so a two-question gap cannot be narrated
+  into a finding.
+- **Secondary, B′ against C′ at the same depth.** B′ ahead by ≥ 3 of 12 is the Bpost effect
+  reproducing and is the **only** result that licences keeping the structured-relay machinery.
+  B′ within 1 of C′ means structure does not rescue the punished regime, and the machinery is
+  cut whatever the primary rule says.
+- **Manipulation check, and it can void the run.** If measured relay depth is below 3 in any
+  arm, that arm is void and re-run — a nominal three-stage design that collapses to two cannot
+  test the regime. If the shared-context arms show a new-information fraction the shared pack
+  cannot account for, the context was not in fact shared and the run is void.
+- No efficacy peeking; report all 12. A re-run after seeing outcomes is a new experiment
+  requiring a new registration.
+**What it cannot decide:** whether Owner-led meetings help on **preferential** questions — that
+is Joe's blind grading of the existing 18 decisions and nothing here substitutes for it;
+ADR-0020's authority matrix, which is a separate claim with separate evidence; cross-model
+robustness, since all participants remain one model family, the same limitation
+`exp16-results.md` records; and β.
+
+### EXP-39 · Is the three-signal Antigravity admission rule observable and sufficient? `BLOCKED: a readable plan/quota payload` (registered 20 Aug 2026)
+**Decides:** whether ADR-0026's admission evidence may carry the three-signal rule that
+`experiments/exp05/findings-exp05.md` states as `[asserted]` — that admitting an Antigravity
+composition requires **all three** of a fresh plan/quota snapshot, a successful structured
+execution probe and `useG1Credits=false`. EXP-05 already measured that model discovery alone is
+insufficient: `agy models` returned eleven models through a saved Google identity while a
+structured print-mode probe failed before inference with zero tokens. [measured] What is
+unmeasured is whether the other two signals catch anything the execution probe does not, and
+whether the quota signal can be read at all.
+**Precondition:** Antigravity CLI 1.1.15 installed and authenticated (it is, 19 Aug 2026); the
+live status payload Google documents — plan tier, remaining fractions, reset fields — reachable
+from the CLI or a supported local surface. That payload is currently `[cited]` and has never
+been observed here, which is why this entry is BLOCKED rather than READY: a rule cannot require
+a signal nobody has read.
+**Procedure:** in order, and stop at the first failure. (1) Read the settings file and confirm
+`useG1Credits=false`; a true value stops the experiment before any probe, because the run must
+not be able to spend AI-credit overage. (2) Read the plan/quota payload and record it verbatim.
+(3) Run the same structured print-mode probe EXP-05 used, unchanged, on the same trivial public
+fixture, at most **10 attempts across at most 2 sessions**, stopping at the first success.
+Record provider, model, effort, harness, usage fields where exposed, artefact change and exit
+condition for every attempt.
+**Measures:** whether each of the three signals is observable at all; the probe's success rate
+over the capped attempts; and, for each signal, whether it would have rejected a composition the
+other two would have admitted — which is the only thing that justifies a three-part rule over a
+one-part one.
+**Stopping rules (fixed before the run):**
+- All three signals observable **and** a structured probe succeeds while the snapshot shows
+  headroom and the switch is false → the rule is satisfiable, and it may be recorded in
+  ADR-0026's admission evidence as `[measured]` **for this composition only**. Antigravity is
+  still not admitted to unattended routing by this alone.
+- The documented payload cannot be read from any supported local surface within the capped
+  effort → the quota signal is **not obtainable**, and ADR-0026 must not require it. A rule that
+  names a signal the instrument cannot read is a declaration, not a rule — the defect EXP-31
+  records for its own out-of-repository write rule. Drop it to a two-signal rule and say why.
+- No structured probe succeeds within 10 attempts → Antigravity stays excluded and the rule is
+  **untestable rather than validated**. Record `insufficient evidence`; do not read repeated
+  failure as the rule working.
+- Any signal that never rejects anything the execution probe would not have rejected on its own
+  is redundant and is cut. A three-part admission rule that is really a one-part rule is
+  ceremony.
+- `useG1Credits` true at step 1, or any metered call resolved into the command, stops the run.
+**What it cannot decide:** anything about Antigravity's coding quality, since no scored task
+runs; whether the rule generalises to other subscription-gated harnesses — ADR-0027 makes each
+composition its own accounting unit, and Google-plan Antigravity, direct Gemini API access and
+OpenRouter/Gemini stay separate even when they select the same model family; and β.
 
 ### EXP-19 · Feedback-prompt completion rate over time `BLOCKED: feedback prompts (v1+)`
 **Decides:** whether the outcome-feedback friction budget
