@@ -1,6 +1,7 @@
 # 0031. Implement v0 in Python, with a stdlib-only core
 
-- **Status:** PROVISIONAL — the distribution question is Joe's and is not decided here
+- **Status:** ⛔ SUPERSEDED by [0032](0032-single-language-python-for-the-orchestrator.md), 20 Aug 2026 — same
+  answer, properly evidenced, and the distribution question is now closed
 - **Date:** 2026-08-20
 - **Deciders:** Joe Brown (approval of the specification), Claude Opus 5 (this choice)
 - **Inquiry tier reached:** T1 ground — a reversibility argument, not a measurement

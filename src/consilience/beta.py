@@ -13,20 +13,22 @@ from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass, field
-from typing import Iterable
+from typing import Iterable, Literal, assert_never
 
 # Below this many human rejections there is no interval worth showing. ADR-0002 puts verifier
 # calibration at 50-200 labels; 30 is the floor for reporting anything at all and is
 # [asserted], not derived.
 MIN_REJECTIONS = 30
 
-INSUFFICIENT = "insufficient_data"
-MEASURED = "measured"
+Verdict = Literal["measured", "insufficient_data"]
+
+INSUFFICIENT: Verdict = "insufficient_data"
+MEASURED: Verdict = "measured"
 
 
 @dataclass(frozen=True)
 class Beta:
-    verdict: str
+    verdict: Verdict
     task_family: str | None
     verifier_version: str | None
     n_rejected: int
@@ -76,20 +78,25 @@ class Beta:
             " / ".join(x for x in (self.task_family, self.verifier_version) if x)
             or "all"
         )
-        if self.verdict == INSUFFICIENT:
-            return (
-                f"beta [{scope}]: insufficient data "
-                f"({self.n_rejected} human rejections, need {MIN_REJECTIONS})"
-            )
-        # __post_init__ guarantees both are present for a measured verdict. Restating it
-        # here is what lets the checker prove it rather than take our word for it.
-        assert self.point is not None and self.interval is not None
-        low, high = self.interval
-        return (
-            f"beta [{scope}]: {self.point:.3f} [{low:.3f}, {high:.3f}] "
-            f"from {self.n_false_accept}/{self.n_rejected} rejections "
-            f"— lower bound on a joint human-plus-checks error"
-        )
+        match self.verdict:
+            case "insufficient_data":
+                return (
+                    f"beta [{scope}]: insufficient data "
+                    f"({self.n_rejected} human rejections, need {MIN_REJECTIONS})"
+                )
+            case "measured":
+                # __post_init__ guarantees both are present. Restating it here is what
+                # lets the checker prove it rather than take our word for it.
+                assert self.point is not None and self.interval is not None
+                low, high = self.interval
+                return (
+                    f"beta [{scope}]: {self.point:.3f} [{low:.3f}, {high:.3f}] "
+                    f"from {self.n_false_accept}/{self.n_rejected} rejections "
+                    f"— lower bound on a joint human-plus-checks error"
+                )
+            case _:
+                # A verdict added without handling it here fails the type check, by name.
+                assert_never(self.verdict)
 
 
 def wilson(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:
