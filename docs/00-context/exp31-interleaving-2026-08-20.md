@@ -505,3 +505,62 @@ budget and stopping rules are unchanged and were not touched. If the verdicts co
 same session voided. The instrument changed between them, which is exactly why the earlier data
 cannot be pooled with this — and pooling it would be the outcome-aware move the project has
 refused three times. The two capped datasets stay outside the evidence base.
+
+
+---
+
+# The lock I shipped to prevent this had the same class of bug, and it was live for eight minutes
+
+Eight minutes after starting the clean re-run I looked at the experiment directory and **the lock
+file was gone**, while the run was still going. [measured]
+
+The cause is mine and it is embarrassing in a useful way. To verify the lock worked I deliberately
+launched a second runner. It refused, correctly, printing the holder's pid and age — and then ran
+`release_lock()` in its `finally` block and **deleted the lock it had never acquired**.
+
+```python
+def release_lock() -> None:
+    try:
+        LOCK.unlink(missing_ok=True)   # no ownership check
+    except OSError:
+        pass
+```
+
+So the act of *testing* the protection removed it, and a three-hour run sat unprotected by the
+mechanism written that morning to protect it. **A release that does not check ownership is not a
+release; it is a free deletion.**
+
+## Why the tests did not catch it
+
+There were five, and they passed. Every one of them released the lock **from the holder**. Not one
+exercised release from a process that had been refused — which is the only path where ownership
+matters. [measured]
+
+That is the same shape as the V0-18 fixture defect found last night: *a suite that only ever
+constructs the legitimate case cannot see the illegitimate one.* Twice in twelve hours, in
+different code, by the same author. It is worth stating as a rule rather than a coincidence:
+**a test that only exercises the happy path of a guard is a test of the guard's happy path, not
+of the guard.**
+
+## Fixed
+
+`release_lock()` now reads the lock and returns unless `held["pid"] == os.getpid()`. Two tests
+added: one asserts a refused runner leaves the live lock intact, one asserts the holder can still
+release. Seven tests now, all passing.
+
+The live run's lock was restored by hand with its original `pid`, `run_id` and `started_epoch`, so
+the age check stays true, plus a note recording that it was rewritten.
+
+## A second gap in the same fix, found while looking at the first
+
+The `run_id` was stamped into the **final** payload and the infeasible-VRAM payload, but **not into
+the per-attempt checkpoints**. So during a run — precisely when an interleaving would be happening
+— the file carried no run identity at all. The identifier existed only once the run was over,
+which is exactly too late. [measured] Checkpoints now carry `run_id` and an explicit
+`stop_reason: null`.
+
+**Neither fix affects the run now in flight**, which imported the module at 08:59. That is the
+near-miss lesson from earlier applied in the other direction: editing a file does not change a
+running process, so this run's checkpoints will lack `run_id` and its release will use the old
+unconditional code. Recorded here so the gap in *this* run's artefacts is expected rather than
+discovered.

@@ -137,3 +137,43 @@ def test_a_corrupt_lock_does_not_wedge_the_runner(tmp_path, monkeypatch):
     lock.write_text("{not json", encoding="utf-8")
     assert run_exp31.acquire_lock("run-new", cap_s=3600) is True
     run_exp31.release_lock()
+
+
+
+def test_a_refused_runner_does_not_release_the_lock_it_never_held(tmp_path, monkeypatch):
+    """The defect that shipped and was live for eight minutes.
+
+    A second launch refused correctly, then called release_lock() in its `finally` and deleted
+    the lock held by the running process — leaving a three-hour run unprotected by the
+    mechanism written to protect it. The earlier tests only ever released from the holder, so
+    they could not see it. A release that does not check ownership is a free deletion.
+    """
+    import run_exp31
+
+    lock = tmp_path / "run.lock"
+    monkeypatch.setattr(run_exp31, "LOCK", lock)
+
+    # A different process holds it.
+    lock.write_text(
+        json.dumps(
+            {"pid": os.getpid() + 1, "run_id": "live-run", "started_epoch": time.time()}
+        ),
+        encoding="utf-8",
+    )
+
+    assert run_exp31.acquire_lock("second-launch", cap_s=3600) is False
+    run_exp31.release_lock()
+
+    assert lock.exists(), "a refused runner deleted the live runner's lock"
+    assert json.loads(lock.read_text(encoding="utf-8"))["run_id"] == "live-run"
+
+
+def test_the_holder_can_still_release(tmp_path, monkeypatch):
+    """The ownership check must not prevent the legitimate release."""
+    import run_exp31
+
+    lock = tmp_path / "run.lock"
+    monkeypatch.setattr(run_exp31, "LOCK", lock)
+    assert run_exp31.acquire_lock("mine", cap_s=3600) is True
+    run_exp31.release_lock()
+    assert not lock.exists()

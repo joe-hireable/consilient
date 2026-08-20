@@ -189,6 +189,22 @@ def acquire_lock(run_id: str, cap_s: int) -> bool:
 
 
 def release_lock() -> None:
+    """Release the lock only if this process holds it.
+
+    The first version unlinked unconditionally, and it was wrong within minutes of shipping.
+    A second launch correctly *refused* to start, then ran this in its `finally` and deleted
+    the lock held by the live runner — leaving a three-hour run unprotected by the very
+    mechanism written to protect it. Found by reading the directory, not by the tests, which
+    only ever exercised release from the holder.
+
+    A release that does not check ownership is not a release; it is a free deletion.
+    """
+    try:
+        held = json.loads(LOCK.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if held.get("pid") != os.getpid():
+        return
     try:
         LOCK.unlink(missing_ok=True)
     except OSError:
@@ -433,7 +449,13 @@ def main() -> int:
                 RESULTS.write_text(
                     json.dumps(
                         {
+                            # run_id on every checkpoint, not only on the final payload.
+                            # The first version stamped it at the end, which is precisely when
+                            # an interleaving is too late to see: the 20 Aug incident was only
+                            # detectable because a VRAM probe happened to differ.
+                            "run_id": run_id,
                             "complete": False,
+                            "stop_reason": None,
                             "probe": probe,
                             "limitations": LIMITATIONS,
                             "runs": runs,
