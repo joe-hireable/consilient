@@ -1526,6 +1526,87 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
 - Higher-order multi-point semantic failures not captured by single-mutant operators.
 
+### EXP-56 · Per-model β on a label-free corpus, and the CEILING on what routing can buy `READY`
+**Pre-registered 20 Aug 2026. Not run.** Flagship of the routing programme.
+**Decides:** which model family should do which task — and, before that, whether the question has an
+answer worth acting on. ADR-0003 (no learned routing policy in v0) was decided on argument; this
+measures it.
+**The asset that makes this possible, and it is unusual.** Joe holds flat-fee access to **204
+models** through one Cursor subscription. Per-token pricing is why cross-model studies at this
+breadth are normally not run; here the marginal cost of the 200th model is wall-clock, not money.
+That is a genuine research position and it should be spent on the question nobody else can afford
+to ask.
+**The design's one real idea — measure the CEILING, do not build a router.**
+A router cannot beat the best possible assignment of items to models. So construct the
+**hindsight-optimal router**: for every item, retrospectively pick the model that got it right.
+That is an upper bound no real router can exceed, and it is computable from the same runs that
+produce the per-model rates. **If the ceiling does not clear the best single model, no router can,
+and the routing question is closed without a router ever being written.**
+**Corpus:** EXP-47's 1,931 first-order mutants (bad by construction, mechanical ground truth, no
+human labels) plus unmutated controls (good by construction). Reuses the EXP-08 critic seam.
+**Sample, fixed before the run:** 16 models stratified across families (Anthropic, OpenAI, Google,
+xAI, Moonshot, Zhipu) and effort tiers, at **n = 120 items each** — 60 mutated, 60 control. At
+β ≈ 0.3 that gives a Wilson half-width near ±0.09, enough to separate families that differ by more
+than 20 points and honestly insufficient to separate near-neighbours. **That limitation is accepted
+in advance rather than discovered afterwards.**
+**Measures:** per-model β and α with Wilson intervals; per-model wall-clock and token cost;
+the hindsight-optimal ceiling and its interval; agreement matrix between every model pair; and the
+**variance across models**, which decides whether the routing question is live at all.
+**Stopping rules (fixed before the run):**
+- If the hindsight-optimal ceiling's interval **overlaps the best single model's** $\implies$
+  **routing cannot improve quality on this task class.** ADR-0003 is vindicated on evidence, and the
+  harness should route on cost, availability and headroom — never on predicted quality. [asserted]
+- If the ceiling beats the best single model with **non-overlapping intervals** $\implies$ routing
+  has measurable headroom, and the gap is the entire prize available to any router. Report the gap,
+  not a router. [asserted]
+- If per-model β spans **less than 10 percentage points** across all 16 $\implies$ **model choice
+  does not matter for this task** and the routing question is moot here regardless of the ceiling.
+  This is the outcome that would most embarrass the premise and it must be reported first if it
+  occurs. [asserted]
+- If any model refuses or fails on more than 20% of items, it is reported as **unusable for this
+  task** rather than scored, because a refusal is not a wrong answer. [asserted]
+**What it cannot decide:** anything about tasks unlike accept/reject on a small mutated diff.
+Long-horizon planning, open-ended design and multi-file refactoring are exactly where routing is
+usually claimed to matter, and this corpus says nothing about them. **State that before the
+numbers.**
+
+### EXP-57 · The marginal value of context — does more context buy accuracy, or cost? `READY`
+**Pre-registered 20 Aug 2026. Not run.**
+**Decides:** whether just-in-time context engineering is worth building. Joe asked for
+"dynamic/just-in-time prompting/context engineering"; this asks first whether context volume
+changes the answer at all.
+**Why it is worth running rather than assuming.** EXP-45 measured condensation retention at
+**40.71%** with consequential loss of **0.00%** [measured] — most of what was dropped was not
+load-bearing. And Grok's first authenticated run spent **33,344 input tokens** answering *"reply
+with the single word: ok"* [measured]. Both point the same way and neither measures the thing
+directly.
+**Design — four arms, same items, same model, context volume the only variable:**
+
+| arm | what the model sees |
+|---|---|
+| **minimal** | the diff alone |
+| **relevant** | the diff plus the tests that cover it |
+| **full** | the diff plus the whole source tree |
+| **padded** | full, plus a fixed body of confidently irrelevant material |
+
+**Measures:** β and α per arm with Wilson intervals; input tokens per arm; and the interval on each
+pairwise difference, because a difference whose interval spans zero is not a difference.
+**Stopping rules (fixed before the run):**
+- If **minimal ≈ full** $\implies$ context volume is cost without benefit on this task, and
+  just-in-time context engineering is worth building for the cost saving alone. [asserted]
+- If **full materially beats minimal** $\implies$ **the premise is wrong**: send everything, and
+  build nothing. This outcome contradicts what Joe asked for and must be reported as loudly as the
+  other. [asserted]
+- If **padded is worse than full** $\implies$ irrelevant context actively degrades the answer. That
+  is context poisoning with an interval on it, and it makes retrieval quality a correctness concern
+  rather than a cost one. [asserted]
+- If all four arms overlap $\implies$ **insufficient power**; report the intervals and do not
+  narrate a trend across overlapping bars. [asserted]
+**What it cannot decide:** whether the effect holds for tasks whose difficulty scales with context —
+which is most real work, and the honest reason this experiment is a first step rather than an
+answer.
+
+
 ### EXP-52 · Does agent consensus reduce error, or reproduce it? `READY`
 **Pre-registered 20 Aug 2026, before any arm was run. Registered because a refusal was made on
 theory and Joe was right that theory is not measurement.**
