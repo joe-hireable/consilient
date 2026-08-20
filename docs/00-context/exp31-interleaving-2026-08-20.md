@@ -286,3 +286,85 @@ edits in 18 attempts while a 31B model on the same rig, same harness, same timeo
 interesting one. It is *not* a registered result: the verdicts say insufficient evidence, the run
 is capped at 38 of 50, and it was contaminated by my own second runner. **It should be re-run
 clean before it is cited**, and the register entry stays `COMPROMISED`.
+
+
+---
+
+# Correction 05:15 — the timeout mechanism failed catastrophically, so every timing figure here is void
+
+The second runner finished too. **Both were mine**: this session's task list holds *"Run EXP-31 in
+the background"* and *"Relaunch EXP-31"*. I launched the same experiment twice and then spent
+three hours diagnosing the consequence as though it were someone else's.
+
+Reading the durations against the caps the runner itself applied changes what every
+`agent_timeout` in this experiment means.
+
+## The overruns
+
+| | attempts over their own cap | worst overrun | worst as a multiple |
+|---|---|---|---|
+| writer 29126 | **10 of 28** | **1,771.7 s** | **8.4×** |
+| writer 19126 | **16 of 38** | **1,208.8 s** | **6.0×** |
+
+**26 of 66 attempts — 39% — ran past the timeout that was supposed to stop them.** [measured]
+One `gemma4:31b` attempt on `windows-wsl-path` ran **2,011.7 seconds against a 240-second cap**.
+That is thirty minutes of a process the instrument believed it had killed half an hour earlier.
+
+EXP-07 recorded this defect at **10–269 s**. Under two concurrent runners it reached **1,772 s**.
+The mechanism is the one already known: `subprocess.run(timeout=…)` kills the direct child while
+Codex descendants keep the pipes open, so the parent returns and the work does not stop.
+
+## What that does to the record
+
+**`agent_timeout` does not mean "the model exceeded the cap and was stopped".** It means **the
+stop failed**. The recorded durations are not bounded by the cap and are not measurements of
+model latency — they are measurements of how long a runaway process happened to survive.
+
+So: **every duration-derived quantity from this run is void.** The paired first-attempt ratios,
+the median ratio, the censoring flags, all of it. The runner's own `latency` verdict already reads
+`insufficient_evidence`, which was the right answer for a reason better than the one it gave.
+
+## And it corrects my correction
+
+Twenty minutes ago I wrote that `gemma4` is **"bimodal by fixture — 5/5 or 0/5, never mixed"**,
+and called it a capability-or-latency boundary a median would hide. **That reading is confounded
+and I should not have stated it as cleanly as I did.**
+
+On `windows-wsl-path`, `gemma4`'s five "timeouts" ran 2,011.7 s, 1,627.5 s, 494.1 s, 446.0 s and
+440.7 s. Those are not a model failing to finish inside 240 seconds and being stopped. They are
+the instrument losing control. **Whether `gemma4` would have solved that fixture given a working
+timeout is unknown**, and this run cannot say.
+
+What survives of it: `gemma4` **did not produce a passing artefact** on those two fixtures in any
+attempt, and did on the other two in every attempt. That is still a clean partition. The word
+"bimodal" was fine; the causal gloss was not.
+
+## What actually survives, and it is the useful part
+
+**Edit production does not depend on timing at all**, and it replicates across both writers:
+
+| | attempts | **produced an edit** | passes |
+|---|---|---|---|
+| `qwen3:8b` | **33** | **0** | 0 |
+| `gemma4:31b` | 33 | **19** | 19 |
+
+Thirty-three `qwen3:8b` attempts across two independent runs and four fixtures produced **zero
+file edits**. EXP-07 saw zero in twenty-five on a different fixture set. That is **58 attempts,
+two fixture sets, two runs, no edit.** [measured]
+
+And both writers independently reported the **identical** verdict detail — `qwen 0/5 vs gemma
+2/5` — from different cell subsets under different contention. [measured]
+
+**So the capability floor is measurable with this instrument and the latency multiplier is not.**
+That is worth more than the experiment's registered question, because it says which half of
+EXP-31's design survives contact with the rig: count what the model *produced*, never how long it
+took, until the process tree is killed properly.
+
+## Owed, and now unambiguous
+
+The process-tree kill is no longer a tidy-up. **It is a precondition for any duration-dependent
+registration**, which the sweep's P9 already said and which this run has now demonstrated at 8.4×
+the cap rather than 1.1×. Together with the single-instance lock, it is the whole of what EXP-31
+needs before a clean re-run.
+
+Both runners' final states and both stdout streams are preserved in the session scratchpad.
