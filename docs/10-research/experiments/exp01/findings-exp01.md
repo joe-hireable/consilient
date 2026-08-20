@@ -2,8 +2,12 @@
 
 Run 19 Aug 2026. Method: mine RECORDED CI verdicts (statusCheckRollup at merge) via the
 GitHub API — no check replay needed for the first pass — then proxy-label outcomes and
-**audit the labels** (32-agent sample, one agent per sampled label, verdicts
-abstract-only). Per the privacy rule (AGENTS.md): per-PR records live in `data/`
+**audit the labels** (**40 audited labels** — 15 bad-pairs plus 5 cleans per repository,
+across two repositories — one agent per sampled label, verdicts abstract-only).
+*Corrected 2026-08-20: this read "32-agent sample", which matched neither the itemised
+audit below (15 + 5, twice, = 40) nor the register's planned 30. The register's 30 was
+the prospective protocol; 40 is what was drawn. Three counts for one audit made the
+denominator indeterminate, which weakens every corrected estimate derived from it.* Per the privacy rule (AGENTS.md): per-PR records live in `data/`
 (gitignored, never committed); this file carries aggregates only.
 
 ## Raw aggregates `[measured]`

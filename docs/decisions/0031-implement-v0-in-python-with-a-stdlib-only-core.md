@@ -95,3 +95,16 @@ interface under ADR-0023's T2 tier. Changing it is a versioned schema change, no
 ## Publication candidate?
 
 No. [asserted] This is an ordinary implementation choice with no falsifiable claim attached.
+
+
+## Correction: 2026-08-20 — the ecosystem-adjacency premise was false and is superseded
+
+This ADR argued in part from the premise that the neighbouring harnesses are Node CLIs. **Local
+inspection the following day showed that they are not.** `@openai/codex` is a 7,236-byte Node shim
+that spawns a Rust binary — 50.6 MB of Rust against 98 KB of TypeScript — and Claude Code ships
+eight platform binaries with zero dependencies. [measured]
+
+ADR-0032 supersedes this record and reaches the same conclusion on independent grounds, so the
+decision is unchanged. The premise is corrected here because a false premise that happens to
+support a correct conclusion is the most durable kind of error: nothing downstream ever fails in a
+way that exposes it.

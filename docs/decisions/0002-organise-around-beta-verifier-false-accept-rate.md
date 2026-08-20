@@ -81,7 +81,12 @@ underpowered near the threshold.
 > Found by Codex auditing numeric provenance across the decision records; the arithmetic was
 > reproduced independently and against the script's own output before this correction was
 > written. At true β = 0.04 against β* = 0.111, n≈200 declares safe
-97% of the time. At true β = 0.08, even n=800 only reaches 84%.
+97% of the time. At true β = 0.08, even n=800 only reaches **87%** — and 84% against the rounded 0.111
+written in this prose rather than the exact 0.1118654 the script uses. *Corrected
+2026-08-20: at the exact threshold k=72 is admitted and P(X≤72 | n=800, β=0.08) =
+0.8653; at the rounded one only k≤71 is, giving 0.8361. The conclusion is identical at
+either value — prospective sampling near the threshold is severely underpowered — which
+is why this is a correction and not a reversal.*
 
 **Operational rule:** 50–200 accepted diffs suffice when β is far from β*; near it, report
 "insufficient data" rather than a verdict. Prospective labelling is too slow; **historical

@@ -48,7 +48,7 @@ Solving for β* where cascade quality equals frontier quality:
 | 0.32 | 0.076 |
 | 0.27 | 0.111 |
 | 0.17 | 0.249 |
-| 0.10 | 0.432 |
+| 0.10 | 0.432 *(superseded: the closed form gives 0.4358 at gap 0.10 — see ADR-0002's update, which records the exact recomputation. Retained because this table is the simulation it superseded.)* |
 
 **The cheaper the model you route to, the better your tests must be.** Haiku-tier routing
 on a thinly-tested repo is strictly worse than not routing.

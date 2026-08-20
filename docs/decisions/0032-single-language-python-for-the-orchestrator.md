@@ -93,7 +93,7 @@ failure a harness can attack directly.
   not established. It shows the loop is powerful, not that the language must change.
 - **Per-language agent benchmarks disagree with each other more than they disagree about
   languages.** [cited] Multi-SWE-bench 2025 puts Python at 52.2% and TypeScript at 2.2%,
-  a 23× gap; SWE-bench Multilingual puts Rust highest at 58.14%; ProMax at COLM 2026 finds no
+  a **23.7×** gap (52.2/2.2 = 23.727; this read 23×, a floor rather than the value); SWE-bench Multilingual puts Rust highest at 58.14%; ProMax at COLM 2026 finds no
   stable ordering and attributes variance to training data rather than language difficulty.
   Decisively for a meta-harness: the same model on the same TypeScript instances scores 2.23%
   or 11.16% depending only on the scaffold — **scaffold variance is the same order as language
