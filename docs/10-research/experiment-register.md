@@ -3295,6 +3295,46 @@ forbids waiting on it.
 **What it cannot decide:** k = 8 is an existence floor, not a rate. Nothing about the general
 population, about assistive technology, or about whether anyone returns a second time.
 
+### EXP-95 · Inter-rater reliability of the 5-dimension design critique `READY`
+
+**Pre-registered 21 Aug 2026 under ADR-0060. Not run.**
+
+**Decides:** whether the 5-dimension critique (`using-open-design/references/critique-upstream.md`)
+produces an inter-rater reliable signal across independent model families, or whether it is
+noise dressed as structure. If scores across independent reviewers do not correlate, ADR-0060 §2's
+claim that critique provides a structured second reading fails, and the critique is retired from
+the workflow.
+
+**Precondition:** (a) 5 rendered HTML artefacts representing diverse design states: 1 unstyled
+functional HTML, 1 generic AI-SaaS median layout, 1 polished compliant layout, 1 intentionally broken
+hierarchy/alignment fixture, and 1 distinctive outlier design. (b) 2 independent model families
+(e.g. Claude Code via Sonnet 4.5 and Cursor via Composer 2.5 / Gemini 3.7) with zero shared context
+or prompt reasoning. (c) A frozen scoring harness extracting the 5 dimension scores (0–10).
+
+**Procedure:** each model family scores each of the 5 artefacts independently against the 5 dimensions
+(Philosophy consistency, Visual hierarchy, Detail execution, Functionality, Innovation), with cited
+evidence.
+
+**Measures:**
+- Kendall's rank correlation coefficient (τ) and Cohen's κ across all (artefact × dimension) pairs.
+- Per-dimension agreement rates: which dimensions show convergent signal vs divergence.
+- Citation validity rate: percentage of cited lines/elements that actually exist in the fixture.
+
+**Stopping rules (fixed before the run):**
+- Kendall τ ≥ **0.40** across dimensions and citation validity ≥ **0.85** ⟹ **confirms reliability**.
+  The critique is a weak but real structured observation. ADR-0060 §2 stands. [asserted]
+- Kendall τ < **0.20** across dimensions ⟹ **critique is noise**. Two models scoring the same page
+  produce unrelated numbers. ADR-0060 is superseded; the critique skill is retired from the active
+  workflow and reduced to an un-scored checklist. [asserted]
+- 0.20 ≤ τ < 0.40 ⟹ **marginal signal**. Keep Functionality and Detail (which track mechanical
+  properties); deprecate Philosophy and Innovation scoring. [asserted]
+
+**Blocks implementation? No.** ADR-0060 is PROVISIONAL; construction of the frontend DESIGN.md
+proceeds under the brand constraints regardless of the critique's inter-rater reliability.
+
+**What it cannot decide:** whether model critique correlates with human aesthetic preference. It
+measures inter-model convergence only. Human preference is an external oracle (Q24).
+
 ---
 
 ## Not experiments
