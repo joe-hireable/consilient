@@ -45,13 +45,17 @@ V5  Difficulty-dependent beta(d). The decision rule compares a MEASURED
     core-logic changes hit the covered paths).
 """
 
+from math import erf, log
+
 import numpy as np
 
 ALPHA, K, S_C, S_F = 0.03, 8.0, 0.45, 0.72
 GAP = S_F - S_C
 CLOSED = (1 - ALPHA) * np.exp(-K * GAP)  # 0.1118
 
-sig = lambda x: 1 / (1 + np.exp(-x))
+
+def sig(x):
+    return 1 / (1 + np.exp(-x))
 
 # quadrature grid over difficulty
 D = np.linspace(1e-6, 1 - 1e-6, 4001)
@@ -99,14 +103,15 @@ def rasch(k_c=K, k_f=K):
 
 
 # ---------------------------------------------------------------- V2  links
-from math import erf, log
-
 Phi = np.vectorize(lambda x: 0.5 * (1 + erf(x / np.sqrt(2))))
 # slope-matched at p=0.5: logistic slope k/4  ==  probit slope k_p/sqrt(2*pi)
 K_PROBIT = K * np.sqrt(2 * np.pi) / 4
 # cloglog p = 1 - exp(-ln2 * exp(k_g*x)) has slope ln2/2*k_g at x=0 -> match k/4
 K_GOMP = K / (2 * log(2))
-cloglog = lambda x: 1 - np.exp(-log(2) * np.exp(K_GOMP * x))
+
+
+def cloglog(x):
+    return 1 - np.exp(-log(2) * np.exp(K_GOMP * x))
 
 LINKS = {
     "logistic (baseline)": lambda s: sig(K * (s - D)),

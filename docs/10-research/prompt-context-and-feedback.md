@@ -1,7 +1,7 @@
 # Prompt, context and feedback discipline
 
 **Status:** research position; the performance claims are not yet established for the
-Consilience harness. [asserted]
+Consilient harness. [asserted]
 
 ## Finding
 
@@ -15,7 +15,7 @@ for current Claude models. [cited] Google's Gemini guidance still recommends few
 examples for many tasks and warns about overfitting from too many examples. [cited]
 
 The transferable rule is therefore **minimum sufficient contract**, not “short prompts are
-better”. [asserted] A Consilience task contract retains the objective, authority and scope,
+better”. [asserted] A Consilient task contract retains the objective, authority and scope,
 invariants, evidence boundary, verifier, budget, stopping rule and output schema. [asserted]
 Every additional instruction is a versioned intervention whose value can be ablated; a
 provider-global prompt profile is not assumed. [asserted]
@@ -29,7 +29,7 @@ phrases was larger, and several model/task cells worsened. [cited] OpenAI's curr
 guidance recommends acknowledging the specific issue and omitting generic praise when it
 adds nothing. [cited]
 
-Consilience may still recognise good work because humans read and participate in the team.
+Consilient may still recognise good work because humans read and participate in the team.
 [asserted] Recognition is concise, true and attached to an observed evidence delta: “Good:
 4/5 checks pass” is admissible; “brilliant work” without a measured referent is presentation
 noise. [asserted] No recognition field changes factual confidence, authority, routing,
@@ -104,7 +104,7 @@ used sparingly for human-readable culture but is not credited with improving the
 ## Publication disposition
 
 **Research-note candidate; not publishable before the run.** [asserted] The prompt-detail,
-feedback-tone and false-authority interaction may be useful beyond Consilience if the fixed
+feedback-tone and false-authority interaction may be useful beyond Consilient if the fixed
 cross-harness experiment produces a reproducible effect or an informative null. [asserted]
 No formal paper claim is available from the literature synthesis or orchestration anecdotes
 alone. [asserted]

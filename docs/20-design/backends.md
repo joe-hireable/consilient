@@ -17,6 +17,50 @@ python run_all.py ollama:qwen3:8b      # local provider
 python run_all.py opencode+openrouter:qwen/qwen3-coder
 ```
 
+## Grok Build — measured 20 August 2026, after Joe authenticated
+
+`@xai-official/grok` 1.0.5, signed in against the **SuperGrok Heavy subscription** by device code.
+Not an API key: `XAI_API_KEY` is the metered xAI path and ADR-0044 permits only OpenRouter as a
+metered vendor, so `adapter_grok.py` refuses to run if it finds one in the environment.
+
+**Models offered on the subscription:** `grok-4.6` (default) and `grok-4.5`. [measured]
+
+**Per-run accounting is available**, which was the open question in
+`fourth-runtime-admission-2026-08-20.md`. A headless run returns it inline:
+
+```json
+"usage": { "input_tokens": 33344, "cache_read_input_tokens": 512,
+           "output_tokens": 40, "reasoning_tokens": 35, "total_tokens": 33896 },
+"total_cost_usd": 0.01142128,
+"modelUsage": { "grok-4.6-build": { "modelCalls": 1, "costUSD": 0.01142128 } }
+```
+
+Three things in that response matter more than the cost figure. [measured]
+
+1. **Per-run cost is observable at the moment the run ends.** This is the property whose absence
+   killed the one metered composition attempted here (`"delayed cumulative billing prevents per-run
+   attribution"`), and it is the same property ADR-0044 relies on OpenRouter having.
+2. **The served model is not the requested one.** `grok-4.6` was requested; `grok-4.6-build`
+   answered. A different string, on the very first run. `adapter_cursor.py`'s
+   `model_requested` / `model_selected` separation is not hygiene — it is load-bearing, and
+   `cursor-xai-and-evidence-class-independence-2026-08-20.md` argued exactly this before there was
+   an instance of it.
+3. **33,344 input tokens to answer "reply with the single word: ok".** The harness's own preamble
+   dominates a short task by three orders of magnitude. Any cost model built on prompt length will
+   be wrong for this runtime.
+
+**Admission state: `excluded_unknown_headroom`** — the same as Cursor. The CLI exposes the tier but
+no remaining-allowance counter, and ADR-0026 excludes unknown headroom from unbounded unattended
+work. [measured]
+
+**That exclusion is narrower than it sounds, and the distinction is worth stating.** *Remaining
+allowance* is unknown; *per-run consumption* is not. A runtime whoseper-run cost is observable can be
+bounded by a self-imposed budget even when the provider will not say how much is left — which is
+precisely what the refuse-only budget primitive does. Grok is admissible for **bounded supervised
+work** today, which is how Cursor has been used throughout, and inadmissible for unbounded
+unattended work until either xAI exposes headroom or the harness enforces its own ceiling against
+the per-run figures above.
+
 ## The six measured coding compositions
 
 | Composition | Adapter | Auth | Accounting | Live state |
@@ -141,7 +185,7 @@ adapter boundary, closes stdin and passes the provider key only through `WSLENV`
 
 **Cursor's native external-control surface is ACP, not MCP.** The measured ACP client used
 newline-delimited JSON-RPC over stdio and retained both allow-once execution requests.
-[measured] Cursor remains an MCP client for tool access. [cited] A future Consilience MCP
+[measured] Cursor remains an MCP client for tool access. [cited] A future Consilient MCP
 façade should submit a delegation intent to the coordinator; only the coordinator should
 drive Cursor through ACP, so MCP cannot bypass authority, admission or trajectory logging.
 [asserted]

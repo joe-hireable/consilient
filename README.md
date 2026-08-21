@@ -1,4 +1,4 @@
-# Consilience
+# Consilient
 
 > **"The Consilience of Inductions takes place when an Induction, obtained from one class of
 > facts, coincides with an Induction obtained from another different class. Thus Consilience
@@ -30,6 +30,46 @@ before routing work to cheaper models or running agents in parallel.
 
 MIT. Fully open source. No capability is ever withheld from the open-source version.
 
+## Install and run
+
+Python **3.13 or newer** — the only version the suite has been run on, and the version
+`mypy.ini` type-checks against. No runtime dependencies: `consilient` is standard library
+only.
+
+```bash
+git clone https://github.com/joe-hireable/consilient
+cd consilient
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"                            # drop [dev] if you only want the CLI
+
+consil --help
+consil beta        # -> "insufficient data (0 human rejections, need 30)" on a fresh clone
+consil doctor      # gate status; exits non-zero while the gates are shut
+```
+
+`consil` is observe-only. It records trajectory events, projects them into SQLite and
+computes β. It cannot route, block or accept anything, and a test asserts the CLI exposes
+no surface that could.
+
+Before proposing a change, run every gate at once:
+
+```bash
+python scripts/release_check.py
+```
+
+It reports PASSED, FAILED or **UNAVAILABLE** per gate and exits non-zero unless all of them
+passed. `UNAVAILABLE` is deliberately not a pass — the private-corpus leak scan can only run
+on the maintainer's machine, and a release approved without it running is not an approval.
+Do not pipe it into `tail`; a pipeline's exit status is the last command's, and this project
+has already lost a day to that.
+
+**Cross-platform status.** `src/consilient/`, `tests/`, `scripts/` and `.github/scripts/`
+are portable and CI runs them on Linux. The research instruments under
+`docs/10-research/experiments/` are **Windows-only** in places — WSL invocation, `cmd.exe`,
+`taskkill`, absolute `C:\` paths — and CI never executes them. See
+`docs/00-context/cross-platform-status.md` for the itemised list. If you are on Linux or
+macOS, the CLI, the suite and the gates work; the experiment runners may not.
+
 ## Scope — what v0 is, and what it is not
 
 | | Scope | Gate |
@@ -49,12 +89,30 @@ harness routes work and runs agents in parallel, and every one assumes its verif
 is sound. Define **β** = the rate at which automated checks *accept a bad artifact*.
 Executed simulation shows β determines (a) whether cheap-first routing helps or silently
 degrades quality, (b) how many agents you can run before human review saturates, and (c) how
-much of your day you spend reviewing. **Nothing on the market measures it.**
+much of your day you spend reviewing.
 
-The same gap exists one level up: every published self-improving agent system — Darwin Gödel
-Machine, SICA, Huxley-Gödel, HyperAgents — accepts a self-modification when a test says it is
-better, and **none measures how often that test is wrong**. In an archive-based system that
-error compounds. β is the missing safety property of that entire literature.
+β has been measured before, and we should say so plainly: Reflexion reported its own
+self-generated oracle's false-accept rate in 2023 (1.4% on HumanEval-PY, 16.3% on MBPP-PY);
+Wang, Pradel & Liu (ICSE 2026, arXiv:2503.15223) found **7.8%** of accepted patches fail the
+developer-written test suite (n=877, SWE-bench Verified); METR measured a **24.2pp** gap
+between maintainer judgement and the grader (n=296). **What none of them does is act on it.**
+Every one measures β, reports it, and recommends a human. **Nothing conditions its own routing,
+its parallelism or its acceptance threshold on a measured β.** That is the gap this project is
+built in.
+
+A related gap exists one level up. Self-improving agent systems — Darwin Gödel Machine, SICA,
+Huxley-Gödel, HyperAgents, Voyager, ADAS, Meta-Harness, Live-SWE-agent — accept a
+self-modification when a test says it is better, and in a survey of eight, **none reports a
+denominator-based false-acceptance rate for candidate promotion against independent truth**. In
+an archive-based system that error compounds: DGM produced one evaluator-bypassing winner in a
+150-iteration run, caught by manual audit rather than by a rate.
+
+**Corrected 20 August 2026.** This previously read *"none measures how often that test is
+wrong"*, which is now known to be false. **Ratchet** (arXiv:2605.22148v3, Apache-2.0) audits the
+judge governing skill synthesis and survival, reporting false-pass ≈0.01 (n=210) and false-fail
+≈0.95 (n=42, 95% CI 0.84–0.99). That is not pre-persistence β and the audit is not shipped in
+the system, but the categorical claim does not survive it. The narrower statement above is what
+the evidence supports.
 
 **This is a hypothesis, not a finding.** It survived one round of simulation under assumed
 functional forms. It has never met a real repository.
@@ -79,7 +137,7 @@ functional forms. It has never met a real repository.
 
 ## Status: v0 approved, observe-only increment shipped
 
-The v0 specification was approved for implementation on 20 August 2026. `src/consilience/`
+The v0 specification was approved for implementation on 20 August 2026. `src/consilient/`
 records trajectory events, projects them into SQLite and computes β — and does nothing else:
 it cannot route, block or accept anything, and a test asserts the CLI exposes no surface that
 could. Everything past instrumentation is gated on ADR-0015 Gate A, which has not been passed.

@@ -1,14 +1,14 @@
-# Skills — portable across Claude Code, Consilience, and other harnesses
+# Skills — portable across Claude Code, Consilient, and other harnesses
 
 **This directory is the source of truth.** `.claude/skills/` is a mirror. See
 `../../docs/decisions/0014-portable-skills-agents-md.md`.
 
 ## Why here and not `.claude/`
 
-Skills written today must survive the migration to Consilience (`0015`) without a rewrite.
+Skills written today must survive the migration to Consilient (`0015`) without a rewrite.
 The `SKILL.md` convention is already read by Claude Code, OpenHarness and DeepSeek Harness,
 and `.agents/` is the emerging vendor-neutral location. So portability comes from **adopting
-a standard, not inventing one** — and Consilience is obliged to read this directory
+a standard, not inventing one** — and Consilient is obliged to read this directory
 natively.
 
 ## Format
@@ -81,12 +81,12 @@ our own manifests keeps the lockfile and CI in the loop.
 This is not generic caution. A project whose thesis is *measure whether your checks can be
 trusted before relying on them* cannot install unvetted instructions into its own agents.
 
-**Out:** Consilience's own skills ship bundled inside its npm package, version-locked to the
+**Out:** Consilient's own skills ship bundled inside its npm package, version-locked to the
 tool that reads them — because they are tool-coupled. A `beta-verdict` skill must match the
 verdict schema; git-based distribution lets that drift.
 
 ## Where these run
 
 - **Now:** Claude Code, via the `.claude/skills/` mirror.
-- **After Gate A/B (`0015`):** Consilience, reading this directory directly.
+- **After Gate A/B (`0015`):** Consilient, reading this directory directly.
 - **Elsewhere:** OpenHarness and DeepSeek Harness read `SKILL.md` today, unmodified.

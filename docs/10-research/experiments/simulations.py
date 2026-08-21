@@ -21,7 +21,10 @@ Symbols
 import numpy as np
 
 rng = np.random.default_rng(7)
-sig = lambda x: 1 / (1 + np.exp(-x))
+
+
+def sig(x):
+    return 1 / (1 + np.exp(-x))
 
 
 # --------------------------------------------------------------------------
@@ -69,7 +72,8 @@ def three_tier(N=300_000, k=8.0, alpha=0.03, beta=0.10,
 K = 8
 TRUE_S_C = np.array([0.62, 0.40, 0.28, 0.70, 0.80, 0.68, 0.30, 0.45])
 S_F, KK, LAM = 0.78, 8.0, 0.004
-CP = np.array([.22, .14, .16, .12, .08, .10, .06, .12]); CP = CP / CP.sum()
+CP = np.array([.22, .14, .16, .12, .08, .10, .06, .12])
+CP = CP / CP.sum()
 
 
 def episode(cls, use_cheap, rs, c_cheap=1.0, c_front=25.0, c_v=0.4, waste=1.0):
@@ -90,20 +94,23 @@ def evaluate(policy, n=40_000, seed=99):
     for _ in range(n):
         cls = rs.choice(K, p=CP)
         ok, cost = episode(cls, policy(cls), rs)
-        q += ok; c += cost
+        q += ok
+        c += cost
     return q / n, c / n
 
 
 def learn(n_traj, seed=1):
     """Thompson sampling over {cheap, frontier} per task class."""
     rs = np.random.default_rng(seed)
-    a = np.ones((K, 2)); b = np.ones((K, 2))
+    a = np.ones((K, 2))
+    b = np.ones((K, 2))
     for _ in range(n_traj):
         cls = rs.choice(K, p=CP)
         arm = int(np.argmax(rs.beta(a[cls], b[cls])))   # 0 = cheap
         ok, cost = episode(cls, arm == 0, rs)
         r = float(np.clip(ok - LAM * cost, 0, 1))
-        a[cls, arm] += r; b[cls, arm] += 1 - r
+        a[cls, arm] += r
+        b[cls, arm] += 1 - r
     post = a / (a + b)
     return lambda cls: bool(np.argmax(post[cls]) == 0)
 

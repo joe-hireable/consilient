@@ -96,6 +96,23 @@ def composition_for(name):
             "provider": "google-account:plan-unverified",
             "model": model,
         }
+    if name == "grok":
+        return {
+            "agent": "grok",
+            "domain": "coding",
+            "harness": "grok",
+            "provider": "xai-subscription",
+            "model": "unknown:not-recorded-by-adapter",
+        }
+    if name.startswith("grok:"):
+        model = name.split(":", 1)[1]
+        return {
+            "agent": f"grok:{model}",
+            "domain": "coding",
+            "harness": "grok",
+            "provider": "xai-subscription",
+            "model": model,
+        }
     return {
         "agent": name,
         "domain": "coding",
@@ -132,6 +149,17 @@ def codex_auth_ready(stdout, return_code):
 
 def cursor_auth_ready(stdout, return_code):
     return return_code == 0 and "Logged in as" in (stdout or "")
+
+
+def grok_auth_ready(stdout, return_code):
+    if return_code != 0 or not stdout:
+        return False
+    text = stdout.lower()
+    return (
+        "not authenticated" not in text
+        and "not signed in" not in text
+        and "grok login" not in text
+    )
 
 
 def available():
@@ -211,6 +239,30 @@ def available():
         if cursor_auth_ready(r.stdout, r.returncode):
             have.append("cursor")
             have.append("cursor-acp")
+    grok_cand = [
+        shutil.which("grok.cmd"),
+        shutil.which("grok.exe"),
+        shutil.which("grok"),
+        str(Path.home() / ".grok" / "bin" / "grok.exe"),
+        str(Path.home() / ".grok" / "bin" / "grok"),
+        "/mnt/c/Users/jpbpr/.grok/bin/grok.exe",
+    ]
+    for cand in grok_cand:
+        if cand and (Path(cand).exists() or shutil.which(cand)):
+            try:
+                status = subprocess.run(
+                    [cand, "models"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=30,
+                )
+                if grok_auth_ready(status.stdout, status.returncode):
+                    have.append("grok")
+                break
+            except Exception:
+                pass
     return have
 
 
@@ -256,6 +308,11 @@ def run_one(name):
             import adapter_antigravity as a
 
             out = a.run(ticket, name.split(":", 1)[1])
+        elif name == "grok" or name.startswith("grok:"):
+            import adapter_grok as a
+
+            model = name.split(":", 1)[1] if ":" in name else None
+            out = a.run(ticket, model=model)
         else:
             raise ValueError(name)
     except Exception as e:

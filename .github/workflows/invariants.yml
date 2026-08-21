@@ -14,21 +14,54 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: pip install pytest mypy
+      - run: pip install pytest mypy ruff
       - name: Static checks
         # Added after mypy found a reachable crash in beta.render() that 24 passing tests
         # missed. A stronger check is a lower beta; this is the ratchet applied to us.
-        run: python -m mypy src/consilience
+        run: python -m mypy --strict src/consilient
+      - name: Repository-wide Ruff
+        run: python -m ruff check .
       - name: Invariant checks
         run: python -m pytest tests -q
-      - name: Replay invariant on the real trajectory
-        # Build the projection first so that `replay` has a subject to compare against.
-        # Before 20 Aug 2026 this step ran `replay` on a fresh checkout with no state on
-        # disk, and `replay` compared two rebuilds from the same log — identical by
-        # construction. Gate A condition 2 was recorded as satisfied on a check that could
-        # not fail. `compared` must now be true, or the run failed to test anything.
+      - name: Rename safety invariant check
+        run: python .github/scripts/check_rename_safety.py --check
+      - name: Replay invariant on the real trajectory, with a drift control
+        # Until 21 Aug 2026 this step ran `beta` first, "so that `replay` has a subject to
+        # compare against", then required `compared && identical`. The subject `beta` leaves
+        # behind is itself a rebuild from the same log — `cmd_beta` calls `projection.build`,
+        # which unlinks the database — so `identical: true` was guaranteed. That is A1, the
+        # two-rebuild comparison this step was written to replace, moved one invocation
+        # further out. A fresh checkout never carries `.harness/state.db`; it is gitignored,
+        # so in CI there has never been an independent subject to compare against.
+        #
+        # What CI can honestly test is that the detector works. The control below drifts the
+        # state out of band and REQUIRES the check to see it; then it requires a clean
+        # rebuild over a non-empty trajectory to compare identical. Both assertions can fail.
         run: |
-          PYTHONPATH=src python -m consilience.cli --json beta > beta.json
-          PYTHONPATH=src python -m consilience.cli --json replay > replay.json
-          cat replay.json
-          python -c "import json,sys; r=json.load(open('replay.json')); sys.exit(0 if r['compared'] and r['identical'] else 1)"
+          python - <<'PY'
+          import argparse, sqlite3, sys
+          sys.path.insert(0, "src")
+          from consilient.cli import cmd_replay
+
+          args = argparse.Namespace(log=".harness/log", db=".harness/state.db")
+
+          seed = cmd_replay(args)
+          assert seed["events"] > 0, "no trajectory to replay; the control would be vacuous"
+
+          conn = sqlite3.connect(args.db)
+          conn.execute("UPDATE events SET actor = 'ci-drift-control' WHERE position = 0")
+          conn.commit()
+          assert conn.total_changes == 1, "the control changed no row; it proves nothing"
+          conn.close()
+
+          drifted = cmd_replay(args)
+          assert drifted["compared"] and drifted["identical"] is False, (
+              f"the replay check did not see deliberate out-of-band drift: {drifted}"
+          )
+
+          clean = cmd_replay(args)
+          assert clean["compared"] and clean["identical"] is True and clean["events"] > 0, (
+              f"a clean rebuild over a non-empty trajectory did not compare identical: {clean}"
+          )
+          print(f"drift control OK over {clean['events']} events")
+          PY

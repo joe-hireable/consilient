@@ -33,7 +33,12 @@ can never give you. One probe, both parameters.
 import numpy as np
 
 rng = np.random.default_rng(11)
-sig = lambda x: 1 / (1 + np.exp(-x))
+
+
+def sig(x):
+    return 1 / (1 + np.exp(-x))
+
+
 K, S_C, S_F, TRUE_DELTA = 8.0, 0.45, 0.72, 0.27
 ALPHA = 0.03
 

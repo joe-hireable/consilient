@@ -17,7 +17,7 @@ to sign, until a qualified solicitor has reviewed and approved them.**
 
 ## Commercial context the reviewer needs
 
-Project name: **Consilience** (`joe-hireable/consilience`), fixed 19 Aug 2026 by ADR-0008.
+Project name: **Consilience** (`joe-hireable/consilient`), fixed 19 Aug 2026 by ADR-0008.
 **A trademark search on that name has not been carried out and is part of this instruction.**
 
 Solo maintainer, England. Intent: build an open-source community first; a separate

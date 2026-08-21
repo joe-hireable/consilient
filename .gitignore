@@ -1,5 +1,7 @@
 node_modules/
 dist/
+build/
+*.egg-info/
 .next/
 __pycache__/
 *.pyc
@@ -29,6 +31,9 @@ entities.json
 .harness/state.db
 .harness/state.db-wal
 .harness/state.db-shm
+# `replay` sets aside a stale projection before rebuilding; it is a local artefact,
+# reproducible from the log, and not part of the record.
+.harness/state.db.stale-*
 
 # Transient runner state: a pid and a run id, meaningful only while a run is live.
 # Committing it would assert a lock that is not held.
@@ -36,3 +41,22 @@ docs/10-research/experiments/*/run.lock
 
 # EXP-27 collector runtime state: rebuilt by running the collector; not evidence.
 docs/10-research/experiments/exp27/collector-state.json
+
+# Agent transcripts. These are multi-megabyte verbatim records of dispatched runs: they carry
+# whatever an agent read, printed or was told, and they sit inside the repository. Nothing in
+# them belongs in the record, and a single `git add -A` would commit all of them — which is not
+# hypothetical, because `git add -A` swept four brief files into a commit on 20 August 2026.
+.harness/dispatch/
+# Briefs written for a dispatched agent, which live in a clone's root by convention.
+brief-*.md
+
+# Raw private-corpus extracts. EXP-01 mines ../hireable-3.0 and ../jobboard-v2, whose NAMES and
+# AGGREGATE METRICS may be recorded (AGENTS.md) but whose PR titles, commit messages and file
+# paths may never be. The derived data files are referenced by findings documents and must not
+# become committable if anyone regenerates them.
+data/
+*-prs.json
+red-cells-evidence.json
+
+# Pseudonym maps back to private-corpus identifiers. Local only, never published.
+*.local.json

@@ -1,10 +1,10 @@
-# Consilience — agent rules
+# Consilient — agent rules
 
 Universal project rules for any AI coding assistant. `CLAUDE.md` `@`-references this file.
 
 ## What this project is
 
-**Consilience** — read [`CONSILIENCE.md`](CONSILIENCE.md) first. It is not background; it is
+**Consilient** — read [`CONSILIENCE.md`](CONSILIENCE.md) first. It is not background; it is
 the source every rule below is derived from.
 
 > "The Consilience of Inductions takes place when an Induction, obtained from one class of
@@ -23,16 +23,31 @@ architecture itself is domain-blind (see `docs/20-design/architecture-sketch.md`
 β exists because of Whewell's third clause: convergence is a *test*, and tests have error
 rates. The multi-agent constraints exist because of his second clause: **different** class.
 
-**Current phase: approved for the observe-only increment.** Joe approved the v0
-specification for implementation on 20 August 2026, recorded as `spec.approval_observed`.
-Product code lives in `src/consilience/` and is **observe-only**: it records trajectory
-events, projects them into SQLite and computes β. It does not route, block or accept
-anything, and a test asserts the CLI exposes no surface that could.
+**Current phase: Stage 3, entered 20 August 2026.** Joe entered Stage 3 on that date
+under ADR-0039, which reserves entry to the principal, recorded in the trajectory as
+`stage.entered` authored by him. Routing, blocking and orchestration behaviour may now be
+built and run.
 
-Research, experiments, ADRs, invariant checks, specification work and observe-only
-implementation are all permitted. **Routing, blocking and orchestration remain gated** —
-ADR-0015 Gate A before anything routes or blocks, Gate B before orchestration on a
-non-Consilience repository. Neither gate has been passed.
+**Two things Stage 3 does not authorise, and they are the ones that matter.**
+
+1. **Gate B still governs dependence.** Under ADR-0039, Gate B is no longer a licence to
+   *build* orchestration; it is the evidence that the harness is trustworthy to *depend
+   on* for work on a repository other than this one. **Gate B is not passed.** Nothing
+   here may be pointed at `../hireable-3.0` or `../jobboard-v2`.
+2. **Gate A is not passed either.** Do not take the condition-by-condition state from this
+   file — run `consil doctor` and read what it says. This paragraph previously listed
+   "A1, A2 and B1 pass … B3 needs the fallback exercised", and on 21 August 2026 three of
+   those four were wrong: A1 **fails** (EXP-01's stopping rule fired), A2 reports
+   **unknown** on a fresh checkout, and B3 **passes**. [measured] `consil doctor` is the
+   authority; a hand-maintained copy of its output in a governance file is a second source
+   of truth that drifts, which is what happened here. Since 21 August it also **exits
+   non-zero** while the gates are shut, so `consil doctor && …` no longer runs the next
+   step. `routing_orchestration_enabled` remains `false` — **the flag reports the gates,
+   and the gates are not open.** Entering the stage permits the work; it does not pass the
+   gates.
+
+Product code in `src/consilient/` remains observe-only *today* because nothing else has
+been built yet, not because it is forbidden.
 
 ## Working principles for this repo
 
@@ -82,8 +97,8 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 - Surface trade-offs when more than one approach is reasonable.
 
 ### Ask first
-- Writing routing, blocking or orchestration behaviour (gated on ADR-0015 Gate A/B).
-  Observe-only increment work is authorised.
+- Pointing the harness at any repository other than this one. Stage 3 permits building
+  orchestration; Gate B governs depending on it, and Gate B is not passed.
 - Naming the project.
 - Adding a dependency.
 - Changing anything in `docs/10-research/` — that's the evidence base.
@@ -91,12 +106,30 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 ### Never do
 - **Publish anything from `../hireable-3.0` or `../jobboard-v2`.** They are strictly
   private commercial repos, usable as inspiration and as measurement corpora only
-  (EXP-01 runs on their histories). Their names and *aggregate measured metrics* may
-  appear in docs; their code, file contents, excerpts and detailed file paths may
-  never be committed here or included in anything published from here. (Joe,
-  19 Aug 2026.)
+  (EXP-01 runs on their histories). Their code, file contents, excerpts, detailed file paths
+  and **commit identifiers** may never be committed here or included in anything published
+  from here.
+
+  What Joe actually said, 19 Aug 2026, was that they **"must not be published as part of this
+  repo"** — flat, with no carve-out. The narrower reading that their *names and aggregate
+  measured metrics* may appear is **the orchestrator's inference, not the principal's words**,
+  and was found signed in his name by an audit on 21 Aug 2026. It is recorded here as inference
+  because a loosening filed under the principal's signature is worse than an invented
+  tightening, and because this specific carve-out is what let 71 private commit identifiers
+  reach a results file. It stands provisionally until Joe adopts or rejects it. **Where the two
+  readings disagree, take his.**
 - Commit secrets or `.env`. `.github/workflows/secret-scan.yml` enforces this against the
   tracked tree and repository history without printing a detected credential.
+- **Put a secret into a public repository, under any circumstances.** Joe's words, 20 Aug 2026,
+  were **"no secrets in public repo"**. Everything after this sentence is **the orchestrator's
+  reading of that instruction, not his words** — recorded as inference on 21 Aug 2026 after an
+  audit found the expansion signed in his name. It is almost certainly what he meant, and it is
+  kept because it is the safe direction; but it deleted a gate condition (B3), so he is owed the
+  chance to confirm or narrow it.
+  The reading: not merely "do not commit one", but do not place one
+  in repository settings, Actions secrets, or anywhere the public repository can reach. A
+  capability that needs a credential there is not built — **it runs locally or it does not
+  run.** Gate B3 is the first thing this rule cost.
 - Present a simulated figure as an empirical result.
 - Add architecture with no falsifiable claim attached to it.
 - **Add a structure that cannot be traced back to `CONSILIENCE.md`.** If a proposal does not

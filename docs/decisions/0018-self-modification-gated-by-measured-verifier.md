@@ -1,6 +1,10 @@
 # 0018. Self-modification is gated by measured verifier reliability, and the verifier is not self-modifiable
 
-- **Status:** PROPOSED
+- **Status:** **ACCEPTED 20 August 2026.** Accepted by Joe Brown, 20 August 2026, in the orchestration chat: *"I accept all the recommendations."* Recorded in the trajectory at `.harness/log/2026-08-20.jsonl` as a `decision.*` event authored by the principal.
+  The gate binds as written: at the measured composite β = 0.3132 [0.2926, 0.3346]
+  (EXP-47) it refuses most persistent self-modification. Lowering β is the unlock.
+  Decision 2 (the verification layer is not self-modifiable) remains PROVISIONAL
+  pending EXP-12, as its own text says.
 - **Date:** 2026-08-19
 - **Deciders:** Joe Brown (vision), Claude (the gate)
 - **Inquiry tier reached:** T1 ground

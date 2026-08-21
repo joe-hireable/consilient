@@ -14,7 +14,11 @@ near the threshold. 50-200 accepted diffs suffice when beta is far from beta*.
 import numpy as np
 
 rng = np.random.default_rng(23)
-sig = lambda x: 1 / (1 + np.exp(-x))
+
+
+def sig(x):
+    return 1 / (1 + np.exp(-x))
+
 
 K, ALPHA, S_F = 8.0, 0.03, 0.72
 
@@ -45,8 +49,10 @@ def delta(dfn, beta, s_c, N=300_000):
 
 def bstar_empirical(dfn, s_c):
     lo, hi = 1e-4, .99
-    if delta(dfn, lo, s_c) < 0: return None
-    if delta(dfn, hi, s_c) > 0: return 1.0
+    if delta(dfn, lo, s_c) < 0:
+        return None
+    if delta(dfn, hi, s_c) > 0:
+        return 1.0
     for _ in range(26):
         m = (lo + hi) / 2
         lo, hi = (m, hi) if delta(dfn, m, s_c) > 0 else (lo, m)
@@ -59,8 +65,10 @@ def bstar_closed_form(gap, alpha=ALPHA, k=K):
 
 # ---------------------------------------------------------------- Q2
 def wilson(k_, n, z=1.96):
-    if n == 0: return (0.0, 1.0)
-    p = k_ / n; d = 1 + z * z / n
+    if n == 0:
+        return (0.0, 1.0)
+    p = k_ / n
+    d = 1 + z * z / n
     c = (p + z * z / (2 * n)) / d
     h = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
     return (max(0.0, c - h), min(1.0, c + h))
@@ -79,7 +87,8 @@ if __name__ == "__main__":
 
     print("Q3 — escalation rate varies hugely even though beta* does not (beta=0.10)")
     for name, dfn in DISTS.items():
-        N = 200_000; d = dfn(N)
+        N = 200_000
+        d = dfn(N)
         okc = rng.random(N) < sig(K * (0.45 - d))
         p = np.where(okc, rng.random(N) > ALPHA, rng.random(N) < 0.10)
         print(f"  {name} cheap solves {okc.mean()*100:5.1f}%  escalates {(~p).mean()*100:5.1f}%")

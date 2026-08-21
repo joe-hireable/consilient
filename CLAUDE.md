@@ -7,10 +7,15 @@ Read it. This file adds session-start guidance only.
 
 ## Start here
 
-The v0 specification is **approved** and the observe-only increment has shipped to
-`src/consilience/`. The repository holds that increment, experimental adapters, research
-instruments, CI invariants, 34 ADRs and 35 registered experiments. Routing, blocking and
-orchestration are still gated on ADR-0015.
+**Stage 3 was entered on 20 August 2026** by Joe, under ADR-0039, which reserves entry to
+the principal. Routing, blocking and orchestration behaviour may now be built and run. The
+repository holds the observe-only increment in `src/consilient/`, experimental adapters,
+research instruments, CI invariants, 45 ADRs and 47 registered experiments.
+
+**Entering the stage is not passing the gates**, and the distinction is the whole of your job
+here. `consil doctor` reports `routing_orchestration_enabled: false` and will keep doing so
+until every condition passes. Gate B governs *depending* on the harness for work on another
+repository — nothing may be pointed at `../hireable-3.0` or `../jobboard-v2`.
 
 Read in this order before doing anything:
 
@@ -38,14 +43,19 @@ Brainstorm, adversarially. Specifically:
   verification-gated orchestration. Establish honestly what is left that is genuinely new.
 - **Resolve authorised evidence gaps.** Pre-register the stopping rule before a run and
   record insufficient data honestly.
-- **Keep the gates honest.** The specification is approved for the observe-only
-  increment only; do not let Gate A or Gate B be crossed by inference.
+- **Keep the gates honest.** Stage 3 permits building orchestration; it passes nothing.
+  Four of the seven conditions were found unpassable on 20 August and three have been repaired
+  by ADR-0043 and ADR-0045 — which means the remaining failures are real work, not walls. Do
+  not let a gate be crossed by inference, and do not repair a condition by loosening it
+  without an ADR the principal accepts.
 
 ## What not to do
 
-- Don't write routing, blocking or orchestration behaviour. Those are Stage 3 and gated on
-  ADR-0015 Gate A/B, neither of which has passed. Observe-only increment work, experimental
-  adapters, research instruments and invariant checks are all authorised under `AGENTS.md`.
+- Don't point the harness at any repository other than this one. Building orchestration is
+  authorised; depending on it elsewhere is Gate B, and Gate B is not passed.
+- **Don't put a secret anywhere a public repository can reach it** — not a commit, not
+  repository settings, not Actions secrets. A capability needing one runs locally or not at
+  all. (Joe, 20 Aug 2026.)
 - Don't treat the current draft or a multi-agent agreement as evidence.
 - Don't accept architecture in `docs/20-design/` as settled without a falsifiable claim and
   evidence-class-different challenge.

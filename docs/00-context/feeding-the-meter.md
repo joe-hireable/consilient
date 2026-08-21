@@ -1,26 +1,47 @@
-# Feeding the β meter — the one-command version
+# Feeding the β meter — the two-event version
 
 **Written 20 August 2026**, because the briefing's top finding is that the meter has never
 received a row of its own input: 60 trajectory events, 60 distinct event kinds, zero
 `attempt.outcome` events, zero human verdicts. `consil beta` says `insufficient data (0 human
 rejections, need 30)` and it is right. [measured]
 
-Nothing needs building. The event kind exists, the projection applies it, `beta.py` computes from
-it, and `consil record` writes it. What is missing is the habit, and the half only Joe can supply.
+The verifier outcome and human verdict are separate append-only events joined by one stable
+`attempt_id`. [measured] Replay resolves them into one row for β; `task` is not the join key,
+because retries legitimately give one task several attempts. [measured]
 
-## The one command
+## First record the verifier outcome
+
+Replace the timestamp with the current RFC3339 clock value and allocate the attempt identifier
+when the attempt is created. [asserted]
 
 ```bash
 consil record --event '{
   "v": 1,
-  "ts": "2026-08-20T09:15:00+01:00",
+  "ts": "<current RFC3339 timestamp>",
   "event": "attempt.outcome",
-  "actor": "joe-brown",
+  "actor": "consilience-verifier",
   "data": {
+    "attempt_id": "attempt-7f20c8b1",
     "task": "some-task-id",
     "task_family": "repair",
     "verifier_version": "pytest+mypy",
-    "verifier_accept": true,
+    "verifier_accept": true
+  }
+}'
+```
+
+## Later record the human verdict
+
+The verdict carries the same `attempt_id` and no repeated verifier result. [asserted]
+
+```bash
+consil record --event '{
+  "v": 1,
+  "ts": "<current RFC3339 timestamp>",
+  "event": "attempt.verdict",
+  "actor": "joe-brown",
+  "data": {
+    "attempt_id": "attempt-7f20c8b1",
     "human_verdict": "reject",
     "principal": "joe-brown",
     "via": "cli"
@@ -28,21 +49,23 @@ consil record --event '{
 }'
 ```
 
-`verifier_accept` is what the automated checks said. `human_verdict` is what you said. **β is the
-rate at which those disagree in the dangerous direction** — checks accepted, you rejected.
+`verifier_accept` is what the automated checks said. `human_verdict` is what the human principal
+said. **β is the rate at which those disagree in the dangerous direction** — checks accepted,
+the human rejected. [algebra]
 
-## What is checked, verified end to end on 20 August
+## What the invariant tests verify on 20 August
 
 | | result |
 |---|---|
-| Human authors their own verdict | **accepted**, `rc=0` [measured] |
-| Agent tries to author one | **refused**, `rc=2`, *"a human_decision event must name its principal"* [measured] |
-| β picks it up | `insufficient data (1 human rejections, need 30)` [measured] |
+| Deferred verdict references its attempt | one projected row; β sees one rejection [measured] |
+| Agent tries to author a verdict or correction | refused under V0-18 [measured] |
+| Verdict references an unknown attempt | projection fails closed [measured] |
+| A second ordinary verdict references the same attempt | projection fails closed [measured] |
 
-That middle row is V0-18 holding **through the command line**, not merely in a unit test. Until
-this morning the invariant was bypassable by exactly this route — an `attempt.outcome` carrying a
-`human_verdict` with no `human_decision` sailed straight through into the table β is computed
-from. It does not now.
+V0-18 applies to both `attempt.verdict` and `attempt.verdict.correction`; a null verdict is also
+refused rather than treated as an absent field. [measured] `attempt.outcome` cannot carry a human
+verdict, eliminating the second projection path that previously bypassed the authority guard.
+[measured]
 
 ## Three things worth knowing before the habit forms
 
@@ -56,8 +79,14 @@ must name the channel it arrived through. No agent can supply this for you, by d
 could, β would be the agents grading themselves.
 
 **3. Rows with no `human_verdict` are excluded from both numerator and denominator.** Recording
-the verifier outcome alone is still worth doing — it costs nothing and the verdict can be added
-later as a second event — but it does not move β until a verdict exists.
+the verifier outcome alone creates one unlabelled row. The later verdict amends that row rather
+than adding another attempt, so it does not move β until the verdict exists and cannot double the
+observation set. [measured]
+
+If the human changes their judgement, append `attempt.verdict.correction` with `attempt_id`, the
+`previous_verdict`, the new `human_verdict`, and a non-empty `reason`. [asserted] A plain second
+verdict is refused; a correction whose expected prior value does not match is also refused, so
+replay never silently chooses the last value. [measured]
 
 ## What it takes to get an answer
 

@@ -43,7 +43,21 @@ is what produced all three collisions — it is the step that feels sufficient a
 > differs materially from the bad-and-green cell's audited 1/15, the two cannot share a
 > correction factor and every corrected β needs its own audit.
 
-### EXP-01 · Measure β on repository history `IN PROGRESS 19 Aug 2026 — see experiments/exp01/findings-exp01.md`
+### EXP-01 · Measure β on repository history `DONE 20 Aug 2026 — stopping rule FIRED for this method; see experiments/exp01/stopping-rule-verdict-2026-08-20.md`
+**Verdict, 20 Aug 2026.** The pre-registered rule fires: pooled across BOTH corpora there are
+**209** evaluable bad artefacts and ±0.05 needs **332** at the measured rate — 63.0% of what
+the rule demands, with no more history available. [algebra] Recorded-CI-verdict mining is
+therefore retired as the β instrument.
+**But the consequence the rule names does not follow.** The rule assumed history mining was how
+β gets measured. EXP-47 measured it at **0.3132 [0.2926, 0.3346]**, half-width 0.0210, in 104 s,
+with no proxy labels and no censoring. [measured] And precision was never the binding
+constraint: the metadata proxy (0.6809) and the executable replay (0.0000) differ by **14×** the
+rule's own ±0.05 tolerance, so the problem is validity, not width. [measured]
+**ADR-0002 stays PROVISIONAL.** The rule's stated consequence and the evidence point in opposite
+directions; reconciling them is a decision about the architecture's centre and belongs to Joe.
+**Gate note:** this flips `doctor`'s A1 to PASS. Gate A still fails on A3, which is permanently
+unsatisfiable, so no gate opens. One `git revert` returns A1 to FAIL.
+
 **First pass run on both repos** (recorded-CI-verdict mining, no replay). Raw proxy
 labels proved ~93% noise (audited precision 1/15 on both repos); corrected β̂ ≈ 0.12
 [0.02, 0.42] (jobboard-v2) — the honest verdict is "insufficient data", exactly
@@ -536,7 +550,7 @@ not redistributed unless their licence permits it.
   false admits in the held-out cells. [asserted]
 - If benchmark provenance or `as_of` is absent for more than 20% of records used, the feed
   remains discovery-only regardless of predictive result. [asserted]
-- If OpenRouter's automatic router produces any unattended false admit that Consilience's
+- If OpenRouter's automatic router produces any unattended false admit that Consilient's
   β-gated route rejects, it remains advisory; if it matches every verdict and uses at least
   20% less cost or elapsed time, ADR-0027's prohibition reopens. [asserted]
 - Hitting the run or spend cap without satisfying a promotion condition is an honest
@@ -634,7 +648,7 @@ adherence as a diagnostic only.
 
 ### EXP-26 · Typed native control versus transcript injection `BLOCKED: coordinator event prototype + three live adapters`
 **Decides:** the real-time control section of `agent-identity-and-collaboration.md` — whether
-Consilience needs typed `context_next`/`steer`/`interrupt` commands and staged ACKs in v0.
+Consilient needs typed `context_next`/`steer`/`interrupt` commands and staged ACKs in v0.
 **Precondition:** a coordinator inbox/outbox prototype; Codex app-server plus at least two
 of Cursor ACP, OpenCode server and a subscription-safe Claude Code control path; 30 fixture
 runs whose next invalid action is observable; no metered fallback.
@@ -679,9 +693,12 @@ elapsed time; recovery after restart.
 > tests including one per forbidden action. A change feed may only *invalidate*; only an
 > authenticated account read may ever credit resource state.
 >
-> **Owed and not yet built:** the dispatch-time version/capability handshake (procedure step 4)
-> and the three injected fixtures (step 5). Neither blocks the clock, and both must land before
-> the window closes or the run cannot answer its own question.
+> **Built and verified on 20 August 2026:** the dispatch-time version/capability handshake
+> (procedure step 4) and the three injected fixtures with refusal tests (step 5) landed in
+> `handshake.py`, `injected_fixtures.py`, `test_handshake.py` and `test_injected_fixtures.py`.
+> Live zero-inference probes against Claude Code (2.1.237), Codex (0.148.0) and Cursor
+> (2026.08.11-e8db854, tier Ultra) pass; all 47 exp27 tests pass. Promotion verdict remains
+> **insufficient evidence** pending completion of the 30-day collection window. [measured]
 **Decides:** ADR-0029 — whether vendor change monitoring earns v0 scope as an early-warning
 and invalidation layer, while authenticated resource state remains a separate authority.
 **Phase-A result:** all six fixed endpoints returned HTTP 200 and the resource-mutation
@@ -724,7 +741,7 @@ resource-ledger mutation originating from change intelligence.
   lower the threshold. [asserted]
 
 ### EXP-28 · Prompt detail, feedback tone and resistance to false correction `BLOCKED: frozen fixtures + three admitted runtimes`
-**Decides:** whether Consilience should default to a lean task contract, whether calibrated
+**Decides:** whether Consilient should default to a lean task contract, whether calibrated
 constructive feedback changes verified outcomes, and whether generic praise or scathing
 correction earns any performance role.
 **Precondition:** six immutable synthetic fixtures with deterministic external verifiers —
@@ -1315,6 +1332,1306 @@ exceeded: cut to one question (goal achieved: fully/partially/no), drop sampling
 10 closes, and re-measure. If the one-question form also breaches, asked feedback is
 retired entirely and the outcome record runs on derived signals alone. The β-verdict
 prompt is never sacrificed to keep these prompts alive.
+
+### EXP-43 · Retro-verification of historical commits via forward test replay `DONE 20 Aug 2026 — see experiments/exp43/findings-exp43.md`
+**Decides:** whether replay of future test suites against historical commits (with parent-commit
+control) provides an automated, human-free ground truth for β = P(accept | bad), replacing
+the noisy revert/hotfix proxy without requiring human maintainer triage.
+**Precondition:** target repository git history; isolated scratch worktree/clone; deterministic unit
+test runner; strictly no mutation of target repository.
+**Procedure:**
+1. Draw a fixed sample of historical merge commits ($N=5$ pilot, $N=50$ primary evaluation).
+2. For each merge commit $C_i$, identify its first parent $P_i$.
+3. Overlay the later test suite (unit tests from HEAD or forward revision $C_i + \Delta$) onto both
+   $P_i$ and $C_i$ in a detached scratch worktree.
+4. Execute the filtered deterministic test runner under single-instance file lock and process-tree
+   kill timeout.
+5. Classify the pair:
+   - `defect`: $P_i$ PASS $\land$ $C_i$ FAIL (candidate introduced a regression caught by later tests).
+   - `clean`: $P_i$ PASS $\land$ $C_i$ PASS (candidate satisfies later tests).
+   - `drift`: $P_i$ FAIL $\land$ $C_i$ FAIL (interface evolution / pre-existing incompatibility; unattributable).
+   - `enhancement`: $P_i$ FAIL $\land$ $C_i$ PASS (candidate added functionality asserted by later tests).
+   - `execution_error` / `timeout`: execution aborted.
+6. On contemporaneous green merges with valid parent baseline ($P_i$ PASS), compute:
+   $\beta_{\text{retro}} = \text{Count}(\text{defect}) / (\text{Count}(\text{defect}) + \text{Count}(\text{clean}))$.
+**Exclusions (mandatory):**
+- Live-model / LLM evaluation suites (`evals/`, prompt evaluations).
+- End-to-end browser suites (Playwright / Cypress).
+- External network/API calls, database migrations requiring live cloud services, and non-deterministic timing tests.
+**Measures:**
+- Discrimination rate: fraction of evaluated commits where $P_i \neq C_i$.
+- Drift rate: fraction where $P_i$ FAIL $\land$ $C_i$ FAIL (censored by interface evolution).
+- Median wall-clock cost per commit pair $(P_i, C_i)$.
+- $\beta_{\text{retro}}$ point estimate and Wilson 95% confidence interval.
+**Stopping rules (fixed before the run):**
+- If drift rate $> 80\%$ across the sample, retro-verification is structurally unviable as a universal
+  β oracle due to interface evolution $\rightarrow$ REJECT as general oracle, restrict to regression diagnostic. [asserted]
+- If discrimination rate $> 0$ with zero false-positive drift on known-clean historical baseline commits
+  and drift rate $\le 80\%$, retro-verification is ADMITTED as a mechanical ground truth for regression β. [asserted]
+- If fewer than 10 commits yield an evaluable parent-pass baseline ($P_i$ PASS), record `insufficient evidence`
+  — do not report a point estimate from single-digit denominators. [asserted]
+- Pilot stopping rule: If median commit pair execution exceeds 120 s wall-clock or produces process runaway,
+  halt pilot and tighten test filtering before any larger run. [asserted]
+**What it cannot decide:**
+- β on greenfield/additive PRs where the interface did not exist at $P_i$ (censored by the parent control);
+- Latent defects that were never discovered and never received a regression test (survivorship bias);
+- Defect severity or maintainer intent.
+### EXP-44 · Defect-proxy reliability vs repository AI-authorship share `READY` (registered 20 Aug 2026 — see public-corpus-study-design.md)
+**Decides:** whether SZZ and revert/hotfix defect-mining proxies remain valid under increasing
+AI authorship, or whether the defect-mining literature's foundational assumptions have expired.
+**Precondition:** 30 longitudinal public GitHub repositories with continuous history across
+2018–2026 (including CPython as primary human-review control); GitHub GraphQL API access; Python
+analysis scripts.
+**Procedure:**
+1. Ingest all merged PRs across three eras: Pre-AI (2018–2021), Early Adoption (2023–2024), and
+   High-AI (2025–2026).
+2. Classify commit AI-authorship share via explicit bot identities, git trailers, and PR tool signatures.
+3. Apply standard SZZ and 14-day hotfix proxies to extract candidate defect-inducing commits.
+4. Evaluate candidate labels against independent ground truth: developer-informed `Fixes:` links,
+   triaged bug issues, and retro-verifier regression test execution.
+5. Perform blind human/cross-model audit on a stratified sample of 300 candidate pairs (100 per era).
+6. Compute proxy precision, recall, and differential misclassification by file count and commit velocity across eras.
+**Measures:** proxy precision $P(\text{True Defect} \mid \text{Proxy Flag})$ by era; revert-to-hotfix ratio;
+proxy F1 against developer-informed oracles; correlation between AI-share and false-positive rate;
+size ratio between bad-and-red and bad-and-green cells.
+**Stopping rules (fixed before the run):**
+- Proxy precision in the High-AI era (2025–2026) is lower than the Pre-AI era (2018–2021) by
+  $\ge 20$ percentage points ($p < 0.01$) across the panel $\implies$ **The literature has expired.**
+  Defect proxies cannot be used on AI-authored code without primary ground-truth audits. Update research
+  position and publication draft P1. [asserted]
+- Proxy precision is invariant to AI share (change $\le 5$ percentage points across eras) $\implies$
+  **The hypothesis is refuted.** Proxy noise is an intrinsic baseline property of git history, not an
+  AI degradation effect. Cut the larger claim and restrict findings to corpus-specific noise. [asserted]
+- Revert arm fires $\ge 10\%$ in both human and AI eras $\implies$ Lack of reverts is an idiosyncratic
+  property of fix-forward private repos, not a universal property of AI workflows. [asserted]
+- If fewer than 60 audit pairs per era achieve unambiguous ground truth, the verdict is **insufficient evidence**.
+  Do not extrapolate from inconclusive audit samples. [asserted]
+**What it cannot decide:** whether AI code has higher *absolute* defect density in production (it measures
+*proxy reliability*, not code quality); whether closed-source commercial workflows match open-source
+GitHub practices; and $\beta$ for unverified local environments. [asserted]
+
+### EXP-45 · Condensation retention and consequential loss in longitudinal transcripts `DONE 20 Aug 2026 — see experiments/exp45/findings-exp45.md`
+**Run 20 Aug 2026 across 1,495 transcripts (535.7 MB, 203 unique sessions).** Evaluated 48 condensation
+and away-summary boundaries across 317,625 pre-boundary entity instances.
+**Headline:** Multi-week sessions are rare outliers (median 2.7 minutes, max 8.37 days); condensation
+is lossy ($R = 40.71\%$ [32.50%, 48.83%]), but **loss does not bite** (file re-read rate 0.50% (5/992),
+re-discovery rate 0.00% (0/599), aggregate $L_{\text{bite}} = 0.00\% < 1.0\%$).
+**Stopping rule 2 FIRED:** Condensation discards freely and safely; the perpetual memory / GNN harness
+architecture is **RETIRED** as solving a non-existent problem.
+**Decides:** whether condensation operates as a noisy verifier with measurable false-accept rate
+($\beta$ analogue: retention loss and consequential loss), and whether perpetual memory architecture
+is required or refutable.
+**Precondition:** `~/.claude/projects/` longitudinal transcript corpus (1,495 JSONL sessions, ~654 MB);
+deterministic local parser; scratch directory in `/tmp`. Strictly zero external API/model calls.
+**Procedure:**
+1. Ingest all JSONL session transcripts in `/mnt/c/Users/jpbpr/.claude/projects/` deterministically.
+2. Measure session longevity distributions (turn counts, record counts, wall-clock duration in days)
+   and condensation frequency (sessions containing `compact_boundary`, `isCompactSummary`/`compactMetadata`,
+   or `away_summary`). Test user claim of multi-week continuous sessions against measured corpus.
+3. For each condensation boundary $B_k$, extract the pre-boundary entity set $E_{\text{pre}}$ (file paths,
+   command signatures, code identifiers, constraint phrases) and post-boundary entity set $E_{\text{post}}$.
+4. Compute item retention rate: $R = |E_{\text{pre}} \cap E_{\text{post}}| / |E_{\text{pre}}|$.
+   - False-positive mode: incidental lexical matching of generic identifiers across distinct contexts.
+   - False-negative mode: synonymy/paraphrase where the concept survives but specific surface tokens differ.
+5. Compute consequential loss rate $L_{\text{bite}}$: fraction of dropped entities $E_{\text{pre}} \setminus E_{\text{post}}$
+   whose absence forces observable post-boundary re-reading (file re-read that was already read pre-boundary)
+   or re-discovery (re-running identical discovery commands/queries). Report un-needed loss and consequential loss separately.
+6. Compute survival correlations against pre-boundary features: recency (turn distance to boundary),
+   repetition frequency, origin channel (tool result vs user prompt vs assistant text), and whether the entity
+   was acted upon before condensation.
+**Measures:**
+- Condensation boundary frequency (% sessions, boundaries per session).
+- Session lifespan distribution (p50, p90, p99, max in records and days).
+- Overall entity retention rate $R$ with bootstrap 95% confidence interval.
+- Consequential loss rate $L_{\text{bite}}$ (re-read / re-query fraction among lost entities).
+- Rank correlation coefficients between survival and recency, frequency, and tool vs prose origin.
+**Stopping rules (fixed before the run):**
+- If retention rate $R \ge 98\%$ across all boundaries $\implies$ **Condensation is near-lossless.**
+  Condensation does not behave as an error-prone verifier; $\beta$ does not usefully generalise to it;
+  retire perpetual memory / GNN harness direction. [asserted]
+- If retention rate $R < 98\%$ but consequential loss $L_{\text{bite}} < 1.0\%$ $\implies$ **Loss does not bite.**
+  Condensation discards safely; subsequent work is not defect-inducing; retire dedicated memory layer
+  as unneeded complexity. [asserted]
+- If retention rate $R < 98\%$ and $L_{\text{bite}} \ge 1.0\%$ $\implies$ **Condensation is an error-prone verifier with bite.**
+  Admit condensation loss as an empirical $\beta$ domain; promote feature correlation profile to design baseline. [asserted]
+- If fewer than 10 sessions contain identifiable condensation boundaries or pre-boundary history is
+  structurally missing from transcripts, record **insufficient evidence** — do not extrapolate from single-digit sessions. [asserted]
+**What it cannot decide:**
+- Silent semantic errors where the model proceeds erroneously without emitting an observable re-read or tool check;
+- Paraphrased entity retention not captured by mechanical tokenization;
+- Non-Claude Code condensation mechanisms (Cursor, Codex, or native open-model contexts). [asserted]
+
+### EXP-47 · Mutation testing: direct measurement of verifier β and check independence `DONE 20 Aug 2026 — see experiments/exp47/findings-exp47.md`
+**Run 20 Aug 2026 across 1,931 first-order mutants on `src/consilient/` (104.1 s total, 0.054 s/mutant).**
+Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check`) separately and in composite.
+**Headline:**
+- Per-check $\beta$: `pytest` $\hat{\beta} = 0.3848$ [0.3633, 0.4067] (743/1,931); `mypy` $\hat{\beta} = 0.6981$ [0.6772, 0.7182] (1,348/1,931); `ruff` $\hat{\beta} = 0.9596$ [0.9499, 0.9675] (1,853/1,931).
+- Composite $\beta$: Raw $\hat{\beta}_{\text{raw}} = 0.3345$ [0.3138, 0.3559] (646/1,931); Corrected for 60 equivalent mutants: $\hat{\beta}_{\text{corr}} = 0.3132$ [0.2926, 0.3346] (586 true defects / 1,871 non-equivalent mutants).
+- **Stopping Rule 1 FIRED:** Corrected $\beta = 0.3132 \ge 0.20$. Invariant test guards have material blind spots (V0-18 `"spend_authorisation"`, unasserted `EventError` message strings, `wilson` interval defaults, and CLI formatting).
+- **Stopping Rule 3 FIRED (Check independence refuted):** $\chi^2 = 187.28, p < 10^{-15}$. Mutants surviving `pytest` survived `mypy` at 87.89% (vs 58.50% for killed mutants). ADR-0012's independent-product prior is refuted.
+**Decides:** whether mutation testing provides a direct, unconfounded empirical measurement of verifier false-accept rate $\beta = P(\text{verifier accepts} \mid \text{artefact is bad})$ without proxy labelling (revert/hotfix) or attribution drift; whether per-check outcomes (`pytest`, `mypy`, `ruff`) are statistically independent (speaking to ADR-0012's unknown-dependence assumption); and which invariants in `src/consilient/` possess the weakest automated guards.
+**Precondition:** `src/consilient/` source tree (~1,100 LOC across 5 modules); 92 passing invariant tests; clean `mypy` run; deterministic mutation harness using an upstream-first engine (`mutmut` BSD-3-Clause / `cosmic-ray` MIT) running under `uv`; isolated execution with timeout and process-tree kill. Mutating `tests/` is strictly prohibited.
+**Scope and mutant budget:** Complete census of all non-test Python files in `src/consilient/` (`__init__.py`, `events.py`, `projection.py`, `beta.py`, `cli.py`). A target generation of all syntactically valid first-order mutants generated by the engine's core operator set.
+**Operator set (explicit):**
+1. Comparison operator replacement (`==`, `!=`, `<`, `<=`, `>`, `>=`, `is`, `is not`, `in`, `not in`).
+2. Boolean and logical replacement (`True` $\leftrightarrow$ `False`, `and` $\leftrightarrow$ `or`).
+3. Binary/arithmetic operator replacement (`+`, `-`, `*`, `/`, `//`, `%`, `**`, `&`, `|`, `^`, `<<`, `>>`).
+4. Unary operator inversion / deletion (`not x` $\leftrightarrow$ `x`, `-x` $\leftrightarrow$ `+x`, `~x` $\leftrightarrow$ `x`).
+5. Constant and literal mutation (numbers, strings, `None` substitution).
+6. Statement mutation (removal of calls/assignments, break $\leftrightarrow$ continue, exception replacement).
+**Equivalent mutant handling:** All surviving mutants are audited and classified into: (a) true behavioural defect (verifiable regression in semantics); (b) equivalent mutant (AST/semantic no-op or unreachable/redundant defensive branch); (c) unclassifiable / ambiguous. True $\beta$ is computed over non-equivalent mutants: $\beta = (N_{\text{survived}} - N_{\text{equiv}}) / (N_{\text{total}} - N_{\text{equiv}})$. The unclassifiable fraction is reported as residual uncertainty.
+**Measures:**
+- Per-check $\beta$ for `pytest`, `mypy`, and `ruff`, with Wilson 95% score intervals.
+- Composite verifier $\beta_{\text{comp}}$ (fraction of non-equivalent mutants surviving all three checks simultaneously).
+- Pairwise contingency tables and statistical independence tests ($\chi^2$ test / mutual information) across check outcomes.
+- Guard vulnerability ranking: inventory of surviving mutants by module, line, invariant ID (e.g. V0-01, V0-18, V0-26, V0-27), and code path.
+- Computational cost: wall-clock time per mutant and total run duration.
+**Stopping rules (fixed before the run):**
+- If composite $\beta_{\text{comp}} \ge 0.20$ on the non-test source tree $\implies$ **High verifier false-accept rate.** Automated guards have significant blind spots; document the weakest invariants in `P2-guards.md` and trigger invariant hardening. [asserted]
+- If composite $\beta_{\text{comp}} < 0.05$ on non-test source tree $\implies$ **Strong verifier discipline.** The invariant suite + type checker provides tight containment; verify that survivors concentrate in cosmetic/render code rather than security/authority paths. [asserted]
+- If check outcomes exhibit statistically significant dependence ($p < 0.05$ on contingency test, e.g. $P(\text{survive pytest} \mid \text{survive mypy}) \neq P(\text{survive pytest})$) $\implies$ **ADR-0012's independence assumption is refuted.** The product of individual check error rates is invalid as a prior; composite $\beta$ must be measured directly. [asserted]
+- If fewer than 50 valid non-equivalent mutants are generated or execution fails to complete across all checks, the verdict is **insufficient evidence**. Do not extrapolate from uncompleted or underpowered sweeps. [asserted]
+**What it cannot decide:**
+- Generalisation of $\beta$ to non-Python repositories or unconstrained multi-file semantic edits;
+- Specification defects where tests and code agree on an incorrect invariant (oracle correctness);
+- Human cognitive error distributions (mutants simulate synthetic syntactic mutations, not real developer failure modes).
+
+### EXP-48 · Mechanical generation of the defective-guard catalogue via mutation survivor clustering `DONE 20 Aug 2026 — see experiments/exp48/findings-exp48.md`
+**Run 20 Aug 2026 across EXP-47's 586 non-equivalent surviving mutants (61 spatial clusters) vs P2's 25 defective guards.**
+**Headline:**
+- **Overall Catalogue Recall: 20.00% (5/25)** [8.9%, 39.1%]. 68.0% (17/25) of P2's catalogued guards live outside Python source code (in ADRs, CI workflows, governance rules, and research harnesses) where program mutation testing cannot operate.
+- **Code-Resident Recall: 62.50% (5/8)** [30.6%, 86.3%]. Recovers A1, A3, A6, A8, A14. The 3 missed code guards (A4, A5, A11) are killed by regression tests written for their fixes.
+- **Cluster Precision: 24.59% (15/61)**. 46 unmatched clusters (75.41%) represent unasserted CLI formatting (14 clusters / 182 mutants), gate regex parsing (12 clusters / 205 mutants), and unchecked exception strings, none of which represent claimed-but-inert invariants.
+- **Stopping Rules 2 & 3 FIRED (Structural Divergence):** Mutation testing cannot automate the guard catalogue. Guard vacuity is a claim-vs-implementation mismatch requiring governance intent, whereas mutation testing measures AST code-vs-test sensitivity.
+**Decides:** whether EXP-47's 743 `pytest` mutation survivors mechanically regenerate the 25 hand-curated inert/defective guards from `docs/50-publications/P2-guards.md` (turning an $n=1$ existence claim into an automatable prevalence method), or whether mutation survival and "guard-cannot-fail" are structurally distinct phenomena (because guard vacuity is a claim-vs-implementation mismatch requiring human/governance intent, whereas mutation testing only measures code-vs-test sensitivity).
+**Precondition:** EXP-47 mutation results file (`docs/10-research/experiments/exp47/results-exp47.json`) containing 1,931 mutants and 743 `pytest` survivors mapped to file, line, AST operator, and mutation details; `docs/50-publications/P2-guards.md` anchoring 25 hand-catalogued defective guards (A1–A11, A13, A14; A12, A15; B1–B10) plus 1 control (C1).
+**Procedure:**
+1. Parse the 743 `pytest` survivors from EXP-47 deterministically and cluster them by file, function/block, and code region (line ranges and AST context).
+2. Map each of the 25 hand-catalogued defects from P2 to its underlying source/artefact location: identify which are in-scope of Python source mutation (`src/consilient/`) versus out-of-scope governance/CI/workflow/design artefacts (ADR gates, CI yaml, docstrings, git metadata, external systems).
+3. Compute bidirectional correspondence:
+   - **Recall**: Proportion of P2's catalogued guards (overall and source-resident subset) recovered by survivor clusters.
+   - **Precision**: Proportion of mutation survivor clusters that correspond to real hand-found guards or newly identified unstated invariant failures vs noise/untested cosmetic helpers.
+4. Inspect the top unmatched survivor clusters: determine whether they represent genuine uncatalogued guards that cannot fail (with stated claims) or unasserted helper/formatting code.
+**Measures:**
+- Out-of-scope fraction of P2 catalogue (artefacts lacking Python mutants: ADRs, CI workflows, logs, external processes).
+- Recall on total P2 catalogue (out of 25) and recall on code-resident P2 subset.
+- Precision of survivor clusters (clusters matching real defective guards / total clusters).
+- Classification of top non-P2 survivor clusters (stated invariant defect vs cosmetic/helper code).
+**Stopping rules (fixed before the run):**
+- If recall on code-resident P2 guards $\ge 70\%$ AND precision of substantive non-cosmetic clusters $\ge 50\% \implies$ **Catalogue is mechanically automatable.** Mutation survivor clustering can regenerate the guard catalogue and scales to arbitrary repositories without manual audit. Update P2 positioning to claim automated prevalence. [asserted]
+- If recall on total P2 catalogue $< 35\%$ OR code-resident recall $< 50\% \implies$ **The correspondence is too weak to automate (Structural divergence).** Guard-cannot-fail is a claim-versus-implementation mismatch that mutation testing cannot see; P2's hand-audit method is structurally necessary rather than an artefact of early effort. [asserted]
+- If $\ge 50\%$ of P2's 25 guards live outside Python source (in ADRs, CI workflows, git metadata, external projections) $\implies$ **Domain boundary refutation.** Mutation testing over program code has no access to governance/orchestration layers where most vacuous checks live. [asserted]
+- If fewer than 100 survivors are parsed or data is missing location metadata $\implies$ **Insufficient evidence.** Do not extrapolate from corrupted or truncated survivor records. [asserted]
+**What it cannot decide:**
+- Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
+- Higher-order multi-point semantic failures not captured by single-mutant operators.
+
+### EXP-58 · Harness uplift on a mainstream eval — and the number nobody else reports `READY`
+**Pre-registered 20 Aug 2026. Not run.** The flagship proof experiment.
+**Decides:** whether attaching this harness to a model produces a transformative, replicable gain on
+a benchmark outsiders already trust — and whether the gain is real or bought.
+**Joe's framing:** *"plug our harness onto any model and gain an average of x% on [mainstream eval].
+We are looking for transformative differences, proof."* That is the right ambition. This entry adds
+the two things that make such a claim believable rather than dismissable.
+
+**Benchmark:** SWE-bench Verified (500 human-validated instances). Chosen because it is the
+benchmark this field actually argues about, its instances are real repository issues, and its
+oracle is a test suite rather than a judge — which matters for the second measure below.
+
+**Arms — and the discipline is the whole design.** Harness-versus-bare comparisons are where this
+field cheats, almost always unintentionally:
+- **same model**, same weights, same decoding parameters;
+- **same token budget and same retry budget** — a scaffold that wins by spending five times as much
+  has not won, it has paid;
+- **same repository snapshot and same environment image**;
+- the only difference is the scaffold.
+**Cost per resolved instance is a primary result, not a footnote.**
+
+**Measure 1 — resolve rate.** The number everyone reports. Report the paired difference with a
+bootstrap interval, not two separate percentages, because the instances are the same.
+
+**Measure 2 — β on the benchmark, which nobody reports.** SWE-bench marks an instance resolved when
+its selected `FAIL_TO_PASS` and `PASS_TO_PASS` tests pass. **Those tests are an oracle, and oracles
+have error rates.** For every instance either arm marks resolved, run the repository's **full** test
+suite, not the benchmark's selected subset. An instance that passes the selected tests and fails the
+full suite is a **false accept** — a patch the benchmark called correct and which broke something.
+That ratio is β for SWE-bench itself.
+This is the differentiated claim and it is measurable with the corpus as it already ships: **every
+system on the leaderboard reports pass@1 and none reports how many of its passes are wrong.**
+
+**Sampling:** a stratified subsample if the full 500 exceeds the machine's budget, drawn and frozen
+**before** any run, with the seed committed. Power stated in advance: at a resolve rate near 0.4, a
+paired design needs roughly 200 instances to detect a 10-point difference at conventional power —
+**say so before running, not after.**
+
+**Stopping rules (fixed before the run):**
+- If the paired resolve-rate interval **excludes zero and the harness is higher at equal or lower
+  cost** $\implies$ **the uplift claim is supported** and is publishable with the cost figure
+  attached. [asserted]
+- If the harness is higher **only at materially greater cost** $\implies$ report it as a
+  cost/quality trade, never as an uplift. A scaffold that buys accuracy with tokens is a known and
+  uninteresting result. [asserted]
+- If the paired interval **contains zero** $\implies$ **no uplift on this benchmark.** Report it.
+  This project has published every result that went against it today and this one is not exempt.
+  [asserted]
+- If measure 2 finds β **above 0.10 for either arm** $\implies$ the leaderboard's own oracle admits
+  more than one bad patch in ten, and **that finding outranks the uplift result** regardless of which
+  way the uplift went. It should be the paper. [asserted]
+- If fewer than 60 instances complete in either arm $\implies$ **insufficient evidence**; report no
+  difference. [asserted]
+
+**What it cannot decide:** whether uplift transfers to work unlike SWE-bench — greenfield
+construction, multi-repository change, anything without an existing test suite to serve as oracle.
+EXP-43 already measured that this project's own retro-verifier is **blind to 72.8–75.9%** of merges
+because they add new components. SWE-bench is a repair benchmark and the same censoring applies.
+**State that before the numbers, not after.**
+
+**Precondition and honest blocker:** the harness does not route yet. ADR-0015 Gate A and Gate B both
+fail today, so the "harness arm" as of tonight is the observe-only increment plus dispatch, not the
+routing system the claim will eventually be about. **Measure 2 does not depend on that and can run
+first.**
+
+
+### EXP-56 · Per-model β on a label-free corpus, and the CEILING on what routing can buy `READY`
+**Pre-registered 20 Aug 2026. Not run.** Flagship of the routing programme.
+### EXP-56 · Per-model β on a label-free corpus, and the CEILING on what routing can buy `STOPPED 20 Aug 2026 — see experiments/exp56/findings-exp56.md`
+**Pre-registered 20 Aug 2026. Preflight stopped; scoring not run.** Flagship of the routing programme.
+**Decides:** which model family should do which task — and, before that, whether the question has an
+answer worth acting on. ADR-0003 (no learned routing policy in v0) was decided on argument; this
+measures it.
+**The asset that makes this possible, and it is unusual.** Joe holds flat-fee access to **204
+models** through one Cursor subscription. Per-token pricing is why cross-model studies at this
+breadth are normally not run; here the marginal cost of the 200th model is wall-clock, not money.
+That is a genuine research position and it should be spent on the question nobody else can afford
+to ask.
+**The design's one real idea — measure the CEILING, do not build a router.**
+A router cannot beat the best possible assignment of items to models. So construct the
+**hindsight-optimal router**: for every item, retrospectively pick the model that got it right.
+That is an upper bound no real router can exceed, and it is computable from the same runs that
+produce the per-model rates. **If the ceiling does not clear the best single model, no router can,
+and the routing question is closed without a router ever being written.**
+**Corpus:** EXP-47's 1,931 first-order mutants (bad by construction, mechanical ground truth, no
+human labels) plus unmutated controls (good by construction). Reuses the EXP-08 critic seam.
+**Sample, fixed before the run:** 16 models stratified across families (Anthropic, OpenAI, Google,
+xAI, Moonshot, Zhipu) and effort tiers, at **n = 120 items each** — 60 mutated, 60 control. At
+β ≈ 0.3 that gives a Wilson half-width near ±0.09, enough to separate families that differ by more
+than 20 points and honestly insufficient to separate near-neighbours. **That limitation is accepted
+in advance rather than discovered afterwards.**
+**Measures:** per-model β and α with Wilson intervals; per-model wall-clock and token cost;
+the hindsight-optimal ceiling and its interval; agreement matrix between every model pair; and the
+**variance across models**, which decides whether the routing question is live at all.
+**Stopping rules (fixed before the run):**
+- If the hindsight-optimal ceiling's interval **overlaps the best single model's** $\implies$
+  **routing cannot improve quality on this task class.** ADR-0003 is vindicated on evidence, and the
+  harness should route on cost, availability and headroom — never on predicted quality. [asserted]
+- If the ceiling beats the best single model with **non-overlapping intervals** $\implies$ routing
+  has measurable headroom, and the gap is the entire prize available to any router. Report the gap,
+  not a router. [asserted]
+- If per-model β spans **less than 10 percentage points** across all 16 $\implies$ **model choice
+  does not matter for this task** and the routing question is moot here regardless of the ceiling.
+  This is the outcome that would most embarrass the premise and it must be reported first if it
+  occurs. [asserted]
+- If any model refuses or fails on more than 20% of items, it is reported as **unusable for this
+  task** rather than scored, because a refusal is not a wrong answer. [asserted]
+**What it cannot decide:** anything about tasks unlike accept/reject on a small mutated diff.
+Long-horizon planning, open-ended design and multi-file refactoring are exactly where routing is
+usually claimed to matter, and this corpus says nothing about them. **State that before the
+numbers.**
+
+### EXP-57 · The marginal value of context — does more context buy accuracy, or cost? `DONE 20 Aug 2026 — see experiments/exp57/findings-exp57.md`
+**Pre-registered 20 Aug 2026 and run unaltered the same day. 640 `claude -p` calls
+(512 census + 128 determinism control) over 128 items from EXP-47's corpus — 64 defect-introducing
+and 64 defect-removing changes, disjoint mutants, seed 57. One model (`claude-sonnet-5`), context
+volume the only variable.**
+**Headline:**
+- $\hat\beta$: minimal **0.0469** [0.0161, 0.1290]; relevant **0.0469** [0.0161, 0.1290]; full
+  **0.0313** [0.0086, 0.1070]; padded **0.0313** [0.0086, 0.1070]. $\hat\alpha$: 0.0313, 0.0469,
+  0.0469, 0.0156. All at $n = 64$ per class per arm, 0 unparsable replies in 640 calls.
+- Input tokens per call: **921 → 1,601 → 21,479 → 41,686**, a **45.3×** range (67.7× counting the
+  auxiliary model the CLI bills alongside the answering one). Latency 3.8 s → 5.2 s.
+- **All eighteen pairwise difference intervals span zero** (Newcombe, 95%). Item-level: minimal and
+  full give different verdicts on 8 of 128 items, **4 wrong each way**, exact McNemar $p = 1.000$.
+- **Stopping rule 4 FIRED — `insufficient power`.** Reported as pre-registered: the intervals, and
+  no trend narrated across them.
+- **The padding rule did not fire.** `padded` has the *lowest* error rate (0.0234 vs full's 0.0391),
+  difference interval [−0.0330, +0.0671]. **No measured context poisoning** at 41,686 tokens of
+  plausible irrelevant code, at this $n$.
+- **The adverse rule did not fire and did not come close.** Full's $\beta$ is below minimal's by one
+  item in 64 on an interval six times wider than the gap. No evidence for "send everything, build
+  nothing"; equally, no evidence against it finer than ~10 percentage points.
+- **Determinism control: 4 of 128 re-run verdicts flipped — 96.88% agreement, 3.1%
+  irreproducible.** The largest between-arm gap is 1.6 points. **The noise floor is larger than
+  every difference measured**, which is why no trend may be read off these arms.
+- Measurement facts the registration did not anticipate: the default CLI invocation carries
+  **75,285 input tokens** before the prompt (stripped to ~600 here); the CLI bills a **second
+  model** on the same prompt (20,697 tokens/call on `padded`); and under 6-way concurrency **125 of
+  512 calls returned a verdict with no usage block**, which recorded as zeros would have understated
+  `padded` sixfold.
+- Corrections to the pre-registration, none of them applied to the design: it fixes **no sample
+  size** while offering "insufficient power" as a verdict; **"materially beats" and "≈" are
+  undefined**; it has **no floor-effect guard** and the run hit the floor (~2,400 items per class per
+  arm would be needed to resolve the gap observed); "the interval on each pairwise difference" does
+  not say **paired or unpaired** though all arms share items; and the **`relevant` arm is
+  half-degenerate** — 65 of 128 items have no test naming the changed code, because the corpus is
+  made of mutants that survived pytest. See findings §6.
+**Run result, 20 Aug 2026:** the preflight stopped before scored calls because EXP-47's committed
+JSON contains no item-level killed rows, no item-level equivalent rows and no source snapshot
+identity; the registered survivor/killed sample therefore cannot be drawn without a post hoc
+amendment. [measured] No registered stopping rule was evaluable. [algebra] No per-model statistic
+was produced. [measured] One unscored Cursor identity probe reported a display name but not
+served-weight identity and is recorded as `unknown:not-reported-by-runtime`. [measured] The
+pre-registration above is preserved unchanged apart from this status and result note. See
+`experiments/exp56/findings-exp56.md`.
+
+### EXP-57 · The marginal value of context — does more context buy accuracy, or cost? `READY`
+**Pre-registered 20 Aug 2026. Not run.**
+**Decides:** whether just-in-time context engineering is worth building. Joe asked for
+"dynamic/just-in-time prompting/context engineering"; this asks first whether context volume
+changes the answer at all.
+**Why it is worth running rather than assuming.** EXP-45 measured condensation retention at
+**40.71%** with consequential loss of **0.00%** [measured] — most of what was dropped was not
+load-bearing. And Grok's first authenticated run spent **33,344 input tokens** answering *"reply
+with the single word: ok"* [measured]. Both point the same way and neither measures the thing
+directly.
+**Design — four arms, same items, same model, context volume the only variable:**
+
+| arm | what the model sees |
+|---|---|
+| **minimal** | the diff alone |
+| **relevant** | the diff plus the tests that cover it |
+| **full** | the diff plus the whole source tree |
+| **padded** | full, plus a fixed body of confidently irrelevant material |
+
+**Measures:** β and α per arm with Wilson intervals; input tokens per arm; and the interval on each
+pairwise difference, because a difference whose interval spans zero is not a difference.
+**Stopping rules (fixed before the run):**
+- If **minimal ≈ full** $\implies$ context volume is cost without benefit on this task, and
+  just-in-time context engineering is worth building for the cost saving alone. [asserted]
+- If **full materially beats minimal** $\implies$ **the premise is wrong**: send everything, and
+  build nothing. This outcome contradicts what Joe asked for and must be reported as loudly as the
+  other. [asserted]
+- If **padded is worse than full** $\implies$ irrelevant context actively degrades the answer. That
+  is context poisoning with an interval on it, and it makes retrieval quality a correctness concern
+  rather than a cost one. [asserted]
+- If all four arms overlap $\implies$ **insufficient power**; report the intervals and do not
+  narrate a trend across overlapping bars. [asserted]
+**What it cannot decide:** whether the effect holds for tasks whose difficulty scales with context —
+which is most real work, and the honest reason this experiment is a first step rather than an
+answer.
+
+### EXP-58 · β for SWE-bench Verified's own oracle — how often does a *resolved* patch break something the oracle never ran? `PHASE 1 RUNNING`
+**Pre-registered 20 Aug 2026, 23:20 UTC+1, before any β-relevant run.** The dispatching brief
+(`brief-swebench.md`) stated that this entry already existed and that "its stopping rules were fixed
+before any data". **It did not exist.** `rg -n "EXP-5[89]" docs/` returned only the brief itself.
+The number was free, so the identifier stands, but the pre-registration is this text and its
+provenance is the commit that introduced it — not an earlier decision it can be attributed to.
+Everything below was written after artefact reconnaissance (availability, licence, file layout,
+runtime calibration) and before a single β-relevant test run.
+
+**Decides:** whether the oracle that the entire coding-agent field grades itself against admits
+patches that break the repository outside the tests it chose to run — and at what rate. If it does,
+β is not a property this project invented to justify itself; it is a measurable property of the
+field's most trusted verifier, and `docs/decisions/0002` gets external support from the one place
+that would be hardest to dismiss.
+
+**Why this is not the same finding as SWE-Bench+ or METR, and the brief overclaimed it.** The brief
+asserted "every system on that leaderboard reports pass@1; none reports how many of its passes are
+wrong". That is false, and this repository's own bibliography is what falsifies it. **SWE-Bench+**
+(arXiv:2410.06992) found 32.67% of successful patches involved solution leakage and 31.08% were
+suspicious through weak tests, dropping SWE-Agent+GPT-4 from 12.47% to 3.97% [cited]; **METR**
+(*Many SWE-bench-Passing PRs Would Not Be Merged*, Mar 2026) measured automated pass rates roughly
+24 pp above maintainer merge rates [cited]. Both are false-accept measurements on this benchmark and
+both predate this entry.
+
+What is left, and it is narrower than the brief's framing:
+
+| prior work | failure mode measured | how |
+|---|---|---|
+| SWE-Bench+ | the selected tests were **too weak** to distinguish a wrong fix; the answer **leaked** into the issue text | manual inspection of a sample, on SWE-bench (original / Lite) |
+| METR | the patch would not be **accepted by a maintainer** | human judgement |
+| **EXP-58** | the patch **breaks a test the oracle never ran** | mechanical execution, on SWE-bench **Verified** |
+
+Those are three different things. A patch can be specific, unleaked, and mergeable-looking, and still
+regress a module the selected tests do not touch. SWE-bench Verified exists *because* OpenAI filtered
+the under-specification SWE-Bench+ found, so a Verified-era measurement is not a re-run of it.
+**Unselected regression is the oracle's structural blind spot rather than a defect in any instance's
+test choice**, and no source in `bibliography.md` measures it. If a source does, this experiment's
+value is to replicate it and that is still a win. [asserted]
+
+**Why the blind spot is structural, and this is the finding that made the design.** `eval.sh` for
+`astropy__astropy-12907` runs `pytest -rA astropy/modeling/tests/test_separable.py` — one file — and
+`FAIL_TO_PASS` ∪ `PASS_TO_PASS` for that instance is exactly the 15 tests that file contains
+[measured, 20 Aug 2026]. The selected set equals the observed set. So **mining the published logs
+cannot find a single unselected failure**: the oracle's selection *is* its execution. The only way to
+observe the blind spot is to run tests the benchmark never ran, which is why this phase needs Docker
+even though it needs no model. That killed the cheaper design the brief proposed and it is better
+known now.
+
+**Artefact and licence position, recorded 20 Aug 2026.**
+- Predictions and evaluation artefacts are **not** in `github.com/SWE-bench/experiments` any more —
+  submission folders hold only `README.md`, `metadata.yaml`, `results/`. The brief's premise was out
+  of date. They are in the S3 bucket `swe-bench-submissions`
+  (`analysis/download_logs.py`, `S3_BUCKET`), as
+  `verified/<system>/logs/<instance_id>/{patch.diff,report.json,test_output.txt,eval.sh}`.
+- The repository README says an AWS account is required. **It is not** — the bucket is readable with
+  `Config(signature_version=UNSIGNED)`, and a plain unauthenticated
+  `GET https://swe-bench-submissions.s3.amazonaws.com/?list-type=2&prefix=verified/...` returns 200
+  [measured]. **No credential is created, held or used**, which is what makes this phase compatible
+  with the 20 Aug credential-containment rule rather than an exception to it.
+- **Licence: none.** `GET /repos/SWE-bench/experiments` returns `"license": null` and the tree has no
+  `LICENSE` file [measured]. The README states the logs "are publicly accessible and meant to enable
+  greater reproducibility and transparency of the experiments conducted on the SWE-bench task" — a
+  statement of purpose that covers reading them for exactly this, and **not** a redistribution grant.
+  **Consequence, and it is a hard rule for this experiment: no patch, log, diff or excerpt from those
+  artefacts is written into this repository.** Only derived measurements, instance identifiers and
+  test identifiers are recorded. Test identifiers are facts about the upstream open-source projects,
+  not content from the submissions.
+
+**Design — three arms per instance, one variable: what was applied, and what was run.**
+
+| arm | model patch applied | tests run |
+|---|---|---|
+| **baseline** | no | full suite |
+| **patched** | yes, one arm per resolved system | full suite |
+| **oracle** | yes | the selected tests — *taken from the published `report.json`*, not re-run |
+
+The oracle arm is not re-executed. The published `report.json` **is** the official harness's verdict,
+accepted onto the leaderboard; re-running it locally would produce a weaker artefact than the one the
+benchmark already stands behind. The brief asked for the official harness for that half and this
+satisfies the intent more strongly than complying literally would. [asserted]
+
+**The full-suite command is derived mechanically, never hand-written.** Take the instance's own
+`eval.sh`, and replace its test-selection arguments with the first path component of the first
+selected test path (`astropy/modeling/tests/test_separable.py` → `astropy`), or delete them where
+there are none (Django already passes module labels only). Everything else — the conda environment,
+the editable install, the `git checkout <base_commit> <test files>` reset, the gold test patch — is
+byte-identical to the official script. A hand-written per-repo table would be twelve judgement calls
+with no audit trail; this is one rule with twelve outputs, and the rule is in the results JSON.
+
+**Classification, fixed before the run.** For system *s* on instance *i*, over the full-suite runs:
+- `regressed(s,i)` = tests **PASSED in baseline** and **FAILED or ERRORED in patched**. Requiring a
+  baseline pass is what excludes pre-existing failures, and the baseline run is mandatory: **without
+  it the headline is meaningless** and it is the most likely way this goes wrong.
+- `unselected(s,i)` = `regressed(s,i)` minus (`FAIL_TO_PASS` ∪ `PASS_TO_PASS`). A selected-test
+  failure is not a blind spot — the oracle would have caught it, and by the definition of *resolved*
+  there are none.
+- **false accept** ⟺ `unselected(s,i)` is non-empty **after flake confirmation**.
+- **Flake confirmation is not optional and every candidate gets it.** Each candidate false accept is
+  re-run — baseline and patched arm both, fresh containers — and a candidate whose unselected
+  regression does not reproduce is reclassified **flaky** and excluded from the numerator, staying in
+  the denominator. A test that fails intermittently is noise about the harness, not evidence about
+  the patch.
+- Excluded as **noise**, with the count and reason reported: runs that time out, containers that fail
+  to start, patches that fail to apply, and any instance whose baseline run does not produce a
+  parseable test segment. An instance excluded for any of these reasons is excluded for **all** its
+  systems, so exclusion cannot correlate with a system's quality.
+- Statuses are read with **SWE-bench's own parsers** (`MAP_REPO_TO_PARSER_PY`, `swebench` 5.0.2,
+  installed in an experiment-local venv outside this repository — **no dependency is added here**).
+  Writing twelve parsers would put the measurement's most disputable step in our own hands.
+
+**Sample, frozen before the run — see `experiments/exp58/sample-exp58.json`.** Frame: SWE-bench
+Verified instances resolved by **at least one** of three submitted systems, because β is defined only
+over accepted patches. The three systems, chosen for architectural spread rather than score:
+`20250807_openhands_gpt5` (agentic scaffold, frontier model, 359 resolved),
+`20250522_tools_claude-4-sonnet` (minimal tool loop, frontier model, 362),
+`20241028_agentless-1.5_gpt4o` (non-agentic pipeline, weaker model, 194). Stratified by repository in
+proportion to the frame, `random.Random(20260820)`, **instance identifiers and seed committed before
+the first run**.
+**Power, stated in advance.** The unit of β is a *patch*, not an instance, so 30 instances yields
+roughly 65 patches; at β ≈ 0.1 that is a Wilson half-width near **±0.07** — wider than the ±0.06 the
+brief asked for, and the honest cost of the baseline and flake-confirmation runs the brief also asked
+for. Patches on the same instance are **not independent**; the patch-level Wilson interval is
+therefore reported **alongside** per-system intervals and an instance-clustered interval, and the
+patch-level figure is never quoted alone.
+
+**Measures:** β for the oracle, pooled and per-system, with Wilson 95% intervals; the pre-existing
+failure count per instance (the baseline, reported before the headline); exclusions with reasons; the
+number of distinct unselected tests broken per false accept; and the flake rate from confirmation
+re-runs.
+
+**Stopping rules (fixed before the run):**
+- If pooled β's interval **excludes 0** ⟹ **the benchmark's oracle admits regressions it never looked
+  for**, at a measured rate. ADR-0002's premise holds on the field's own instrument, and the correct
+  reading is about the oracle, not about anyone's system. [asserted]
+- If pooled β's interval **includes 0** ⟹ **on this sample the oracle's blind spot is not detectably
+  populated.** That is evidence *against* the project's rhetoric about test suites and it must be
+  reported first if it occurs. The honest conclusion is then that SWE-bench Verified's selected tests
+  are a better proxy for the full suite than this project has been assuming. [asserted]
+- If per-system β intervals are **mutually non-overlapping** ⟹ the finding is about those systems,
+  not the benchmark, and must be written that way. [asserted]
+- If per-system β intervals **all overlap** ⟹ the finding is about the benchmark. Those are different
+  papers and the choice between them is made by this rule, not after seeing which is more
+  interesting. [asserted]
+- If **more than 40%** of sampled instances are excluded as noise ⟹ **the instrument is the finding**
+  and no β is reported from this phase. A β computed on the survivors of a 40% attrition is a
+  measurement of which repositories have stable test suites. [asserted]
+- If the flake-confirmation step reclassifies **more than half** of candidates ⟹ report the flake
+  rate as the primary result and β as provisional. [asserted]
+
+**What it cannot decide.**
+- **It is a lower bound, and the direction matters.** The full suite is still a test suite. A patch
+  that is wrong in a way no test in the repository exercises is invisible here and is counted as a
+  correct accept. Every number this produces understates β.
+- Nothing about **why** a patch regressed, and nothing about severity: one broken test and forty
+  broken tests are both one false accept.
+- Nothing about the leaderboard's *ranking*. β is measured over each system's own accepted patches,
+  so a system that resolves fewer instances is not thereby better.
+- Nothing about **this project's** β, which is separately measured at 0.3132 and is not comparable —
+  different artefacts, different oracle, different task.
+- **It does not license benchmark scores as an evaluation target.** ADR-0013 chose repository history
+  over benchmarks and this does not reopen it: the benchmark is the *object of measurement* here, not
+  the yardstick. If this entry is ever cited to justify grading the harness on SWE-bench, it is being
+  misused.
+
+**Phases.** *Phase 1* (this entry, running): three systems, the frozen sample, the full pipeline
+end-to-end. *Phase 2* (not authorised by this entry): more systems and a larger sample, and a second
+oracle-blind-spot probe using mutation of the patched source rather than the patch itself.
+
+### EXP-52 · Does agent consensus reduce error, or reproduce it? `READY`
+**Pre-registered 20 Aug 2026, before any arm was run. Registered because a refusal was made on
+theory and Joe was right that theory is not measurement.**
+**Decides:** whether swarm consensus — the largest single mechanism in `ruvnet/ruflo`, and the one
+this project refused in `ruflo-assessment-2026-08-20.md` — reduces the false-accept rate, or merely
+reproduces a single agent's error at N times the cost. **It also tests ADR-0010 against itself**,
+which is why it is worth running rather than arguing: if voting over shared evidence materially
+beats a single agent, ADR-0010 is too strong and Ruflo is right.
+**Precondition:** EXP-47's mutant corpus, already committed. Each non-equivalent mutant is a
+known-bad artefact with mechanical ground truth and no human labelling — the same property that made
+EXP-47 possible.
+**Design — four arms over the same items:**
+
+| arm | agents | evidence each sees | what it isolates |
+|---|---|---|---|
+| **1 Single** | 1 | the mutated file and the task | the baseline |
+| **2 Consensus, same family** | N, one family | *identical* context | voting alone |
+| **3 Consensus, cross-family** | N, different families | *identical* context | family diversity without evidence diversity |
+| **4 Cross-family, different evidence** | N, different families | **different views** — one the diff, one the tests, one the specification | ADR-0010's compliant configuration |
+
+All four use the same majority rule and the same items. **Arm 2 versus arm 4 is the decisive
+comparison**: identical voting machinery, different evidence bases.
+**Measures:** β and α per arm with Wilson 95% intervals; pairwise agreement between agents within
+each arm; cost per decision in wall-clock and tokens; and the fraction of items where the arm
+differs from arm 1 at all — a consensus that never overturns the single agent is decorative
+regardless of its β.
+**Stopping rules (fixed before the run):**
+- If arm 2's β interval overlaps arm 1's $\implies$ **voting over shared evidence adds nothing.**
+  Consensus is echo at N times the cost, the refusal in the Ruflo assessment stands on measurement
+  rather than on the theorem alone, and this becomes the empirical support ADR-0010 currently
+  lacks. [asserted]
+- If arm 2's β is materially **below** arm 1's $\implies$ **ADR-0010 is too strong.** Agreement
+  between agents sharing evidence does carry information, the theorem's assumptions do not transfer
+  to this setting, and the refusal must be withdrawn and Ruflo's mechanism reconsidered for
+  adoption. **This outcome goes against the project and must be reported as loudly as the other.**
+  [asserted]
+- If arm 4 beats arms 2 and 3 with non-overlapping intervals $\implies$ **the different class of
+  facts is what helps, not the voting.** That is the strongest available support for the project's
+  central constraint and the clearest argument against buying consensus machinery. [asserted]
+- If arm 3 ≈ arm 2 $\implies$ **family diversity without evidence diversity is not diversity.**
+  Directly relevant to the Cursor/xAI finding, which asks whether a four-family panel is really
+  four. [asserted]
+- If fewer than 60 adjudicable items complete in any arm, the verdict is **insufficient evidence**
+  and no arm is compared. [asserted]
+**What it cannot decide:** whether consensus helps on tasks *unlike* mutation detection —
+open-ended design, long-horizon planning, or work with no mechanical oracle. Mutants are the corpus
+that makes ground truth free, and that is exactly the population where a single agent is already
+strong. **This is the honest limitation and it should be stated in any write-up before the result
+is.**
+
+### EXP-53 · What does signing the trajectory cost, and what does it fail to cover? `READY`
+**Pre-registered 20 Aug 2026. Not run.**
+**Decides:** whether ed25519 signatures at the `append()` chokepoint — the one mechanism worth
+taking from `ruvnet/ruflo` — close the gap that V0-18, V0-28 and the budget-state ingress all share.
+Each protects **declared** provenance: `actor`, `via` and `openrouter-probe` are strings in a JSON
+field, and a hand-written line defeats all three.
+**Precondition:** none beyond the current log. No new dependency: `cryptography` is not installed
+and `AGENTS.md` requires asking first, so the experiment must first establish whether the standard
+library suffices or a dependency is genuinely needed — **that question is part of the experiment,
+not a prerequisite waived before it.**
+**Measures:**
+- Append throughput with and without signing, events per second, on this machine.
+- **Retroactive coverage**, which is expected to be zero and must be reported as such: the existing
+  105 events are unsigned and cannot be signed after the fact without rewriting an append-only log.
+  Signing is forward-only and **the historical record stays unauthenticated permanently.**
+- Whether a signed log still replays to an identical canonical digest (Gate A2 must not break).
+- Whether a reader **without** the key can still read, project and audit the log. If it cannot, the
+  cure is worse than the disease: an unreadable record fails provenance, which is rule one.
+- Key custody. No secret may reach the public repository (Joe, 20 Aug 2026), so the private key is
+  local. **A locally-held key means only this machine can sign**, which bounds the cross-machine
+  federation the mechanism was borrowed to enable — that tension is a result, not an obstacle.
+**Stopping rules (fixed before the run):**
+- If a reader without the key cannot fully audit the log $\implies$ **do not adopt.** Provenance is
+  the first of the three rules derived from `CONSILIENCE.md` and a record only its author can check
+  is not a record. [asserted]
+- If throughput cost exceeds 10x $\implies$ sign **decision events only**, not every event, and say
+  which classes are covered wherever the guarantee is quoted. [asserted]
+- If signing breaks canonical-digest equality $\implies$ the signature belongs outside the canonical
+  form, in a sidecar the digest does not include. [asserted]
+**What it cannot decide:** whether signing prevents the failure V0-18 was written about. EXP-16
+measured **structural confusion**, not forgery, and a signature stops forgery. It is entirely
+possible this closes a hole nothing has ever come through — which is worth knowing before it is
+built, and is the strongest argument for running the experiment before writing the ADR.
+
+
+### EXP-51 · Probe OpenRouter's spend controls before any spend is authorised `READY`
+**Pre-registered 20 Aug 2026 in ADR-0044, before any credential exists. Not run.**
+**Decides:** whether the capabilities ADR-0044 relies on are real. Everything in that ADR's
+capability table is `[cited]` from OpenRouter's documentation and **none of it has been run here**,
+because running it needs the principal's key. No figure from it may be quoted as measured until this
+reports.
+**Precondition:** an OpenRouter key supplied by the principal, and the refuse-only budget primitive
+already shipped. **The probe must not perform a completion it has not been authorised to pay for.**
+**Questions, fixed now:**
+1. Does `limit_reset` accept `weekly` and `monthly`, or only `daily`? The provisioning documentation
+   demonstrates only `daily`. **Joe's stated requirement is weekly and monthly.**
+2. Does every completion response carry a `usage` object with a cost — on every model, and on
+   streamed and errored requests? Per-run attribution rests entirely on this.
+3. Does the account-level cap surface through `GET /api/v1/key`, or is it invisible to the API?
+4. What happens at exhaustion — a clean 402, or a partial charge?
+**Stopping rules (fixed before the probe):**
+- If (1) fails, the weekly and monthly ceilings cannot be enforced vendor-side. They must then be
+  enforced harness-side and **declared as the weaker guarantee they are** — a boundary anything can
+  route around, which is the failure working principle 3 exists to prevent. [asserted]
+- If (2) fails on any tested model, per-run attribution is unavailable and **ADR-0044 must be reduced
+  to ADR-0019 condition 3** — metered calls permitted only with a human present for each one, with
+  the ceiling as an addition rather than a replacement. [asserted]
+- If (3) shows the account cap is invisible, the harness must never reason about the principal's
+  £100 and must say so wherever a budget is displayed. [asserted]
+**What it cannot decide:** whether OpenRouter's routing keeps a fixed model string pointing at a
+fixed model. That is a reproducibility hazard for any measurement taken through a broker and needs
+its own experiment.
+
+
+### EXP-49 · Mutation testing on the research instruments themselves `DONE (partial) 20 Aug 2026 — see experiments/exp49/findings-exp49.md`
+**Pre-registered at `7b6ada0`. Two runs, 20 Aug 2026. Verdict under the fixed stopping rules:
+`insufficient_evidence` — the census did not complete, twice.**
+**Headline (5 of 6 targets, 5,430 mutants):**
+- Research instruments raw $\beta = 0.6825$ [0.6700, 0.6948] against the product code's
+  $0.3345$ [0.3138, 0.3559] (EXP-47). **The instruments are twice as permissive as the code they
+  measure**, and the intervals are far apart.
+- **32.7% of mutants (1,773) lie in 15 functions where NOTHING is killed** — including
+  `exp43/run_commit_test` (the retro-verifier's oracle, 295/295), `exp31/summarise` (224/224),
+  `exp07/run_attempt` (215/215) and `exp27_collector/collect` (208/208). The measurement apparatus
+  has no automated verification.
+- Critical paths are worse than average: `results_write` 0.7984, `timeout` 0.7753, `run_id` 0.5567,
+  `lock` 0.5092.
+- Equivalence uncorrected, so $\beta$ is an **upper bound**. Sensitivity: 75.4% of survivors would
+  have to be equivalent for the gap to close; EXP-47 measured 9.29%. [algebra]
+- **Determinism control passes:** 2,390 mutants compared across two independent 24-worker runs,
+  **zero** outcome disagreements (`compare_runs.py`).
+**Why incomplete:** `input_manifest()` hashes every file found by `rglob` under the watched
+directories, so a transient file created by an instrument's own test suite aborts the census. It is
+a race — run 1 passed the checkpoint that stopped run 2, and no pinned path differs afterwards. The
+repair is proposed in the findings and deliberately not applied, because it changes `harness_sha256`
+and must be recorded as an amendment rather than a silent patch. `exp27_handshake` (965 mutants)
+remains unmeasured; its verifier makes live CLI capability probes and is ~10x slower per mutant.
+**Decides:** whether the error bars on this project's published figures rest on code that is itself
+verified. They do not.
+**What it cannot decide:** whether any published number is wrong — a weakly guarded instrument is
+not a wrong one; the competence-difficulty gap it inherits from EXP-47, which **EXP-50** is
+registered to measure; and the sixteen research instruments never selected as targets.
+
+
+### EXP-50 · Do LLM-emitted faults evade the checks at the same rate as synthetic mutants? `READY`
+**Pre-registered 20 Aug 2026, before any fault was generated. Not yet run.**
+**Decides:** the one residual empirical question that both `P1-proxy.md` §2.4 and `P3-echo.md`
+§falsifier-5 name and neither answers — *"whether a check suite's false-negative rate against the
+faults an LLM agent actually emits differs from its rate against synthetic mutants."* If it does
+not, EXP-47's $\beta = 0.3132$ transfers, mutation testing was already the instrument, and this
+programme's contribution shrinks to orchestration. If it does, every $\beta$ quoted from EXP-47 is
+a floor rather than an estimate, and P2 §7's "competence-difficulty gap" objection is confirmed
+rather than conceded.
+**Precondition:** EXP-47's census complete on the same source tree and the same three checks
+(`pytest`, `mypy --strict`, `ruff`), so the comparison arm already exists and is not re-run.
+`src/consilient/` unchanged between arms, pinned by SHA-256 manifest as EXP-49 does.
+
+**Design — three arms, one of which is already measured.**
+
+| arm | fault source | sees `tests/`? |
+|---|---|---|
+| **S** (control) | EXP-47's 1,871 non-equivalent first-order mutants | n/a — syntactic |
+| **B** (blind) | model asked to inject a defect given `src/consilient/` and the v0 spec only | **no** |
+| **A** (aware) | model asked to inject a defect given source, spec **and** the test suite | **yes** |
+
+Arm A is not a nuisance condition. It is the harness's actual operating regime: an agent that can
+read the gate it must pass. Separating A from B separates *"LLM faults are different in kind"*
+from *"LLM faults are adversarial to this particular suite"*, and only the second is Goodhart.
+
+**Generation protocol (fixed):** each injected fault must (i) change `src/consilient/` only,
+(ii) name the invariant or documented behaviour it violates, and (iii) be a single self-contained
+diff. Two model families generate in **both** arms — family is a recorded covariate, not confounded
+with arm — target $n = 100$ per arm, minimum 60 for a verdict.
+
+**Ground truth by cross-family adjudication.** A model told to inject a bug frequently injects a
+no-op. Every candidate is adjudicated by a **different family from the one that generated it**, and
+by one that never saw the injection prompt, into: (a) real behavioural defect, (b) semantic no-op,
+(c) ambiguous. $\beta$ is computed over (a) only; (b) is discarded exactly as an equivalent mutant
+is; (c) is reported as residual uncertainty. The adjudicator is never the orchestrator — a
+self-adjudicated corpus is echo (ADR-0010).
+
+**Measures:**
+- $\hat{\beta}_B$ and $\hat{\beta}_A$ with Wilson 95% intervals, and each per-check.
+- The interval on $\hat{\beta}_B - 0.3132$, and on $\hat{\beta}_A - \hat{\beta}_B$.
+- No-op rate per arm and per family — the instrument's own $\alpha$-analogue.
+- Diff size and files-touched distribution per arm, against arm S's one-token profile.
+- Family main effect, to detect a generator that is simply better at hiding.
+
+**Stopping rules (fixed before the run):**
+- If $\hat{\beta}_B$'s interval lies entirely **above** 0.3132 $\implies$ **synthetic mutants
+  understate $\beta$.** Every EXP-47 figure is a floor; say so in P1, P2 and P3 and stop quoting
+  0.3132 as an estimate. [asserted]
+- If $\hat{\beta}_B$'s interval **contains** 0.3132 $\implies$ **mutation testing is an adequate
+  proxy for non-adversarial LLM faults.** The residual question is answered against us: the
+  instrument was free, off-the-shelf and decades old. Record it plainly in the novelty assessment
+  rather than burying it. [asserted]
+- If $\hat{\beta}_A$ and $\hat{\beta}_B$ intervals do **not** overlap, with $\hat{\beta}_A$ higher
+  $\implies$ **suite-aware generation raises $\beta$.** A $\beta$ measured on faults that could not
+  see the gate understates the $\beta$ of an agent optimising against it. This is Goodhart's law
+  with an interval on it, and it bears directly on ADR-0015: routing on a gate an agent can read
+  is not the same decision as routing on one it cannot. [asserted]
+- If the adjudicated no-op rate is $\ge 40\%$ in either arm $\implies$ **insufficient evidence.**
+  The instrument is measuring prompt compliance, not fault distribution. Do not report a $\beta$.
+  [asserted]
+- If the two adjudicating families disagree on $\ge 25\%$ of candidates $\implies$ **the oracle is
+  the finding**, as it was on 20 Aug 2026 when two families differed on 16 of 75 labels. Report
+  the disagreement rate and withhold the $\beta$. [asserted]
+
+**What it cannot decide — and this is the load-bearing limitation, stated first rather than last:**
+- **A model told to inject a defect is not a model that made one.** Deliberate injection and
+  unintentional error may have entirely different distributions, and nothing in this design
+  measures the second. Partial mitigation, pre-registered: compare the injected corpus's diff-size
+  and operator profile against the real agent-authored defects this repository has recorded — P2's
+  A-catalogue, the five dead assignments in `run_exp43.py`, the line-ending mismatch that made an
+  edit silently no-op. **If the profiles differ sharply, the arm is measuring something else and
+  the verdict must say so.**
+- Whether either $\beta$ generalises beyond a ~1,100-line Python tree with an unusually
+  invariant-heavy suite.
+- Specification defects, where the code and the tests agree on the wrong thing. No arm here can
+  see those; only P2's hand audit found any.
+
+### EXP-58 · Can output-free local adaptation predict verifier false accepts? `BLOCKED: EXP-56 + exact-model/dependency approval + provenance-complete fixture bank`
+**Pre-registered 20 Aug 2026. Not run.** This is the training gate proposed in
+`local-training-legality-and-feasibility-2026-08-20.md`, not authority to add a learned router.
+[measured]
+**Decides:** whether locally training an adapter on licence-cleared, mechanically labelled
+artefacts adds enough residual-defect signal to justify any further learned-critic work. It does
+not decide whether routing enters v0; ADR-0003 remains binding whatever the result. [asserted]
+**Why EXP-47 is not silently used as text:** its kill/survive labels are mechanical
+measurements, but its source examples do not carry line-level provenance proving that no text
+originated in a frontier-model response. Mechanical labels do not cleanse their examples.
+[measured] EXP-47 supplies check definitions and a secondary outcome benchmark only; no source,
+diff, prompt or response from it enters training until that provenance gap is closed. [asserted]
+**Precondition:**
+1. EXP-56 is complete, so the fixed zero-shot reviewer panel and its hindsight routing ceiling
+   exist as a baseline rather than being reconstructed after this result. [asserted]
+2. The exact 7–8B base revision is pinned by hash and its licence expressly permits local
+   fine-tuning and use of its outputs. The expected route is QLoRA, which fits the measured
+   32,607 MiB RTX 5090 by the arithmetic in the research note; model selection remains an
+   explicit pre-run amendment because no new weight may be downloaded without hardware and
+   licence admission. [algebra]
+3. A fixture/verifier bank with at least 40 independent task families is frozen. Every source
+   example, verifier and label-producing rule has a provenance record establishing that it is
+   principal-owned, permissively licensed for this use, or produced by a local open-weight model
+   whose exact licence permits reuse. Frontier inputs, outputs, teacher logits, synthetic
+   examples, rewards and evaluation answers are excluded. [asserted]
+4. Any new training dependency and any model download has the principal's separate approval.
+   Registration supplies no such approval. [measured]
+**Procedure:**
+1. Produce attempted artefacts locally against the frozen fixtures. Retain the complete
+   verifier 2×2: bad-and-green, bad-and-red, good-and-green and good-and-red. Ground truth comes
+   from the fixture's independent oracle, not from a model's self-report. [asserted]
+2. Split by fixture family before training: at least 25 families train, 5 validate and 10 remain
+   held out. No mutation location, template sibling or near-duplicate crosses a split. Freeze and
+   hash the split before fitting. [asserted]
+3. Compare three arms on the identical holdout: a prevalence-only baseline; the frozen base
+   model; and one QLoRA adapter. The adapter receives the artefact, task contract and real
+   verifier result and predicts the residual event `bad AND verifier_green`. It never replaces
+   the real verifier, whose EXP-47 census took about 0.054 seconds per mutant. [measured]
+4. Use one fixed hyperparameter budget selected before holdout evaluation. No second adapter,
+   prompt tuning or threshold tuning after a holdout result; that requires a new registration.
+   [asserted]
+**Measures:** recall on bad-and-green artefacts; false-escalation rate on good-and-green
+artefacts; precision and PR-AUC at the fixed threshold; Brier score/calibration; verifier and
+adapter wall-clock; peak VRAM; training time and energy estimate; and exact train/validation/
+holdout provenance digests. [asserted]
+**Stopping rules (fixed before any corpus or training run):**
+- **No corpus, no run.** Any item with missing/ambiguous rights or provider-output provenance,
+  any cross-split sibling, fewer than 10 held-out task families, fewer than 100 held-out
+  bad-and-green artefacts or fewer than 100 held-out good-and-green artefacts returns
+  `insufficient_evidence`; an item is not replaced after its outcome is known. [asserted]
+- The adapter earns a further supervised critic experiment only if its 95% interval lower bound
+  clears **50% recall** on bad-and-green at a fixed **≤10% false-escalation rate** on
+  good-and-green, and it improves recall by at least **10 percentage points** over both the
+  frozen base and prevalence baseline. [asserted]
+- If the adapter fails either absolute threshold, or its interval overlaps both baselines, local
+  adaptation is rejected for this task. Do not respond by adding frontier outputs, weakening the
+  split or increasing model size. [asserted]
+- If a random item split beats the family-held-out split by at least 10 percentage points in
+  recall, the apparent gain is leakage and the experiment fails regardless of its headline
+  score. [asserted]
+- Peak allocated VRAM above 30,500 MiB, any OOM, or any unbounded process-tree overrun rejects
+  unattended training on this card; a CPU-offloaded rerun is a different throughput regime and
+  needs a new registration. [asserted]
+- A passing model remains advisory and cannot route, block or accept. Promotion requires a new
+  ADR and a prospective β measurement under the unchanged v0 gates. [asserted]
+**What it cannot decide:** whether the signal transfers to real repositories, longer-horizon
+work or specification defects; whether a larger model would pass; whether fine-tuning on actual
+unintentional agent errors differs from locally manufactured attempts; or whether any frontier
+provider would authorise output training. [asserted]
+
+
+### EXP-54 · Does a log-anchored view checker catch known-invalid projections, or is that just a missing test? `READY`
+**Pre-registered 20 August 2026, before any view-mutant was generated. Proposed in
+`interface-beta-2026-08-20.md`. Not run.**
+**Decides:** whether the decidable class that note names — a view that disagrees with the
+trajectory log — is large enough and weakly-enough guarded to be worth treating as a check
+with its own β, or whether it collapses to "write the tests V0-14 already claimed". It is
+registered because one fixture is an existence proof (human `consil beta` drops a quarantine
+that `--json` reports) and a rate needs a census, and because the tempting move is to name
+the rate "interface-β". **The stopping rules include the result that forbids that name.**
+**Precondition:** none. Fixture logs under a temp directory; `consil beta`, `consil replay`
+and `consil doctor` as they stand; no front end, no new dependency, no metered call. The
+operator catalogue is the ten named in `interface-beta-2026-08-20.md` §2 and is **closed
+when this entry is committed**. Adding an operator after the run starts is a different
+experiment.
+**Design — two arms over the same logs and the same operators:**
+
+| arm | view | what it isolates |
+|---|---|---|
+| **J** | `consil <cmd> --json` payload | the machine-readable contract V0-14 already tests, weakly |
+| **H** | a structured parse of human stdout for the same command | the form a person actually sees, which EXP-47 found the suite does not look at |
+
+A later arm D (DOM or accessibility tree of a graphical surface) is out of scope until
+ADR-0007 is superseded. It is not a third arm of this run.
+**Procedure (fixed):**
+1. Build a small bank of fixture logs that exercise the fields the operators touch:
+   insufficient β, measured β (synthetic rows, $n \ge 30$), a quarantined line, a
+   `HUMAN_ONLY` event with `via: slack` that `validate()` would refuse, a doctor run whose
+   gates are not all `pass`. The fixtures are written before any mutant is applied.
+2. Render the honest view on each arm.
+3. Apply each operator once per fixture, producing a known-invalid view. Record
+   equivalence when the surface cannot express the mutated field (the human `beta` line
+   cannot show a point it does not print; that is equivalent, not a survivor).
+4. Run a checker specified *before* step 3. The checker may read the view and the log. It
+   may not read renderer source, and it may not diff against the honest view as an expected
+   value — that would be state-anchoring. Its rule is: every field the view asserts must be
+   implied by the log, and every refusal the log recorded must appear where the view
+   reports the rate or the gate that depends on that log.
+5. Separately, run the existing pytest suite against the same invalid views, as a control:
+   if pytest already kills a live operator, the operator is a missing assertion in a test
+   that exists, not evidence of an unmeasured quantity.
+**Measures:** $\hat{\beta}_J$ and $\hat{\beta}_H$ with Wilson 95% intervals, over
+non-equivalent view-mutants only; live-operator count per arm; the fraction of live
+operators the existing suite already kills; whether tonight's quarantine hole is unique or
+modal.
+**Stopping rules (fixed before the run):**
+- If both arms' corrected β lie **below 0.05**, or arm H has **fewer than five live
+  operators** $\implies$ **there is no quantity to name.** The decidable class is a test
+  file. Write the checks, including the quarantine assertion on human `beta`. Do not call
+  anything interface-β. **This is the result that goes against treating the class as a
+  research object, and it is the expected one.** [asserted]
+- If arm J's interval lies entirely **below** 0.05 and arm H's lies entirely **above** 0.20
+  $\implies$ **V0-14 is a claim, not a check.** JSON is guarded, the human-visible form is
+  not. Any future surface must run the log-anchored checker against whatever a person sees,
+  not only against `--json`. [asserted]
+- If both arms' intervals lie entirely **above** 0.20 $\implies$ **even the easy class has
+  no oracle yet.** A front end cannot honestly claim projection QA until this checker
+  exists and this rule would no longer fire. [asserted]
+- If the existing pytest control kills **every** live operator on both arms $\implies$
+  **the suite already has the oracle and the tests do not call it on these fixtures.**
+  That is a coverage hole, not β. Patch the tests; do not register a quantity. [asserted]
+- If fewer than 30 non-equivalent view-mutants complete on either arm $\implies$
+  **insufficient evidence.** Do not report a β. [asserted]
+**What it cannot decide:** whether a front end should be built (ADR-0007); whether a surface
+reduces `T_effective_review` without raising artefact-β; whether a layout is confusing;
+whether simulated users find real-user defects; the rate of EXP-01's affordance-after-reload
+class; anything about a graphical surface, which this run does not have. Those limits are
+the load-bearing ones and are stated in the note before this experiment exists.
+
+
+### EXP-58 · Where inside its sharp bound does composite β actually land? `READY`
+**Pre-registered 20 Aug 2026 in `composite-beta-under-dependence-2026-08-20.md`, before any
+additional check was run.**
+
+**Decides:** whether *"composite β sits near the sharp upper bound"* is a property of software
+verifiers or an artefact of EXP-47's particular stack. That document derived the sharp
+Fréchet–Hoeffding/Hailperin bounds for EXP-47's three checks and found the measured composite at
+**91.03%** of the width between them — near the most pessimistic end. If that replicates, *"gate on
+the upper bound, it is nearly right"* is a usable rule for any CI system composing error rates. If
+it does not, the rule is needless pessimism and the recommendation must be withdrawn.
+
+**What must NOT be registered as a stopping rule, because it cannot fail:** *"does the measured
+composite fall inside the bound?"* It is a theorem, not a prediction — it holds for any internally
+consistent inputs. Only the **position** within the bound, the **model fit**, and
+**transportability** are falsifiable. This is stated because the vacuous version is the obvious one
+to write.
+
+**Preconditions.**
+- $k \ge 4$ checks, at least one killing $> 20\%$ of mutants. EXP-47's `ruff` accepted 95.96%, and a
+  near-constant check is nearly comonotone with anything — the leading confound for the 91% figure,
+  and the reason $k=3$ cannot settle this. A fourth check is also the identifiability threshold: a
+  two-class latent-difficulty model has $1+2k$ parameters against $2^k-1$ data df, so $k=3$ leaves
+  **zero** df and $k=4$ leaves **six**. [algebra]
+- **Full $2^k$ outcome vector recorded per mutant**, not per-check totals. `run_exp47.py` computed
+  `pytest_pass`/`mypy_pass`/`ruff_pass` per mutant and saved only aggregates plus one 2×2 table; the
+  other two pairwise margins survive only as ranges 71 mutants wide. This is a one-line
+  instrumentation change and it is the whole reason this experiment exists rather than being a
+  re-analysis.
+- $\ge 2$ source trees. `src/consilient/` is the first; the second must **not** be a research
+  instrument (EXP-49 measured those at $\beta = 0.6825$, twice as permissive, so they are a
+  different population). Gate B forbids pointing anything at `../hireable-3.0` or `../jobboard-v2`,
+  so the second tree is a public-corpus target or a synthetic one.
+
+**Measures.**
+- The position statistic $\pi = (\beta_{\text{comp}} - L)/(U - L)$ against the sharp bound $[L, U]$
+  computed from marginals plus all pairwise margins, per tree, with a bootstrap interval.
+- All $\binom{k}{2}$ pairwise margins and the full joint table, so bounds are computable at every
+  information level rather than one.
+- Two-class latent-difficulty model: fit by maximum likelihood, goodness of fit on $2^k-1-(1+2k)$ df.
+- Whether the independence product falls outside the bound implied by marginals plus **one** pairwise
+  table — the infeasibility-guard fire rate, which decides whether that guard is worth shipping.
+- Per-check kill rate, to test whether $\pi$ tracks the weakest check's β rather than anything
+  structural.
+
+**Stopping rules (fixed before the run).**
+- If $\pi < 0.50$ on either tree $\implies$ **the near-comonotone hypothesis is refuted.** Withdraw
+  the § 8 recommendation to gate at the conservative end as *empirically motivated*; it survives
+  only as a safety convention, which is a weaker and honest claim. [asserted]
+- If $\pi > 0.80$ on both trees, intervals excluding 0.50 $\implies$ **the regularity holds so far.**
+  Still $n=2$; record as a hypothesis with two supporting instances, never as a general result.
+- If $\pi$ correlates with the weakest check's β across trees $\implies$ **the effect is the
+  near-constant-check artefact, not verifier structure.** The 91% figure is then explained away and
+  must be reported as explained. [asserted]
+- If the latent-difficulty model fits ($p > 0.05$ on $\ge 6$ df) $\implies$ **model the dependence,
+  do not bound it.** One parameter replaces an interval, and the bounding framing in
+  `composite-beta-under-dependence-2026-08-20.md` becomes the fallback rather than the answer.
+- If the infeasibility guard fires on fewer than half the trees $\implies$ **do not ship it.** A
+  guard that rarely fires is a maintenance cost, and the § 10 grading of it as a worthwhile artefact
+  was wrong.
+- If any tree's census fails to complete $\implies$ **`insufficient_evidence` for that tree**, as
+  EXP-49 correctly recorded twice. Do not pool a partial census with a complete one.
+
+**What it cannot decide.**
+- **Anything about LLM-emitted faults.** Every β here is conditional on first-order syntactic
+  mutants. EXP-50 owns the transfer question, and if it fires, every figure in this experiment is a
+  floor rather than an estimate.
+- Whether the bounds are *useful*, as opposed to correct. On a tree where mutation testing runs at
+  0.054 s/mutant the composite is directly measurable and the bound is redundant; the decision-
+  relevant case is composing β measured on *different* corpora, which this design does not create.
+- Whether negative dependence between checks is achievable. Littlewood & Miller (1989) show forced
+  diversity permits it in multi-version software; nothing here selects checks adversarially to try.
+- Specification defects, where code and tests agree on the wrong thing — invisible to mutation
+  testing at any $k$.
+External candidate facts, versions and licence readings for EXP-58–EXP-64 are anchored in
+[`orchestration-dependencies-2026-08-20.md`](../20-design/orchestration-dependencies-2026-08-20.md).
+[cited]
+
+### EXP-59 · Does durable execution survive the crash window without displacing the trajectory? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether LangGraph, Temporal or Prefect should replace hand-built crash recovery in the
+orchestrator. The existing JSONL is durable evidence, but it cannot distinguish “the adapter never
+ran” from “the adapter completed and the process died before recording that fact.” This experiment
+tests that exact ambiguity rather than accepting a framework's “durable” label. [measured]
+
+**Arms:** a minimal trajectory-only recovery state machine; LangGraph with its local SQLite
+checkpointer; Temporal Python SDK with a local persisted development server; Prefect with a local
+persisted server. Pin every package, server binary and transitive lock before the run. After
+installation, all arms run with outbound networking denied and telemetry disabled.
+
+**Fixture:** one run with two deterministic activities. Activity A writes a run-scoped idempotency
+token. Activity B writes one externally visible side effect to a separate SQLite oracle and returns
+an `Outcome`. Barriers make these six kill points exact:
+
+1. before dispatch intent is appended;
+2. after intent append and before worker launch;
+3. after worker launch and before the side effect;
+4. after the side effect and before outcome append;
+5. after outcome append and before worker acknowledgement;
+6. during retry after a synthetic transient failure.
+
+Kill the complete process group at each barrier, restart from disk, and run each arm five times per
+barrier: 30 recoveries per arm. The side-effect oracle is not available to recovery code; it exists
+only to score duplicates and losses. After every terminal run, delete derived projections and
+rebuild them from JSONL. At every non-terminal kill point, repeat once after deleting the
+framework's private store: recovery may create a new runtime instance, but it must be able to do so
+from the trajectory without guessing.
+
+**Measures:**
+- duplicate and lost side effects;
+- missing, duplicated or contradictory trajectory transitions;
+- equality of canonical terminal `Outcome` and `state_digest()` after replay;
+- whether recovery needs facts present only in a framework database;
+- Consilient-owned recovery branches and production lines in the spike;
+- added processes, direct/transitive packages, cold start and idle memory.
+
+**Stopping rules (fixed before the run):**
+- One duplicate, one lost side effect, one contradictory terminal event or one replay-digest
+  mismatch in 30 recoveries $\implies$ **reject that arm.** “Usually durable” is not the property
+  being bought. [asserted]
+- If deleting the framework store makes recovery impossible from the trajectory at any cut
+  $\implies$ **reject that candidate.** It has displaced the source of truth rather than projected
+  it. [asserted]
+- If the trajectory-only arm passes all cuts, a dependency is eligible only if it reduces both
+  Consilient-owned recovery branches and production lines by at least 30% while passing every
+  correctness and authority check. Otherwise keep the in-house state machine. [asserted]
+- If the trajectory-only arm fails and exactly one candidate passes, that candidate is the
+  provisional adoption choice. If several pass, choose lexicographically: fewest non-projection
+  stores, then fewest additional processes, then least Consilient glue, then fewest transitive
+  packages. Record every value; do not substitute a popularity judgement. [asserted]
+- If no arm completes 30 recoveries, or a kill barrier cannot be placed deterministically, report
+  **insufficient evidence** and adopt nothing. [asserted]
+
+**What it cannot decide:** production-cluster operability, recovery from loss of the machine holding
+all local state, or whether the same engine is appropriate outside this repository.
+
+### EXP-58 · Can an agent framework be embedded without becoming the coordinator? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether LangGraph, Google ADK, CrewAI, AG2 or Microsoft Agent Framework supplies a
+smaller implementation of the approved coordinator while preserving Consilient's authority.
+AutoGen is excluded because its upstream is maintenance-only; no execution result can reverse that
+maintainer decision. [cited]
+
+**Reference workflow:** a dependency-free Python coordinator receives a fixed `Ticket`, selects one
+of two deterministic fake adapters under a supplied policy, runs it once, asks a deterministic
+critic that sees a different fixture class, and appends the route, delegation, evidence-class and
+terminal events through the existing chokepoint. The framework arms must implement the same
+workflow. Model calls, framework routing heuristics, memory, hosted tracing and self-reported
+confidence are disabled.
+
+**Corpus:** 24 fixtures: six routes × accepted/rejected outcomes × normal/exceptional completion.
+Add eight hostile fixtures covering duplicate completion, callback reordering, unknown adapter,
+critic timeout, malformed outcome, direct verdict injection, direct trajectory-write attempt and
+framework-state deletion. Run each fixture once with networking available only to localhost and
+once with outbound networking denied.
+
+**Measures:**
+- canonical event-sequence equality with the reference, excluding timestamps;
+- route, `Ticket`, `Outcome`, evidence-class and fail-closed equality;
+- unlogged framework state transitions or direct framework decisions;
+- Consilient glue branches and lines, import time, idle memory, direct/transitive packages and
+  processes;
+- network attempts with all documented telemetry opt-outs set.
+
+**Stopping rules (fixed before the run):**
+- Any framework-selected route, model-derived acceptance, unlogged decision, independent
+  trajectory writer or need for shared-evidence voting $\implies$ **reject that candidate.**
+  Those are violations of the product, not integration inconveniences. [asserted]
+- Any mismatch on the 32 fixtures, or any outbound attempt in the denied phase $\implies$ **reject
+  that candidate.** [asserted]
+- A passing candidate is eligible only if it deletes at least 30% of the reference coordinator's
+  branches and production lines and does not add an authoritative store. If the framework merely
+  wraps each existing callback, it has no job and is rejected. [asserted]
+- If several candidates pass, select only a strict Pareto winner on Consilient glue, additional
+  processes, transitive packages, import time and idle memory. If none dominates, adopt none;
+  preference among agent programming models is not evidence. [asserted]
+- If the reference itself fails a hostile fixture, repair the fixture or reference and restart all
+  arms. Do not let a framework win against a defective control. [asserted]
+
+**What it cannot decide:** whether one of these frameworks is a good way to build a different agent
+product, or whether its own agents outperform existing coding agents. Neither question belongs to
+this meta-harness.
+
+### EXP-60 · Does Pydantic AI beat Pydantic Core at a native model-I/O seam? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether Pydantic AI belongs at a future native-model boundary, or whether
+dependency-free validation or Pydantic Core supplies all of the value without an agent framework.
+It does not compare agent quality; it compares parsing, validation and control ownership.
+[asserted]
+
+**Fixture provider:** a local fake OpenAI-compatible server emits 120 pinned responses: 40 valid
+complete outputs, 20 valid streamed outputs, and 60 invalid cases covering missing fields, wrong
+types, unknown enum values, extra fields, duplicate tool calls, truncated streams, invalid UTF-8
+replacement, non-finite numbers, integers beyond interoperable JSON range, provider error frames
+and tool/output interleaving. A hand-written JSON Schema and expected `Outcome` or rejection for
+every fixture are frozen before any arm runs.
+
+**Arms:** current-style explicit validation; Pydantic Core models/`TypeAdapter`; Pydantic AI
+structured output. Every arm must return the same project `Outcome`, call only the local fixture
+provider, append through the same event writer, and expose no route or acceptance decision to the
+package.
+
+**Measures:**
+- false accepts and false rejects against the frozen fixture labels;
+- canonical `Outcome` and trajectory equality on accepted fixtures;
+- static-checker result for every adapter;
+- Consilient parsing/validation branches and production lines;
+- transitive packages, import time, global mutable configuration, caches and outbound attempts.
+
+**Stopping rules (fixed before the run):**
+- Any false accept, false reject, trajectory mismatch or package-owned route/verdict $\implies$
+  **reject that candidate.** [asserted]
+- If the dependency-free arm has zero classification errors, add neither dependency: there is no
+  validation defect for a dependency to repair. [asserted]
+- If Pydantic Core corrects every reference error and Pydantic AI catches no additional case,
+  **reject Pydantic AI as overbroad.** A decision to add base Pydantic remains separate and still
+  needs approval. [asserted]
+- Pydantic AI is eligible only if it uniquely corrects every remaining reference/Core false accept
+  without introducing a false reject, passes static checking, reduces both validation branches and
+  production lines by at least 30%, and leaves orchestration outside the package. [asserted]
+- If the fake provider cannot reproduce at least 20 valid streaming and 50 invalid cases, report
+  **insufficient evidence**; a happy-path demo cannot decide a boundary dependency. [asserted]
+
+**What it cannot decide:** behaviour of an untested provider, model instruction-following quality,
+or whether a native model path should exist. The experiment becomes obsolete if external-agent
+adapters remain the only execution path.
+
+### EXP-61 · Does DSPy optimisation reduce held-out β without buying it through α or leakage? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether DSPy's actual proposition — optimising an LM programme against a metric —
+earns a place in a future native-model path. Typed signatures alone are not the adoption claim.
+[asserted]
+
+**Corpus:** stratify EXP-47's non-equivalent mutants by file, function and mutation operator, then
+freeze disjoint optimisation and held-out partitions. The optimisation set contains 60 mutants and
+60 unmutated controls; the held-out set contains 120 of each. No file/function/operator cluster may
+occur in both partitions. Ground truth is mechanical and held-out labels are unavailable to the
+optimiser. Cap optimisation at 500 model calls.
+
+**Arms, with the same pinned local model and output schema:** a hand-written fixed prompt/programme;
+the equivalent unoptimised DSPy signature/module; and that DSPy module optimised on the training
+partition. Token and wall-clock ceilings are equal for scoring. Cache state is cleared between arms,
+and outbound networking is denied after installation.
+
+**Measures:** held-out β and α with Wilson intervals; the intervals on each difference from the
+fixed-program arm; refusal/invalid-output rate; input/output tokens; wall-clock; programme and prompt
+diffs produced by the optimiser; and any overlap between optimiser inputs and held-out material.
+
+**Stopping rules (fixed before the run):**
+- Any held-out item, label, verifier outcome or semantically equivalent cluster entering the
+  optimisation context $\implies$ **invalidate the run as leakage.** [asserted]
+- If the optimised arm's β interval does not lie wholly below the fixed-program arm's, **reject
+  DSPy:** optimisation did not improve the target error rate. [asserted]
+- If β improves but α rises by more than 5 percentage points, invalid/refusal rate rises, or median
+  tokens exceed 2× the fixed arm, **reject:** the gain was bought by a different failure or cost.
+  [asserted]
+- If the unoptimised DSPy arm's interval does not overlap the fixed arm's, first attribute that
+  adapter effect. The optimised arm is eligible only if its improvement also clears the unoptimised
+  arm with non-overlapping intervals. [asserted]
+- DSPy is eligible only if all preceding checks pass on all 240 held-out items and the optimised
+  programme re-runs deterministically from a pinned serialised artefact. [asserted]
+
+**What it cannot decide:** open-ended work without a mechanical oracle, transfer to another model
+family, or whether the optimisation corpus remains representative as the code changes.
+
+### EXP-62 · Can OpenTelemetry be a disposable projection without losing Consilient semantics? `READY`
+**Pre-registered 20 Aug 2026. Not run.**
+
+**Decides:** whether OpenTelemetry GenAI semantic conventions should back an optional local
+observability projection. The conventions repository has no release and no schema URL on the
+registration date, so a passing run establishes semantic fit but adoption additionally requires a
+tagged release with a usable schema identifier. [cited]
+
+**Procedure:**
+1. Freeze one fixture for every trajectory event type and at least 40 events in total.
+2. Map committed events, never live decisions, to OTel spans/events using a pinned conventions
+   commit. Prompt, response, tool-argument, tool-result and file content capture are disabled.
+3. Export first to the in-memory SDK and then to a local OTel Collector plus Jaeger with outbound
+   networking denied.
+4. Delete all telemetry and prove that trajectory replay and `state_digest()` are unchanged.
+5. Answer eight fixed queries: run timeline; adapter duration/status; route event; tool failures;
+   model/token use where present; verifier result and evidence class; budget refusal; and
+   span-to-immutable-trajectory-event correlation.
+
+The first, second, fourth and fifth queries must use standard OTel fields where a convention
+exists. Project-only facts use a documented `consilient.*` namespace and carry the source event ID.
+
+**Measures:** fixture coverage, the eight query results, fields requiring custom attributes,
+captured sensitive-content bytes, trajectory digest before/after, exporter failures and added
+packages/processes.
+
+**Stopping rules (fixed before the run):**
+- Any trajectory mutation, decision input from telemetry, missing event correlation, or captured
+  sensitive content $\implies$ **reject OTel.** [asserted]
+- If any of the eight queries cannot be answered from the local backend, or fewer than the four
+  designated queries use standard fields, the standard buys too little and is rejected. [asserted]
+- If all checks pass and a tagged GenAI-conventions release with a schema URL exists, adopt OTel as
+  an optional content-off projection. If the repository is still untagged or lacks a schema URL,
+  record **compatible but not adoptable** and keep the trajectory-only implementation. [asserted]
+- If the local collector cannot run without an account or outbound access, reject the deployment
+  path even if the in-memory mapping passes. [asserted]
+
+**What it cannot decide:** a hosted backend, long-term storage cost, or whether future conventions
+will preserve today's fields.
+
+### EXP-63 · Does MCP standardise tools without creating a route around the coordinator? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether the MCP Python SDK should implement the future tool boundary reserved by
+ADR-0016. MCP is not tested as durable execution: the 2.0 SDK does not implement the tasks
+extension. [cited]
+
+**Arms:** a minimal hand-written local JSON-RPC tool bridge and MCP Python SDK 2.x over stdio. Both
+expose only two deterministic capabilities: read a pinned context fixture and compute a pure
+digest. The coordinator validates input, invokes the bridge and appends the result.
+
+**Corpus:** 32 fixed calls: eight valid, eight malformed protocol/schema cases, and sixteen hostile
+authority attempts including route selection, adapter dispatch, verdict submission, direct event
+append, arbitrary path access, duplicate request ID, protocol downgrade, capability spoofing and
+post-cancellation completion. Run under denied outbound networking.
+
+**Measures:** accepted/rejected call equality, protocol error equality, complete audit correlation,
+authority bypasses, production parser/transport lines, transitive packages and process cleanup on
+timeout/cancellation.
+
+**Stopping rules (fixed before the run):**
+- One successful route, dispatch, verdict, trajectory-write or out-of-bound path attempt
+  $\implies$ **reject the SDK boundary.** [asserted]
+- One unaudited valid call, duplicate terminal result, leaked child process or outbound attempt
+  $\implies$ **reject.** [asserted]
+- If no real tool integration exists at run time, record **no present job** and add no dependency,
+  regardless of protocol conformance. [asserted]
+- Once a real integration exists, the SDK is eligible only if all 32 fixtures pass and it deletes
+  at least 30% of the hand-written protocol/transport branches and lines. Otherwise keep the direct
+  Python boundary. [asserted]
+
+**What it cannot decide:** remote untrusted MCP servers, registry supply-chain safety, or using MCP
+as an agent/task protocol.
+
+### EXP-64 · Does the ACP Python SDK delete adapter protocol code without changing outcomes? `READY`
+**Pre-registered 20 Aug 2026. Not run. Temporary package installation still requires the
+principal's approval.**
+
+**Decides:** whether ACP should become the transport inside adapters for backends that expose it.
+Only stable ACP v1 is in scope. ACP v2 is draft and dual-version support is not accepted merely for
+future-proofing. [cited]
+
+**Precondition:** the existing 233-line Cursor ACP v1 client in
+`docs/10-research/experiments/exp05/adapter_cursor_acp.py`, its transcript fixtures, and the measured
+Cursor ACP run. [measured] Pin the official Python SDK and schema before the comparison.
+
+**Arms:** the existing custom client and an `agent-client-protocol` SDK client against the same
+deterministic local fake agent. Replay 40 transcripts covering initialization and capability
+negotiation, authentication, session creation, prompt streaming, tool approval, plan update, normal
+completion, agent error, malformed frame, unknown union variant, oversized frame, cancellation,
+timeout, EOF and process-tree shutdown. Then repeat the valid bounded task against Cursor ACP using
+the existing subscription composition; no credential is written to the repository.
+
+**Measures:** transcript accept/reject equality, canonical project `Outcome`, trajectory sequence,
+capability downgrade behaviour, cancellation latency, surviving descendant processes,
+Consilient-owned parser/session branches and lines, and transitive packages.
+
+**Stopping rules (fixed before the run):**
+- Any transcript mismatch, changed `Outcome`, unaudited update, capability accepted without
+  negotiation, process surviving timeout or outbound attempt $\implies$ **reject the SDK.**
+  [asserted]
+- If all fake and Cursor fixtures pass and the SDK deletes at least 30% of the custom
+  parser/session branches and production lines, adopt it for ACP-capable adapters only. Otherwise
+  retain the measured custom client. `Ticket`, `Outcome` and coordinator policy remain outside ACP.
+  [asserted]
+- Do not implement ACP v2 until it is stable and an admitted backend requires it. If that occurs,
+  register a separate v1/v2 negotiation experiment; this result does not transfer. [asserted]
+
+**What it cannot decide:** adoption by agents that do not expose ACP, the safety of editor-side
+resource access, or v2's eventual stable surface.
+
 
 ---
 

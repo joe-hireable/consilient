@@ -1,0 +1,80 @@
+{
+  "experiment_id": "EXP-45",
+  "date": "2026-08-20",
+  "verdict": "falsifier_2_loss_does_not_bite",
+  "verdict_reason": "Retention rate R = 40.7% is lossy, but consequential loss L_bite = 0.00% < 1.0%. Condensation discards safely; retire memory layer.",
+  "longevity_and_frequency": {
+    "total_files": 1495,
+    "total_unique_sessions": 203,
+    "sessions_with_compact_boundary": 3,
+    "total_compact_boundary_events": 6,
+    "sessions_with_away_summary": 9,
+    "total_away_summary_events": 42,
+    "sessions_with_any_boundary": 10,
+    "total_all_boundary_events": 48,
+    "record_counts": {
+      "p50": 52.0,
+      "p90": 159.6,
+      "p95": 215.9,
+      "p99": 384.3,
+      "max": 21145
+    },
+    "duration_days": {
+      "p50": 0.0019,
+      "p90": 0.0082,
+      "p95": 0.0118,
+      "p99": 0.0384,
+      "max": 8.3722
+    },
+    "session_level_duration_days_max": 8.3722
+  },
+  "retention_analysis": {
+    "all_boundaries_count": 48,
+    "mean_retention_rate": 0.4071,
+    "retention_bootstrap_95ci": [
+      0.325,
+      0.4883
+    ],
+    "path_retention_mean": 0.1443,
+    "ident_retention_mean": 0.4244,
+    "compact_boundary_mean_retention": 0.4431,
+    "away_summary_mean_retention": 0.402
+  },
+  "consequential_loss_analysis": {
+    "mean_consequential_loss_rate": 0.0,
+    "aggregate_file_reread_rate": 0.005,
+    "total_pre_read_files": 992,
+    "total_reread_files": 5,
+    "aggregate_command_rediscovery_rate": 0.0,
+    "total_pre_discovery_commands": 599,
+    "total_rediscovery_commands": 0,
+    "aggregate_consequential_loss_rate": 0.0
+  },
+  "survival_correlations": {
+    "frequency": {
+      "spearman_rho": 0.308,
+      "point_biserial_r": 0.1383
+    },
+    "recency_turn_dist": {
+      "spearman_rho": -0.283,
+      "point_biserial_r": -0.2449
+    },
+    "tool_origin_frac": {
+      "spearman_rho": -0.1225,
+      "point_biserial_r": -0.1141
+    },
+    "is_acted_upon": {
+      "spearman_rho": -0.0623,
+      "point_biserial_r": -0.0623
+    },
+    "is_path": {
+      "spearman_rho": -0.1628,
+      "point_biserial_r": -0.1628
+    },
+    "is_ident": {
+      "spearman_rho": 0.1608,
+      "point_biserial_r": 0.1608
+    }
+  },
+  "entity_sample_size": 317625
+}

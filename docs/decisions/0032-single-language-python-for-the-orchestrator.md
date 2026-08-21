@@ -131,7 +131,7 @@ default posture. A second language now needs a measured trigger, named below.
 
 ## Enforcement
 
-- Check: `mypy src/consilience` runs in CI ahead of the test suite, and fails the build.
+- Check: `mypy src/consilient` runs in CI ahead of the test suite, and fails the build.
   Shipped in the same commit as the rule. [measured]
 - Check: `test_the_cli_exposes_no_routing_or_blocking_surface` already constrains the CLI
   surface; the exhaustiveness pattern is enforced by the type check, not by review.

@@ -1,0 +1,1337 @@
+{
+  "run_id": "exp43-20260820T123510-184517",
+  "protocol": {
+    "sample_size": 50,
+    "test_ref": "HEAD",
+    "test_target": "tests/unit/services",
+    "timeout_s": 60
+  },
+  "limitations": [
+    "The oracle is structurally blind to greenfield/additive defects where the interface did not exist at the parent commit (censored by parent-commit control).",
+    "Survivorship bias: future test suites only contain regression tests for defects that were discovered and tested; latent unfound bugs remain unmeasured.",
+    "Dependency and schema drift over long time horizons can induce false parent/child failures.",
+    "Results apply to evaluated repository commits and unit test suites only.",
+    "Commit identifiers are pseudonymised. The corpus is a private commercial repository, and AGENTS.md permits its name and aggregate metrics but not per-incident identifiers. Every measurement is unchanged; the real mapping is held locally and is not published."
+  ],
+  "complete": true,
+  "stop_reason": null,
+  "elapsed_s": 156.772,
+  "records": [
+    {
+      "child_commit": "commit-023",
+      "parent_commit": "commit-008",
+      "outcome": "clean",
+      "pair_duration_s": 3.271,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.706,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.565,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-027",
+      "parent_commit": "commit-056",
+      "outcome": "clean",
+      "pair_duration_s": 3.115,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.564,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.551,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-056",
+      "parent_commit": "commit-024",
+      "outcome": "clean",
+      "pair_duration_s": 3.098,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.571,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.527,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-024",
+      "parent_commit": "commit-064",
+      "outcome": "clean",
+      "pair_duration_s": 3.269,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.684,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.585,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-064",
+      "parent_commit": "commit-017",
+      "outcome": "clean",
+      "pair_duration_s": 3.158,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.585,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.572,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-026",
+      "parent_commit": "commit-040",
+      "outcome": "clean",
+      "pair_duration_s": 3.112,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.56,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.551,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-052",
+      "parent_commit": "commit-051",
+      "outcome": "clean",
+      "pair_duration_s": 3.119,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.538,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.58,
+        "total_tests": 48,
+        "passed_tests": 48,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-029",
+      "parent_commit": "commit-001",
+      "outcome": "clean",
+      "pair_duration_s": 3.242,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.673,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.568,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-001",
+      "parent_commit": "commit-028",
+      "outcome": "clean",
+      "pair_duration_s": 3.064,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.557,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.506,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-028",
+      "parent_commit": "commit-041",
+      "outcome": "clean",
+      "pair_duration_s": 3.072,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.539,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.533,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-046",
+      "parent_commit": "commit-048",
+      "outcome": "clean",
+      "pair_duration_s": 3.061,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.535,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.525,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-068",
+      "parent_commit": "commit-071",
+      "outcome": "clean",
+      "pair_duration_s": 3.064,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.552,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.512,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-044",
+      "parent_commit": "commit-045",
+      "outcome": "clean",
+      "pair_duration_s": 3.048,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.526,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.521,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-041",
+      "parent_commit": "commit-012",
+      "outcome": "clean",
+      "pair_duration_s": 3.062,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.529,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.532,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-012",
+      "parent_commit": "commit-019",
+      "outcome": "clean",
+      "pair_duration_s": 3.086,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.546,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.539,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-048",
+      "parent_commit": "commit-039",
+      "outcome": "clean",
+      "pair_duration_s": 3.306,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.677,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.628,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-071",
+      "parent_commit": "commit-066",
+      "outcome": "clean",
+      "pair_duration_s": 3.125,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.573,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.551,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-045",
+      "parent_commit": "commit-009",
+      "outcome": "clean",
+      "pair_duration_s": 3.203,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.593,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.609,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-019",
+      "parent_commit": "commit-016",
+      "outcome": "clean",
+      "pair_duration_s": 3.248,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.716,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.531,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-020",
+      "parent_commit": "commit-021",
+      "outcome": "clean",
+      "pair_duration_s": 3.117,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.57,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.546,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-016",
+      "parent_commit": "commit-070",
+      "outcome": "clean",
+      "pair_duration_s": 3.104,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.582,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.522,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-002",
+      "parent_commit": "commit-010",
+      "outcome": "clean",
+      "pair_duration_s": 3.119,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.562,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.556,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-070",
+      "parent_commit": "commit-055",
+      "outcome": "clean",
+      "pair_duration_s": 3.061,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.542,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.518,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-059",
+      "parent_commit": "commit-060",
+      "outcome": "clean",
+      "pair_duration_s": 3.162,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.61,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.552,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-055",
+      "parent_commit": "commit-054",
+      "outcome": "clean",
+      "pair_duration_s": 3.12,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.589,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.53,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-007",
+      "parent_commit": "commit-032",
+      "outcome": "clean",
+      "pair_duration_s": 3.261,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.675,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.585,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-054",
+      "parent_commit": "commit-018",
+      "outcome": "clean",
+      "pair_duration_s": 3.102,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.536,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.565,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-018",
+      "parent_commit": "commit-015",
+      "outcome": "clean",
+      "pair_duration_s": 3.252,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.548,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.704,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-049",
+      "parent_commit": "commit-063",
+      "outcome": "clean",
+      "pair_duration_s": 3.175,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.602,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.573,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-015",
+      "parent_commit": "commit-006",
+      "outcome": "clean",
+      "pair_duration_s": 3.106,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.564,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.541,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-043",
+      "parent_commit": "commit-003",
+      "outcome": "clean",
+      "pair_duration_s": 3.123,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.575,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.548,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-006",
+      "parent_commit": "commit-036",
+      "outcome": "clean",
+      "pair_duration_s": 3.068,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.558,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.51,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-047",
+      "parent_commit": "commit-025",
+      "outcome": "clean",
+      "pair_duration_s": 3.053,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.536,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.516,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-036",
+      "parent_commit": "commit-042",
+      "outcome": "clean",
+      "pair_duration_s": 3.061,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.544,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.517,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-061",
+      "parent_commit": "commit-030",
+      "outcome": "clean",
+      "pair_duration_s": 3.179,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.647,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.532,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-038",
+      "parent_commit": "commit-037",
+      "outcome": "clean",
+      "pair_duration_s": 3.131,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.583,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.548,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-057",
+      "parent_commit": "commit-014",
+      "outcome": "clean",
+      "pair_duration_s": 3.348,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.579,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.769,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-042",
+      "parent_commit": "commit-033",
+      "outcome": "clean",
+      "pair_duration_s": 3.025,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.514,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.511,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-011",
+      "parent_commit": "commit-013",
+      "outcome": "clean",
+      "pair_duration_s": 3.132,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.559,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.572,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-025",
+      "parent_commit": "commit-065",
+      "outcome": "clean",
+      "pair_duration_s": 3.094,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.54,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.553,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-030",
+      "parent_commit": "commit-067",
+      "outcome": "clean",
+      "pair_duration_s": 3.081,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.549,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.532,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-067",
+      "parent_commit": "commit-058",
+      "outcome": "clean",
+      "pair_duration_s": 3.104,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.556,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.548,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-005",
+      "parent_commit": "commit-053",
+      "outcome": "clean",
+      "pair_duration_s": 3.129,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.542,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.586,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-033",
+      "parent_commit": "commit-035",
+      "outcome": "clean",
+      "pair_duration_s": 3.085,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.561,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.524,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-037",
+      "parent_commit": "commit-034",
+      "outcome": "clean",
+      "pair_duration_s": 3.106,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.558,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.547,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-013",
+      "parent_commit": "commit-050",
+      "outcome": "clean",
+      "pair_duration_s": 3.096,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.551,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.545,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-069",
+      "parent_commit": "commit-004",
+      "outcome": "clean",
+      "pair_duration_s": 3.168,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.611,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.557,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-035",
+      "parent_commit": "commit-022",
+      "outcome": "clean",
+      "pair_duration_s": 3.107,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.579,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.527,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-022",
+      "parent_commit": "commit-062",
+      "outcome": "clean",
+      "pair_duration_s": 3.084,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.523,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.56,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    },
+    {
+      "child_commit": "commit-050",
+      "parent_commit": "commit-031",
+      "outcome": "clean",
+      "pair_duration_s": 3.112,
+      "parent_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.571,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      },
+      "child_result": {
+        "passed": true,
+        "error": null,
+        "timed_out": false,
+        "duration_s": 1.54,
+        "total_tests": 44,
+        "passed_tests": 44,
+        "failed_tests": 0,
+        "returncode": 0
+      }
+    }
+  ],
+  "summary": {
+    "total_pairs_evaluated": 50,
+    "outcomes": {
+      "clean": 50
+    },
+    "drift_rate": 0.0,
+    "discrimination_rate": 0.0,
+    "evaluable_parent_pass_count": 50,
+    "beta_retro_point": 0.0,
+    "beta_retro_95_interval": [
+      0.0,
+      0.0713
+    ],
+    "median_pair_duration_s": 3.112,
+    "stopping_rule_verdict": "inconclusive"
+  }
+}

@@ -32,11 +32,31 @@ skip, which is what a release step should pass.
 Exit 0 clean, 1 on any finding. Never prints the matched private path in full -- it prints
 where the leak is in THIS repository and enough of the needle to find it, because a script
 that dumps private paths to a build log has become the leak.
+
+THE 21 AUGUST 2026 REPAIR. This gate was unsound in both directions and the cause was an
+inherited environment. Git exports `GIT_DIR`, `GIT_INDEX_FILE` and `GIT_WORK_TREE` when it
+invokes a hook, and **`GIT_DIR` overrides `cwd`**. Measured that day: run standalone the
+script enumerated 2854 distinctive needles from the two corpora and passed; run from the
+`pre-push` hook it enumerated **17**, because both `git ls-files` calls read the repository
+the hook came from rather than the corpus they were pointed at, and reported 2123 findings
+that were this repository's files matching themselves. [measured]
+
+The false-PASS direction is the serious one. `--require-corpora` tested only that
+`<corpus>/.git` existed; it never established that the enumeration came from the corpus. On a
+tree where those 17 wrong needles happened not to match, **the sole gate protecting private
+commercial code would have reported PASS having read neither corpus.** [measured]
+
+Two things now prevent it. Every git subprocess runs with `GIT_ENV`, from which every `GIT_*`
+variable has been removed. And `ls_files()` will not return a listing until
+`git rev-parse --show-toplevel`, run from the same directory, resolves to that same directory
+-- so an enumeration is bound to its source, and `--require-corpora` means "I read those
+corpora" rather than "those directories exist".
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -62,35 +82,62 @@ GENERIC = re.compile(
 EXPECTED = {"docs/30-source-material/prior-repo-assets.md"}
 
 
-def tracked_files(root: Path) -> list[str]:
+class BindingError(RuntimeError):
+    """An enumeration could not be proved to have come from the directory it names."""
+
+
+# Git exports GIT_DIR, GIT_INDEX_FILE and GIT_WORK_TREE into every hook it runs, and GIT_DIR
+# overrides cwd. A git subprocess that inherits them reads whatever repository the hook came
+# from. Scrubbing them is half the repair; ls_files() below is the other half.
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
+def ls_files(repo: Path) -> list[str]:
+    """Tracked paths of `repo`, or raise unless the listing provably came from `repo`.
+
+    The binding check is the load-bearing part. `cwd=` is a request; `git rev-parse
+    --show-toplevel` is the answer, and only when the answer is `repo` itself is the listing
+    evidence about `repo`. An empty listing is also refused: a corpus that yields no paths
+    yields no needles, and a gate that checks nothing must never report PASS.
+    """
+    top = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=repo,
+        env=GIT_ENV,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    ).stdout.strip()
+    if not top or Path(top).resolve() != repo.resolve():
+        raise BindingError(
+            f"enumeration of '{repo.name}' resolved to a different repository; refusing to "
+            "report on a tree that was never read"
+        )
     out = subprocess.run(
         ["git", "ls-files"],
-        cwd=root,
+        cwd=repo,
+        env=GIT_ENV,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
         check=True,
     )
-    return [line for line in out.stdout.splitlines() if line.strip()]
+    files = [line.strip() for line in out.stdout.splitlines() if line.strip()]
+    if not files:
+        raise BindingError(f"'{repo.name}' enumerated to zero tracked files")
+    return files
+
+
+def tracked_files(root: Path) -> list[str]:
+    return ls_files(root)
 
 
 def corpus_paths(repo: Path) -> set[str]:
     """Every path in the corpus's HEAD tree, as forward-slash strings."""
-    out = subprocess.run(
-        ["git", "ls-files"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=True,
-    )
-    return {
-        line.strip().replace("\\", "/")
-        for line in out.stdout.splitlines()
-        if line.strip()
-    }
+    return {line.replace("\\", "/") for line in ls_files(repo)}
 
 
 def needles(paths: set[str]) -> set[str]:
@@ -116,8 +163,18 @@ def main() -> int:
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
-    present = [c for c in CORPORA if (c / ".git").exists()]
-    missing = [c.name for c in CORPORA if c not in present]
+    # The corpus locations above are absolute paths on the principal's Windows machine, so
+    # this gate can only be RUN there. `CONSILIENT_CORPORA` (os.pathsep-separated) lets the
+    # same person run it from a second machine, or from Linux, without editing this file
+    # and without those paths entering the repository. Unset, behaviour is unchanged.
+    override = os.environ.get("CONSILIENT_CORPORA", "").strip()
+    corpora = (
+        [Path(p) for p in override.split(os.pathsep) if p.strip()]
+        if override
+        else CORPORA
+    )
+    present = [c for c in corpora if (c / ".git").exists()]
+    missing = [c.name for c in corpora if c not in present]
 
     if missing:
         message = (
@@ -132,14 +189,19 @@ def main() -> int:
         return 0
 
     all_needles: set[str] = set()
-    for repo in present:
-        all_needles |= needles(corpus_paths(repo))
+    try:
+        for repo in present:
+            all_needles |= needles(corpus_paths(repo))
+        checked = tracked_files(root)
+    except BindingError as error:
+        print(f"FAIL {error}")
+        return 1
     print(
         f"checking against {len(all_needles)} distinctive paths from {len(present)} corpora"
     )
 
     findings: list[tuple[str, int, str]] = []
-    for rel in tracked_files(root):
+    for rel in checked:
         path = root / rel
         try:
             text = path.read_text(encoding="utf-8")

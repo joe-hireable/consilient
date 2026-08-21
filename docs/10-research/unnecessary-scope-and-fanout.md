@@ -1,13 +1,13 @@
 # Unnecessary scope and fan-out: when less is better
 
-**Status:** literature-backed hypothesis and pre-registration; no Consilience prevalence
+**Status:** literature-backed hypothesis and pre-registration; no Consilient prevalence
 estimate exists yet. [asserted]
 
 ## Claim boundary
 
 Some current model–harness compositions produce more code, scope, tool use or coordination
 than is needed for the same verifier outcome. [cited] No reviewed source establishes an
-internal motive or universal preference to “do more”, so Consilience measures behaviour and
+internal motive or universal preference to “do more”, so Consilient measures behaviour and
 does not infer intent. [asserted] The effect may belong to the model, native harness, prompt,
 task, verifier or their interaction; provider names are not causal explanations. [asserted]
 
@@ -52,7 +52,7 @@ decomposition improved GPT-5 from 57.0% to 96.5% at comparable cost on a separab
 task. [cited] Task topology and new evidence, not agent count, are the candidate moderators.
 [asserted]
 
-Consilience has already seen two compatible incidents. [measured] EXP-05's first OpenCode
+Consilient has already seen two compatible incidents. [measured] EXP-05's first OpenCode
 artefact passed its functional tests while adding an unrequested duplicate test file; the
 changed-file verifier rejected that extra scope. [measured] EXP-16's Owner-meeting arm used
 4.8× the single-agent tokens and 3.7× the wall time while reaching the same substantive

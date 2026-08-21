@@ -1,6 +1,6 @@
 # 0015. Dogfooding gate — do not depend on Consilience until it clears three tests
 
-- **Status:** ACCEPTED
+- **Status:** ACCEPTED (Gate B condition 2 superseded by [0037](0037-replace-gate-b2-with-measured-critic-throughput-gain.md))
 - **Date:** 2026-08-19
 - **Deciders:** Joe Brown (intent), Claude (the gate)
 - **Inquiry tier reached:** T1 ground
@@ -34,7 +34,7 @@ happened: a gate condition passed for a day on evidence that could not have fail
 
 The original reasoning, retained because it is what a reader would otherwise repeat:
 `.github/workflows/invariants.yml` runs
-`consilience.cli --json replay` against the committed trajectory on every push and pull
+`consilient.cli --json replay` against the committed trajectory on every push and pull
 request and exits non-zero when `identical` is false. [measured] — true as far as it went, and
 insufficient, because nothing established that `identical` could ever *be* false.
 
@@ -60,6 +60,9 @@ ticket/result interface intact; #4, #5 and #6 fit without redesign. [measured] A
 stopping rule therefore did not fire — see
 `../10-research/experiments/exp05/findings-exp05.md`. Gate B stays closed on conditions 2,
 3 and 4.
+
+**Gate B condition 2 — SUPERSEDED by [0037](0037-replace-gate-b2-with-measured-critic-throughput-gain.md).**
+Condition 2 as written (*"derived parallelism ceiling is > 1"*) is a mathematical tautology ($n_{\text{max}} \ge 3.125 > 1$ for all $\beta \in [0, 1]$) and cannot fail. Superseded by ADR-0037, which requires a measured $\ge 20\%$ review-throughput gain over the unassisted baseline in EXP-08 ($G(\beta) \ge 0.20$, $\beta \le 0.6296$). [algebra]
 
 **The Enforcement clause below is unimplemented, and that is now recorded as debt.**
 `consil doctor` does not exist; the CLI exposes `record`, `replay` and `beta` and nothing

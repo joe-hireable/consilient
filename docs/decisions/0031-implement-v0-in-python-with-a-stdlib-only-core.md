@@ -16,12 +16,12 @@ constrains the implementation.
 
 Two signals pointed in different directions. Every research instrument in the repository is
 Python, and CI already installs Python. [measured] But `packages/consil` and
-`packages/consilience` are npm name reservations, which implies an intent to distribute on
+`packages/consilient` are npm name reservations, which implies an intent to distribute on
 npm. [measured]
 
 ## Decision
 
-**Implement v0 in Python, in `src/consilience/`, with a core that imports nothing outside the
+**Implement v0 in Python, in `src/consilient/`, with a core that imports nothing outside the
 standard library.** Tests live in `tests/` and run under pytest, which the repository already
 uses.
 
@@ -73,7 +73,7 @@ CI needed one workflow and no lockfile.
 **Negative.** If npm distribution is chosen, the CLI layer is rewritten or wrapped. The core
 logic and every test survive that, because they operate on files rather than on a runtime.
 
-**Neutral but load-bearing.** The event schema in `src/consilience/events.py` is now a public
+**Neutral but load-bearing.** The event schema in `src/consilient/events.py` is now a public
 interface under ADR-0023's T2 tier. Changing it is a versioned schema change, not an edit.
 
 ## Enforcement

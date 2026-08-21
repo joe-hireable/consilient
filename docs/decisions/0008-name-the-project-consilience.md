@@ -1,6 +1,6 @@
 # 0008. Name the project Consilience
 
-- **Status:** ACCEPTED
+- **Status:** SUPERSEDED by [0038](0038-rename-the-project-consilient.md) — the project is named Consilient. This record stands as written; the concept and this file's reasoning are unchanged, only the name of the artefact.
 - **Date:** 2026-08-19
 - **Deciders:** Joe Brown
 - **Inquiry tier reached:** T1 ground — availability checked against live registries

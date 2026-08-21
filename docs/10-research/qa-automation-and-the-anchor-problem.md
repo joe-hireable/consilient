@@ -9,7 +9,7 @@ abstract or listing depth via arXiv; **none was read in full.** [measured] That 
 materially thinner evidence base than
 `human-success-and-the-human-side-of-beta.md` (65 sources, 44 in full), and every citation
 below is therefore `[ABS]` in the bibliography sense and **may not be promoted to a `[cited]`
-line in an ADR until fetched and read.** [asserted] Nothing in this file is a Consilience
+line in an ADR until fetched and read.** [asserted] Nothing in this file is a Consilient
 measurement except where it quotes EXP-01. [asserted]
 
 ---

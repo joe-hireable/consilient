@@ -55,7 +55,7 @@ about one vendor.**
 
 **Checks, named rather than implied.** The identity ground has one and it has shipped:
 `actor` is required on every event and V0-18 refuses a `human_decision` authored by anyone
-but its named principal, in `src/consilience/events.py`, with tests. [measured] The
+but its named principal, in `src/consilient/events.py`, with tests. [measured] The
 schema-rigidity ground has **no check** — a harness-owned status vocabulary is named as a
 native-design inheritance in `exp16-results.md` and does not exist in the observe-only
 increment. Until it ships, "the harness owns the status vocabulary" is `[asserted]` and owed.

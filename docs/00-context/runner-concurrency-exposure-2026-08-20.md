@@ -63,7 +63,7 @@ design.**
 
 ## The fix, which is to adopt an invariant this project already has
 
-`src/consilience/events.py` is clean and has been all along: append-only writes, a schema
+`src/consilient/events.py` is clean and has been all along: append-only writes, a schema
 version, RFC3339 timestamps with an explicit offset, and a prefix digest that makes a committed
 position immutable. There is a test asserting exactly that. [measured]
 

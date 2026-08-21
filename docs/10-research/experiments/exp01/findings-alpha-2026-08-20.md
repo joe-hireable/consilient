@@ -262,6 +262,56 @@ recorded here, only their counts and classes. Note that
 `.github/scripts/check_private_corpus.py` matches file paths and would **not** have caught a
 leaked check name; that is a known gap in the net.
 
+## 7.6 Independently replicated, and the two corrections reconciled
+
+Everything in §2 to §7.5 was derived by one model family from one reading of one dataset. That
+is the echo condition, and this project does not get to exempt itself from its own rule. A
+second family (`gemini-3.7-flash-high`, under WSL) was given the primary records and the four
+claims, and told to derive each from scratch before comparing. [measured]
+
+**All four replicate exactly.** α at 23/97 and 4/28 with identical Wilson intervals; 0 reverts
+in 203 and 22 bad labels; size ratios 2.60 and 3.00; 15/75 and 3/23 cancelled-only.
+
+One accounting divergence surfaced, and it is language rather than arithmetic:
+`hireable-platform` has **22** bad PRs of which **21** carry a recorded verdict. Both numbers
+were already in the table above; the word "total" was doing two jobs. Fixed here by saying so.
+
+**The new result is the reconciliation, which nobody had done.** Two corrections to α were
+produced independently and could have double-counted:
+
+- this document's §7.5 removes **3** cancelled-only good-and-red PRs, on the ground that no
+  verdict was taken;
+- a concurrent `gpt-5.6` adjudication of all 23 good-and-red PRs removes **9** as not
+  meaningful rejections.
+
+**They do not double-count: the 3 are a strict subset of the 9.** [measured] The other 6 failed
+non-blocking live-model evaluation suites or infrastructure checks — the same class of
+non-rejection, identified by a different route.
+
+The reconciled good row on `jobboard-v2`, N = 97:
+
+| | count | reading |
+|---|---|---|
+| CI green | 74 | verifier accepted |
+| cancelled only | 3 | no verdict taken |
+| non-blocking, live-model or lint only | 6 | ran, but not a rejection on the merits |
+| borderline | 3 | unresolved |
+| confirmed gating rejection | 11 | verifier rejected on the merits |
+
+| treatment | α | Wilson 95% |
+|---|---|---|
+| as recorded | 23/97 = 0.2371 | [0.1635, 0.3307] |
+| cancelled excluded from both (§7.5) | 20/94 = 0.2128 | [0.1422, 0.3059] |
+| all 9 non-verdicts kept in denominator | 14/97 = 0.1443 | [0.0880, 0.2278] |
+| **all 9 treated as no verdict** | **14/88 = 0.1591** | **[0.0972, 0.2495]** |
+
+**Under every treatment, the entire interval lies above the assumed 0.03.** That is the claim
+this file makes, and it is now the claim that survives three independent derivations rather
+than one. The point estimate is treatment-dependent and should always be quoted with its
+treatment; anyone wanting a single number should take **0.1591 [0.0972, 0.2495]**, the reading
+that counts an unrun or non-gating check as no verdict rather than as a rejection, because that
+is the conditional β\* is defined on.
+
 ## 8. Reversal and falsifier
 
 **Reversal:** `git revert` the commit carrying this file and the two scripts. Nothing else
@@ -277,3 +327,65 @@ and it has not been run.**
 A second falsifier: if `_ci` conflates non-blocking or lint-only checks with correctness
 checks, then "red" overcounts genuine rejections and α is inflated for a mechanical reason.
 This is the same question the bad-and-red audit asks, applied to the other row.
+
+---
+
+## 9. β on the corrected labels — and why the two families' agreement is weaker than it looks
+
+The bad-and-red cell was adjudicated **twice, blind, by different model families**, over all 75
+PRs, from metadata only. [measured]
+
+| | `gpt-5.6` | `gemini-3.7` |
+|---|---|---|
+| bad label confirmed | 29 | 45 |
+| bad label refuted | 36 | 25 |
+| bad unclear | 10 | 5 |
+| red meaningful | 39 | 37 |
+| red **not** meaningful | 33 | 38 |
+| **corrected β** | **144/167 = 0.8623** | **155/178 = 0.8708** |
+
+The corrected form moves confirmed-bad PRs whose red was *not* a rejection into the numerator,
+and drops refuted-bad PRs from the denominator:
+`β = (128 + promoted) / (203 − refuted)`.
+
+**Both families report β within 0.0085 of each other while disagreeing by 16 PRs on how many
+bad labels are genuine. That should not be taken at face value, and it does not survive the
+obvious test.** [algebra]
+
+`beta_convergence.py` recomputes β under every cross combination of the two adjudications'
+inputs:
+
+| promoted from | refuted from | β |
+|---|---|---|
+| `gpt-5.6` | `gpt-5.6` | 0.8623 *(as reported)* |
+| `gpt-5.6` | `gemini-3.7` | **0.8090** |
+| `gemini-3.7` | `gpt-5.6` | **0.9281** |
+| `gemini-3.7` | `gemini-3.7` | 0.8708 *(as reported)* |
+
+**Reported spread 0.0085. Cross spread 0.1192. The agreement is 14× narrower than the
+disagreement in its inputs warrants.** An adjudicator that refutes more labels also promotes
+fewer, so a larger numerator trades against a smaller denominator in roughly compensating
+amounts and β is stable while the labels underneath are not.
+
+**So the honest reading is the sign, not the point.** Under every combination β lies far above
+the recorded 0.6305, and the two families agree on that without qualification. **The interval
+to quote is [0.81, 0.93], not [0.862, 0.871].**
+
+This is the project's own rule applied to its own most important number: two agents agreeing is
+not evidence, and here the agreement was partly arithmetic. Had only one family run, or had the
+two been compared on β alone, this would have been published as a tight cross-validated
+estimate. It is not one.
+
+**What it still says, and it is the largest result the project has.** On this corpus, once
+spurious labels and non-rejections are removed, the verifier accepts roughly **four in five to
+nine in ten** of the bad artefacts it actually rules on — against a recorded 0.63 and a
+design-time β\* threshold of ~0.11. [measured, proxy labels, metadata-only adjudication, n=75,
+one repository]
+
+**What it is not.** Not a diff-level audit — no adjudicator read a patch. Not β for the
+project — it is β for one repository's CI on merged PRs. Not independent of §7's proxy
+problems; it inherits every one of them. The 10 and 5 `unclear` verdicts are unresolved.
+
+**Falsifier:** a diff-level audit of any 20 of the 75 that disagrees materially with both
+metadata adjudications would show the method cannot be run from metadata at all, which would
+retire this estimate rather than adjust it.

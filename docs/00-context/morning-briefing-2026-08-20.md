@@ -35,7 +35,7 @@ here.
 ### 🔴 A. Which quantity is β?
 `beta-axis-defect-2026-08-20.md`
 
-ADR-0002 and `src/consilience/beta.py` define **β = P(checks accept | artefact bad)**.
+ADR-0002 and `src/consilient/beta.py` define **β = P(checks accept | artefact bad)**.
 `exp01/mine_beta.py` computes **P(bad | checks accepted)** — the transpose — and says so in its
 own output string. The only empirical β this project has is not the quantity the architecture is
 built on.
@@ -311,7 +311,7 @@ them.
   **You cannot run a blind experiment inside the repository you write your findings into.** The
   defect survives, stronger for three verifications. The claim does not. We have no measured
   evidence that difference-of-class does anything for us — which is where we were yesterday.
-- **I gave Cursor a `docs`-only snapshot** and it correctly reported `src/consilience/` as absent
+- **I gave Cursor a `docs`-only snapshot** and it correctly reported `src/consilient/` as absent
   — as phantom code with fabricated benchmarks. My staging error, and the lesson belongs in the
   product: *an agent given a partial corpus will report absence as a finding, and absence is the
   one claim a partial corpus cannot support.*

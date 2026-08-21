@@ -47,7 +47,7 @@ harnesses, while OpenCode or Codex can compose with it for coding work. [asserte
 records the corrected boundary. [measured]
 
 Cursor consumes MCP servers as tools, but its measured external-control protocol is Agent
-Client Protocol v1 over newline-delimited JSON-RPC on stdio. [measured] A future Consilience
+Client Protocol v1 over newline-delimited JSON-RPC on stdio. [measured] A future Consilient
 MCP tool may accept an authorised delegation request from another agent, but the request
 must enter the coordinator before that coordinator drives Cursor through ACP. [asserted]
 Allowing an MCP caller to spawn Cursor directly would bypass the proposed authority,

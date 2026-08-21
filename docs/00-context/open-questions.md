@@ -278,7 +278,7 @@ measures the mechanism, not β itself, and is n=1. See
 **Q31. What is the honest counterfactual for a meta-harness?**
 
 The field's positive results compare AI against no AI. The realistic comparison for
-Consilience is against a well-configured Claude Code, and the one matched study of that
+Consilient is against a well-configured Claude Code, and the one matched study of that
 transition measured +3.1% commits and −6.3% lines for repositories that had already adopted
 AI IDEs. [cited] Meanwhile the effect's sign is set by task selection — +55.8% on a greenfield
 toy task, −19% on real issues in a developer's own mature repository — so a harness that
@@ -310,6 +310,28 @@ Three questions must be answered before any design, and the second is the danger
    scarcest input in the system? [measured]
 
 Do not write a QA design document before these are answered. [asserted]
+
+## Three gaps that must close before any metered call is made
+
+Raised 20 August 2026 by the agent that built the refuse-only budget primitive, in its own
+report, and recorded here because they block provider integration rather than the primitive.
+**A budget permission is not a spend authorisation**, and these are why.
+
+1. **Reservation settlement and release are unspecified.** A permitted reservation consumes
+   budget. Nothing yet reconciles it against what was actually charged, or releases it if the
+   call never happened. Left as it is, the budget fills monotonically until a fresh
+   `budget.state` snapshot arrives — fail-closed, and unusable without the probe that writes
+   those snapshots. [asserted]
+2. **Requested cost is not actual cost.** The request names an amount before the call; the
+   provider returns a cost after it. Which one the ceiling binds, and what happens when they
+   differ, is undecided. [asserted]
+3. **Budget-state ingress is declared, not authenticated.** State is written by an actor named
+   `openrouter-probe`. That is a claim in a JSON field, so a hand-written line can move the
+   budget — the same limitation as V0-18 and V0-28, and the same unbuilt cryptographic half.
+   [measured, by construction]
+
+Provider integration stays disabled until all three are resolved. EXP-51 answers what the vendor
+offers; these three are what the harness must decide regardless of the answer.
 
 ## Method note for the brainstorm
 

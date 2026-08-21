@@ -8,7 +8,7 @@ intellectual property in their contributions.
 
 ---
 
-Thank you for Your interest in the Consilience project (the "**Project**") maintained by
+Thank you for Your interest in the Consilient project (the "**Project**") maintained by
 Joseph Brown of Hertford, England (the "**Maintainer**").
 
 This Corporate Contributor Licence Agreement ("**Agreement**") sets out the terms on which

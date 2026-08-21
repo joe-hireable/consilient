@@ -1,8 +1,19 @@
-# Consilience v0 implementation specification — draft for review
+# Consilient v0 implementation specification — draft for review
 
-> **DRAFT · NOT APPROVED · NO IMPLEMENTATION AUTHORITY.** This document is a concrete
-> target for criticism. Product implementation remains forbidden until Joe explicitly
-> approves a specification or supersedes that gate. [asserted]
+> **APPROVED FOR THE OBSERVE-ONLY INCREMENT — 20 August 2026, 01:22.** Joe sent the exact
+> sentence §13.1 requires; it is recorded in the trajectory as `spec.approval_observed`.
+> [measured]
+>
+> **What that authorises:** Stage 2 only — recording trajectory events, projecting them and
+> computing β. The increment does not route, block or accept anything, and a test asserts the
+> CLI exposes no surface that could. **Routing, blocking and orchestration remain gated** on
+> ADR-0015 Gate A and Gate B, neither of which has passed. [measured]
+>
+> **Corrected 20 August 2026.** This block read *"DRAFT · NOT APPROVED · NO IMPLEMENTATION
+> AUTHORITY… product implementation remains forbidden"* for the fifteen hours after the
+> approval it describes. Two agents read it and drew the wrong conclusion about what they were
+> permitted to do. A stale gate marker in the specification's own header is worse than a stale
+> one anywhere else, because it is the document every other document defers to. [measured]
 
 **Version:** 0.1-draft · **Date:** 19 August 2026 · **Owner:** Joe Brown ·
 **Evidence base:** [`../decisions/index.md`](../decisions/index.md),
@@ -11,7 +22,7 @@ authoritative EXP-16 scope event in `.harness/log/2026-08-19.jsonl`. [measured]
 
 ## 1. Outcome and boundary
 
-Consilience v0 is a local-first, CLI-only instrument for coding work that measures how
+Consilient v0 is a local-first, CLI-only instrument for coding work that measures how
 often a repository's automated checks accept a human-rejected artefact, then uses that
 measurement to admit and route bounded agent attempts only after the dogfooding gates
 permit control. [asserted]
@@ -73,7 +84,7 @@ becomes a management metric, is a cost regardless of its output quality. [assert
   working arrangement in
   [`../10-research/agent-identity-and-collaboration.md`](../10-research/agent-identity-and-collaboration.md)
   is a working convenience, not v0 scope, and no check enforces it. [asserted]
-- Consilience does not distribute model weights or reproduce content from the private
+- Consilient does not distribute model weights or reproduce content from the private
   measurement corpora. [asserted]
 
 ## 3. Delivery sequence and irreversible gates
@@ -81,7 +92,7 @@ becomes a management metric, is a cost regardless of its output quality. [assert
 ### Stage 1 — bootstrap without dependence
 
 Existing agents may produce research instruments, adapters, ADRs and this draft, but
-Consilience is not on the critical path and may not route work. [asserted] Experimental
+Consilient is not on the critical path and may not route work. [asserted] Experimental
 adapter outcomes remain measurements, not product interfaces. [asserted]
 
 Three boundaries bind who performs that work. They belong to this draft because they are the
@@ -128,18 +139,22 @@ override: [asserted]
 
 ### Stage 3 — route, criticise and orchestrate, after Gate B
 
-Control begins on a project other than Consilience only after Gate B. [asserted]
+Control begins on a project other than Consilient only after Gate B. Under ADR-0039, Stage 3 is
+entered on the principal's approval (authorising construction and supervised orchestration) and
+exited through Gate B (which gates default dependence and unattended operation). [asserted]
 
 1. EXP-05 is complete and a second adapter did not force a shared-interface redesign.
    [measured]
-2. EXP-08 is complete and measured critic recall yields a parallelism ceiling greater
-   than one. [asserted]
-3. A one-command bare-agent fallback exists and a scheduled check exercises it weekly.
-   [asserted]
-4. Twenty non-Consilience tickets complete without intervention in the harness itself.
-   [asserted]
+2. EXP-08 is complete and the critic tier's own β has been measured, with a confidence interval,
+   by an instrument that does not depend on human rejections (ADR-0045, superseding the
+   tautological parallelism ceiling formula from ADR-0007 / ADR-0037). [asserted]
+3. A one-command bare-agent fallback exists and is evidenced by a machine-readable result dated
+   within the last 14 days recording a pass (ADR-0045 and ADR-0046, superseding the scheduled
+   CI job trigger requirement to comply with the no-secrets-in-public-repo rule). [asserted]
+4. Twenty non-Consilient tickets complete without intervention in the harness itself
+   (governing dependence on the harness for foreign repository work under ADR-0039). [asserted]
 
-The bare-agent fallback remains permanent; Consilience must never become the only way to
+The bare-agent fallback remains permanent; Consilient must never become the only way to
 work on its own repository. [asserted]
 
 ## 4. Required records
@@ -277,7 +292,7 @@ their scarcity and failure modes differ. [asserted]
 Provider-native quota windows are recorded without conversion into a fictional shared
 token unit. [asserted] Fresh authoritative headroom is preferred; local trajectory
 accounting can lower an availability estimate but cannot promote it to provider truth
-because usage may occur outside Consilience. [asserted]
+because usage may occur outside Consilient. [asserted]
 
 Resource records are keyed by account, provider, plan, native bucket and native window;
 concurrent or nested windows remain separate. [asserted] A current user attestation may
@@ -306,7 +321,7 @@ An installed fit provider must decide model-revision, quantisation, context, eng
 hardware compatibility before the harness transfers model bytes. [asserted] Infeasible or
 unknown means no harness-initiated download or execution. [asserted]
 
-Consilience wraps rather than builds this capability; `llmfit` is the current candidate in
+Consilient wraps rather than builds this capability; `llmfit` is the current candidate in
 [ADR-0026](../decisions/0026-admit-only-budget-and-hardware-feasible-backends.md), but adding
 it remains a separate dependency-approval decision. [cited] EXP-21 must validate
 the constraint case on a real 16 GB machine; replaying the RTX 5090/64 GB measurements is
@@ -409,6 +424,7 @@ not satisfy the invariant. [asserted]
 | V0-23 | The harness asks only in the classes ADR-0033 names, and an approval returned below the affordability floor is stored unread and cannot satisfy a human decision. [asserted] | Configuration-load test rejects an unlisted ask class; fixture proves a below-floor approval fails V0-18. [asserted] | ADR-0033 |
 | V0-24 | A recorded reversal is executable, and reversibility is measured rather than declared. [asserted] | Schema test rejects a reversal that is not a revert reference, a command or a named inverse; a sampler executes recorded reversals in a scratch worktree and publishes the misclassification rate. [asserted] | ADR-0033 |
 | V0-25 | Liveness is never resolved from a process identity, a terminal artefact record outranks a stale liveness signal, and detection escalates rather than terminating. [asserted] | Fixtures reject PID-only liveness, reproduce the Airflow completed-task-marked-failed regression, fail a configured-but-unfed progress channel at load, and reject termination without a standing authority. [asserted] | ADR-0034 |
+| V0-26 | Multi-contributor events declare a distinct evidence class per contributor; duplicate, missing or empty classes are refused. [asserted] | Event validation rejects multi-contributor events with duplicate, missing or empty `evidence_class` declarations while accepting single-actor and distinct-class events. [asserted] | ADR-0010 |
 
 ## 12. Acceptance evidence and release decision
 

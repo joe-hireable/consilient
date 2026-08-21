@@ -65,7 +65,7 @@ The fetch filter is real — `mine_beta.py` does pass `--state merged`. But the 
 **not** why the route fails, and the real reason is worse:
 
 - **There is no pipeline at all.** `mine_beta.py` writes private JSON to `data/<repo>-prs.json`.
-  Nothing in `src/consilience/` reads it. No adapter, no loader, no ingestion path converts it
+  Nothing in `src/consilient/` reads it. No adapter, no loader, no ingestion path converts it
   into schema-v1 `attempt.outcome` events. [measured]
 - **The product explicitly forbids what the experiment produces.** `beta.py`: *"No proxy label is
   accepted here — the caller must have resolved a real verdict before the row reaches this
@@ -90,7 +90,7 @@ miss rate — and does not address the architectural disconnect at all.
 ## 3. β\* is absent from the specification and the code — PARTLY
 
 **Confirmed:** `β*` (in every spelling) appears **zero times** in `docs/40-spec/v0-draft.md` and
-zero times in `src/consilience/`. Nothing in the code compares a measured β against any
+zero times in `src/consilient/`. Nothing in the code compares a measured β against any
 threshold; `beta.py` computes a point estimate and a Wilson interval and checks a sample floor,
 and that is all. [measured]
 

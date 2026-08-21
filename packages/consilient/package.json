@@ -1,0 +1,7 @@
+{
+  "name": "consilient",
+  "version": "0.0.1",
+  "description": "Reserved: Consilient — an open-source meta-harness for agentic work, organised around measuring β, the rate at which automated checks accept a bad artifact. Pre-release; nothing is published here yet.",
+  "license": "MIT",
+  "files": ["README.md"]
+}

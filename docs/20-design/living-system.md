@@ -62,7 +62,7 @@ HGM already gestures at this from a different angle: it explicitly rejects the a
 that higher benchmark scores correspond to greater self-improvement capacity. It does not,
 however, measure the acceptance signal's error rate.
 
-**Consilience's contribution, if it has one: self-modification gated by a *measured* verifier
+**Consilient's contribution, if it has one: self-modification gated by a *measured* verifier
 false-accept rate.** β is not a feature alongside self-improvement. It is the property that
 makes self-improvement safe rather than merely fast.
 
@@ -178,7 +178,7 @@ And one honest limit, from the literature:
 > improvement operator makes the task layer better, but the operator does not itself get
 > smarter. HyperAgents attempts the second level; results are early.
 
-Consilience should not claim otherwise, in documentation or marketing.
+Consilient should not claim otherwise, in documentation or marketing.
 
 ---
 

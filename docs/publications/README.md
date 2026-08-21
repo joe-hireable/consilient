@@ -61,7 +61,7 @@ seniority, persona and rhetorical confidence carry no weight. [asserted]
 
 ## Human authorship, AI assistance and submission authority
 
-Joe is the accountable human author and submission principal for Consilience papers unless
+Joe is the accountable human author and submission principal for Consilient papers unless
 a later human collaborator independently satisfies the target venue's authorship rules.
 [asserted] An AI system is never listed as an author: arXiv, NeurIPS, AAAI and ACL state
 that directly, while all make the human authors responsible for the submitted content.

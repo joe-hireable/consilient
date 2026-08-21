@@ -1,0 +1,24 @@
+{
+  "date": "2026-08-20",
+  "purpose": "identity_probe",
+  "scored": false,
+  "requested_model_id": "gemini-3.7-flash-low",
+  "runtime_reported_model": "Gemini 3.7 Flash Low",
+  "served_model": "unknown:not-reported-by-runtime",
+  "served_identity_reported": false,
+  "output_format": "stream-json",
+  "prompt": "Do not inspect files or use tools. Reply with exactly: identity-probe-ok",
+  "response": "identity-probe-ok",
+  "result": "success",
+  "session_id": "ec17c894-8937-4ddb-a76d-f42569f05ad1",
+  "request_id": "002429d3-3904-4388-8f3c-c351bf5171a3",
+  "duration_ms": 4864,
+  "duration_api_ms": 4864,
+  "usage": {
+    "input_tokens": 29146,
+    "output_tokens": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+  },
+  "exclusion_reason": "The stream init event reported a display name, not served-weight identity."
+}
