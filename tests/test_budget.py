@@ -706,7 +706,9 @@ def test_state_from_a_previous_utc_budget_period_is_stale(
 
     monkeypatch.setattr(budget, "_utc_now", lambda: now)
     log = tmp_path / f"{now.date().isoformat()}.jsonl"
-    log.write_text(canonical(budget_state(now, observed_at=observed_at)) + "\n")
+    log.write_text(
+        canonical(budget_state(now, observed_at=observed_at)) + "\n", encoding="utf-8"
+    )
 
     decision = budget.check_budget(
         tmp_path,

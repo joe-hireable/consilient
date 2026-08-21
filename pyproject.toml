@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "consilient"
+version = "0.1.0"
+description = "An open-source meta-harness for agentic work, organised around measuring beta, the rate at which automated checks accept a bad artifact."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+# The tested floor, not the measured minimum. 3.13 is the only interpreter the suite has
+# been run on and the version `mypy.ini` type-checks against, so it is the only version
+# this project may claim. Lowering it is a measurement, not an edit: install and run
+# `python scripts/release_check.py` on the lower interpreter first, then change both this
+# line and `python_version` in mypy.ini. `test_the_declared_python_floor_matches_mypy`
+# fails if the two ever disagree.
+requires-python = ">=3.13"
+authors = [{ name = "Joe Brown", email = "joe@gethireable.com" }]
+keywords = ["agents", "verification", "false-acceptance-rate", "harness", "evaluation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+# No runtime dependencies, deliberately. `consilient` is standard library only: argparse,
+# json, sqlite3, hashlib, pathlib, datetime, re. Adding one is a decision to announce in
+# the commit message, not a detail to absorb here.
+dependencies = []
+
+[project.optional-dependencies]
+# Only what the gates in `scripts/release_check.py` invoke. Not required to run `consil`.
+dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/joe-hireable/consilient"
+Source = "https://github.com/joe-hireable/consilient"
+
+[project.scripts]
+consil = "consilient.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

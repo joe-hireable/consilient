@@ -146,8 +146,16 @@ def doctor_payload(tmp_path, capsys):
             "doctor",
         ]
     )
-    assert code == 0
-    return json.loads(capsys.readouterr().out)
+    payload = json.loads(capsys.readouterr().out)
+    # This asserted `code == 0` until 21 Aug 2026, against a command that returned 0
+    # unconditionally because `cmd_doctor`'s result carries no `identical` key. It could not
+    # fail, and it pinned that defect across every doctor test in this file. The exit code
+    # must now agree with the payload printed beside it.
+    assert code == (0 if payload["routing_orchestration_enabled"] else 1), (
+        f"doctor exited {code} while routing_orchestration_enabled is "
+        f"{payload['routing_orchestration_enabled']}"
+    )
+    return payload
 
 
 # ---------------------------------------------------------------- V0-01
@@ -2571,4 +2579,147 @@ def test_foreign_commit_identifiers_may_only_decrease():
     assert total <= 14, (
         f"foreign commit identifiers rose to {total}; publishing them would put another "
         "repository's commit history into a public one. Aggregate them instead."
+    )
+
+
+# ------------------------------------------- packaging and exit codes, 21 August 2026
+# `pip install .` failed on a clean machine: neither `pyproject.toml` nor `setup.py`
+# existed, so the `consil` entry point that `packages/consil/README.md` and thirty-odd
+# documents refer to could not be installed by anyone. These pin the repair.
+
+
+def _pyproject() -> dict:
+    import tomllib
+
+    return tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+
+def test_the_consil_entry_point_resolves_to_a_real_callable():
+    """A declared console script that does not import is a broken install, not a typo."""
+    import importlib
+
+    target = _pyproject()["project"]["scripts"]["consil"]
+    module_name, _, attribute = target.partition(":")
+    assert module_name and attribute, f"malformed entry point {target!r}"
+    resolved = getattr(importlib.import_module(module_name), attribute)
+    assert callable(resolved), f"{target} is not callable"
+
+
+def test_the_declared_python_floor_matches_mypy():
+    """Two files state the supported interpreter. They must not drift apart.
+
+    `requires-python` is what pip enforces on a stranger's machine; `python_version` in
+    mypy.ini is what the type checker assumes. If the floor is lowered in one and not the
+    other, the gate type-checks against a version pip will not install on.
+    """
+    declared = _pyproject()["project"]["requires-python"]
+    assert declared.startswith(">="), f"floor {declared!r} is not a simple lower bound"
+    floor = declared.removeprefix(">=").strip()
+    mypy_ini = Path("mypy.ini").read_text(encoding="utf-8")
+    assert f"python_version = {floor}" in mypy_ini, (
+        f"pyproject requires-python is {declared!r} but mypy.ini does not target {floor}"
+    )
+
+
+def test_the_package_declares_no_runtime_dependencies():
+    """`consilient` is standard library only. A new dependency is a decision, not a diff.
+
+    AGENTS.md requires a new dependency to be argued. Nothing enforced that, so this does:
+    adding one fails here and the commit has to say what it bought.
+    """
+    assert _pyproject()["project"]["dependencies"] == [], (
+        "consilient gained a runtime dependency; say in the commit what it buys and why "
+        "the standard library could not"
+    )
+
+
+def test_doctor_exits_nonzero_while_the_gates_are_shut(tmp_path, capsys):
+    """`consil doctor` printed `Gate A: FAIL` and exited 0 until 21 August 2026.
+
+    `main()` returned `0 if result.get("identical", True) else 1`, and `cmd_doctor`'s
+    result carries no `identical` key, so every doctor invocation returned 0 whatever the
+    gates said. ADR-0015's Enforcement clause calls this command "Not advisory"; a command
+    whose failure a caller cannot read from `$?` is advisory. B9 in the guard catalogue is
+    the same mistake made accidentally with a pipe.
+    """
+    write_capture_days(tmp_path / "log", "2026-08-20")
+    code = main(
+        ["--log", str(tmp_path / "log"), "--db", str(tmp_path / "state.db"), "--json", "doctor"]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["routing_orchestration_enabled"] is False, "fixture should not open the gates"
+    assert code == 1, "doctor reported shut gates and told its caller they were open"
+
+
+def test_doctor_exits_zero_when_every_gate_passes(tmp_path, capsys, monkeypatch):
+    """The other direction, so the exit code is a report and not a constant.
+
+    Building a world where all seven conditions pass needs evidence this repository does
+    not have. The mapping from payload to exit code is what is under test here, so the
+    payload is supplied directly.
+    """
+    from consilient import cli as cli_mod
+
+    monkeypatch.setattr(
+        cli_mod,
+        "cmd_doctor",
+        lambda args: {"gates": {}, "routing_orchestration_enabled": True},
+    )
+    assert main(["--json", "doctor"]) == 0
+    assert json.loads(capsys.readouterr().out)["routing_orchestration_enabled"] is True
+
+
+def test_gate_a2_does_not_pass_on_an_empty_trajectory(tmp_path, capsys):
+    """Comparing zero events to zero events is not evidence that replay works.
+
+    Measured 21 August 2026 from a clean install in an empty directory: two `consil doctor`
+    runs reported A2 `pass`, reason "Compared 0 events; canonical state is identical." The
+    first run creates the state the second one compares against, and both are rebuilds of
+    the same empty log. That is A1 — two rebuilds compared — one invocation further out.
+    """
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    log_dir.mkdir(parents=True)
+    projection.build(log_dir, db).close()  # a prior projection exists, over zero events
+
+    condition = {
+        c["id"]: c for c in doctor_payload(tmp_path, capsys)["gates"]["A"]["conditions"]
+    }["A2"]
+
+    assert condition["status"] == "unknown", condition["reason"]
+    assert "zero events" in condition["reason"]
+
+
+def test_gate_a2_still_passes_on_a_non_empty_identical_replay(tmp_path, capsys):
+    """The narrowing must not have blunted the condition it narrows."""
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    write_capture_days(log_dir, "2026-08-20")
+    projection.build(log_dir, db).close()
+
+    condition = {
+        c["id"]: c for c in doctor_payload(tmp_path, capsys)["gates"]["A"]["conditions"]
+    }["A2"]
+
+    assert condition["status"] == "pass", condition["reason"]
+    assert "Compared 1 events" in condition["reason"]
+
+
+def test_ci_replay_step_carries_a_control_that_can_fail():
+    """The CI replay step must not manufacture the subject it then compares against.
+
+    Until 21 August 2026 it ran `beta` before `replay` "so that replay has a subject". The
+    subject `cmd_beta` leaves behind is a rebuild from the same log — it calls
+    `projection.build`, which unlinks the database — so `identical: true` was guaranteed.
+    A fresh checkout carries no `.harness/state.db` at all; it is gitignored. Measured:
+    with that sequence, deliberate out-of-band drift produced `identical: true` and the
+    gate exited 0.
+    """
+    workflow = Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
+    step = workflow.partition("- name: Replay invariant")[2]
+    assert step, "the replay invariant step is gone"
+    assert "cli --json beta" not in step, (
+        "the replay step seeds its own comparison subject again; a rebuild is not evidence "
+        "that the state on disk was intact"
+    )
+    assert "identical'] is False" in step or 'identical"] is False' in step, (
+        "the replay step lost the drift control that proves it can fail"
     )

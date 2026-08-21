@@ -37,6 +37,7 @@ that dumps private paths to a build log has become the leak.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -116,8 +117,18 @@ def main() -> int:
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
-    present = [c for c in CORPORA if (c / ".git").exists()]
-    missing = [c.name for c in CORPORA if c not in present]
+    # The corpus locations above are absolute paths on the principal's Windows machine, so
+    # this gate can only be RUN there. `CONSILIENT_CORPORA` (os.pathsep-separated) lets the
+    # same person run it from a second machine, or from Linux, without editing this file
+    # and without those paths entering the repository. Unset, behaviour is unchanged.
+    override = os.environ.get("CONSILIENT_CORPORA", "").strip()
+    corpora = (
+        [Path(p) for p in override.split(os.pathsep) if p.strip()]
+        if override
+        else CORPORA
+    )
+    present = [c for c in corpora if (c / ".git").exists()]
+    missing = [c.name for c in corpora if c not in present]
 
     if missing:
         message = (
