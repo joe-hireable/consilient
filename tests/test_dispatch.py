@@ -510,7 +510,8 @@ def test_every_harness_applies_the_native_caps_its_cli_actually_exposes(
 ):
     """R11 obliges that no arm runs UNBOUNDED. It does not oblige a flag spelling.
 
-    Joe, 21 August 2026: "Do not let any arm run unbounded. Hard turn and token caps."
+    R11's attribution was withdrawn on 21 August 2026; the bounded-arm obligation remains
+    on engineering merit.
 
     Until that evening this suite pinned the stricter reading -- refuse the launch unless the
     CLI exposed BOTH `--max-turns` and `--max-tokens` natively. Measured against the installed

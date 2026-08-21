@@ -432,9 +432,9 @@ def native_cap_flags(
 ) -> list[str] | str:
     """Return whatever native hard-cap flags the installed CLI actually exposes.
 
-    R11 is the principal's instruction, verbatim: "Do not let any arm run unbounded. Hard
-    turn and token caps." The obligation is that **no arm runs unbounded** -- not that a
-    particular flag spelling exists.
+    R11's attribution was withdrawn on 21 August 2026. The retained engineering
+    obligation is that **no arm runs unbounded** -- not that a particular flag spelling
+    exists.
 
     Until 21 August 2026 this demanded `--max-turns` AND `--max-tokens` natively and refused
     the launch otherwise. Measured against the installed CLIs that day: grok exposes
