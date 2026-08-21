@@ -23,6 +23,19 @@ if ! python "$checker" --staged >/dev/null 2>&1; then
   exit 1
 fi
 
+# A locally observed error marked prevented may not recur unnoticed. The error
+# store is ignored instance data; a fresh clone with no observations has nothing
+# to check.
+error_record=".harness/log/errors/errors.jsonl"
+error_checker=".github/scripts/check_error_recurrence.py"
+if [ -f "$error_record" ]; then
+  if [ ! -f "$error_checker" ]; then
+    echo "pre-commit: REFUSED — check_error_recurrence.py is missing." >&2
+    exit 1
+  fi
+  python "$error_checker" "$error_record" >&2 || exit 1
+fi
+
 # Commit-attribution gate: while dispatch claims are live in this worktree, a
 # commit must name its committer and may not stage a path another live run
 # claims. Policy: src/consilient/commit_gate.py.

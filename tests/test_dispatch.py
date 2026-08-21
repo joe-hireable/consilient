@@ -626,6 +626,39 @@ def test_default_headroom_refresh_is_bounded_and_uses_the_local_probe(
     assert captured["kwargs"]["timeout_s"] == 45
 
 
+def test_non_ok_dispatch_emits_only_a_privacy_bounded_error_identity(tmp_path):
+    from consilient.error_tracking import read_records
+
+    script = _load_script()
+    harness = harness_by_id("grok")
+    assert harness is not None
+    result = script.RunResult(
+        harness=harness,
+        status="timeout",
+        reason=r"C:\\private\\repo token=must-not-appear",
+        exit_code=None,
+        stdout="private output",
+        stderr="private error",
+        artefact_bytes=1,
+        diff_bytes=0,
+        timed_out=True,
+        duration_s=1.0,
+        command=("secret-command",),
+        run_id="run-error",
+        stdout_path="private-stdout",
+        stderr_path="private-stderr",
+    )
+
+    script.record_dispatch_error(tmp_path, result)
+
+    records = read_records(tmp_path / "errors" / "errors.jsonl")
+    assert len(records) == 1
+    assert records[0]["component"] == "dispatch.grok"
+    assert records[0]["error_type"] == "DispatchOutcome"
+    assert records[0]["error_code"] == "timeout"
+    assert "private" not in json.dumps(records[0]).casefold()
+
+
 @pytest.mark.parametrize("harness_id", ("claude", "grok", "codex"))
 def test_brief_is_delivered_by_reference(monkeypatch, tmp_path, harness_id):
     script = _load_script()

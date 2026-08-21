@@ -41,6 +41,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from consilient import coordination  # noqa: E402
+from consilient.error_tracking import (  # noqa: E402
+    ErrorRecordError,
+    append_record,
+    build_record,
+)
 from consilient.events import EventError, read_all  # noqa: E402
 from consilient.harness import (  # noqa: E402
     DEFAULT_PERMISSION_MODE,
@@ -118,6 +123,25 @@ class RunResult:
     run_id: str
     stdout_path: str
     stderr_path: str
+
+
+def record_dispatch_error(log_dir: Path, result: RunResult) -> None:
+    """Record a non-OK identity without raw task, command, or exception text."""
+    if result.status == "ok":
+        return
+    try:
+        append_record(
+            log_dir / "errors" / "errors.jsonl",
+            build_record(
+                component=f"dispatch.{result.harness.id}",
+                error_type="DispatchOutcome",
+                error_code=result.status,
+                observed_at=now_ts(),
+                no_check_yet=True,
+            ),
+        )
+    except (ErrorRecordError, OSError) as exc:
+        print(f"error tracking failed after outcome recording: {exc}", file=sys.stderr)
 
 
 def to_wsl_path(path: Path) -> str:
@@ -1416,6 +1440,7 @@ def dispatch_one(
         duration_s=result.duration_s,
         command=result.command,
     )
+    record_dispatch_error(log_dir, result)
     _harvest_quietly(log_dir, runs_dir)
     # Three release paths and any one suffices: this completion, the outcome event
     # above (live_claims treats a terminal dispatch event as a release), or the claim's
@@ -1575,6 +1600,7 @@ def dispatch_fanout(
             duration_s=result.duration_s,
             command=result.command,
         )
+        record_dispatch_error(log_dir, result)
         results.append(result)
 
     first, second = results

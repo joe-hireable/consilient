@@ -29,6 +29,8 @@ def test_tracked_git_hooks_call_the_publication_checkers():
     assert "check_secrets.py" in pre_commit
     assert "check_private_corpus" in pre_push
     assert "check_foreign_identifiers" in pre_push
+    assert "check_error_recurrence.py" in pre_commit
+    assert ".harness/log/errors/errors.jsonl" in pre_commit
     assert "[ -f \"$checker\" ] || exit 0" not in pre_commit
     assert "|| continue" not in pre_push
 
