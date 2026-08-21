@@ -18,7 +18,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from .events import SCHEMA_VERSION, EventPayload, append
+from .events import (
+    CAPABILITY_GAP_KIND,
+    SCHEMA_VERSION,
+    EventPayload,
+    append,
+)
 
 # Operator observation, 21 August 2026. Claude weekly is "nearly exhausted"; no precise
 # counter was supplied, so it is flagged exhausted rather than given an invented percent.
@@ -31,6 +36,18 @@ FANOUT_KIND = "dispatch.fanout"
 Status = Literal["ok", "silent", "failed", "timeout", "refused"]
 DecisionKind = Literal["run", "refuse"]
 VerdictKind = Literal["agree", "disagree", "incomparable"]
+PermissionMode = Literal["bypass", "prompt"]
+
+# Default is bypass: the principal asked that dispatched harnesses run like this Grok
+# session, without per-tool prompts. `prompt` is the attended alternative. Flags were
+# read from each CLI's --help on 21 August 2026. [measured]
+DEFAULT_PERMISSION_MODE: PermissionMode = "bypass"
+BYPASS_FLAGS: dict[str, tuple[str, ...]] = {
+    "claude": ("--dangerously-skip-permissions",),
+    "codex": ("--dangerously-bypass-approvals-and-sandbox",),
+    "grok": ("--always-approve",),
+    "cursor-composer": ("--force", "--trust"),
+}
 
 SILENT_MARKERS: tuple[str, ...] = (
     "workspace trust required",
@@ -147,6 +164,184 @@ DEFAULT_POOLS: tuple[PoolState, ...] = (
 )
 
 CURSOR_OTHER_PREFIXES: tuple[str, ...] = ("claude-", "gpt-", "gemini-")
+
+
+@dataclass(frozen=True)
+class ModelOption:
+    """One selectable model on one harness, and the quota pool it draws on."""
+
+    id: str
+    harness_id: str
+    family: str
+    pool: str
+
+
+# `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids. The
+# Cursor Models pool serves the non-vendor families below; claude-*/gpt-*/gemini-* bill
+# to the avoided Other Models pool (CURSOR_OTHER_PREFIXES). Only cursor-composer has a
+# measured multi-model surface today; the other harnesses expose no probed model list
+# here, so they register none rather than an invented one. `auto` is deliberately absent:
+# selection must name what it spends. Registry order is the preference order within a
+# family when pools tie — highest measured tier first [asserted].
+MODELS: tuple[ModelOption, ...] = (
+    ModelOption("composer-2.5", "cursor-composer", "composer", "cursor-models"),
+    ModelOption("composer-2.5-fast", "cursor-composer", "composer", "cursor-models"),
+    ModelOption("kimi-k3-max", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("kimi-k3-high", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("kimi-k3-low", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("kimi-k2.7-code", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("cursor-grok-4.6-xhigh", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-xhigh-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-high", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-high-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-medium", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-medium-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-low", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-low-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-high", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-high-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-medium", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-medium-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-low", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-low-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("glm-5.2-max", "cursor-composer", "glm", "cursor-models"),
+    ModelOption("glm-5.2-high", "cursor-composer", "glm", "cursor-models"),
+)
+
+
+def models_for_harness(
+    harness_id: str, models: tuple[ModelOption, ...] = MODELS
+) -> tuple[ModelOption, ...]:
+    return tuple(item for item in models if item.harness_id == harness_id)
+
+
+def model_family(model_id: str) -> str:
+    """The model family an id belongs to. A heuristic for unregistered ids."""
+    lowered = model_id.strip().casefold()
+    if lowered.startswith("cursor-grok"):
+        return "grok"
+    return lowered.split("-", 1)[0]
+
+
+def pool_for_model(
+    harness_id: str,
+    model_id: str,
+    *,
+    models: tuple[ModelOption, ...] = MODELS,
+    harnesses: tuple[Harness, ...] = HARNESSES,
+) -> str:
+    """The pool a model draws on: the registry first, then the prefix rule."""
+    for item in models:
+        if item.harness_id == harness_id and item.id == model_id:
+            return item.pool
+    if harness_id == "cursor-composer":
+        return cursor_pool_for_model(model_id)
+    harness = harness_by_id(harness_id, harnesses)
+    return harness.pool if harness is not None else "unknown"
+
+
+def select_model(
+    harness_id: str,
+    *,
+    pools: Sequence[PoolState],
+    requested: str | None = None,
+    family: str | None = None,
+    models: tuple[ModelOption, ...] = MODELS,
+    harnesses: tuple[Harness, ...] = HARNESSES,
+) -> ModelOption | str:
+    """Pick a model within a harness, or return a refusal reason string.
+
+    An explicit `requested` id is attended naming, like an explicit `--harness`: it is
+    returned with its pool resolved, unblocked. Automatic selection is stricter: only
+    registered models on a pool with known, unexhausted headroom, most remaining
+    headroom first, registry order within a tie. It never falls to the avoided
+    cursor-other pool on its own — that is the silent-fallback shape at model level.
+    """
+    harness = harness_by_id(harness_id, harnesses)
+    if harness is None:
+        known = ", ".join(item.id for item in harnesses)
+        return f"unknown harness {harness_id!r}; known: {known}"
+    if requested is not None:
+        return ModelOption(
+            requested,
+            harness_id,
+            model_family(requested),
+            pool_for_model(harness_id, requested, models=models, harnesses=harnesses),
+        )
+    registered = list(models_for_harness(harness_id, models))
+    if not registered:
+        return (
+            f"no models registered for {harness_id}; pass --model explicitly "
+            "(an unregistered default would be an invented capability)"
+        )
+    if family is not None:
+        registered = [item for item in registered if item.family == family]
+        if not registered:
+            known_families = sorted(
+                {item.family for item in models_for_harness(harness_id, models)}
+            )
+            return (
+                f"no {family!r} family models registered for {harness_id}; "
+                f"known families: {', '.join(known_families)}"
+            )
+    pool_tuple = tuple(pools)
+    eligible: list[tuple[int, ModelOption]] = []
+    considered: list[str] = []
+    for index, option in enumerate(registered):
+        pool = pool_by_name(option.pool, pool_tuple)
+        if pool is None:
+            considered.append(f"{option.id}: pool {option.pool} has no headroom snapshot")
+            continue
+        if _is_exhausted(pool):
+            considered.append(f"{option.id}: {option.pool} is exhausted")
+            continue
+        if pool.used_percent is None:
+            considered.append(f"{option.id}: {option.pool} headroom is unknown")
+            continue
+        eligible.append((index, option))
+    if not eligible:
+        detail = "; ".join(considered) if considered else "no registered models"
+        return (
+            f"no eligible model for {harness_id}: every registered model draws on an "
+            f"exhausted or unmeasured pool. {detail}. Pass --model explicitly to spend "
+            "an avoided pool attended."
+        )
+
+    def rank(pair: tuple[int, ModelOption]) -> tuple[float, int]:
+        index, option = pair
+        pool = pool_by_name(option.pool, pool_tuple)
+        assert pool is not None and pool.used_percent is not None
+        return (pool.used_percent, index)
+
+    eligible.sort(key=rank)
+    return eligible[0][1]
+
+
+def permission_flags(
+    harness_id: str, mode: PermissionMode = DEFAULT_PERMISSION_MODE
+) -> tuple[str, ...]:
+    """Flags the meta-harness injects. Empty in `prompt` mode. Unknown harnesses get none."""
+    if mode == "prompt":
+        return ()
+    return BYPASS_FLAGS.get(harness_id, ())
+
+
+def load_permission_mode(path: Path | None = None) -> PermissionMode:
+    """INSTANCE override. Missing or unreadable file → the default, bypass."""
+    if path is None or not path.is_file():
+        return DEFAULT_PERMISSION_MODE
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return DEFAULT_PERMISSION_MODE
+    if not isinstance(raw, dict):
+        return DEFAULT_PERMISSION_MODE
+    mode = raw.get("mode")
+    if mode == "bypass":
+        return "bypass"
+    if mode == "prompt":
+        return "prompt"
+    return DEFAULT_PERMISSION_MODE
 
 
 def harness_by_id(
@@ -452,8 +647,13 @@ def classify_artefact(
     """Verify by artefact, never by exit code. Empty exit-0 is `silent`."""
     combined = f"{stdout}\n{stderr}"
     lowered = combined.casefold()
+    # A trust banner with nothing else is silent (Cursor, measured). The same
+    # banner buried in a 700 kB Codex transcript is not: twice on 21 Aug 2026
+    # Codex wrote the named artefact and was recorded silent because agents.md
+    # in the dump contained the marker. Marker wins only when there is no work.
+    trust_only = output_bytes <= 200 and diff_bytes == 0
     for marker in SILENT_MARKERS:
-        if marker in lowered:
+        if marker in lowered and trust_only:
             return (
                 "silent",
                 f"harness produced no work: {marker!r} (exit {exit_code})",
@@ -483,6 +683,121 @@ def judge_fanout(first_text: str, second_text: str, first_ok: bool, second_ok: b
     if left == right:
         return "agree"
     return "disagree"
+
+
+# Refusal-reason markers generated by this package and by scripts/dispatch.py. Each is
+# pinned by a test, so a reworded reason breaks a test loudly rather than misclassifying
+# a gap quietly. Matching prose this codebase writes is not parsing model output.
+_GAP_NOT_IMPLEMENTED_MARKERS: tuple[str, ...] = (
+    "not installed",
+    "not on path",
+    "not reachable",
+    "no invocation for harness",
+    "unknown harness",
+    "no models registered",
+    "no eligible model",
+)
+# Refusals that time closes on its own: quota windows reset and live claims expire.
+# Every other refusal escalates — fail closed rather than guess at a self-repair. The
+# aggregate selection refusal ("every pool is exhausted, unknown, or not installed")
+# contains a not-implemented marker by construction, so it escalates: from prose alone
+# the record cannot tell a resettable window from a missing install, and guessing is
+# the failure this event exists to record.
+_GAP_RETRY_MARKERS: tuple[str, ...] = (
+    "exhausted",
+    "claims overlap a live dispatch",
+)
+
+
+def classify_gap(status: str, reason: str) -> tuple[str, str, str] | None:
+    """Map an existing dispatch signal to (failure, closure, repair), or None if no gap.
+
+    This is the self-healing boundary stated as policy rather than prose. The system
+    MAY close a gap itself only where another attempt is honest: a pool window
+    resetting, a live claim expiring, or a loud failure worth one recorded re-attempt
+    (closure "retry" — every re-attempt is itself recorded, so a retry that does not
+    close the gap ranks it higher on the gap view). It MUST escalate a silent run (the
+    measured laundering path: four exit-0 dispatches wrote nothing on 21 Aug 2026), a
+    capability that is not implemented (no retry builds it), and every refusal this
+    rule does not recognise. The record is the deliverable; an honest escalation beats
+    a quiet failure to self-heal.
+    """
+    if status == "ok":
+        return None
+    if status == "silent":
+        return (
+            "silent",
+            "escalate",
+            "a human inspects why the harness reported success and produced nothing; "
+            "dispatch policy already forbids an unattended retry on another pool",
+        )
+    if status in ("failed", "timeout"):
+        return (
+            "failed",
+            "retry",
+            "re-dispatch the task; if the same failure repeats it ranks higher on the "
+            "capability-gap view and a human builds the fix",
+        )
+    lowered = reason.casefold()
+    if any(marker in lowered for marker in _GAP_NOT_IMPLEMENTED_MARKERS):
+        return (
+            "not_implemented",
+            "escalate",
+            "install or build the named capability; no retry creates it",
+        )
+    if any(marker in lowered for marker in _GAP_RETRY_MARKERS):
+        return (
+            "refused",
+            "retry",
+            "re-dispatch once the pool window has reset or the live claim has expired",
+        )
+    return (
+        "refused",
+        "escalate",
+        "a human changes what was asked, what is configured, or the policy that "
+        "refused it",
+    )
+
+
+def record_gap(
+    log_dir: Path,
+    *,
+    ts: str,
+    run_id: str,
+    task: str,
+    cwd: str,
+    attempted: str,
+    failure: str,
+    detail: str,
+    closure: str,
+    repair: str,
+    source: str,
+) -> EventPayload:
+    """Append one capability.gap through the single writer (V0-41).
+
+    `asked` is the task verbatim — the unprompted demand, expressed at the moment of
+    need, which is the highest-signal thing a user produces. It stays inside the
+    gitignored local trajectory under the same ADR-0057 rule as every dispatch record.
+    """
+    return append(
+        log_dir / f"{ts[:10]}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": ts,
+            "event": CAPABILITY_GAP_KIND,
+            "actor": DISPATCH_ACTOR,
+            "data": {
+                "asked": task,
+                "attempted": attempted,
+                "failure": failure,
+                "detail": detail,
+                "closure": closure,
+                "repair": repair,
+                "run_id": run_id,
+                "source": source,
+            },
+        },
+    )
 
 
 def now_ts() -> str:
@@ -516,8 +831,9 @@ def record_refusal(
     cwd: str,
     reason: str,
     considered: Sequence[str],
+    attempted: str = "harness selection",
 ) -> EventPayload:
-    return append(
+    recorded = append(
         log_dir / f"{ts[:10]}.jsonl",
         _event(
             REFUSED_KIND,
@@ -532,6 +848,26 @@ def record_refusal(
             },
         ),
     )
+    # A refusal is a capability gap the boundary already detected: the user asked, and
+    # nothing ran. It is recorded as such here, at the chokepoint every refusal passes
+    # through, so no present or future caller can forget it (V0-41).
+    gap = classify_gap("refused", reason)
+    if gap is not None:
+        failure, closure, repair = gap
+        record_gap(
+            log_dir,
+            ts=ts,
+            run_id=run_id,
+            task=task,
+            cwd=cwd,
+            attempted=attempted,
+            failure=failure,
+            detail=reason,
+            closure=closure,
+            repair=repair,
+            source=REFUSED_KIND,
+        )
+    return recorded
 
 
 def record_outcome(
@@ -551,7 +887,7 @@ def record_outcome(
     duration_s: float,
     command: Sequence[str],
 ) -> EventPayload:
-    return append(
+    recorded = append(
         log_dir / f"{ts[:10]}.jsonl",
         _event(
             DISPATCH_OUTCOME_KIND,
@@ -574,6 +910,26 @@ def record_outcome(
             },
         ),
     )
+    # A non-ok outcome is a capability gap the runner already measured: the harness was
+    # asked and could not do it. Recorded at the same chokepoint so "exit 0, nothing
+    # written" can never again be only a success-shaped log line (V0-41).
+    gap = classify_gap(status, reason)
+    if gap is not None:
+        failure, closure, repair = gap
+        record_gap(
+            log_dir,
+            ts=ts,
+            run_id=run_id,
+            task=task,
+            cwd=cwd,
+            attempted=harness.id,
+            failure=failure,
+            detail=reason,
+            closure=closure,
+            repair=repair,
+            source=DISPATCH_OUTCOME_KIND,
+        )
+    return recorded
 
 
 def record_fanout(

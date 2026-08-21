@@ -1,6 +1,6 @@
 # Decision index
 
-59 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+64 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
 `python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
 catches a row missing from this table, which is the argument for generating it rather than
@@ -25,7 +25,10 @@ Read these before anything else. Everything downstream depends on them.
 | # | Decision | Status |
 |---|---|---|
 | [0003](0003-no-learned-routing-policy-in-v0.md) | No learned routing policy in v0 | ✅ |
-| [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary) | ⛔ |
+| [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary; category word retired by [0062](0062-call-consilient-a-command-post-not-a-meta-harness.md)) | ⛔ |
+| [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) | Adopt Open Design's portable contract for design work; desktop app optional | 🟡 |
+| [0061](0061-the-descriptor-is-agent-command-post.md) | **The descriptor is Agent Command Post** — product Consilient; children are harnesses | ✅ |
+| [0062](0062-call-consilient-a-command-post-not-a-meta-harness.md) | Command post as category; descriptor superseded by 0061 | ⛔ |
 | [0005](0005-local-model-library-with-hardware-gating.md) | Local model library with hardware gating (superseded by 0026) | ⛔ |
 | [0006](0006-ticket-store-sqlite-plus-git-log.md) | Ticket store: SQLite for coordination, append-only JSONL in git for the record | ✅ |
 | [0007](0007-cli-only-no-review-surface.md) | CLI only, and build no review surface (the diff-review half stands; the no-visibility half superseded by 0053) | ⛔ |
@@ -63,7 +66,8 @@ Read these before anything else. Everything downstream depends on them.
 | [0057](0057-a-users-trajectory-is-their-data.md) | **A user's trajectory is their data** — private by default, never tracked, shared only by explicit consent | ✅ |
 | [0058](0058-orchestration-ships-as-a-script-until-the-cli-surface-is-settled.md) | **Orchestration ships as `scripts/dispatch.py`**; the `consil` CLI surface stays the principal's to settle | ✅ |
 | [0059](0059-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
-| [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) | **Adopt Open Design's portable contract and critique; desktop is a composition element, not a runtime dependency**; brand direction: outlier identity, anti-median, minimalist distinction | 🟡 |
+| [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) | **Adopt Open Design's portable contract and critique; desktop is an optional local tool, not a runtime dependency**; brand direction: outlier identity, anti-median, minimalist distinction | 🟡 |
+| [0063](0063-instance-cwd-allowlist-is-supervised-dispatch-not-a-gate-pass.md) | **Instance cwd allowlist is supervised dispatch, not a Gate B pass** — no override flag; doctor stays red; the loop still refuses foreign workspaces | ✅ |
 
 ## Behaviour and safety
 
@@ -120,4 +124,4 @@ to every ADR and every PR:
 - **0055** — PROVISIONAL pending EXP-74, EXP-75 and EXP-76; owes three enforcement checks (V0-30, V0-31, V0-32), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
 - **0056** — PROVISIONAL pending EXP-94 for the allocation clauses; D5 ships with its check.
 - **0060** — PROVISIONAL pending EXP-95 (critique inter-rater reliability); token-lockdown
-  CI check shipped in PR #2 (`check_design_tokens.py`).
+  CI check shipped in PR #3 (`check_design_tokens.py`).

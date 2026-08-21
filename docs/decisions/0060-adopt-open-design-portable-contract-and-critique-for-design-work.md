@@ -280,8 +280,8 @@ critique as a second reader.
   exists in the visual modality. `[asserted]`
 - **Open Design is one project's convention, not a standard.** Mitigated by vendored copy
   and simple markdown format. `[asserted]`
-- **The token-lockdown guidance has no shipped check.** Logged in `gate-bypass-log.md` as a
-  deviation from I1. `[asserted]`
+- **The token-lockdown check is shipped in `.github/scripts/check_design_tokens.py`.**
+  Enforcement is tested in `invariants.yml` and verified by `tests/test_design_tokens.py`. `[measured]`
 - **The desktop installation is unprobed.** `[asserted]` until a probe runs.
 - **The critique has no measured inter-rater reliability.** EXP-95 is registered to test
   this. `[asserted]`
@@ -314,8 +314,7 @@ design work should respect the ban list and the brand constraints.
   `invariants.yml`. Verifies that all governed UI/CSS files strictly adhere to the declared
   `DESIGN.md` color palette without undeclared inventions.
 - **Fails CI:** yes (`check_design_tokens.py --check`).
-- **Added in the same commit:** yes — shipped with PR #2 / `DESIGN.md`. Debt recorded in
-  `gate-bypass-log.md` is paid.
+- **Added in the same commit:** yes — shipped in PR #3. Debt recorded in `gate-bypass-log.md` is paid.
 
 ## What would overturn this
 

@@ -843,6 +843,7 @@ def render(command: str, result: CommandResult) -> str:
     if command == "dashboard":
         traj = result["trajectory"]
         unanswerable = sum(1 for g in result["schema_gaps"] if not g["answerable"])
+        gaps = result["capability_gaps"]
         enabled = "yes" if result["routing_orchestration_enabled"] else "no"
         return (
             f"wrote {result['written']}\n"
@@ -851,7 +852,8 @@ def render(command: str, result: CommandResult) -> str:
             f"  routing/orchestration enabled: {enabled}\n"
             f"  {result['beta_line']}\n"
             f"  RACI derivable: {'yes' if result['raci']['derivable'] else 'no'}; "
-            f"{unanswerable} question(s) the record cannot answer"
+            f"{unanswerable} question(s) the record cannot answer\n"
+            f"  capability gaps: {gaps['total']} recorded, {gaps['distinct']} distinct"
         )
     if command == "doctor":
         provenance = result["provenance"]

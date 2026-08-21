@@ -12,13 +12,14 @@ the source every rule below is derived from.
 > Consilience is a **test of the truth** of the Theory in which it occurs."
 > — Whewell, 1840
 
-An open-source **meta-harness**: an orchestrator for agentic work in general — above
-existing agents (Claude Code, Codex, opencode, Antigravity CLI, or any other the user
-favours), with a native execution path for open models — organised around measuring
-**β**, the rate at which automated checks accept a bad artifact. Coding is v0 because it
-is the only domain with a cheap automated oracle, so it is where β can be measured; the
-architecture itself is domain-blind (see `docs/20-design/architecture-sketch.md`,
-"Domain posture", and Q24).
+An open-source **Agent Command Post** (ADR-0061): you do not ask a model; you ask
+Consilient, and it sends **harnesses** (Claude Code, Codex, Cursor, Grok, opencode, or any
+other the user favours), with a native execution path for open models when no delegated
+harness fits. Organised around measuring **β**, the rate at which automated checks accept
+a bad artifact. Coding is v0 because it is the only domain with a cheap automated oracle,
+so it is where β can be measured; the architecture itself is domain-blind (see
+`docs/20-design/architecture-sketch.md`, "Domain posture", and Q24). Child runtimes stay
+*harnesses*. Consilient is not one.
 
 β exists because of Whewell's third clause: convergence is a *test*, and tests have error
 rates. The multi-agent constraints exist because of his second clause: **different** class.
@@ -32,8 +33,12 @@ built and run.
 
 1. **Gate B still governs dependence.** Under ADR-0039, Gate B is no longer a licence to
    *build* orchestration; it is the evidence that the harness is trustworthy to *depend
-   on* for work on a repository other than this one. **Gate B is not passed.** Nothing
-   here may be pointed at `../hireable-3.0` or `../jobboard-v2`.
+   on* for work on a repository other than this one. **Gate B is not passed.** Supervised
+   dispatch may `--cwd` into a root the principal has named in the gitignored instance
+   file `.harness/allowed-cwds.json` (ADR-0063). That listing does not pass Gate B, does
+   not authorise unattended operation, and does not authorise publishing anything from
+   those repositories. An unnamed root is still refused. The unattended loop still
+   refuses any workspace that is not this repository.
 2. **Gate A is not passed either.** Do not take the condition-by-condition state from this
    file — run `consil doctor` and read what it says. This paragraph previously listed
    "A1, A2 and B1 pass … B3 needs the fallback exercised", and on 21 August 2026 three of
@@ -54,7 +59,8 @@ harness; to *run* it, type those commands. The skill is
 
 Product code in `src/consilient/` remains observe-only *today* because routing is not a
 `consil` subcommand, not because orchestration cannot be built. Dispatch is a script
-(ADR-0058). Gate B still forbids pointing it at another repository.
+(ADR-0058). Gate B still forbids *depending* on it for another repository; instance cwd
+allowlisting is ADR-0063 and is not a gate pass.
 
 ## Working principles for this repo
 
@@ -95,6 +101,56 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
    licences can be bought on request. If a question is answerable by running something
    locally, run it. Local compute is free, and it is what upgrades a claim from
    `[simulated]` to `[measured]`. See `docs/10-research/local-experimentation.md`.
+
+9. **Find the bar, then beat it.** Joe, 21 August 2026: *"In everything we do, and the harness does,
+   we should always enforce aiming for better than the best that already exists. That is the bar."*
+   And: *"we need to always be finding where the bar is and raising it."*
+
+   **Finding the bar is the work; beating it is the easy half.** Before building a capability, name
+   the best thing that already does it — a product, a paper, a library, a competitor — and say what
+   it achieves. Then state how this will be better, and **what measurement would show it**. If you
+   cannot find an incumbent, say what you searched; "nothing exists" is a claim requiring evidence
+   like any other, and it is the claim this project has already got wrong.
+
+   Once found, the bar is not a one-time check. **Record it so it can be re-checked**, because the
+   incumbent moves. A bar beaten in August and never re-measured is a bar you have stopped clearing.
+
+   This principle exists because we breached it. `README.md` claimed *"Nothing on the market measures
+   it"* while **eight published systems measured β**, including Reflexion in 2023 — and our own
+   experiment register already said so on line 1738 while the README contradicted it. [measured]
+   That claim was in the public shop window of a project whose entire subject is measurement honesty.
+
+   **Enforcement:** a capability claim in public-facing prose names its incumbent and the evidence,
+   or it does not ship. `tests/test_v0_invariants.py` fails a superlative — "nothing", "no one",
+   "first", "only" — appearing in public-facing prose without a citation beside it. Beating a bar you
+   never located is indistinguishable from not knowing where it was.
+
+10. **Reach for open data and public APIs before reasoning from memory.** Joe, 21 August 2026:
+    *"we should encourage the sourcing, downloading, manipulating and utilisation of open source data
+    as well... it should be a default practice to use open source data where it might be useful to
+    make a decision or build something for a user. Also plugging into public-apis for building stuff
+    as well and being able to help users do better than the best existing for anything they ever do."*
+
+    This is not a convenience; it is principle 6 applied. **A public dataset is a different class of
+    facts from a model's training**, so an answer derived from data downloaded and run is a genuinely
+    independent induction, while an answer recalled from weights is the same class as every other
+    answer that model gives. Whewell's test needs two classes, and open data is the cheapest second
+    one available.
+
+    It is also how principle 9 is actually done. **You cannot know where the bar is without the data
+    that measures it**, and you cannot beat it without something to measure against. EXP-96 pins
+    Pallets `itsdangerous` 2.2.0 as a second corpus for exactly this reason.
+
+    In practice: prefer a real dataset over a plausible estimate; prefer a public API over an
+    assumption about what it returns; record the source, the licence and the retrieval date, because
+    a dataset without provenance is an assertion wearing a number's clothes. **Check the licence
+    before use, not after** — a permissive licence is required for anything this project redistributes.
+
+    **Enforcement, stated honestly:** partly enforced, and the gap is real. `evidence_class` on
+    trajectory events and the `[measured]`/`[cited]`/`[asserted]` tags already force a claim to
+    declare where it came from, and CI checks those. **Nothing yet checks that a question answerable
+    from public data was answered that way** — that is a judgement no test currently makes, and until
+    one exists this principle binds by discipline, not by machinery.
 
 ## Boundaries
 

@@ -1,0 +1,5 @@
+{
+  "_": "INSTANCE. Copy to .harness/permissions.json. That path is gitignored. No credential belongs here.",
+  "_mode": "bypass = dispatched children run without per-tool prompts (the default). prompt = leave each harness's ask-loop on. The CLI flag --permissions overrides this file.",
+  "mode": "bypass"
+}

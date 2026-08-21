@@ -11,6 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The foreign-identifier step asks git whether a 40-hex string resolves in
+          # this repository. The default shallow clone would report our own history
+          # as foreign. fetch-depth 0 is the check being able to see its subject.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -32,7 +37,17 @@ jobs:
         # ADR-0060 / using-open-design. Asserts that all governed UI/CSS files
         # strictly adhere to the declared DESIGN.md color palette without undeclared inventions.
         run: python .github/scripts/check_design_tokens.py --check
-      - name: Replay invariant on the real trajectory, with a drift control
+      - name: Foreign identifier invariant check
+        # A path-matcher cannot see a commit identifier. `check_foreign_identifiers.py` was
+        # written on 21 Aug 2026 after an audit found 71 forty-character SHAs from a private
+        # commercial repository in a tracked results file, and it then had no CI step at all —
+        # so the tracked tree was only ever scanned when someone remembered to. `--self-test`
+        # is additive here, not instead-of: the script proves its detector still detects and
+        # then scans. `check_private_corpus.py` deliberately does NOT get a step: its own
+        # docstring says it cannot run on a runner, and a gate that silently no-ops is worse
+        # than no gate. That omission is pinned by a test.
+        run: python .github/scripts/check_foreign_identifiers.py --self-test
+      - name: Replay invariant on a committed fixture trajectory, with a drift control
         # Until 21 Aug 2026 this step ran `beta` first, "so that `replay` has a subject to
         # compare against", then required `compared && identical`. The subject `beta` leaves
         # behind is itself a rebuild from the same log — `cmd_beta` calls `projection.build`,
@@ -41,16 +56,23 @@ jobs:
         # further out. A fresh checkout never carries `.harness/state.db`; it is gitignored,
         # so in CI there has never been an independent subject to compare against.
         #
+        # It also read `.harness/log`, which ADR-0057 gitignored because a user's trajectory
+        # is their data. On a fresh checkout that directory is empty, so the first assertion
+        # aborted the step before it could prove anything. The subject is now a committed
+        # synthetic fixture — one schema-v1 event, no user data — and the database is
+        # runner-local, so the step never touches a user's trajectory or state.
+        #
         # What CI can honestly test is that the detector works. The control below drifts the
         # state out of band and REQUIRES the check to see it; then it requires a clean
         # rebuild over a non-empty trajectory to compare identical. Both assertions can fail.
         run: |
           python - <<'PY'
-          import argparse, sqlite3, sys
+          import argparse, os, sqlite3, sys, tempfile
           sys.path.insert(0, "src")
           from consilient.cli import cmd_replay
 
-          args = argparse.Namespace(log=".harness/log", db=".harness/state.db")
+          db = os.path.join(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir(), "replay-ci.db")
+          args = argparse.Namespace(log="tests/fixtures/replay-ci", db=db)
 
           seed = cmd_replay(args)
           assert seed["events"] > 0, "no trajectory to replay; the control would be vacuous"

@@ -39,6 +39,11 @@ entities.json
 # be published deliberately; it must never be published as a side effect of a user's log living
 # in a tracked path. Enforced by test_no_user_trajectory_is_tracked.
 .harness/log/
+# Redacted share bundles are still the user's data. They are held privately if the
+# user consents (ADR-0057); they must never become publishable by occupying a tracked
+# path. The exporter does not exist yet. The ignore rule does, so the third leak is
+# not how we discover the gap. docs/20-design/trajectory-sharing-consent-2026-08-21.md.
+.harness/share/
 .harness/state.db-wal
 .harness/state.db-shm
 # `replay` sets aside a stale projection before rebuilding; it is a local artefact,
@@ -62,6 +67,9 @@ docs/10-research/experiments/exp27/collector-state.json
 # them belongs in the record, and a single `git add -A` would commit all of them — which is not
 # hypothetical, because `git add -A` swept four brief files into a commit on 20 August 2026.
 .harness/dispatch/
+# EXP-50 smoke batches and other local RSI artefacts. The producing scripts are tracked;
+# the generated candidates are instance data.
+.harness/rsi/
 # Operator quota snapshot. Local to this machine; not evidence and not publishable.
 .harness/headroom.json
 # Briefs written for a dispatched agent, which live in a clone's root by convention.
@@ -83,3 +91,17 @@ red-cells-evidence.json
 # payload observed from their account, is theirs and stays out of a public repository.
 .harness/limits.json
 .harness/usage/
+# INSTANCE permission mode for dispatched harnesses. PRODUCT default is bypass.
+.harness/permissions.json
+.harness/status.html
+# INSTANCE cwd allowlist. PRODUCT ships the empty example; machine paths stay here.
+# Listing a root is supervised dispatch (ADR-0063), not a Gate B pass.
+.harness/allowed-cwds.json
+# Exclusive lock around cursor-agent. Two processes race ~/.cursor/cli-config.json.
+.harness/cursor-agent.lock
+# INSTANCE knowledge materialisation and operator briefs. PRODUCT is the scripts.
+.harness/knowledge/
+.harness/briefs/
+# Local EXP-96 corpus clones and lock files. The runner is tracked; the pin is not.
+.harness/exp96-candidate-*/
+docs/10-research/experiments/*/results-*.json.lock
