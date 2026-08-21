@@ -2635,6 +2635,225 @@ resource access, or v2's eventual stable surface.
 
 ---
 
+## Loops, schedules and the offline phase — reserved block EXP-70…EXP-73
+
+*(Registered 21 August 2026, alongside [ADR-0051](../decisions/0051-a-tick-is-an-attempt-and-only-execution-runs-unattended.md).)*
+
+**Numbers 65–69 are deliberately left free, and this block is offset on purpose.** R15
+(`../20-design/dispatch-layer-requirements-2026-08-20.md`) records five concurrent agents each
+independently choosing EXP-58 on 20 August 2026, every one of them by correctly taking the next
+free number. **Taking `max + 1` is the move that collides**, and it collides precisely because it is
+the right answer for every agent at once. An offset block cannot be reached by that rule. The gap is
+a reservation, not an omission. [measured]
+
+**This agent was not issued experiment numbers in its brief, and R15 says to stop and ask.** That
+rule exists to prevent the `max + 1` race; a declared offset block is the nearest available
+substitute for layer allocation, and renaming an entry later is a two-line edit against a round trip
+that would have blocked the work. The deviation is recorded here rather than assumed, so whoever
+builds the allocator knows this block was hand-claimed. [asserted]
+
+**All four are backlog, not gates.** Each states the largest effect it could show, as
+[ADR-0050](../decisions/0050-gate-on-effect-size-not-on-uncertainty.md) requires of any entry that
+wants to block anything, and each then says why it does not.
+
+### EXP-70 · Does a scheduled sensing tick find anything the interactive session did not? `BLOCKED: the class-1 battery running under one schedule`
+
+**Pre-registered 21 Aug 2026. Not run.**
+
+**Decides:** whether ADR-0051's standing schedule earns its existence, or whether the same commands
+should simply be invoked on demand. Promotes ADR-0051 decision 2 from PROVISIONAL, or cuts it.
+
+**Claim (falsifiable):** over the window, the standing check battery produces **at least two
+findings that no interactive session in the same 24 hours produced**.
+
+**Precondition:** the class-1 battery running under one schedule and writing a machine-readable
+outcome per tick. Two members already exist and one is already scheduled: `scripts/capture_health.py`
+runs under the Windows scheduled task `Consilient-Capture-Health`, and `scripts/run_fallback.py`
+exists but is invoked by hand. [measured]
+
+**Procedure:** every tick appends its outcome. For each non-green tick outcome, adjudicate from the
+trajectory alone whether the same defect is visible in that day's interactive record.
+
+**Measures:** the 2×2 table *found-by-tick* × *found-by-interactive*, per finding. Report the
+tick-unique cell as a count with a Wilson interval on the per-tick rate — **not** an agreement rate,
+which mixes the cell that matters with the cell that does not
+(`formalising-echo-2026-08-20.md` §4). [algebra]
+
+**Stopping rule (fixed before the run):** stop at **30 consecutive daily ticks**, or at **5
+tick-unique findings**, whichever comes first. A missed day does not reset the count; it is recorded
+and the window extends by one day, to a hard ceiling of 45 calendar days.
+
+- **≤1 tick-unique finding in the window ⟹ the standing schedule is cut.** The commands stay and are
+  invoked on demand; the schedule goes.
+- ≥2 tick-unique findings ⟹ the schedule stands and ADR-0051 decision 2 may be promoted.
+
+**Largest effect it could show (ADR-0050):** deletion of the scheduler. That is the largest effect
+available to it, because it changes what exists rather than how well it works.
+
+**Blocks construction? No** — and the reason is structural rather than a judgement about magnitude.
+**This experiment cannot run until the thing it would gate exists**, because the schedule is its
+precondition. An experiment whose precondition is the component is a review of that component, not a
+gate on it. [algebra] Cutting afterwards costs one deleted schedule entry.
+
+**What it cannot decide:** whether any individual check is worth running, whether the battery's
+composition is right, or anything about class-2 acting ticks, which ADR-0051 leaves disabled.
+
+**Known weakness, recorded before the run:** the adjudication is manual, single-reviewer, and the
+reviewer is the party that proposed the schedule. Q19's rule — *the party that produced the material
+cannot certify what it missed* — applies and is **not** satisfied here. The correction is a second
+reader given the trajectory cold; it is not budgeted. [asserted]
+
+### EXP-71 · Is β stationary between ticks, or does a stored β decay? `READY`
+
+**Pre-registered 21 Aug 2026. Not run.**
+
+**Decides:** whether a scheduled consumer of β may read the last recorded value or must re-measure
+inside its own tick. Bears on ADR-0002, on ADR-0051's retry ceiling, and on every future decision
+that reads a β off a stored record.
+
+**Claim (falsifiable):** on an unchanged tree with a fixed mutant seed, composite β re-measured on
+successive ticks varies by **less than the half-width EXP-47 reported (0.0210)**.
+
+**Precondition:** none beyond EXP-47's mutation instrument, which measured β = 0.3132
+[0.2926, 0.3346] in 104 s. [measured] **This is runnable today**, which is why it is `READY` and why
+it should be run before anything consumes a stored β.
+
+**Procedure:** two arms per tick against the same tree — (a) fixed mutant seed, (b) fresh seed. At
+least 20 ticks over at least 14 days. Record the tree digest with every measurement, so a changed
+tree is never compared as an unchanged one.
+
+**Measures:** β per tick with its Wilson interval; paired differences between consecutive ticks; the
+tree digest; wall-clock between ticks. **Do not pool ticks into one interval.** Repeated
+measurements over the same tree with the same seed are not independent samples, and pooling them
+manufactures precision. Report the drift series, not a tighter number.
+
+**Stopping rule (fixed before the run):** stop at **20 ticks or 14 days, whichever is later**. Stop
+**early and report an instrument fault** if any two consecutive fixed-seed ticks on an identical tree
+digest differ by more than 0.0210.
+
+- Fixed-seed drift within ±0.0210 on identical digests ⟹ a stored β may be read inside its recorded
+  window.
+- Drift exceeding it ⟹ **a stored β is not a routing input.** Any tick consuming β re-measures inside
+  the same tick, and ADR-0051's retry ceiling gains that constraint.
+
+**Largest effect it could show (ADR-0050):** one stored read becomes one re-measurement inside a tick
+that already exists. The cost of being wrong is bounded by a measured 104 s per measurement.
+[measured]
+
+**Blocks construction? No.** Its largest effect changes how well a tick works, not what is built —
+ADR-0050 test 2 — and the cost of being wrong is 104 seconds per tick.
+
+**What it cannot decide:** whether β measured by mutation transfers to β against a human verdict.
+EXP-01, EXP-47 and `two-oracles-disagree-2026-08-20.md` own that question, and the two oracles there
+differ by 14× the tolerance under discussion. [measured]
+
+### EXP-72 · Does an offline consolidation phase beat spending the same budget on verification? `BLOCKED: matched-budget accounting over the frozen fixture bank`
+
+**Pre-registered 21 Aug 2026. Not run.**
+
+**Decides:** whether the offline consolidation phase — the "dreaming" idea — that ADR-0051 declines
+gets written as ADR-0052 after all. **This is the experiment that would resurrect it, and that ADR
+number is deliberately left unclaimed until it fires.**
+
+**Claim (the one ADR-0051 asserts, stated so it can be killed):** a consolidation phase that
+re-reads the trajectory and emits distilled lessons produces **no paired reduction in β beyond an
+equivalence margin of ±0.02**, and does not beat the same token budget spent on additional mutation
+testing.
+
+**Precondition:** the frozen fixture bank and mutation instrument from EXP-47/EXP-50, and matched
+token accounting across arms. No new dependency and no metered call — the arms run on a subscription
+or local composition.
+
+**Arms, paired over identical items:**
+
+1. **Baseline** — task, verifier, outcome.
+2. **Consolidation** — a phase over the accumulated trajectory emitting lessons into the next task's
+   context, then task, verifier, outcome.
+3. **Matched-budget verification** — arm 1 plus additional mutation testing costing the same tokens
+   as arm 2's consolidation phase.
+
+Arm 3 is what makes this an experiment rather than a demonstration. Without it, any gain in arm 2 is
+confounded with simply having spent more.
+
+**Measures:** per-item correctness for every arm, retaining the **full 2×2 correctness table per
+pair**, the double-fault cell and pairwise φ — not agreement, and not arm-level β point estimates.
+This repository has already been burnt by arithmetic cancellation between arm-level statistics that
+concealed 16 disagreements in 75 item-level decisions. [measured] Report α beside β: a rule that
+lowers false acceptance by rejecting everything has not helped.
+
+**Stopping rule (fixed before the run):** accumulate discordant pairs between arms 1 and 2 until
+**100 discordant pairs** or **2,000 items**, whichever comes first. 100 discordant pairs separates a
+65/35 split from an even one at conventional levels under McNemar. [algebra] Analysis is a paired
+bootstrap over items against the pre-registered equivalence margin.
+
+- Arm 2 beats baseline beyond the margin **and** arm 3 does not match it ⟹ **write ADR-0052.** The
+  phase buys something the provenance argument did not predict, and the honest reading is the bounded
+  one — it removed interpretation noise, not common-evidence error (Dietrich & List 2004). [cited]
+- Arm 3 matches or beats arm 2 ⟹ consolidation stays cut. The same tokens buy more as verification.
+- Both within the margin ⟹ **"difference unresolved", not "equivalent".** Overlapping intervals fail
+  to reject a difference and do not establish equivalence; EXP-52's registered overlap rule is
+  invalid for this purpose. [algebra]
+
+**The ±0.02 margin is not derived.** It is EXP-47's measured half-width (0.0210) rounded down, so the
+margin sits at the instrument's resolution rather than below it. Recorded as a choice, per ADR-0050's
+objection to round numbers that quietly become thresholds. [asserted]
+
+**Largest effect it could show (ADR-0050):** an architectural phase that does not currently exist
+gets built.
+
+**Blocks construction? No**, and this is the cleanest case in the register. **Nothing is being built
+for the consolidation phase — ADR-0051 declines it.** An experiment cannot gate work that was never
+authorised. If this one fires it *authorises* work rather than releasing it.
+
+**What it cannot decide:** whether consolidation helps a human reader, whether it helps latency (the
+sleep-time-compute claim, which this design does not test), or whether it transfers off the fixture
+bank.
+
+### EXP-73 · Is artefact progress a usable stall signal, and what is its false-stall rate? `BLOCKED: class-1 ticks declaring a progress artefact`
+
+**Pre-registered 21 Aug 2026. Not run.**
+
+**Decides:** ADR-0034's own named falsifier, which it stated and nobody registered. Bears directly on
+ADR-0051's termination rule, which inherits the signal wholesale.
+
+**Claim (falsifiable):** across scheduled ticks, stall verdicts raised on artefact progress are
+**more often genuine than false**, where *false* means the work later reached a normal terminal
+outcome without intervention.
+
+**Precondition:** class-1 ticks running under a schedule, each declaring the artefact that
+constitutes its progress. ADR-0034 already requires the declaration — a task that cannot name one
+cannot be supervised — so this adds no new machinery.
+
+**Procedure:** record per tick the progress-sample series, every stall verdict with its signal,
+threshold and observed value, and the eventual terminal outcome. **No verdict terminates anything**
+— ADR-0034 §3 already forbids that — so every flagged run also produces its own ground truth. That
+is what makes this measurable at all.
+
+**Measures:** the 2×2 of *stall-flagged* × *eventually-completed-normally*; the false-stall rate with
+a Wilson interval; the distribution of quiet intervals on runs that completed normally, which is what
+any future threshold must be set from.
+
+**Stopping rule (fixed before the run):** stop at **200 ticks or 20 stall verdicts**, whichever comes
+first.
+
+- False stalls ≥ genuine detections at 20 verdicts ⟹ **artefact progress is the wrong signal for this
+  workload.** ADR-0034 §2 and §4 must be revised toward heartbeats carrying progress state, and
+  ADR-0051's termination rule follows it.
+- **Zero stall verdicts in 200 ticks ⟹ the detector is untested, not vindicated.** Report it as such
+  and do not promote ADR-0034; its own third falsifier applies and the machinery should be cut to the
+  artefact-existence check alone.
+
+**Largest effect it could show (ADR-0050):** one liveness signal is exchanged for another inside a
+supervisor that already exists.
+
+**Blocks construction? No.** ADR-0050 test 2: it can only tune.
+
+**What it cannot decide:** the thresholds. Every parameter in ADR-0034 is preferential, and this
+measures the signal rather than the numbers.
+
+
+---
+
 ## Not experiments
 
 **Q4** (what v0 optimises for), **Q14** (does the Inquiry tier belong in v0), **Q15/Q23**
