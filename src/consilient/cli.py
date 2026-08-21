@@ -17,12 +17,15 @@ import shutil
 import sqlite3
 import sys
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from . import beta as beta_mod
 from . import events as events_mod
+from . import budget
 from . import projection
+from . import usage as usage_mod
 from .events import EventError, append, read_all
 
 # Each CLI command has a different nested JSON result shape. Any is confined to this
@@ -35,9 +38,7 @@ EXPERIMENT_REGISTER = Path("docs/10-research/experiment-register.md")
 GATE_B2_ADR = Path(
     "docs/decisions/0045-give-gate-b2-and-b3-success-criteria-they-never-had.md"
 )
-GATE_B_CIRCULARITY = Path(
-    "docs/00-context/gate-b-cannot-be-passed-2026-08-20.md"
-)
+GATE_B_CIRCULARITY = Path("docs/00-context/gate-b-cannot-be-passed-2026-08-20.md")
 # Refused lines already in the trajectory when ADR-0043 was accepted on 20 August 2026:
 # three V0-18 violations appended between 09:41 and 09:56 that day, permanent because the
 # log is append-only. ADR-0043 tolerates these exact three lines by their content digests.
@@ -101,6 +102,43 @@ def cmd_record(args: argparse.Namespace) -> CommandResult:
     path = Path(args.log) / f"{event.get('ts', '')[:10]}.jsonl"
     append(path, event)
     return {"recorded": True, "file": str(path), "event": event["event"]}
+
+
+def cmd_usage(args: argparse.Namespace) -> CommandResult:
+    """Every configured provider's usage, limits and spend in one place.
+
+    Read-only by default. `--record` puts the snapshot in the trajectory through
+    `append()`, which is opt-in because a dashboard polling this command must not write a
+    line every time somebody looks at it.
+    """
+    sources = usage_mod.Sources(payloads=Path(args.payloads), log=Path(args.log))
+    snapshot = usage_mod.fake_snapshot() if args.fake else usage_mod.snapshot(sources)
+    limits = usage_mod.load_limits(Path(args.limits))
+    if isinstance(limits, budget.BudgetRefusal):
+        snapshot["ceilings"] = {
+            "configured": False,
+            "refusal": limits.reason,
+            "limits": [],
+        }
+    else:
+        snapshot["ceilings"] = {
+            "configured": True,
+            "refusal": None,
+            "limits": [
+                {
+                    "period": ceiling.period,
+                    "amount": str(ceiling.amount),
+                    "currency": ceiling.currency,
+                }
+                for ceiling in limits
+            ],
+        }
+    snapshot["recorded"] = (
+        usage_mod.record(Path(args.log), snapshot)
+        if args.record and not args.fake
+        else 0
+    )
+    return snapshot
 
 
 def cmd_replay(args: argparse.Namespace) -> CommandResult:
@@ -216,7 +254,11 @@ def _experiment_entry(identifier: str) -> tuple[str | None, str]:
     marker = re.search(
         r"`((?:DONE|IN PROGRESS|BLOCKED)[^`]*)`\s*$", entry.partition("\n")[0]
     )
-    status = marker.group(1).partition(" see ")[0].rstrip(" -\N{EM DASH}") if marker else None
+    status = (
+        marker.group(1).partition(" see ")[0].rstrip(" -\N{EM DASH}")
+        if marker
+        else None
+    )
     return status, entry
 
 
@@ -282,16 +324,19 @@ def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResul
 
     b1_status, b1_entry = _experiment_entry("EXP-05")
     b1_result = b1_entry.partition("**Result:**")[2].partition("\n\n")[0]
-    no_redesign = (
-        "Adapter #2 (Codex) did not force an interface redesign"
-        in " ".join(b1_result.split())
+    no_redesign = "Adapter #2 (Codex) did not force an interface redesign" in " ".join(
+        b1_result.split()
     )
     if b1_status is None:
         b1 = _condition("B1", "unknown", "No EXP-05 result is recorded.")
     elif b1_status.startswith("DONE") and no_redesign:
-        b1 = _condition("B1", "pass", "EXP-05 is DONE; adapter two forced no redesign.", register)
+        b1 = _condition(
+            "B1", "pass", "EXP-05 is DONE; adapter two forced no redesign.", register
+        )
     elif b1_status.startswith("DONE"):
-        b1 = _condition("B1", "unknown", "Adapter-two outcome is not recorded.", register)
+        b1 = _condition(
+            "B1", "unknown", "Adapter-two outcome is not recorded.", register
+        )
     else:
         b1 = _condition("B1", "fail", f"EXP-05 is recorded as {b1_status}.", register)
 
@@ -331,7 +376,9 @@ def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResul
 
 def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResult:
     identical = replay["identical"]
-    status = "pass" if identical is True else "fail" if identical is False else "unknown"
+    status = (
+        "pass" if identical is True else "fail" if identical is False else "unknown"
+    )
     if identical is None:
         reason = (
             f"State covers {replay['events_projected']} of {replay['events']} events; not compared."
@@ -389,7 +436,9 @@ def _capture_condition(log: Path) -> CommandResult:
             if day <= datetime.now(timezone.utc).date() and matching:
                 days.append(day)
                 hist_count = sum(
-                    1 for r in rejected if r.content_digest in HISTORICAL_REFUSAL_DIGESTS
+                    1
+                    for r in rejected
+                    if r.content_digest in HISTORICAL_REFUSAL_DIGESTS
                 )
                 new_count = len(rejected) - hist_count
                 historical_refusals_by_day[day] = hist_count
@@ -586,14 +635,16 @@ def _foreign_tickets(log: Path) -> int:
                 attempt_id = str(data.get("attempt_id", ""))
                 task = str(data.get("task", "")) or identifier
                 if identifier:
-                    ticket_completions.append((repository, identifier, attempt_id or task))
+                    ticket_completions.append(
+                        (repository, identifier, attempt_id or task)
+                    )
 
     seen: set[str] = set()
     for repo, ticket_id, attempt_or_task in ticket_completions:
-        if (
-            (repo, attempt_or_task) in verified_attempts
-            or (repo, ticket_id) in verified_attempts
-        ):
+        if (repo, attempt_or_task) in verified_attempts or (
+            repo,
+            ticket_id,
+        ) in verified_attempts:
             seen.add(f"{repo}#{ticket_id}")
 
     return len(seen)
@@ -630,8 +681,7 @@ def cmd_doctor(args: argparse.Namespace) -> CommandResult:
     enabled = all(
         {condition["id"] for condition in gates[name]["conditions"]} == identifiers
         and all(
-            condition["status"] == "pass"
-            for condition in gates[name]["conditions"]
+            condition["status"] == "pass" for condition in gates[name]["conditions"]
         )
         for name, identifiers in expected.items()
     )
@@ -665,6 +715,42 @@ def render(command: str, result: CommandResult) -> str:
                 "written by append(), so validate() never ran on them"
             )
         return line
+    if command == "usage":
+        lines = []
+        for provider in result["providers"]:
+            head = f"{provider['provider']:<12} {provider['status'].replace('_', ' ')}"
+            if provider["status"] != "ok":
+                lines.append(f"{head} — {provider['detail']}")
+                continue
+            lines.append(head)
+            for quota in provider["quotas"]:
+                percent = Decimal(quota["used_fraction"]) * 100
+                reset = quota["resets_at"] or "no reset time reported"
+                lines.append(
+                    f"    quota {quota['window']:<8} {percent:>6.1f}% used, "
+                    f"resets {reset}  [{quota['provenance']}]"
+                )
+            for item in provider["spend"]:
+                lines.append(
+                    f"    spend {item['period']:<8} {item['amount']} {item['currency']}"
+                    f"  [{item['provenance']}]"
+                )
+        ceilings = result["ceilings"]
+        if not ceilings["configured"]:
+            lines.append(
+                f"ceilings: NONE — {ceilings['refusal']}; every metered call refuses"
+            )
+        else:
+            stated = ", ".join(
+                f"{c['period']} {c['amount']} {c['currency']}"
+                for c in ceilings["limits"]
+            )
+            lines.append(f"ceilings: {stated}")
+        if result["recorded"]:
+            lines.append(
+                f"recorded {result['recorded']} observation(s) to the trajectory"
+            )
+        return "\n".join(lines)
     if command == "beta":
         return beta_mod.Beta(
             verdict=result["verdict"],
@@ -682,9 +768,7 @@ def render(command: str, result: CommandResult) -> str:
             lines.append(f"Gate {name}: {gate['status'].replace('_', '-').upper()}")
             for condition in gate["conditions"]:
                 mark = condition["status"].replace("_", "-").upper()
-                lines.append(
-                    f"  {condition['id']} {mark}: {condition['requirement']}"
-                )
+                lines.append(f"  {condition['id']} {mark}: {condition['requirement']}")
                 lines.append(f"    {condition['reason']}")
                 evidence = ", ".join(condition["evidence"]) or "none"
                 lines.append(f"    evidence: {evidence}")
@@ -735,6 +819,31 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--task-family")
     b.add_argument("--verifier-version")
     b.set_defaults(handler=cmd_beta)
+
+    usage = sub.add_parser(
+        "usage",
+        parents=[common],
+        help="usage, limits and spend across every configured provider",
+    )
+    usage.add_argument(
+        "--payloads",
+        default=str(usage_mod.DEFAULT_PAYLOADS),
+        help="directory an out-of-tree probe drops provider payloads into",
+    )
+    usage.add_argument(
+        "--limits",
+        default=str(usage_mod.DEFAULT_LIMITS),
+        help="the instance spend-limit configuration; never committed",
+    )
+    usage.add_argument(
+        "--record", action="store_true", help="append the snapshot to the trajectory"
+    )
+    usage.add_argument(
+        "--fake",
+        action="store_true",
+        help="a fabricated snapshot for building a view against; records nothing",
+    )
+    usage.set_defaults(handler=cmd_usage)
 
     doctor = sub.add_parser(
         "doctor",

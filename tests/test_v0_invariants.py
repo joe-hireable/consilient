@@ -908,7 +908,11 @@ def test_the_cli_exposes_no_routing_or_blocking_surface():
     for sub in subparsers.choices.values():
         actions |= {a.dest for a in sub._actions}
 
-    assert commands == {"record", "replay", "beta", "doctor"}, commands
+    # `usage` reports what providers say about themselves and what ceilings are
+    # configured. It reads; it does not route, dispatch or admit anything, and
+    # `--record` writes an observation to the trajectory rather than acting on one.
+    # Adding to this set is the permitted edit; doing it without saying why is not.
+    assert commands == {"record", "replay", "beta", "doctor", "usage"}, commands
     for forbidden in (
         "route",
         "dispatch",
@@ -2571,4 +2575,594 @@ def test_foreign_commit_identifiers_may_only_decrease():
     assert total <= 14, (
         f"foreign commit identifiers rose to {total}; publishing them would put another "
         "repository's commit history into a public one. Aggregate them instead."
+    )
+
+# ------------------------------------------------ V0-30 / V0-31, usage, limits and spend
+# PRODUCT, not instance. Nothing below names an account, a credential or a real balance.
+from decimal import Decimal  # noqa: E402
+
+from consilient import budget as budget_mod  # noqa: E402
+from consilient import usage as usage_mod  # noqa: E402
+
+
+def usage_event(**over):
+    data = {
+        "provider": "codex",
+        "kind": "subscription",
+        "status": "ok",
+        "detail": "account/rateLimits/read",
+        "observed_at": None,
+        "quotas": [
+            {
+                "window": "10080m",
+                "used_fraction": "0.05",
+                "resets_at": now_ts(3600),
+                "provenance": "measured",
+            }
+        ],
+        "spend": [],
+    }
+    data.update(over)
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": "usage.observed",
+        "actor": "consilient.usage",
+        "data": data,
+    }
+
+
+def as_event(result):
+    """A collector's answer, in the form the one writer would have to accept."""
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": "usage.observed",
+        "actor": "consilient.usage",
+        "data": usage_mod.as_payload(result),
+    }
+
+
+def test_a_provider_that_could_not_be_read_may_not_carry_a_figure():
+    """V0-30. The invented number is how this feature goes wrong, so it is unwritable.
+
+    A dashboard showing "0%" for a provider nobody could read is worse than one showing
+    nothing: it reports headroom that was never observed, and the reader cannot tell the
+    two apart. The rule is enforced at `append()` rather than at the renderer, because a
+    renderer is one of several things that could display the number and the writer is the
+    only thing all of them go through -- working principle 3.
+    """
+    for status in ("unavailable", "not_configured"):
+        with pytest.raises(EventError, match="carries a figure"):
+            validate(usage_event(status=status))
+        with pytest.raises(EventError, match="carries a figure"):
+            validate(
+                usage_event(
+                    status=status,
+                    quotas=[],
+                    spend=[
+                        {
+                            "amount": "0",
+                            "currency": "USD",
+                            "period": "monthly",
+                            "provenance": "measured",
+                        }
+                    ],
+                )
+            )
+    # And the mirror image: "ok" carrying nothing is a success claim about no evidence.
+    with pytest.raises(EventError, match="no figure"):
+        validate(usage_event(quotas=[], spend=[]))
+
+
+def test_a_usage_figure_must_name_one_of_the_projects_evidence_tags():
+    """V0-30. `[measured]`, `[cited]` or `[asserted]`. An untagged number reads as fact."""
+    for bad in (None, "", "probably", "MEASURED", 1):
+        quota = dict(usage_event()["data"]["quotas"][0])
+        quota["provenance"] = bad
+        with pytest.raises(EventError, match="provenance"):
+            validate(usage_event(quotas=[quota]))
+
+    for tag in sorted(events_mod.PROVENANCE):
+        quota = dict(usage_event()["data"]["quotas"][0])
+        quota["provenance"] = tag
+        validate(usage_event(quotas=[quota]))
+
+
+def test_a_quota_keeps_its_window_and_reset_and_spend_keeps_its_currency():
+    """V0-30. A subscription window and a metered charge are different measurements.
+
+    `backends.md`: "Resource windows remain provider-native and separately keyed; a
+    five-hour, seven-day or monthly bucket is not flattened into one generic reset." The
+    reset time is the part a human acts on, so collapsing a window into one percentage
+    would delete the only half of the answer that says when it stops being a problem.
+    """
+    quota = dict(usage_event()["data"]["quotas"][0])
+    del quota["window"]
+    with pytest.raises(EventError, match="provider-native window"):
+        validate(usage_event(quotas=[quota]))
+
+    quota = dict(usage_event()["data"]["quotas"][0])
+    quota["resets_at"] = "2026-08-28 09:00:00"  # no offset: unreadable across machines
+    with pytest.raises(EventError, match="resets_at"):
+        validate(usage_event(quotas=[quota]))
+
+    # Spend that cannot be compared with a ceiling is not spend.
+    with pytest.raises(EventError, match="currency"):
+        validate(
+            usage_event(
+                kind="metered",
+                quotas=[],
+                spend=[
+                    {"amount": "1.00", "period": "weekly", "provenance": "measured"}
+                ],
+            )
+        )
+
+
+def test_a_used_fraction_outside_zero_to_one_is_refused():
+    """V0-30. A percentage written into a fraction field is a factor-of-100 error."""
+    quota = dict(usage_event()["data"]["quotas"][0])
+    quota["used_fraction"] = "5"
+    with pytest.raises(EventError, match="0, 1"):
+        validate(usage_event(quotas=[quota]))
+
+
+def test_providers_with_no_counter_say_unavailable_and_give_the_reason(tmp_path):
+    """V0-30, at the collector rather than at the writer.
+
+    Measured 20 August 2026: `cursor-agent about --format json` returns `subscriptionTier`
+    with no quota, no consumed figure and no reset window; `grok inspect --json` exposes no
+    individual remaining-quota percentage, allowance counter or reset timestamp. These are
+    the two providers most likely to acquire a fabricated zero, because a dashboard row
+    that says nothing looks like a bug to whoever is asked to fix it.
+
+    The reason string is asserted too. An "unavailable" with no reason is exactly as
+    unfalsifiable as an invented number: nobody can tell whether it is a fact about the
+    vendor or a collector somebody never finished.
+    """
+    (tmp_path / "cursor.json").write_text(
+        '{"subscriptionTier": "ultra"}', encoding="utf-8"
+    )
+    (tmp_path / "grok.json").write_text('{"model": "grok-4.6"}', encoding="utf-8")
+    sources = usage_mod.Sources(payloads=tmp_path, log=tmp_path / "log")
+
+    for provider in ("cursor", "grok"):
+        result = usage_mod.COLLECTORS[provider](sources)
+        assert result.status == "unavailable", provider
+        assert result.quotas == () and result.spend == (), provider
+        assert len(result.detail) > 40, f"{provider} gave no reason for unavailable"
+        validate(as_event(result))
+
+
+def test_an_absent_provider_degrades_to_not_configured_rather_than_failing(tmp_path):
+    """A collector must never raise. An empty directory is an installation, not an error."""
+    sources = usage_mod.Sources(payloads=tmp_path / "nothing", log=tmp_path / "nolog")
+    for name, collector in sorted(usage_mod.COLLECTORS.items()):
+        result = collector(sources)
+        assert result.status in ("not_configured", "unavailable"), name
+        assert result.quotas == () and result.spend == (), name
+        validate(as_event(result))
+
+    snapshot = usage_mod.snapshot(sources)
+    assert [p["provider"] for p in snapshot["providers"]] == sorted(
+        usage_mod.COLLECTORS
+    )
+    assert all(p["status"] != "ok" for p in snapshot["providers"])
+
+
+def test_the_measured_codex_payload_parses_to_a_quota_that_keeps_its_reset(tmp_path):
+    """The one subscription whose headroom schema this repository actually measured.
+
+    EXP-07 queried `codex app-server --stdio` with `account/rateLimits/read` and committed
+    the response. These are its field names and its values, so this fails if the parser
+    drifts from the shape that was really observed. [measured]
+    """
+    (tmp_path / "codex.json").write_text(
+        json.dumps(
+            {
+                "result": {
+                    "rateLimits": {
+                        "planType": "pro",
+                        "primary": {
+                            "usedPercent": 5,
+                            "resetsAt": 1787767120,
+                            "windowDurationMins": 10080,
+                        },
+                        "rateLimitReachedType": None,
+                        "spendControlReached": False,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = usage_mod.COLLECTORS["codex"](
+        usage_mod.Sources(payloads=tmp_path, log=tmp_path)
+    )
+
+    assert result.status == "ok"
+    assert result.spend == (), "a flat-fee subscription window is not money"
+    (quota,) = result.quotas
+    assert quota.used_fraction == Decimal("0.05")
+    assert quota.window == "10080m", "the seven-day window must stay provider-native"
+    assert quota.resets_at == datetime.fromtimestamp(1787767120, timezone.utc)
+    assert quota.provenance == "measured"
+    validate(as_event(result))
+
+
+def test_a_payload_present_but_carrying_no_counter_is_unavailable_not_zero(tmp_path):
+    """The exact failure this layer exists to prevent, at the parser."""
+    (tmp_path / "codex.json").write_text(
+        '{"result": {"rateLimits": {}}}', encoding="utf-8"
+    )
+    (tmp_path / "claude.json").write_text('{"windows": []}', encoding="utf-8")
+    sources = usage_mod.Sources(payloads=tmp_path, log=tmp_path)
+
+    for provider in ("codex", "claude"):
+        result = usage_mod.COLLECTORS[provider](sources)
+        assert result.status == "unavailable", provider
+        assert result.quotas == (), provider
+
+
+def test_claude_figures_are_cited_because_the_schema_was_never_verified_here(tmp_path):
+    """V0-30. `[cited]` is not pedantry; it is the difference from `[measured]`.
+
+    Anthropic documents five-hour and seven-day utilisation and reset fields. EXP-27
+    recorded Claude's quota surface as the *string* "status_line_json", inferred from the
+    CLI being installed -- this repository has never parsed one. Tagging these figures
+    `measured` would upgrade an evidence class without new evidence, which working
+    principle 1 forbids in as many words.
+    """
+    (tmp_path / "claude.json").write_text(
+        json.dumps(
+            {
+                "windows": [
+                    {"window": "5h", "used_percentage": 42, "resets_at": now_ts(3600)},
+                    {"window": "7d", "used_percentage": 8, "resets_at": now_ts(86400)},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = usage_mod.COLLECTORS["claude"](
+        usage_mod.Sources(payloads=tmp_path, log=tmp_path)
+    )
+
+    assert result.status == "ok"
+    assert [q.window for q in result.quotas] == ["5h", "7d"]
+    assert {q.provenance for q in result.quotas} == {"cited"}
+    assert all(q.resets_at is not None for q in result.quotas)
+
+
+def budget_state_event(weekly, monthly):
+    stamp = datetime.now(timezone.utc)
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": stamp.isoformat(),
+        "event": "budget.state",
+        "actor": "openrouter-probe",
+        "data": {
+            "provider": "openrouter",
+            "currency": "USD",
+            "weekly_spent": weekly,
+            "monthly_spent": monthly,
+            "observed_at": stamp.isoformat(),
+            "rejection_digest": events_mod.rejection_digest([]),
+        },
+    }
+
+
+def write_budget_state(log, weekly, monthly):
+    log.mkdir(parents=True, exist_ok=True)
+    name = f"{datetime.now(timezone.utc).date().isoformat()}.jsonl"
+    append(log / name, budget_state_event(weekly, monthly))
+
+
+def test_openrouter_spend_is_unknown_rather_than_zero_without_an_observation(tmp_path):
+    """Measured 20 Aug 2026: the key-status counter read $0, then $0.045138255 later.
+
+    The zero was a true counter value and a false statement about spend. Reporting "no
+    observation" is the only reading of an empty trajectory that is not a claim about
+    money, which is why this collector reads recorded observations rather than a counter.
+    """
+    log = tmp_path / "log"
+    log.mkdir()
+    result = usage_mod.COLLECTORS["openrouter"](
+        usage_mod.Sources(payloads=tmp_path, log=log)
+    )
+    assert result.status == "unavailable"
+    assert "not zero" in result.detail
+    assert result.spend == ()
+
+    write_budget_state(log, "1.50", "4.25")
+    result = usage_mod.COLLECTORS["openrouter"](
+        usage_mod.Sources(payloads=tmp_path, log=log)
+    )
+    assert result.status == "ok"
+    assert result.quotas == (), "metered spend is not a subscription window"
+    assert {(s.period, str(s.amount), s.currency) for s in result.spend} == {
+        ("weekly", "1.50", "USD"),
+        ("monthly", "4.25", "USD"),
+    }
+    assert {s.provenance for s in result.spend} == {"measured"}
+    validate(as_event(result))
+
+
+def test_the_fake_snapshot_obeys_the_same_contract_as_a_real_one():
+    """The dashboard's fixture must not be able to drift from what the writer accepts.
+
+    A fake a renderer can display but `append()` would refuse is a fake that teaches the
+    renderer to handle shapes the real system never produces.
+    """
+    snapshot = usage_mod.fake_snapshot()
+    statuses = {p["status"] for p in snapshot["providers"]}
+    assert statuses == {"ok", "unavailable", "not_configured"}, (
+        "the fixture must exercise every case a renderer has to handle"
+    )
+    for provider in snapshot["providers"]:
+        validate(
+            {
+                "v": SCHEMA_VERSION,
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "usage.observed",
+                "actor": "consilient.usage",
+                "data": provider,
+            }
+        )
+    figures = [
+        figure
+        for provider in snapshot["providers"]
+        for figure in list(provider["quotas"]) + list(provider["spend"])
+    ]
+    assert figures and all(f["provenance"] == "asserted" for f in figures), (
+        "a fabricated figure that leaks into a screenshot must read as fabricated"
+    )
+
+
+def test_usage_observations_reach_the_trajectory_and_project_including_silent_ones(
+    tmp_path,
+):
+    """V0-02 and V0-30 together: the projection is rebuilt from the log, and shows absence.
+
+    A provider that could not be read still gets a row. Projecting only the readable ones
+    would make "unobserved" indistinguishable from "never asked", which is the silent skip
+    the rejections table already exists to prevent.
+    """
+    log, db = tmp_path / "log", tmp_path / "state.db"
+    log.mkdir()
+    assert usage_mod.record(log, usage_mod.fake_snapshot()) == 4
+    assert not events_mod.bypassed(log), "usage must be written through append() only"
+
+    conn = projection.build(log, db)
+    rows = conn.execute(
+        "SELECT provider, status, measure, window_label, used_fraction, resets_at,"
+        " amount, currency, period, provenance FROM usage ORDER BY id"
+    ).fetchall()
+    by_provider: dict[str, list[tuple[object, ...]]] = {}
+    for row in rows:
+        by_provider.setdefault(row[0], []).append(row)
+
+    (silent,) = by_provider["fake-no-counter"]
+    assert silent[1] == "unavailable" and silent[2] == "none"
+    assert silent[9] is None, "a provider that reported nothing must carry no provenance"
+    (absent,) = by_provider["fake-absent"]
+    assert absent[1] == "not_configured" and absent[2] == "none"
+    assert {row[2] for row in by_provider["fake-metered"]} == {"spend"}
+    assert {row[7] for row in by_provider["fake-metered"]} == {"USD"}
+    assert {row[8] for row in by_provider["fake-metered"]} == {"weekly", "monthly"}
+    windows = by_provider["fake-subscription"]
+    assert {row[3] for row in windows} == {"10080m", "300m"}, (
+        "provider-native windows were flattened into one"
+    )
+    assert all(row[5] is not None for row in windows), "a reset time was lost"
+    assert all(row[6] is None for row in windows), "a quota acquired a money column"
+
+    digest = projection.state_digest(conn)
+    conn.close()
+    rebuilt = projection.build(log, db)
+    assert projection.state_digest(rebuilt) == digest
+    rebuilt.close()
+
+
+# --------------------------------------------------------------- V0-31, the spend ceiling
+def limits_file(tmp_path, ceilings, cap=None, name="limits.json"):
+    body = {"ceilings": ceilings}
+    if cap is not None:
+        body["account_cap"] = cap
+    path = tmp_path / name
+    path.write_text(json.dumps(body), encoding="utf-8")
+    return path
+
+
+def test_an_absent_or_malformed_limits_file_refuses_rather_than_meaning_unlimited(
+    tmp_path,
+):
+    """V0-31. Fail-closed: no ceiling is not "unlimited", it is "no" (ADR-0044).
+
+    A default this module chose would be a number the principal never approved, standing
+    where his own should be. Every one of these refusals is reached, not assumed.
+    """
+    assert isinstance(
+        usage_mod.load_limits(tmp_path / "absent.json"), budget_mod.BudgetRefusal
+    )
+
+    (tmp_path / "bad.json").write_text("{not json", encoding="utf-8")
+    assert isinstance(
+        usage_mod.load_limits(tmp_path / "bad.json"), budget_mod.BudgetRefusal
+    )
+
+    empty = usage_mod.load_limits(limits_file(tmp_path, [], name="empty.json"))
+    assert isinstance(empty, budget_mod.BudgetRefusal)
+    assert "no weekly or monthly ceiling is configured" in empty.reason
+
+    # A JSON float has already lost the exactness a money comparison depends on.
+    floaty = limits_file(
+        tmp_path,
+        [{"period": "weekly", "amount": 10.0, "currency": "USD"}],
+        name="float.json",
+    )
+    assert isinstance(usage_mod.load_limits(floaty), budget_mod.BudgetRefusal)
+
+    unknown = limits_file(
+        tmp_path,
+        [{"period": "daily", "amount": "1", "currency": "USD"}],
+        name="daily.json",
+    )
+    assert isinstance(usage_mod.load_limits(unknown), budget_mod.BudgetRefusal)
+
+
+def test_a_configured_ceiling_above_the_declared_account_cap_is_refused(tmp_path):
+    """V0-31. The harness ceiling sits at or below what the principal declared.
+
+    Refused, never clamped. Silently lowering the ceiling to the cap would let a
+    configuration asking for more than the principal allows still run, just quietly, and
+    the operator would never learn that the file they edited does not say what the harness
+    is doing. A boundary that edits your request instead of rejecting it is a preference.
+    """
+    over = limits_file(
+        tmp_path,
+        [{"period": "monthly", "amount": "150.00", "currency": "USD"}],
+        cap={"period": "monthly", "amount": "100.00", "currency": "USD"},
+        name="over.json",
+    )
+    refusal = usage_mod.load_limits(over)
+    assert isinstance(refusal, budget_mod.BudgetRefusal)
+    assert "exceeds the declared" in refusal.reason
+
+    under = limits_file(
+        tmp_path,
+        [
+            {"period": "weekly", "amount": "20.00", "currency": "USD"},
+            {"period": "monthly", "amount": "80.00", "currency": "USD"},
+        ],
+        cap={"period": "monthly", "amount": "100.00", "currency": "USD"},
+        name="under.json",
+    )
+    ceilings = usage_mod.load_limits(under)
+    assert isinstance(ceilings, tuple)
+    assert {c.period for c in ceilings} == {"weekly", "monthly"}
+
+
+def test_a_cap_and_a_ceiling_in_different_currencies_refuse_rather_than_convert(
+    tmp_path,
+):
+    """V0-31. The account cap is stated in pounds and this harness meters in dollars.
+
+    There is no exchange rate in this repository and there must not be one: a rate this
+    module invented would be a number nobody measured, standing between the principal and
+    his money. The honest outcome is a refusal telling him to state the cap in the currency
+    the ceiling is enforced in -- not a silent conversion that looks like it worked.
+    """
+    mixed = limits_file(
+        tmp_path,
+        [{"period": "monthly", "amount": "80.00", "currency": "USD"}],
+        cap={"period": "monthly", "amount": "100.00", "currency": "GBP"},
+    )
+    refusal = usage_mod.load_limits(mixed)
+    assert isinstance(refusal, budget_mod.BudgetRefusal)
+    assert "no conversion is performed" in refusal.reason
+
+
+def test_the_configured_ceiling_actually_refuses_the_spend_that_would_breach_it(
+    tmp_path,
+):
+    """V0-31 end to end. A limit that only warns is not a limit.
+
+    This is the test that separates an enforced ceiling from a displayed one: the same
+    configuration is loaded from the instance file, handed to `check_budget`, and the
+    request that would cross it comes back refused with nothing reserved. Refusing while
+    still writing the reservation would be the subtler version of the same failure.
+    """
+    log = tmp_path / "log"
+    write_budget_state(log, "9.00", "30.00")
+    ceilings = usage_mod.load_limits(
+        limits_file(
+            tmp_path,
+            [
+                {"period": "weekly", "amount": "10.00", "currency": "USD"},
+                {"period": "monthly", "amount": "40.00", "currency": "USD"},
+            ],
+            cap={"period": "monthly", "amount": "100.00", "currency": "USD"},
+        )
+    )
+    assert isinstance(ceilings, tuple)
+
+    before = sorted(path.read_bytes() for path in log.glob("*.jsonl"))
+    breaching = budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-over", Decimal("1.50"), "USD")
+    )
+    assert breaching == budget_mod.BudgetRefusal("weekly ceiling would be breached")
+    assert sorted(path.read_bytes() for path in log.glob("*.jsonl")) == before, (
+        "a refused request reserved something anyway"
+    )
+
+    permitted = budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-under", Decimal("0.50"), "USD")
+    )
+    assert isinstance(permitted, budget_mod.BudgetPermission)
+
+    # ...and the reservation it wrote counts against the next request.
+    assert budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-next", Decimal("0.75"), "USD")
+    ) == budget_mod.BudgetRefusal("weekly ceiling would be breached")
+
+
+def test_the_monthly_ceiling_refuses_independently_of_the_weekly_one(tmp_path):
+    """V0-31. Both limits are real; neither is decoration for the other.
+
+    A monthly ceiling alone would let one week consume the month, and a weekly ceiling
+    alone would let four weeks exceed it. ADR-0044 requires both, so both are exercised.
+    """
+    log = tmp_path / "log"
+    write_budget_state(log, "0.00", "39.90")
+    ceilings = usage_mod.load_limits(
+        limits_file(
+            tmp_path,
+            [
+                {"period": "weekly", "amount": "10.00", "currency": "USD"},
+                {"period": "monthly", "amount": "40.00", "currency": "USD"},
+            ],
+        )
+    )
+    assert isinstance(ceilings, tuple)
+    assert budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-month", Decimal("0.20"), "USD")
+    ) == budget_mod.BudgetRefusal("monthly ceiling would be breached")
+
+
+def test_no_instance_limits_or_captured_payload_is_committed():
+    """PRODUCT ships the shape; INSTANCE keeps the numbers. Only the example is tracked.
+
+    A limits file names what the principal is willing to spend and a captured payload is
+    an observation of his account. Neither is a credential, and neither belongs in a public
+    repository.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+    ).stdout.splitlines()
+    assert ".harness/limits.example.json" in tracked, "the shape must ship"
+    assert ".harness/limits.json" not in tracked, (
+        "an instance limits file was committed"
+    )
+    assert not [name for name in tracked if name.startswith(".harness/usage/")], (
+        "a captured provider payload was committed; those are instance observations"
+    )
+    ignored = Path(".gitignore").read_text(encoding="utf-8")
+    assert ".harness/limits.json" in ignored and ".harness/usage/" in ignored
+
+
+def test_the_shipped_example_limits_file_is_a_shape_not_a_configuration():
+    """The example must parse and must not be usable as a real ceiling by accident."""
+    example = json.loads(
+        Path(".harness/limits.example.json").read_text(encoding="utf-8")
+    )
+    assert example["ceilings"], "the example must show at least one ceiling"
+    assert usage_mod.DEFAULT_LIMITS.name == "limits.json", (
+        "the example must not be the path the harness reads"
     )

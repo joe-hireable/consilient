@@ -46,6 +46,63 @@ class Ceiling:
 
 
 @dataclass(frozen=True)
+class AccountCap:
+    """A limit the principal set at the vendor, outside this repository.
+
+    ADR-0044 is explicit that the harness "cannot read it, cannot enforce it and must not
+    assume it". So it is never a default and never a safety net: it exists only so that a
+    ceiling the principal configures here can be checked against the figure he says he set
+    there, and refused when it is higher. Declaring one is optional; declaring a false one
+    is worse than declaring none, which is why nothing infers it.
+    """
+
+    period: Period
+    amount: Decimal
+    currency: str
+
+
+def within_cap(
+    cap: AccountCap | None, ceilings: Sequence[Ceiling]
+) -> BudgetRefusal | None:
+    """V0-31: a configured ceiling may not exceed the declared account cap.
+
+    Refuses rather than clamps. Silently lowering a ceiling to the cap would let a
+    configuration that asks for more than the principal allows still run, just quietly --
+    and the operator would never learn that the file they edited does not say what the
+    harness is doing. A boundary that edits your request instead of rejecting it is not a
+    boundary, it is a preference.
+
+    No currency conversion happens here, ever. A cap in one currency and a ceiling in
+    another cannot be compared without a rate, and a rate this module invented would be a
+    number nobody measured standing between the principal and his money.
+    """
+    if cap is None:
+        return None
+    if (
+        not isinstance(cap, AccountCap)
+        or cap.period not in ("weekly", "monthly")
+        or not isinstance(cap.amount, Decimal)
+        or not cap.amount.is_finite()
+        or cap.amount < 0
+        or not isinstance(cap.currency, str)
+        or not cap.currency.strip()
+    ):
+        return BudgetRefusal("account cap is malformed")
+    for ceiling in ceilings:
+        if ceiling.currency != cap.currency:
+            return BudgetRefusal(
+                f"ceiling is in {ceiling.currency} and the account cap is in "
+                f"{cap.currency}; no conversion is performed"
+            )
+        if ceiling.amount > cap.amount:
+            return BudgetRefusal(
+                f"{ceiling.period} ceiling {ceiling.amount} exceeds the declared "
+                f"{cap.period} account cap {cap.amount} {cap.currency}"
+            )
+    return None
+
+
+@dataclass(frozen=True)
 class SpendRequest:
     run_id: str
     amount: Decimal
