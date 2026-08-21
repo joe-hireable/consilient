@@ -3166,3 +3166,76 @@ def test_the_shipped_example_limits_file_is_a_shape_not_a_configuration():
     assert usage_mod.DEFAULT_LIMITS.name == "limits.json", (
         "the example must not be the path the harness reads"
     )
+
+
+# ------------------------------------------- the cost of recording one verdict
+def _verdict_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "verdict", Path("scripts/verdict.py").resolve()
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_verdict_script_cannot_orphan_a_verdict_and_counts_only_rejections(tmp_path):
+    """One reviewed attempt, one command, and no way to brick the trajectory with it.
+
+    `attempt.verdict` naming an attempt with no recorded outcome passes `validate()` and
+    appends with exit 0, after which `beta`, `replay` and `doctor` all raise
+    ProjectionError forever — the log is append-only, so appending the missing outcome
+    afterwards does not repair it, because position order still puts the verdict first.
+    Thirty hand-written pairs is thirty chances at that. The script writes both events
+    itself, outcome first, sharing one generated identity, so the orphan is unreachable.
+
+    The second property is beta's denominator: rejections only. The accepted attempt here
+    must move `window` and nothing else, or the meter is counting the wrong thing.
+    """
+    module = _verdict_module()
+    log = tmp_path / "log"
+    common = ["--log", str(log), "--principal", "reviewer"]
+    assert module.main(["reject", "fix pagination", "--checks", "pass", *common]) == 0
+    assert module.main(["accept", "retry backoff", "--checks", "fail", *common]) == 0
+
+    events, rejected = read_all(log)
+    assert not rejected, [r.reason for r in rejected]
+    recorded = set()
+    for event in events:
+        attempt_id = event.raw["data"]["attempt_id"]
+        if event.kind == events_mod.OUTCOME_KIND:
+            recorded.add(attempt_id)
+        else:
+            assert attempt_id in recorded, (
+                f"verdict for {attempt_id!r} precedes its outcome; the trajectory is "
+                "unrecoverable from here"
+            )
+
+    checks = [
+        event.raw["data"]["verifier_accept"]
+        for event in events
+        if event.kind == events_mod.OUTCOME_KIND
+    ]
+    assert checks == [True, False], "--checks must record what the checks said, both ways"
+
+    conn = projection.build(log, tmp_path / "state.db")
+    result = beta_mod.from_connection(conn, None, None)
+    conn.close()
+    assert result.n_rejected == 1, "an accepted attempt is not part of beta's denominator"
+    assert result.n_false_accept == 1, "the checks accepted what the reviewer rejected"
+
+
+def test_verdict_script_refuses_to_guess_what_the_checks_said(tmp_path):
+    """`--checks` is required so that beta cannot be 1.000 by construction.
+
+    Review only what the checks already passed and every rejected row carries
+    verifier_accept=True, so beta is 1 by sampling rather than by measurement
+    (`src/consilient/beta.py`). A default would make that the silent path.
+    """
+    module = _verdict_module()
+    with pytest.raises(SystemExit):
+        # --log is passed only so that a regression here writes to a temporary
+        # directory rather than into the real trajectory.
+        module.main(["reject", "no checks named", "--log", str(tmp_path / "log")])
