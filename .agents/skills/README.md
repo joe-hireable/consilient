@@ -80,9 +80,11 @@ been the right answer three times on this project.
 | `pre-publication-gate` | "All the checks passed" stops being an argument for publishing |
 | `dispatching-workers` | A fan-out that cannot name its different class of facts does not happen |
 | `operating-the-harness` | Orchestration is `python scripts/dispatch.py`, not a chat window |
+| `using-open-design` | UI generation locks a DESIGN.md contract first and refuses the AI-SaaS visual cluster |
 
-Written 21 August 2026: the five after `citing-sources`, adapted from proven public collections
-rather than invented — see each skill's *Adapted from* section for source and licence.
+Written 21 August 2026: the six after `citing-sources` (through `operating-the-harness`),
+adapted from proven public collections rather than invented — see each skill's *Adapted from*
+section for source and licence. `using-open-design` was added later the same day.
 
 Deliberately **not** written, and why:
 
