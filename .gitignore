@@ -89,3 +89,6 @@ red-cells-evidence.json
 # INSTANCE permission mode for dispatched harnesses. PRODUCT default is bypass.
 .harness/permissions.json
 .harness/status.html
+# INSTANCE cwd allowlist. PRODUCT ships the empty example; machine paths stay here.
+# Listing a root is supervised dispatch (ADR-0063), not a Gate B pass.
+.harness/allowed-cwds.json

@@ -9,10 +9,12 @@ surface stays {record, replay, beta, doctor} until the principal settles it.
     python scripts/dispatch.py "reply with the single word pong" --fan-out
     python scripts/dispatch.py --task-file brief.md --cwd <this repository, or a subdirectory>
 
-`--cwd` accepts this repository only — its root, a git worktree of the same repository,
-or a directory inside one of those. Any other path is refused, including on `--dry-run`,
-and there is no override flag: Gate B, which governs depending on this harness for work
-on another repository, is not passed.
+`--cwd` accepts this repository (root, a git worktree of it, or a directory inside one
+of those) and, additionally, any directory named in the instance file
+`.harness/allowed-cwds.json` (ADR-0063). Any other path is refused, including on
+`--dry-run`. There is no override flag: Gate B, which governs *depending* on this
+harness for work on another repository, is not passed. Listing a root is supervised
+dispatch, not a gate pass.
 
 Never silently spends the exhausted pool. A harness that exits 0 having done nothing
 is recorded `silent` and is not retried on another pool.
@@ -75,6 +77,7 @@ DEFAULT_LOG = ROOT / ".harness" / "log"
 DEFAULT_HEADROOM = ROOT / ".harness" / "headroom.json"
 DEFAULT_RUNS = ROOT / ".harness" / "dispatch"
 DEFAULT_PERMISSIONS = ROOT / ".harness" / "permissions.json"
+DEFAULT_ALLOWED_CWDS = ROOT / ".harness" / "allowed-cwds.json"
 CURSOR_WSL_BINARY = Path("/home/jpbpr/.local/bin/cursor-agent")
 GROK_CANDIDATES = (
     Path.home() / ".grok" / "bin" / "grok.exe",
@@ -729,23 +732,64 @@ def repo_roots() -> tuple[Path, ...]:
     return tuple(dict.fromkeys(roots))
 
 
-def resolve_cwd(value: str | None) -> Path:
-    """Resolve the working directory, refusing anything outside this repository.
+def load_allowed_roots(path: Path | None = None) -> tuple[Path, ...]:
+    """Instance cwd allowlist. Missing file means no extra roots. Malformed file fails closed.
 
-    AGENTS.md: nothing here may be pointed at another repository. That boundary had no
-    check, and a boundary without a check is not a boundary (working principle 3). There is
-    deliberately no override flag — a second path to the same state is the same hole.
+    This does not pass Gate B. The principal names supervised roots; the product default is
+    still refuse-everything-else. A filesystem root in the list is refused so a typo cannot
+    authorise the machine.
+    """
+    source = path if path is not None else DEFAULT_ALLOWED_CWDS
+    if not source.is_file():
+        return ()
+    try:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"allowed-cwds file {source} is not valid JSON: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"allowed-cwds file {source} must be a JSON object with a roots list")
+    listed = raw.get("roots", [])
+    if not isinstance(listed, list):
+        raise ValueError(f"allowed-cwds file {source} field 'roots' must be a list of paths")
+    roots: list[Path] = []
+    for item in listed:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"allowed-cwds file {source} roots must be non-empty strings")
+        try:
+            candidate = Path(item).expanduser().resolve()
+        except OSError as exc:
+            raise ValueError(f"allowed-cwds file {source} has an unresolvable root {item!r}: {exc}") from exc
+        if candidate.parent == candidate:
+            raise ValueError(
+                f"refusing filesystem root {candidate} in allowed-cwds: name a repository, "
+                "not a volume"
+            )
+        if candidate.is_dir():
+            roots.append(candidate)
+    return tuple(dict.fromkeys(roots))
+
+
+def resolve_cwd(value: str | None, *, allowed_file: Path | None = None) -> Path:
+    """Resolve the working directory, refusing unnamed foreign roots.
+
+    Default is this repository and its worktrees. Extra roots come only from the gitignored
+    instance allowlist (ADR-0063). There is deliberately no override flag — a second path
+    to the same state is the same hole. Naming a root is supervised dispatch under
+    ADR-0039; it does not pass Gate B.
     """
     path = (Path(value) if value else Path.cwd()).resolve()
-    roots = repo_roots()
+    roots = list(repo_roots())
+    roots.extend(load_allowed_roots(allowed_file))
     for root in roots:
         if path == root or root in path.parents:
             return path
     raise ValueError(
         f"refusing to dispatch with cwd {path}: this harness runs only inside its own "
-        f"repository ({ROOT}), a git worktree of the same repository, or a directory "
-        "within one of those. Gate B — depending on this harness for work on another "
-        "repository — is not passed, and there is no flag that reopens it."
+        f"repository ({ROOT}), a git worktree of the same repository, a directory "
+        "within one of those, or a root named in the instance allowlist "
+        f"({DEFAULT_ALLOWED_CWDS.name}). Gate B — depending on this harness for work on "
+        "another repository — is not passed. Listing a root is supervised dispatch "
+        "(ADR-0039/ADR-0063), not a gate pass, and no command-line flag reopens Gate B."
     )
 
 
@@ -1001,7 +1045,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task-file", help="read the task from this file (preferred for long briefs)")
     parser.add_argument(
         "--cwd",
-        help="working directory; this repository or a worktree of it only, else refused",
+        help="working directory; this repository, a worktree of it, or an instance-allowlisted root",
     )
     parser.add_argument(
         "--harness",

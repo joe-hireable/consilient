@@ -27,6 +27,7 @@ python -m consilient.cli usage
 python -m consilient.cli dashboard
 python scripts/dispatch.py --probe
 python scripts/dispatch.py "the task"
+python scripts/dispatch.py --task-file brief.md --cwd <this repo, or an instance-allowlisted root>
 python scripts/dispatch.py --permissions prompt "ask me before tools"
 python scripts/work.py open --ticket PM-1 --accountable joe-brown "the task"
 python scripts/recall.py --log .harness/log --query dispatch
@@ -63,8 +64,12 @@ If either is missing, the dispatch did not happen.
 
 ## What this is not
 
-It is not a licence to point the harness at another repository. Gate B still
-governs dependence. It is not a licence to put a secret in a public remote.
+It is not a Gate B pass. `consil doctor` still reports the gates shut.
+`--cwd` outside this repository requires a root named in the gitignored
+instance file `.harness/allowed-cwds.json` (ADR-0063). There is no
+`--gate-b-approved`. The unattended loop still refuses a foreign workspace.
+It is not a licence to put a secret in a public remote, and it is not a
+licence to commit another repository's contents into this one.
 
 ## Harness support
 

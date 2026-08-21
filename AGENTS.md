@@ -33,8 +33,12 @@ built and run.
 
 1. **Gate B still governs dependence.** Under ADR-0039, Gate B is no longer a licence to
    *build* orchestration; it is the evidence that the harness is trustworthy to *depend
-   on* for work on a repository other than this one. **Gate B is not passed.** Nothing
-   here may be pointed at `../hireable-3.0` or `../jobboard-v2`.
+   on* for work on a repository other than this one. **Gate B is not passed.** Supervised
+   dispatch may `--cwd` into a root the principal has named in the gitignored instance
+   file `.harness/allowed-cwds.json` (ADR-0063). That listing does not pass Gate B, does
+   not authorise unattended operation, and does not authorise publishing anything from
+   those repositories. An unnamed root is still refused. The unattended loop still
+   refuses any workspace that is not this repository.
 2. **Gate A is not passed either.** Do not take the condition-by-condition state from this
    file — run `consil doctor` and read what it says. This paragraph previously listed
    "A1, A2 and B1 pass … B3 needs the fallback exercised", and on 21 August 2026 three of
@@ -55,7 +59,8 @@ harness; to *run* it, type those commands. The skill is
 
 Product code in `src/consilient/` remains observe-only *today* because routing is not a
 `consil` subcommand, not because orchestration cannot be built. Dispatch is a script
-(ADR-0058). Gate B still forbids pointing it at another repository.
+(ADR-0058). Gate B still forbids *depending* on it for another repository; instance cwd
+allowlisting is ADR-0063 and is not a gate pass.
 
 ## Working principles for this repo
 

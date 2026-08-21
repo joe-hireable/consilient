@@ -13,6 +13,8 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -618,6 +620,92 @@ def test_resolve_cwd_has_no_override_flag():
     source = DISPATCH_PATH.read_text(encoding="utf-8")
     assert "gate-b-approved" not in source
     assert "--allow-foreign" not in source
+
+
+def test_load_allowed_roots_missing_file_is_empty(tmp_path):
+    script = _load_script()
+    assert script.load_allowed_roots(tmp_path / "no-such.json") == ()
+
+
+def test_load_allowed_roots_skips_missing_directories(tmp_path):
+    script = _load_script()
+    present = tmp_path / "present"
+    present.mkdir()
+    allow = tmp_path / "allowed-cwds.json"
+    allow.write_text(
+        json.dumps({"roots": [str(present), str(tmp_path / "gone")]}) + "\n",
+        encoding="utf-8",
+    )
+    assert script.load_allowed_roots(allow) == (present.resolve(),)
+
+
+def test_load_allowed_roots_refuses_a_filesystem_root(tmp_path):
+    script = _load_script()
+    allow = tmp_path / "allowed-cwds.json"
+    allow.write_text(json.dumps({"roots": [str(tmp_path.anchor)]}) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="filesystem root"):
+        script.load_allowed_roots(allow)
+
+
+def test_load_allowed_roots_malformed_json_fails_closed(tmp_path):
+    script = _load_script()
+    allow = tmp_path / "allowed-cwds.json"
+    allow.write_text("{not json", encoding="utf-8")
+    with pytest.raises(ValueError, match="not valid JSON"):
+        script.load_allowed_roots(allow)
+
+
+def test_resolve_cwd_allows_an_instance_listed_root(tmp_path):
+    script = _load_script()
+    foreign = tmp_path / "authorised-repo"
+    foreign.mkdir()
+    allow = tmp_path / "allowed-cwds.json"
+    allow.write_text(json.dumps({"roots": [str(foreign)]}) + "\n", encoding="utf-8")
+    assert script.resolve_cwd(str(foreign), allowed_file=allow) == foreign.resolve()
+
+
+def test_resolve_cwd_allows_a_subdirectory_of_an_instance_listed_root(tmp_path):
+    script = _load_script()
+    foreign = tmp_path / "authorised-repo"
+    inside = foreign / "frontend"
+    inside.mkdir(parents=True)
+    allow = tmp_path / "allowed-cwds.json"
+    allow.write_text(json.dumps({"roots": [str(foreign)]}) + "\n", encoding="utf-8")
+    assert script.resolve_cwd(str(inside), allowed_file=allow) == inside.resolve()
+
+
+def test_resolve_cwd_still_refuses_an_unlisted_foreign_root_when_allowlist_exists(tmp_path):
+    script = _load_script()
+    listed = tmp_path / "authorised-repo"
+    listed.mkdir()
+    other = tmp_path / "some-other-repo"
+    other.mkdir()
+    allow = tmp_path / "allowed-cwds.json"
+    allow.write_text(json.dumps({"roots": [str(listed)]}) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="only inside its own repository"):
+        script.resolve_cwd(str(other), allowed_file=allow)
+
+
+def test_allowed_cwds_instance_file_is_gitignored_and_the_example_ships():
+    """PRODUCT ships the shape; INSTANCE keeps the machine paths."""
+    ignored = Path(".gitignore").read_text(encoding="utf-8")
+    assert ".harness/allowed-cwds.json" in ignored
+    example = json.loads(
+        Path(".harness/allowed-cwds.example.json").read_text(encoding="utf-8")
+    )
+    assert example["roots"] == []
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    tracked = subprocess.run(
+        ["git", "ls-files", ".harness/allowed-cwds.json", ".harness/allowed-cwds.example.json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=True,
+    ).stdout.split()
+    assert ".harness/allowed-cwds.example.json" in tracked
+    assert ".harness/allowed-cwds.json" not in tracked
 
 
 def test_dry_run_outside_this_repository_is_refused_and_prints_no_command(tmp_path, capsys):
