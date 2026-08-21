@@ -67,6 +67,9 @@ Read these before anything else. Everything downstream depends on them.
 | [0058](0058-orchestration-ships-as-a-script-until-the-cli-surface-is-settled.md) | **Orchestration ships as `scripts/dispatch.py`**; the `consil` CLI surface stays the principal's to settle | ✅ |
 | [0059](0059-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
 | [0063](0063-instance-cwd-allowlist-is-supervised-dispatch-not-a-gate-pass.md) | **Instance cwd allowlist is supervised dispatch, not a Gate B pass** — no override flag; doctor stays red; the loop still refuses foreign workspaces | ✅ |
+| [0064](0064-add-training-providers-and-supersede-openrouter-as-sole-metered-vendor.md) | **Add training providers and supersede OpenRouter as sole metered vendor** | ✅ |
+| [0065](0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md) | **What is native, what is adopted, and what is a marketplace** — a component whose error rate must be measured is native; one whose errors are self-evident may be adopted | ✅ |
+| [0066](0066-principal-harvest-is-a-private-training-corpus.md) | **The principal's harvest is a private training corpus**; 30–35B fine-tunes are native backends; the data is never published | ✅ |
 
 ## Behaviour and safety
 
