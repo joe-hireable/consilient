@@ -91,8 +91,12 @@ GROK_CANDIDATES = (
 )
 METERED_KEY_ENV_VARS = ("XAI_API_KEY", "GROK_CODE_XAI_API_KEY", "GROK_API_KEY")
 DEFAULT_TIMEOUT_S = 600
+DEFAULT_MAX_TURNS = 20
+DEFAULT_MAX_TOKENS = 100_000
 DEFAULT_CURSOR_MODEL = "composer-2.5"
-GIT_ENV = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+GIT_ENV = {
+    key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+}
 
 
 @dataclass(frozen=True)
@@ -218,7 +222,9 @@ def git_workspace(cwd: Path) -> tuple[Path, Path] | None:
         return None
     if completed.returncode != 0:
         return None
-    lines = [line.strip() for line in (completed.stdout or "").splitlines() if line.strip()]
+    lines = [
+        line.strip() for line in (completed.stdout or "").splitlines() if line.strip()
+    ]
     if len(lines) < 2:
         return None
     git_dir = Path(lines[0])
@@ -370,8 +376,12 @@ def _cursor_help_and_about() -> tuple[bool, str | None, str]:
 
     bridge = wsl_bridge()
     if bridge is None or os.name != "nt":
-        return False, None, (
-            f"cursor-agent is WSL-only; looked for {CURSOR_WSL_BINARY} and no wsl bridge"
+        return (
+            False,
+            None,
+            (
+                f"cursor-agent is WSL-only; looked for {CURSOR_WSL_BINARY} and no wsl bridge"
+            ),
         )
     inner = "cursor-agent --version || cursor-agent about --format json"
     code, out, err = _run_probe([bridge, "-e", "bash", "-lc", inner])
@@ -411,6 +421,51 @@ def optional_flags(help_blob: str, *flags: str) -> list[str]:
         if f" {flag} " in blob or f" {flag}\n" in help_blob or help_blob.endswith(flag):
             chosen.append(flag)
     return chosen
+
+
+def native_cap_flags(
+    harness_id: str,
+    help_blob: str,
+    *,
+    max_turns: int,
+    max_tokens: int,
+) -> list[str] | str:
+    """Return whatever native hard-cap flags the installed CLI actually exposes.
+
+    R11 is the principal's instruction, verbatim: "Do not let any arm run unbounded. Hard
+    turn and token caps." The obligation is that **no arm runs unbounded** -- not that a
+    particular flag spelling exists.
+
+    Until 21 August 2026 this demanded `--max-turns` AND `--max-tokens` natively and refused
+    the launch otherwise. Measured against the installed CLIs that day: grok exposes
+    `--max-turns` only; codex exposes neither. So the condition could never pass for two of
+    the three subscription harnesses, and the harness had locked itself out of two of the
+    plans it exists to spend. That is the wall-not-gate defect catalogued in
+    `docs/00-context/four-of-seven-gate-conditions-cannot-pass-2026-08-20.md`: a condition
+    that cannot pass teaches people to bypass it, and it contradicted the principal's other
+    standing instruction to use every subscription.
+
+    So: apply every native cap the CLI does offer, and let the caller bound the rest. The
+    caller already enforces a wall-clock timeout and kills the process tree, which is what
+    actually makes an arm bounded on a CLI with no native flag.
+
+    **What this does NOT achieve, stated rather than implied:** no installed CLI exposes a
+    real per-run token cap, so token bounding is only available through the pool ceiling in
+    `budget.py`, not per arm. A wall-clock bound is also strictly weaker than a turn cap --
+    an arm can burn many turns quickly inside its window. Both gaps are real and neither is
+    closed here.
+    """
+    if max_turns <= 0 or max_tokens <= 0:
+        return (
+            f"refusing {harness_id}: hard turn and token caps must be positive integers"
+        )
+    present = set(optional_flags(help_blob, "--max-turns", "--max-tokens"))
+    flags: list[str] = []
+    if "--max-turns" in present:
+        flags += ["--max-turns", str(max_turns)]
+    if "--max-tokens" in present:
+        flags += ["--max-tokens", str(max_tokens)]
+    return flags
 
 
 def metered_grok_reason(env: dict[str, str] | None = None) -> str | None:
@@ -619,6 +674,8 @@ def build_command(
     permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
     family: str | None = None,
     pools: tuple[PoolState, ...] = (),
+    max_turns: int = DEFAULT_MAX_TURNS,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> list[str] | str:
     """Return argv, or a refusal reason string."""
     cwd = cwd.resolve()
@@ -632,7 +689,15 @@ def build_command(
         binary = find_claude()
         if binary is None:
             return "claude is not on PATH"
-        return [binary, *bypass, "-p", instruction]
+        caps = native_cap_flags(
+            harness.id,
+            help_text([binary]),
+            max_turns=max_turns,
+            max_tokens=max_tokens,
+        )
+        if isinstance(caps, str):
+            return caps
+        return [binary, *bypass, *caps, "-p", instruction]
     if harness.id == "grok":
         metered = metered_grok_reason()
         if metered is not None:
@@ -640,21 +705,39 @@ def build_command(
         binary = find_grok()
         if binary is None:
             return "grok is not on PATH or in ~/.grok/bin"
-        extra = optional_flags(help_text([binary]), "--always-approve")
+        help_blob = help_text([binary])
+        caps = native_cap_flags(
+            harness.id,
+            help_blob,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
+        )
+        if isinstance(caps, str):
+            return caps
+        extra = optional_flags(help_blob, "--always-approve")
         for flag in bypass:
             if flag not in extra:
                 extra.append(flag)
-        return [binary, "-p", instruction, "--cwd", str(cwd), *extra]
+        return [binary, "-p", instruction, "--cwd", str(cwd), *caps, *extra]
     if harness.id == "codex":
         binary = find_codex()
         if binary is None:
             return "codex is not on PATH"
-        extra = optional_flags(help_text([binary, "exec"]), "--skip-git-repo-check")
+        help_blob = help_text([binary, "exec"])
+        caps = native_cap_flags(
+            harness.id,
+            help_blob,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
+        )
+        if isinstance(caps, str):
+            return caps
+        extra = optional_flags(help_blob, "--skip-git-repo-check")
         for flag in bypass:
             if flag not in extra:
                 extra.append(flag)
         # Insert extra flags before the prompt so they are not eaten as the task.
-        return [binary, "exec", "-C", str(cwd), *extra, instruction]
+        return [binary, "exec", "-C", str(cwd), *caps, *extra, instruction]
     if harness.id == "cursor-composer":
         chosen = model or DEFAULT_CURSOR_MODEL
         if model is None and (pools or family is not None):
@@ -671,7 +754,16 @@ def build_command(
         native = cursor_native()
         extra: list[str] = []
         if native is not None:
-            extra = optional_flags(help_text([native]), "--force", "--trust")
+            help_blob = help_text([native])
+            caps = native_cap_flags(
+                harness.id,
+                help_blob,
+                max_turns=max_turns,
+                max_tokens=max_tokens,
+            )
+            if isinstance(caps, str):
+                return caps
+            extra = optional_flags(help_blob, "--force", "--trust")
             for flag in bypass:
                 if flag not in extra:
                     extra.append(flag)
@@ -682,6 +774,7 @@ def build_command(
                 chosen,
                 "--output-format",
                 "text",
+                *caps,
                 *extra,
                 instruction,
             ]
@@ -694,15 +787,24 @@ def build_command(
             f"Read the file {wsl_brief} and do exactly that task. "
             "Do not wait for confirmation."
         )
+        help_blob = help_text([bridge, "-e", "bash", "-lc", "cursor-agent --help"])
+        caps = native_cap_flags(
+            harness.id,
+            help_blob,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
+        )
+        if isinstance(caps, str):
+            return caps
         extra = optional_flags(
-            help_text([bridge, "-e", "bash", "-lc", "cursor-agent --help"]),
+            help_blob,
             "--force",
             "--trust",
         )
         for flag in bypass:
             if flag not in extra:
                 extra.append(flag)
-        extra_s = (" " + " ".join(extra)) if extra else ""
+        extra_s = " " + " ".join([*caps, *extra])
         # The task body never enters the shell: only paths we created do.
         # GIT_DIR/GIT_WORK_TREE are WSL paths so linked worktrees are repositories
         # to WSL git (R4). Native cursor-agent is unchanged — it already sees NT paths.
@@ -730,6 +832,8 @@ def run_harness(
     family: str | None = None,
     pools: tuple[PoolState, ...] = (),
     claim_run_id: str | None = None,
+    max_turns: int = DEFAULT_MAX_TURNS,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
@@ -747,6 +851,8 @@ def run_harness(
         permissions=permissions,
         family=family,
         pools=pools,
+        max_turns=max_turns,
+        max_tokens=max_tokens,
     )
     if isinstance(built, str):
         return RunResult(
@@ -862,7 +968,9 @@ def _print_human(payload: dict[str, object]) -> None:
     if "reason" in payload:
         print(f"reason: {payload['reason']}")
     if "harness" in payload:
-        print(f"harness: {payload['harness']} ({payload.get('family')}, {payload.get('pool')})")
+        print(
+            f"harness: {payload['harness']} ({payload.get('family')}, {payload.get('pool')})"
+        )
     if "selected" in payload:
         print(f"selected: {payload['selected']}")
     if "first" in payload and isinstance(payload["first"], dict):
@@ -898,7 +1006,9 @@ def _print_human(payload: dict[str, object]) -> None:
         print(stdout_tail.strip())
     rows = payload.get("harnesses")
     if isinstance(rows, list):
-        print(f"{'id':<18} {'family':<10} {'pool':<16} {'installed':<10} {'used':<8} note")
+        print(
+            f"{'id':<18} {'family':<10} {'pool':<16} {'installed':<10} {'used':<8} note"
+        )
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -980,20 +1090,30 @@ def load_allowed_roots(path: Path | None = None) -> tuple[Path, ...]:
     try:
         raw = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"allowed-cwds file {source} is not valid JSON: {exc}") from exc
+        raise ValueError(
+            f"allowed-cwds file {source} is not valid JSON: {exc}"
+        ) from exc
     if not isinstance(raw, dict):
-        raise ValueError(f"allowed-cwds file {source} must be a JSON object with a roots list")
+        raise ValueError(
+            f"allowed-cwds file {source} must be a JSON object with a roots list"
+        )
     listed = raw.get("roots", [])
     if not isinstance(listed, list):
-        raise ValueError(f"allowed-cwds file {source} field 'roots' must be a list of paths")
+        raise ValueError(
+            f"allowed-cwds file {source} field 'roots' must be a list of paths"
+        )
     roots: list[Path] = []
     for item in listed:
         if not isinstance(item, str) or not item.strip():
-            raise ValueError(f"allowed-cwds file {source} roots must be non-empty strings")
+            raise ValueError(
+                f"allowed-cwds file {source} roots must be non-empty strings"
+            )
         try:
             candidate = Path(item).expanduser().resolve()
         except OSError as exc:
-            raise ValueError(f"allowed-cwds file {source} has an unresolvable root {item!r}: {exc}") from exc
+            raise ValueError(
+                f"allowed-cwds file {source} has an unresolvable root {item!r}: {exc}"
+            ) from exc
         if candidate.parent == candidate:
             raise ValueError(
                 f"refusing filesystem root {candidate} in allowed-cwds: name a repository, "
@@ -1114,6 +1234,8 @@ def dispatch_one(
     claims: tuple[str, ...] = (),
     family: str | None = None,
     pools: tuple[PoolState, ...] = (),
+    max_turns: int = DEFAULT_MAX_TURNS,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "dispatch")
@@ -1162,6 +1284,8 @@ def dispatch_one(
             permissions=permissions,
             family=family,
             pools=pools,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
         )
         command = built if isinstance(built, list) else []
         reason = built if isinstance(built, str) else decision.reason
@@ -1225,6 +1349,8 @@ def dispatch_one(
         family=family,
         pools=pools,
         claim_run_id=run_id,
+        max_turns=max_turns,
+        max_tokens=max_tokens,
     )
     recorded = record_outcome(
         log_dir,
@@ -1250,7 +1376,9 @@ def dispatch_one(
         coordination.close_claim(log_dir, run_id=run_id)
         claim_released: bool | str = True
     except EventError as exc:
-        claim_released = f"close failed ({exc}); expiry and the outcome event release it"
+        claim_released = (
+            f"close failed ({exc}); expiry and the outcome event release it"
+        )
     payload = {
         "status": result.status,
         "selected": decision.reason,
@@ -1285,6 +1413,8 @@ def dispatch_fanout(
     claims: tuple[str, ...] = (),
     family: str | None = None,
     pools: tuple[PoolState, ...] = (),
+    max_turns: int = DEFAULT_MAX_TURNS,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "fanout")
@@ -1378,6 +1508,8 @@ def dispatch_fanout(
             # The claim covering both children is the parent's, so the badge the
             # pre-commit gate checks against is the parent's run id.
             claim_run_id=run_id,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
         )
         record_outcome(
             log_dir,
@@ -1450,12 +1582,21 @@ def dispatch_fanout(
     return payload, _exit_for(worst)
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Dispatch a task to a subscription harness. Not a consil subcommand."
     )
     parser.add_argument("task", nargs="?", help="the task to run")
-    parser.add_argument("--task-file", help="read the task from this file (preferred for long briefs)")
+    parser.add_argument(
+        "--task-file", help="read the task from this file (preferred for long briefs)"
+    )
     parser.add_argument(
         "--cwd",
         help="working directory; this repository, a worktree of it, or an instance-allowlisted root",
@@ -1474,7 +1615,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="spend an exhausted pool; default is to refuse",
     )
-    parser.add_argument("--model", help="model id (cursor-composer defaults to composer-2.5)")
+    parser.add_argument(
+        "--model", help="model id (cursor-composer defaults to composer-2.5)"
+    )
     parser.add_argument(
         "--family",
         help="model family to pick from (e.g. grok, kimi, composer); automatic selection "
@@ -1489,12 +1632,18 @@ def build_parser() -> argparse.ArgumentParser:
         "dispatch claiming an overlapping path is refused. Claims are trajectory events "
         "with an expiry (timeout + grace), so a crashed dispatcher cannot hold one.",
     )
-    parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_S)
+    parser.add_argument("--timeout", type=positive_int, default=DEFAULT_TIMEOUT_S)
+    parser.add_argument("--max-turns", type=positive_int, default=DEFAULT_MAX_TURNS)
+    parser.add_argument("--max-tokens", type=positive_int, default=DEFAULT_MAX_TOKENS)
     parser.add_argument("--log", default=str(DEFAULT_LOG))
     parser.add_argument("--headroom", default=str(DEFAULT_HEADROOM))
     parser.add_argument("--runs", default=str(DEFAULT_RUNS))
-    parser.add_argument("--probe", action="store_true", help="probe installed harnesses and exit")
-    parser.add_argument("--dry-run", action="store_true", help="select (and print argv) without running")
+    parser.add_argument(
+        "--probe", action="store_true", help="probe installed harnesses and exit"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="select (and print argv) without running"
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--permissions",
@@ -1538,7 +1687,9 @@ def main(argv: list[str] | None = None) -> int:
             "cwd": str(cwd),
             "headroom": str(headroom_path),
             "headroom_source": pools[0].source if pools else "",
-            "harnesses": describe_registry(probes=probes, pools=pools, harnesses=HARNESSES),
+            "harnesses": describe_registry(
+                probes=probes, pools=pools, harnesses=HARNESSES
+            ),
         }
         emit(payload, args.json)
         return 0
@@ -1591,6 +1742,8 @@ def main(argv: list[str] | None = None) -> int:
             claims=tuple(args.claim or ()),
             family=args.family,
             pools=pools,
+            max_turns=args.max_turns,
+            max_tokens=args.max_tokens,
         )
         emit(payload, args.json)
         return code
@@ -1614,6 +1767,8 @@ def main(argv: list[str] | None = None) -> int:
         claims=tuple(args.claim or ()),
         family=args.family,
         pools=pools,
+        max_turns=args.max_turns,
+        max_tokens=args.max_tokens,
     )
     emit(payload, args.json)
     return code

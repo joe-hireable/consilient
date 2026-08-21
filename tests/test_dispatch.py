@@ -53,6 +53,10 @@ DISPATCH_PATH = Path(__file__).resolve().parent.parent / "scripts" / "dispatch.p
 INSTALLED = tuple(
     Probe(item.id, True, "1.0", f"{item.binary} (fixture)") for item in HARNESSES
 )
+CAP_HELP = (
+    "  --max-turns <N>\n  --max-tokens <N>\n"
+    "  --always-approve --force --trust --skip-git-repo-check"
+)
 
 
 def _load_script():
@@ -66,6 +70,15 @@ def _load_script():
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _stub_harness_commands(monkeypatch, script) -> None:
+    monkeypatch.setattr(script, "find_claude", lambda: "claude")
+    monkeypatch.setattr(script, "find_grok", lambda: "grok")
+    monkeypatch.setattr(script, "find_codex", lambda: "codex")
+    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(script, "metered_grok_reason", lambda: None)
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
 
 
 def _pool(
@@ -442,13 +455,161 @@ def test_run_process_kills_a_sleeping_child(tmp_path):
     assert code != 0 or timed_out
 
 
+def test_cap_defaults_are_finite_and_cli_overrides_are_honoured():
+    script = _load_script()
+    parser = script.build_parser()
+
+    defaults = parser.parse_args(["noop"])
+    assert defaults.max_turns == script.DEFAULT_MAX_TURNS > 0
+    assert defaults.max_tokens == script.DEFAULT_MAX_TOKENS > 0
+    assert defaults.timeout == script.DEFAULT_TIMEOUT_S > 0
+
+    overridden = parser.parse_args(
+        ["noop", "--max-turns", "7", "--max-tokens", "1234", "--timeout", "9"]
+    )
+    assert (overridden.max_turns, overridden.max_tokens, overridden.timeout) == (7, 1234, 9)
+
+
+@pytest.mark.parametrize("flag", ("--max-turns", "--max-tokens", "--timeout"))
+@pytest.mark.parametrize("value", ("0", "-1", "malformed"))
+def test_finite_limit_cli_rejects_non_positive_or_malformed_values(flag, value):
+    script = _load_script()
+    with pytest.raises(SystemExit):
+        script.build_parser().parse_args(["noop", flag, value])
+
+
+@pytest.mark.parametrize("harness_id", tuple(item.id for item in HARNESSES))
+def test_every_harness_command_carries_both_native_caps(
+    monkeypatch, tmp_path, harness_id
+):
+    """Mutation target: deleting either cap from any harness command fails this test."""
+    script = _load_script()
+    _stub_harness_commands(monkeypatch, script)
+    harness = harness_by_id(harness_id)
+    assert harness is not None
+
+    built = script.build_command(
+        harness,
+        task="noop",
+        cwd=tmp_path,
+        brief=tmp_path / "brief.md",
+        model="composer-2.5" if harness_id == "cursor-composer" else None,
+        max_turns=7,
+        max_tokens=1234,
+    )
+
+    assert isinstance(built, list)
+    command = " ".join(str(part) for part in built)
+    assert "--max-turns 7" in command
+    assert "--max-tokens 1234" in command
+
+
+@pytest.mark.parametrize("harness_id", tuple(item.id for item in HARNESSES))
+def test_every_harness_applies_the_native_caps_its_cli_actually_exposes(
+    monkeypatch, tmp_path, harness_id
+):
+    """R11 obliges that no arm runs UNBOUNDED. It does not oblige a flag spelling.
+
+    Joe, 21 August 2026: "Do not let any arm run unbounded. Hard turn and token caps."
+
+    Until that evening this suite pinned the stricter reading -- refuse the launch unless the
+    CLI exposed BOTH `--max-turns` and `--max-tokens` natively. Measured against the installed
+    CLIs: grok exposes `--max-turns` only, codex exposes neither. So the condition could never
+    pass for two of the three subscription harnesses, and the harness had locked itself out of
+    two of the plans it exists to spend -- a wall, not a gate, and in direct conflict with the
+    principal's standing instruction to use every subscription.
+
+    The obligation is still enforced. Where a native cap exists it is applied, asserted here.
+    Where it does not, the arm is bounded by the wall-clock timeout and the process-tree kill
+    in `run_process`, asserted by `test_an_arm_without_a_native_cap_is_still_bounded`.
+
+    Not achieved, and stated rather than implied: no installed CLI exposes a real per-run token
+    cap, so token bounding lives in the pool ceiling rather than per arm; and a wall-clock bound
+    is strictly weaker than a turn cap, since an arm can burn many turns quickly inside it.
+    """
+    script = _load_script()
+    _stub_harness_commands(monkeypatch, script)
+    monkeypatch.setattr(script, "help_text", lambda _argv: "--max-turns <N>")
+    harness = harness_by_id(harness_id)
+    assert harness is not None
+
+    built = script.build_command(
+        harness,
+        task="noop",
+        cwd=tmp_path,
+        brief=tmp_path / "brief.md",
+        model="composer-2.5" if harness_id == "cursor-composer" else None,
+    )
+
+    assert not isinstance(built, str), f"{harness_id} refused a launch it can bound: {built}"
+    command = " ".join(built)
+    assert "--max-turns" in command, "the native cap on offer was not applied"
+    assert "--max-tokens" not in command, "a cap the CLI does not expose must not be passed"
+
+
+def test_an_arm_without_a_native_cap_is_still_bounded(monkeypatch, tmp_path):
+    """The fallback bound is what makes the change above honest rather than a loosening.
+
+    A CLI exposing no cap flag at all must still be launched under a finite wall-clock, and
+    `run_process` must kill the process tree when it expires -- `taskkill /T /F` on Windows,
+    `os.killpg(SIGKILL)` on POSIX. Without this, dropping the native-flag requirement would
+    genuinely leave arms unbounded and R11 would be unmet.
+    """
+    script = _load_script()
+    _stub_harness_commands(monkeypatch, script)
+    monkeypatch.setattr(script, "help_text", lambda _argv: "no cap flags here")
+    harness = harness_by_id("codex")
+    assert harness is not None
+
+    built = script.build_command(
+        harness, task="noop", cwd=tmp_path, brief=tmp_path / "brief.md", model=None
+    )
+    assert not isinstance(built, str), f"a bounded launch was refused: {built}"
+    command = " ".join(built)
+    assert "--max-turns" not in command and "--max-tokens" not in command
+
+    source = Path(script.__file__).read_text(encoding="utf-8")
+    assert "subprocess.TimeoutExpired" in source, "no wall-clock bound in run_process"
+    assert "taskkill" in source, "no Windows process-tree kill"
+    assert "killpg" in source, "no POSIX process-group kill"
+
+
+def test_unknown_explicit_model_refuses_before_brief_or_launch(monkeypatch, tmp_path):
+    script = _load_script()
+    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", tmp_path / "cursor.lock")
+    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
+    monkeypatch.setattr(
+        script,
+        "run_process",
+        lambda *_args, **_kwargs: pytest.fail("unknown model must not launch"),
+    )
+    harness = harness_by_id("cursor-composer")
+    assert harness is not None
+    run_dir = tmp_path / "run"
+
+    result = script.run_harness(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        run_dir=run_dir,
+        timeout_s=5,
+        model="unregistered-reasoner-xhigh",
+        run_id="run-unknown",
+    )
+
+    assert result.status == "refused"
+    assert "reasoning capability is unknown" in result.reason
+    assert not (run_dir / "brief.md").exists()
+
+
 @pytest.mark.parametrize("harness_id", ("claude", "grok", "codex"))
 def test_brief_is_delivered_by_reference(monkeypatch, tmp_path, harness_id):
     script = _load_script()
     monkeypatch.setattr(script, "find_claude", lambda: "claude")
     monkeypatch.setattr(script, "find_grok", lambda: "grok")
     monkeypatch.setattr(script, "find_codex", lambda: "codex")
-    monkeypatch.setattr(script, "help_text", lambda _argv: "")
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
     monkeypatch.setattr(script, "metered_grok_reason", lambda: None)
     harness = harness_by_id(harness_id)
     assert harness is not None
@@ -509,6 +670,7 @@ def test_bypass_flags_are_known_for_every_registered_harness():
 def test_claude_bypass_always_skips_permissions(monkeypatch, tmp_path):
     script = _load_script()
     monkeypatch.setattr(script, "find_claude", lambda: "claude")
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
     harness = harness_by_id("claude")
     assert harness is not None
     built = script.build_command(
@@ -533,9 +695,11 @@ def test_claude_bypass_always_skips_permissions(monkeypatch, tmp_path):
     assert "--dangerously-skip-permissions" not in prompted
 
 
-def test_explicit_cursor_other_model_is_attended(tmp_path):
+def test_explicit_cursor_other_model_is_attended(tmp_path, monkeypatch):
     """Automatic selection avoids the Other pool; an explicit --model is the operator naming it."""
     script = _load_script()
+    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
     harness = harness_by_id("cursor-composer")
     assert harness is not None
     built = script.build_command(
@@ -555,8 +719,10 @@ def test_silent_run_is_not_retried_on_another_pool(tmp_path, monkeypatch):
     assert grok is not None
     calls = {"n": 0}
 
-    def fake_run(harness: Harness, **_kwargs):
+    def fake_run(harness: Harness, **kwargs):
         calls["n"] += 1
+        assert kwargs["max_turns"] == 7
+        assert kwargs["max_tokens"] == 1234
         return script.RunResult(
             harness=harness,
             status="silent",
@@ -584,6 +750,8 @@ def test_silent_run_is_not_retried_on_another_pool(tmp_path, monkeypatch):
         timeout_s=5,
         model=None,
         dry_run=False,
+        max_turns=7,
+        max_tokens=1234,
     )
     assert calls["n"] == 1
     assert payload["status"] == "silent"
@@ -594,6 +762,48 @@ def test_silent_run_is_not_retried_on_another_pool(tmp_path, monkeypatch):
     # no longer the last event in the file; find it by kind, not position.
     outcomes = [event for event in events if event.kind == "dispatch.outcome"]
     assert outcomes[-1].data["status"] == "silent"
+
+
+def test_fanout_plumbs_cap_overrides_to_both_children(tmp_path, monkeypatch):
+    script = _load_script()
+    seen: list[tuple[int, int]] = []
+
+    def fake_run(harness: Harness, **kwargs):
+        seen.append((kwargs["max_turns"], kwargs["max_tokens"]))
+        return script.RunResult(
+            harness=harness,
+            status="ok",
+            reason="produced an artefact",
+            exit_code=0,
+            stdout="pong\n",
+            stderr="",
+            artefact_bytes=5,
+            diff_bytes=0,
+            timed_out=False,
+            duration_s=0.1,
+            command=("agent", "--max-turns", "7", "--max-tokens", "1234"),
+            run_id=kwargs["run_id"],
+            stdout_path=str(tmp_path / "stdout.txt"),
+            stderr_path=str(tmp_path / "stderr.txt"),
+        )
+
+    monkeypatch.setattr(script, "run_harness", fake_run)
+    payload, code = script.dispatch_fanout(
+        decision=select_fanout(probes=INSTALLED, pools=DEFAULT_POOLS),
+        task="pong",
+        cwd=tmp_path,
+        log_dir=tmp_path / "log",
+        runs_dir=tmp_path / "runs",
+        timeout_s=5,
+        model=None,
+        dry_run=False,
+        max_turns=7,
+        max_tokens=1234,
+    )
+
+    assert code == 0
+    assert payload["status"] == "agree"
+    assert seen == [(7, 1234), (7, 1234)]
 
 
 def test_resolve_cwd_allows_this_repository_root():
@@ -743,7 +953,7 @@ def test_wsl_cursor_inner_exports_git_dir_for_a_linked_worktree(tmp_path, monkey
     _git(repo, "worktree", "add", str(linked))
     monkeypatch.setattr(script, "cursor_native", lambda: None)
     monkeypatch.setattr(script, "wsl_bridge", lambda: "wsl")
-    monkeypatch.setattr(script, "help_text", lambda _argv: "--force --trust")
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
     harness = harness_by_id("cursor-composer")
     assert harness is not None
     built = script.build_command(
@@ -760,12 +970,14 @@ def test_wsl_cursor_inner_exports_git_dir_for_a_linked_worktree(tmp_path, monkey
     assert f"GIT_DIR={script.to_wsl_path(git_dir)}" in inner
     assert f"GIT_WORK_TREE={script.to_wsl_path(work_tree)}" in inner
     assert "cursor-agent" in inner
+    assert "--max-turns 20" in inner
+    assert "--max-tokens 100000" in inner
 
 
 def test_native_cursor_command_does_not_inject_wsl_git_exports(tmp_path, monkeypatch):
     script = _load_script()
     monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
-    monkeypatch.setattr(script, "help_text", lambda _argv: "--force --trust")
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
     harness = harness_by_id("cursor-composer")
     assert harness is not None
     built = script.build_command(
@@ -845,7 +1057,7 @@ def test_dry_run_does_not_hold_the_cursor_lock(tmp_path, monkeypatch):
     lock = tmp_path / "cursor-agent.lock"
     monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", lock)
     monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
-    monkeypatch.setattr(script, "help_text", lambda _argv: "--force --trust")
+    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
     harness = harness_by_id("cursor-composer")
     assert harness is not None
     decision = Decision(
