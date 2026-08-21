@@ -1,0 +1,14 @@
+#!/bin/sh
+# ADR-0017 refreshes structural and episodic memory after a Git commit, not
+# after an agent edit. The Python wrapper owns the safety boundary and errors.
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "post-commit: REFUSED - cannot locate the worktree root." >&2
+  exit 1
+}
+if [ ! -f "$root/scripts/memory_refresh.py" ]; then
+  echo "post-commit: REFUSED - scripts/memory_refresh.py is missing." >&2
+  exit 1
+fi
+
+exec python "$root/scripts/memory_refresh.py"

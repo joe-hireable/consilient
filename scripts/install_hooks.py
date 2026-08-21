@@ -12,12 +12,19 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-HOOKS = ROOT / ".githooks"
+REQUIRED = (
+    Path(".githooks/pre-commit"),
+    Path(".githooks/pre-push"),
+    Path(".githooks/post-commit"),
+    Path("scripts/memory_refresh.py"),
+)
 
 
 def main() -> int:
-    if not (HOOKS / "pre-commit").is_file() or not (HOOKS / "pre-push").is_file():
-        print("install_hooks: .githooks/pre-commit or pre-push is missing", file=sys.stderr)
+    missing = [path for path in REQUIRED if not (ROOT / path).is_file()]
+    if missing:
+        detail = ", ".join(path.as_posix() for path in missing)
+        print(f"install_hooks: required file missing: {detail}", file=sys.stderr)
         return 1
     subprocess.run(
         ["git", "config", "core.hooksPath", ".githooks"],
