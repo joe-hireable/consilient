@@ -7,6 +7,7 @@ fields literally — no condensation, no LLM summary (EXP-45: condensation drops
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 from .events import (
@@ -93,6 +94,21 @@ def pack(log_dir: Path, *, query: str, limit_chars: int) -> str:
         raise ValueError("limit_chars must be at least 1")
 
     events, _ = read_all(log_dir)
+    return pack_events(events, query=query, limit_chars=limit_chars)
+
+
+def pack_events(events: Sequence[Event], *, query: str, limit_chars: int) -> str:
+    """The pack over an already-read event list.
+
+    `instructions` records how many events a pack consumed and their digest, so an
+    auditor can replay the projection over exactly that prefix of the append-only
+    log and must reproduce the pack byte-for-byte. That replay needs the selection
+    logic over an event list rather than a log directory; keeping it here means
+    there is still exactly one implementation of what a recall pack is.
+    """
+    if limit_chars < 1:
+        raise ValueError("limit_chars must be at least 1")
+
     if not events:
         return _EMPTY_PACK
 

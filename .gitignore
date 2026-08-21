@@ -97,3 +97,11 @@ red-cells-evidence.json
 # INSTANCE cwd allowlist. PRODUCT ships the empty example; machine paths stay here.
 # Listing a root is supervised dispatch (ADR-0063), not a Gate B pass.
 .harness/allowed-cwds.json
+# Exclusive lock around cursor-agent. Two processes race ~/.cursor/cli-config.json.
+.harness/cursor-agent.lock
+# INSTANCE knowledge materialisation and operator briefs. PRODUCT is the scripts.
+.harness/knowledge/
+.harness/briefs/
+# Local EXP-96 corpus clones and lock files. The runner is tracked; the pin is not.
+.harness/exp96-candidate-*/
+docs/10-research/experiments/*/results-*.json.lock

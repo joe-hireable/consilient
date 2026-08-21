@@ -68,6 +68,9 @@ It is not a Gate B pass. `consil doctor` still reports the gates shut.
 `--cwd` outside this repository requires a root named in the gitignored
 instance file `.harness/allowed-cwds.json` (ADR-0063). There is no
 `--gate-b-approved`. The unattended loop still refuses a foreign workspace.
+Cursor launches take an exclusive lock at `.harness/cursor-agent.lock`
+(they race a shared CLI config). WSL cursor exports `GIT_DIR` and
+`GIT_WORK_TREE` so a linked worktree is a repository to WSL git.
 It is not a licence to put a secret in a public remote, and it is not a
 licence to commit another repository's contents into this one.
 

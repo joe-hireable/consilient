@@ -26,6 +26,7 @@ from consilient.events import read, validate
 from consilient.harness import (
     DEFAULT_POOLS,
     HARNESSES,
+    Decision,
     permission_flags,
     EXHAUSTED_USED_PERCENT,
     Harness,
@@ -298,8 +299,11 @@ def test_refusal_and_outcome_go_through_append(tmp_path):
     assert recorded["event"] == "dispatch.refused"
     events, rejected = read(tmp_path / f"{ts[:10]}.jsonl")
     assert not rejected
-    assert len(events) == 1
+    # The refusal and the capability gap it constitutes are recorded together (V0-41):
+    # the gap is the same event seen from the user's side, not a side note.
+    assert [event.kind for event in events] == ["dispatch.refused", "capability.gap"]
     assert events[0].raw == recorded
+    assert events[1].data["run_id"] == "run-1"
 
     grok = harness_by_id("grok")
     assert grok is not None
@@ -709,6 +713,166 @@ def test_allowed_cwds_instance_file_is_gitignored_and_the_example_ships():
     ).stdout.split()
     assert ".harness/allowed-cwds.example.json" in tracked
     assert ".harness/allowed-cwds.json" not in tracked
+
+
+def _git(cwd: Path, *args: str) -> None:
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["GIT_AUTHOR_NAME"] = "test"
+    env["GIT_AUTHOR_EMAIL"] = "t@example.com"
+    env["GIT_COMMITTER_NAME"] = "test"
+    env["GIT_COMMITTER_EMAIL"] = "t@example.com"
+    subprocess.run(
+        ["git", "-C", str(cwd), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+    )
+
+
+def test_wsl_cursor_inner_exports_git_dir_for_a_linked_worktree(tmp_path, monkeypatch):
+    """R4. WSL git cannot resolve a Windows gitdir pointer in a linked worktree."""
+    script = _load_script()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "commit", "--allow-empty", "-m", "seed")
+    linked = tmp_path / "linked"
+    _git(repo, "worktree", "add", str(linked))
+    monkeypatch.setattr(script, "cursor_native", lambda: None)
+    monkeypatch.setattr(script, "wsl_bridge", lambda: "wsl")
+    monkeypatch.setattr(script, "help_text", lambda _argv: "--force --trust")
+    harness = harness_by_id("cursor-composer")
+    assert harness is not None
+    built = script.build_command(
+        harness,
+        task="pong",
+        cwd=linked,
+        brief=tmp_path / "brief.md",
+        model="composer-2.5",
+    )
+    assert isinstance(built, list)
+    inner = built[-1]
+    git_dir, work_tree = script.git_workspace(linked)
+    assert git_dir is not None
+    assert f"GIT_DIR={script.to_wsl_path(git_dir)}" in inner
+    assert f"GIT_WORK_TREE={script.to_wsl_path(work_tree)}" in inner
+    assert "cursor-agent" in inner
+
+
+def test_native_cursor_command_does_not_inject_wsl_git_exports(tmp_path, monkeypatch):
+    script = _load_script()
+    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(script, "help_text", lambda _argv: "--force --trust")
+    harness = harness_by_id("cursor-composer")
+    assert harness is not None
+    built = script.build_command(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        brief=tmp_path / "brief.md",
+        model="composer-2.5",
+    )
+    assert isinstance(built, list)
+    assert all("GIT_DIR" not in str(part) for part in built)
+    assert built[0] == "cursor-agent"
+
+
+def test_cursor_run_holds_the_agent_lock(tmp_path, monkeypatch):
+    script = _load_script()
+    lock = tmp_path / "cursor-agent.lock"
+    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", lock)
+    monkeypatch.setattr(script, "build_command", lambda *_a, **_k: ["agent"])
+    calls: list[str] = []
+    orig = script.ExclusiveFileLock
+
+    class Spy(orig):  # type: ignore[misc, valid-type]
+        def __enter__(self):
+            calls.append("enter")
+            return super().__enter__()
+
+        def __exit__(self, *exc: object):
+            calls.append("exit")
+            return super().__exit__(*exc)
+
+    monkeypatch.setattr(script, "ExclusiveFileLock", Spy)
+    monkeypatch.setattr(script, "run_process", lambda *_a, **_k: (0, False, 0.1))
+    harness = harness_by_id("cursor-composer")
+    assert harness is not None
+    result = script.run_harness(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        run_dir=tmp_path / "run",
+        timeout_s=5,
+        model=None,
+        run_id="run-lock",
+    )
+    assert result.status in {"ok", "silent"}
+    assert calls == ["enter", "exit"]
+
+
+def test_non_cursor_run_does_not_take_the_cursor_lock(tmp_path, monkeypatch):
+    script = _load_script()
+    lock = tmp_path / "cursor-agent.lock"
+    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", lock)
+    monkeypatch.setattr(script, "build_command", lambda *_a, **_k: ["agent"])
+    held: dict[str, bool] = {}
+
+    def fake_run_process(_argv, **_kwargs):
+        held["exists"] = lock.exists()
+        return 0, False, 0.1
+
+    monkeypatch.setattr(script, "run_process", fake_run_process)
+    harness = harness_by_id("codex")
+    assert harness is not None
+    script.run_harness(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        run_dir=tmp_path / "run",
+        timeout_s=5,
+        model=None,
+        run_id="run-codex",
+    )
+    assert held.get("exists") is False
+
+
+def test_dry_run_does_not_hold_the_cursor_lock(tmp_path, monkeypatch):
+    script = _load_script()
+    lock = tmp_path / "cursor-agent.lock"
+    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", lock)
+    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(script, "help_text", lambda _argv: "--force --trust")
+    harness = harness_by_id("cursor-composer")
+    assert harness is not None
+    decision = Decision(
+        kind="run",
+        harness=harness,
+        reason="cursor-composer",
+        considered=(),
+    )
+    payload, code = script.dispatch_one(
+        decision=decision,
+        task="noop",
+        cwd=script.ROOT,
+        log_dir=tmp_path / "log",
+        runs_dir=tmp_path / "runs",
+        timeout_s=5,
+        model="composer-2.5",
+        dry_run=True,
+        permissions="bypass",
+    )
+    assert code == 0
+    assert payload["status"] == "dry-run"
+    assert not lock.exists()
+
+
+def test_cursor_agent_lock_is_gitignored():
+    ignored = Path(".gitignore").read_text(encoding="utf-8")
+    assert ".harness/cursor-agent.lock" in ignored
 
 
 def test_dry_run_outside_this_repository_is_refused_and_prints_no_command(tmp_path, capsys):

@@ -80,6 +80,7 @@ been the right answer three times on this project.
 | `pre-publication-gate` | "All the checks passed" stops being an argument for publishing |
 | `dispatching-workers` | A fan-out that cannot name its different class of facts does not happen |
 | `operating-the-harness` | Orchestration is `python scripts/dispatch.py`, not a chat window |
+| `better-than-best` | The bar is retrieved and cited, never recalled — a SOTA claim with no source is `[asserted]` and says so |
 
 Written 21 August 2026: the five after `citing-sources`, adapted from proven public collections
 rather than invented — see each skill's *Adapted from* section for source and licence.

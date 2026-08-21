@@ -82,6 +82,7 @@ DEFAULT_HEADROOM = ROOT / ".harness" / "headroom.json"
 DEFAULT_RUNS = ROOT / ".harness" / "dispatch"
 DEFAULT_PERMISSIONS = ROOT / ".harness" / "permissions.json"
 DEFAULT_ALLOWED_CWDS = ROOT / ".harness" / "allowed-cwds.json"
+DEFAULT_CURSOR_LOCK = ROOT / ".harness" / "cursor-agent.lock"
 CURSOR_WSL_BINARY = Path("/home/jpbpr/.local/bin/cursor-agent")
 GROK_CANDIDATES = (
     Path.home() / ".grok" / "bin" / "grok.exe",
@@ -118,6 +119,129 @@ def to_wsl_path(path: Path) -> str:
     if len(text) > 1 and text[1] == ":":
         return f"/mnt/{text[0].lower()}{text[2:]}"
     return text
+
+
+class ExclusiveFileLock:
+    """Process-exclusive lock. Two cursor-agent processes race ~/.cursor/cli-config.json
+    [measured]; this is the check that forbids that overlap. Dry-run must not enter it.
+    """
+
+    def __init__(self, path: Path, *, timeout_s: float) -> None:
+        self.path = path
+        self.timeout_s = timeout_s
+        self._fh: Any = None
+
+    def __enter__(self) -> ExclusiveFileLock:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        handle = open(self.path, "a+b")
+        self._fh = handle
+        deadline = time.monotonic() + max(0.0, self.timeout_s)
+        while True:
+            try:
+                self._lock_nonblocking()
+                return self
+            except OSError:
+                if time.monotonic() >= deadline:
+                    handle.close()
+                    self._fh = None
+                    raise TimeoutError(
+                        f"cursor-agent lock held: could not acquire {self.path} "
+                        f"within {self.timeout_s}s"
+                    ) from None
+                time.sleep(0.05)
+
+    def _lock_nonblocking(self) -> None:
+        handle = self._fh
+        if handle is None:
+            raise OSError("lock file is not open")
+        handle.seek(0)
+        if handle.read(1) == b"":
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def __exit__(self, *_exc: object) -> None:
+        handle = self._fh
+        if handle is None:
+            return
+        try:
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
+            self._fh = None
+
+
+def git_workspace(cwd: Path) -> tuple[Path, Path] | None:
+    """Return (absolute git dir, work tree) for cwd, or None if git cannot answer.
+
+    A linked worktree's `.git` is a file containing a Windows path. WSL git cannot
+    resolve that path (R4, measured again 21 August 2026 on a jobboard worktree).
+    Dispatch owns the translation; the child is not asked to.
+    """
+    git = which_binary("git")
+    if git is None:
+        return None
+    try:
+        completed = subprocess.run(
+            [
+                git,
+                "-C",
+                str(cwd.resolve()),
+                "rev-parse",
+                "--absolute-git-dir",
+                "--show-toplevel",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            env=GIT_ENV,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    lines = [line.strip() for line in (completed.stdout or "").splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    git_dir = Path(lines[0])
+    work_tree = Path(lines[1])
+    try:
+        git_dir = git_dir.resolve()
+        work_tree = work_tree.resolve()
+    except OSError:
+        return None
+    if not git_dir.exists() or not work_tree.is_dir():
+        return None
+    return git_dir, work_tree
+
+
+def wsl_git_exports(cwd: Path) -> str:
+    workspace = git_workspace(cwd)
+    if workspace is None:
+        return ""
+    git_dir, work_tree = workspace
+    return (
+        f"export GIT_DIR={shlex.quote(to_wsl_path(git_dir))} "
+        f"GIT_WORK_TREE={shlex.quote(to_wsl_path(work_tree))}; "
+    )
 
 
 def which_binary(name: str) -> str | None:
@@ -535,9 +659,12 @@ def build_command(
                 extra.append(flag)
         extra_s = (" " + " ".join(extra)) if extra else ""
         # The task body never enters the shell: only paths we created do.
+        # GIT_DIR/GIT_WORK_TREE are WSL paths so linked worktrees are repositories
+        # to WSL git (R4). Native cursor-agent is unchanged — it already sees NT paths.
         inner = (
-            f"cd {shlex.quote(wsl_cwd)} && cursor-agent -p --model {shlex.quote(chosen)} "
-            f"--output-format text{extra_s} {shlex.quote(wsl_instruction)}"
+            f"{wsl_git_exports(cwd)}cd {shlex.quote(wsl_cwd)} && cursor-agent -p "
+            f"--model {shlex.quote(chosen)} --output-format text{extra_s} "
+            f"{shlex.quote(wsl_instruction)}"
         )
         return [bridge, "-e", "bash", "-lc", inner]
     return f"no invocation for harness {harness.id}"
@@ -593,14 +720,43 @@ def run_harness(
     argv = built
     env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    code, timed_out, duration = run_process(
-        argv,
-        cwd=cwd,
-        stdout_path=stdout_path,
-        stderr_path=stderr_path,
-        timeout_s=timeout_s,
-        env=env,
-    )
+    try:
+        if harness.id == "cursor-composer":
+            with ExclusiveFileLock(DEFAULT_CURSOR_LOCK, timeout_s=float(timeout_s)):
+                code, timed_out, duration = run_process(
+                    argv,
+                    cwd=cwd,
+                    stdout_path=stdout_path,
+                    stderr_path=stderr_path,
+                    timeout_s=timeout_s,
+                    env=env,
+                )
+        else:
+            code, timed_out, duration = run_process(
+                argv,
+                cwd=cwd,
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+                timeout_s=timeout_s,
+                env=env,
+            )
+    except TimeoutError as exc:
+        return RunResult(
+            harness=harness,
+            status="refused",
+            reason=str(exc),
+            exit_code=None,
+            stdout="",
+            stderr="",
+            artefact_bytes=0,
+            diff_bytes=0,
+            timed_out=False,
+            duration_s=0.0,
+            command=tuple(argv),
+            run_id=run_id,
+            stdout_path=str(stdout_path),
+            stderr_path=str(stderr_path),
+        )
     stdout = _read(stdout_path)
     stderr = _read(stderr_path)
     artefact_bytes = len(stdout.encode("utf-8")) + len(stderr.encode("utf-8"))
@@ -881,6 +1037,7 @@ def _claim_conflict_refusal(
         cwd=str(cwd),
         reason=reason,
         considered=considered,
+        attempted=f"dispatch claiming {requested!r}",
     )
     payload = {
         "status": "refused",
@@ -1087,6 +1244,7 @@ def dispatch_fanout(
             cwd=str(cwd),
             reason=decision.reason,
             considered=decision.considered,
+            attempted="fan-out selection (two families)",
         )
         payload = {
             "status": "refused",

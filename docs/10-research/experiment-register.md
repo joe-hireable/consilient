@@ -3299,7 +3299,7 @@ population, about assistive technology, or about whether anyone returns a second
 
 ### EXP-96 · Two-corpus mutation proxy for verifier β `READY`
 
-**Pre-registered 21 Aug 2026; no verifier outcome inspected.** EXP-94 and EXP-95 were already
+**Pre-registered 21 Aug 2026; no mutant verifier outcome inspected.** EXP-94 and EXP-95 were already
 claimed outside this register, so the collision rule in the dispatch brief assigned the next
 unused identifier. [measured]
 
@@ -3320,6 +3320,25 @@ estimand from human-verdict β; it cannot close Gate A1 and no gate reads it. [a
   the composite comparable; the independently authored corpus and tests provide the different
   verification regime ADR-0013 requires. [measured: repository metadata; asserted: selection]
 
+**Pre-run amendment, before any mutant verifier outcome:** `itsdangerous` sets Ruff `fix = true`, so its
+Ruff command is fixed as `ruff check --no-fix .` and the runner refuses any check that changes the
+complete input manifest. Its isolated experiment environment uses the repository's historical pins
+`pytest==8.1.1`, `mypy==1.9.0`, and `ruff==0.3.7`, plus its pinned test requirements; none is added
+to Consilient. Consilient uses the already-installed `pytest==9.0.3`, `mypy==2.3.1`, and
+`ruff==0.15.10`. Both tool contracts refuse version drift; pytest plugin autoload and ambient
+Git/tool-control variables are disabled. [measured: configurations and host versions; asserted:
+isolated-environment contract]
+
+**Pre-run instrument-hardening amendment, before any mutant verifier outcome:** the pinned
+Consilient corpus is a local history-preserving clone because its native tests read older public
+Git objects. Every mutant runs in a new temporary working tree; only read-only Git object storage
+is shared. Check processes are contained in a kill-on-close Windows Job Object or a POSIX process
+group, and unexpected tool exit codes are execution errors rather than rejections. An atomic
+`O_EXCL` output lock refuses concurrent writers. A CLI mutant enters the frozen help-metadata class
+only when the mutated LibCST node is the keyword's string value, not merely because another
+mutation shares a line containing `help=`. [measured: native test and EXP-49/EXP-31 failure modes;
+asserted: instrument controls]
+
 `mutmut==3.7.0` with LibCST generates a complete first-order census using the six operator
 families fixed by EXP-47: comparison, boolean/logical, binary/arithmetic, unary,
 constant/literal, and statement mutation. No test file is mutated. [cited: EXP-47]
@@ -3330,34 +3349,37 @@ constant/literal, and statement mutation. No test file is mutated. [cited: EXP-4
    mutant receipt, and every per-mutant verifier outcome. Refuse input drift, a failed baseline,
    an execution error, a timeout, or an incomplete census; none is counted as a killed mutant.
    Subprocess timeouts kill the process tree. [asserted]
-2. Generate each mutant once with mutmut/LibCST, then run the three checks independently in an
-   isolated copy. Composite acceptance means all three checks accept. [asserted]
+2. Generate each mutant once with mutmut/LibCST, then run the three checks independently in a fresh
+   temporary copy. Composite acceptance means all three checks accept. [asserted]
 3. Freeze EXP-47's four equivalent classes exactly:
    `docstring_mutation`, `sql_case_insensitive_mutation`, `cli_help_metadata_string`, and
    `dataclass_default_caveat_string`. No fifth class may be added after outcomes are visible.
    [cited: EXP-47]
-4. Classify composite survivors three ways. A survivor matching a frozen class is `equivalent`.
-   A pure string/presentation or annotation/default-metadata mutation outside those classes is
-   `unclassifiable`, never silently equivalent. Other non-equivalent operator mutations are
-   `true_defect` under the seeded-fault proxy. Report all three counts per corpus before pooled
-   counts. [asserted]
-5. Let `K` be non-equivalent mutants rejected by the composite, `D` classified true-defect
-   survivors, `E` frozen equivalent survivors, and `U` unclassifiable survivors. Assert the
-   census identity `N = K + D + E + U`. Report classifiable proxy β as `D / (K + D)` with a
-   Wilson 95% interval; never fold `U` into either side. Also report the partial-identification
-   range `D / (K + D)` (all `U` inert) to `(D + U) / (K + D + U)` (all `U` bad). [algebra]
-6. Report known-inert contamination `E/N`, unresolved contamination `U/N`, the possible inertness
-   range `[E/N, (E+U)/N]`, and the corresponding survivor shares. EXP-48's 75.41% is only
+4. Classify every mutant before its verifier outcome is inspected, so rejected ambiguous or
+   equivalent mutants cannot silently enter the known-bad denominator. A frozen-class match is
+   `equivalent`; a pure string/presentation or annotation/default-metadata mutation outside those
+   classes is `unclassifiable`, never silently equivalent; other mutations are `true_defect` under
+   the seeded-fault proxy. Report the accepted survivors in those same three classes per corpus.
+   Do not pool β: the two repositories use different verifier versions and configurations, so a
+   mutant-count-weighted mixture would not estimate either corpus-verifier pair. [asserted]
+5. Let `K` and `D` be rejected and accepted `true_defect` mutants, `E` all frozen equivalents,
+   and `U_R` and `U_A` rejected and accepted unclassifiable mutants. On a complete run assert
+   `N = K + D + E + U_R + U_A`. Report classifiable proxy β as `D / (K + D)` with a Wilson
+   95% interval. Never fold an unclassifiable into the point estimate. Its partial-identification
+   range is `D / (K + D + U_R)` to `(D + U_A) / (K + D + U_A)`. [algebra]
+6. Report known-inert contamination `E/N`, unresolved contamination `(U_R+U_A)/N`, the possible
+   inertness range `[E/N, (E+U_R+U_A)/N]`, and the corresponding survivor shares. EXP-48's
+   75.41% is only
    P2-unmatched spatial clusters (46/61), not this contamination measure. [cited: EXP-48]
 
-**Measures:** per-corpus and pooled classifiable mutation-proxy β with Wilson 95% intervals and
-sample counts; partial-identification ranges; `E`, `U`, and contamination rates; per-check and
+**Measures:** per-corpus classifiable mutation-proxy β with Wilson 95% intervals and sample counts;
+partial-identification ranges; `E`, `U`, and contamination rates; per-check and
 composite outcomes; census completeness; wall-clock cost. No result is human-verdict β. [asserted]
 
 **Stopping rule:** the measurement completes only if both baselines pass, both censuses complete,
 each corpus has at least 50 classifiable non-equivalent mutants, and every per-corpus Wilson 95%
 interval for classifiable composite β has half-width at most 0.05. Otherwise record
-`insufficient_evidence` and no pooled point estimate. If `U/N > 0.10` in either corpus or that
+`insufficient_evidence`. If `U/N > 0.10` in either corpus or that
 corpus's partial-identification range is wider than 0.10, the contamination rule fires: retain the
 measurement but mark it non-decision-grade. Either outcome leaves A1 and
 `routing_orchestration_enabled` unchanged. [asserted]
@@ -3368,7 +3390,9 @@ distribution of developer faults, close Gate A1, or authorise routing. [asserted
 
 **What it cannot decide:** generalisation beyond Python; higher-order or multi-file defects;
 whether mutmut's operator distribution resembles real bad artefacts; whether an unclassifiable
-survivor is actually inert; human-verdict β; or any gate condition. [asserted]
+mutant is actually inert; human-verdict β; or any gate condition. The nominal Wilson coverage
+treats classified mutants as binomial trials, while mutations from the same source are clustered
+and not independent; the half-width may therefore be pseudo-precision. [asserted]
 
 ---
 
