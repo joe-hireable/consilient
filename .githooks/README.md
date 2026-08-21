@@ -11,7 +11,7 @@ the path. [measured 21 August 2026]
 
 | Hook | What it refuses |
 |---|---|
-| `pre-commit` | credential-shaped material in the index |
+| `pre-commit` | credential-shaped material in the index; while dispatch claims are live, a commit that names no committer, stages a path another live run claims, or exceeds what its own run declared |
 | `pre-push` | a push to the public remote that fails the three publication gates |
 | `protect-files.py` | edits of `.env`, credential files, lockfiles |
 | `auto-format.py` | nothing — formats Python if ruff is present, never fails the edit |

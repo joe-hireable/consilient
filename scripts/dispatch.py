@@ -494,6 +494,27 @@ def run_process(
     return process.returncode, timed_out, time.perf_counter() - started
 
 
+def _harvest_quietly(log_dir: Path, runs_dir: Path) -> None:
+    """Paid dispatch is harvested. Failure here must not change the dispatch status.
+
+    Only the operator log is harvested, never a test tmp directory.
+    """
+    live = (ROOT / ".harness" / "log").resolve()
+    try:
+        if log_dir.resolve() != live:
+            return
+        from consilient.harvest import DEFAULT_RELATIVE, HarvestError, harvest
+
+        harvest(
+            log_dir=log_dir,
+            runs_dir=runs_dir,
+            dest=ROOT / DEFAULT_RELATIVE,
+            root=ROOT,
+        )
+    except (HarvestError, OSError, ValueError) as exc:
+        print(f"harvest skipped: {exc}", file=sys.stderr)
+
+
 def git_diff_bytes(cwd: Path) -> int:
     git = which_binary("git")
     if git is None:
@@ -517,7 +538,12 @@ RECALL_LIMIT_CHARS = 8000
 
 
 def write_brief(
-    run_dir: Path, task: str, *, log_dir: Path | None = None, in_flight: str = ""
+    run_dir: Path,
+    task: str,
+    *,
+    log_dir: Path | None = None,
+    in_flight: str = "",
+    claim_run_id: str | None = None,
 ) -> Path:
     """Write the task, plus a verbatim recall pack so the child is not amnesiac.
 
@@ -529,10 +555,29 @@ def write_brief(
     still sees. Both are bounded at RECALL_LIMIT_CHARS; the bound is the point,
     because an unbounded coordination section crowds the task out of the context
     window. `in_flight` is the live-claims table rendered by the caller.
+
+    `claim_run_id` is the run id the claim covering this work was opened under
+    (the parent's, for a fan-out child). The pre-commit gate refuses a commit
+    that does not name its committer while claims are live, so the brief hands
+    the run its badge; the gate, not this paragraph, is the enforcement.
     """
     path = (run_dir / "brief.md").resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     body = task if task.endswith("\n") else task + "\n"
+    if claim_run_id is not None:
+        body += (
+            "\n---\n\n## Your commit badge\n\n"
+            "This run's work is claimed in the trajectory under run id "
+            f"`{claim_run_id}`. While any dispatch claim is live in this "
+            "worktree, the pre-commit gate refuses a commit that does not name "
+            "its committer, and a commit staging a path another live run claims "
+            "is refused. Commit with:\n\n"
+            f"    CONSILIENT_RUN_ID={claim_run_id} git commit ...\n\n"
+            "If this dispatch declared no --claim paths, the gate also needs the "
+            "paths you are committing: CONSILIENT_COMMIT_PATHS=path/one,path/two. "
+            "Stage only paths you created or this brief named; never "
+            "`git add -A`.\n"
+        )
     if log_dir is not None:
         try:
             recall = pack_recall(
@@ -684,10 +729,13 @@ def run_harness(
     in_flight: str = "",
     family: str | None = None,
     pools: tuple[PoolState, ...] = (),
+    claim_run_id: str | None = None,
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
-    brief = write_brief(run_dir, task, log_dir=log_dir, in_flight=in_flight)
+    brief = write_brief(
+        run_dir, task, log_dir=log_dir, in_flight=in_flight, claim_run_id=claim_run_id
+    )
     stdout_path = (run_dir / "stdout.txt").resolve()
     stderr_path = (run_dir / "stderr.txt").resolve()
     built = build_command(
@@ -1099,7 +1147,11 @@ def dispatch_one(
 
     if dry_run:
         brief = write_brief(
-            (runs_dir / run_id).resolve(), task, log_dir=log_dir, in_flight=in_flight
+            (runs_dir / run_id).resolve(),
+            task,
+            log_dir=log_dir,
+            in_flight=in_flight,
+            claim_run_id=run_id,
         )
         built = build_command(
             harness,
@@ -1172,6 +1224,7 @@ def dispatch_one(
         in_flight=in_flight,
         family=family,
         pools=pools,
+        claim_run_id=run_id,
     )
     recorded = record_outcome(
         log_dir,
@@ -1189,6 +1242,7 @@ def dispatch_one(
         duration_s=result.duration_s,
         command=result.command,
     )
+    _harvest_quietly(log_dir, runs_dir)
     # Three release paths and any one suffices: this completion, the outcome event
     # above (live_claims treats a terminal dispatch event as a release), or the claim's
     # own expiry. A close failure therefore degrades to the other two, never to a hang.
@@ -1321,6 +1375,9 @@ def dispatch_fanout(
             in_flight=in_flight,
             family=family,
             pools=pools,
+            # The claim covering both children is the parent's, so the badge the
+            # pre-commit gate checks against is the parent's run id.
+            claim_run_id=run_id,
         )
         record_outcome(
             log_dir,
@@ -1361,6 +1418,7 @@ def dispatch_fanout(
         first_run_id=first.run_id,
         second_run_id=second.run_id,
     )
+    _harvest_quietly(log_dir, runs_dir)
     # As in dispatch_one: completion, the terminal fanout event, and expiry are three
     # independent release paths; any one suffices.
     try:

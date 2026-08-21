@@ -101,15 +101,17 @@ def canonical_path(path: str, *, cwd: Path | None = None) -> str:
     normalisation only; it never touches the filesystem.
     """
     text = path.strip().replace("\\", "/")
+    if not (len(text) >= 2 and text[1] == ":") and not text.startswith("/"):
+        base = cwd if cwd is not None else Path.cwd()
+        text = str(base).replace("\\", "/").rstrip("/") + "/" + text
+    # Drive/mnt normalisation applies after any join, not before it: a relative
+    # path resolved against a /mnt/c base must land on the same spelling as an
+    # absolute /mnt/c input, or a WSL-side claim and a Windows-side claim on one
+    # file compare unequal (found by tests/test_commit_gate.py, 21 August 2026).
     if len(text) >= 3 and text[1] == ":" and text[2] == "/":
         text = text[0].lower() + text[1:]
     elif text.startswith("/mnt/") and len(text) > 6 and text[6] == "/":
         text = f"{text[5]}:{text[6:]}"
-    if not (len(text) >= 2 and text[1] == ":") and not text.startswith("/"):
-        base = cwd if cwd is not None else Path.cwd()
-        text = str(base).replace("\\", "/").rstrip("/") + "/" + text
-        if len(text) >= 3 and text[1] == ":" and text[2] == "/":
-            text = text[0].lower() + text[1:]
     return _normpath(text).casefold()
 
 

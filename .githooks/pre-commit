@@ -5,7 +5,11 @@
 # Reversal: git config --unset core.hooksPath
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-checker="$root/.github/scripts/check_secrets.py"
+# The hook runs from the worktree top-level, so invoke with relative paths: a
+# Windows python behind the WSL shim cannot open the /mnt/c/... spelling git
+# returns here, and refused-everything is not a secrets check [measured 21
+# August 2026 — a WSL-side commit could not pass this stage at all].
+checker=".github/scripts/check_secrets.py"
 if [ ! -f "$checker" ]; then
   echo "pre-commit: REFUSED — check_secrets.py is missing." >&2
   exit 1
@@ -16,6 +20,25 @@ if ! python "$checker" --staged >/dev/null 2>&1; then
   python "$checker" --staged >&2
   echo "" >&2
   echo "Nothing was committed. Unstage the file, or --no-verify with a reason." >&2
+  exit 1
+fi
+
+# Commit-attribution gate: while dispatch claims are live in this worktree, a
+# commit must name its committer and may not stage a path another live run
+# claims. Policy: src/consilient/commit_gate.py.
+# WSL interop drops environment variables not named in WSLENV when `python` is
+# a Windows executable behind a shim [measured 21 August 2026]; bridge the two
+# badge variables so a WSL-side committer's identity survives the boundary.
+WSLENV="CONSILIENT_RUN_ID:CONSILIENT_COMMIT_PATHS:$WSLENV"
+export WSLENV
+gate="scripts/commit_gate.py"
+if [ ! -f "$gate" ]; then
+  echo "pre-commit: REFUSED — commit_gate.py is missing." >&2
+  exit 1
+fi
+if ! python "$gate" >&2; then
+  echo "" >&2
+  echo "Nothing was committed. Unstage foreign paths, name your run, or --no-verify with a reason." >&2
   exit 1
 fi
 exit 0
