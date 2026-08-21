@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from .events import SCHEMA_VERSION, EventPayload, append
 
@@ -148,9 +148,9 @@ def hardware_profile_from_mapping(data: Mapping[str, object]) -> HardwareProfile
         value = data.get(key)
         if value is None:
             return None
-        if value not in {"cuda", "rocm", "metal", "cpu", "unknown"}:
-            return None
-        return value  # type: ignore[return-value]
+        if isinstance(value, str) and value in {"cuda", "rocm", "metal", "cpu", "unknown"}:
+            return cast(Backend, value)
+        return None
 
     def optional_bool(key: str) -> bool | None:
         value = data.get(key)
