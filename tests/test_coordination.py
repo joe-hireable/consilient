@@ -432,6 +432,16 @@ def test_ceiling_for_the_real_shape_of_todays_trajectory_is_a_refusal(tmp_path):
     assert isinstance(outcome, routing.RoutingRefusal)
 
 
+def test_the_routing_mechanism_is_built_but_not_wired():
+    """The brief: build β-conditioned routing, leave it disabled. Disabled means no
+    run-path importer — a statement in a docstring is not a check, so here is the
+    check. If this fails, someone wired the ceiling into dispatch and this pinning
+    test is where the conversation about whether that was authorised starts."""
+    source = DISPATCH_PATH.read_text(encoding="utf-8")
+    assert "routing" not in source
+    assert "candidates_ceiling" not in source
+
+
 # --- dispatch wiring ------------------------------------------------------------
 
 
