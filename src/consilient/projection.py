@@ -4,6 +4,8 @@ V0-02: SQLite is only a projection of the JSONL. Delete it, replay, and the stat
 identical. Nothing may write to the database except a replay of events.
 
 V0-26: an outcome and its deferred human verdict project to one row keyed by attempt_id.
+V0-30: a provider that reported no usable figure still projects a row, so "could not
+be read" is visible in the state rather than absent from it.
 
 "Byte-identical state" is checked as a digest over a canonical dump of every row, not over
 the database file. SQLite files are not byte-stable across writes — page ordering, freelists
@@ -20,6 +22,7 @@ from pathlib import Path
 
 from .events import (
     OUTCOME_KIND,
+    USAGE_KIND,
     VERDICT_CORRECTION_KIND,
     VERDICT_KIND,
     Event,
@@ -48,6 +51,23 @@ CREATE TABLE IF NOT EXISTS outcomes (
     human_verdict   TEXT
 );
 CREATE INDEX IF NOT EXISTS outcomes_family ON outcomes (task_family, verifier_version);
+CREATE TABLE IF NOT EXISTS usage (
+    id            INTEGER PRIMARY KEY,
+    position      INTEGER NOT NULL,
+    provider      TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    detail        TEXT NOT NULL,
+    observed_at   TEXT,
+    measure       TEXT NOT NULL,
+    window_label  TEXT,
+    used_fraction TEXT,
+    resets_at     TEXT,
+    amount        TEXT,
+    currency      TEXT,
+    period        TEXT,
+    provenance    TEXT
+);
 CREATE TABLE IF NOT EXISTS rejections (
     id     INTEGER PRIMARY KEY,
     path   TEXT NOT NULL,
@@ -118,6 +138,50 @@ def _apply(conn: sqlite3.Connection, events: list[Event]) -> None:
             _apply_verdict(conn, position, event)
         elif event.kind == VERDICT_CORRECTION_KIND:
             _apply_verdict_correction(conn, position, event)
+        elif event.kind == USAGE_KIND:
+            _apply_usage(conn, position, event)
+
+
+def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:
+    """Project one usage observation, including the ones that reported no number.
+
+    A provider that could not be read still gets a row, with `measure` set to 'none' and
+    every figure column NULL. Projecting only the readable providers would make an
+    unobserved provider indistinguishable from one that was never asked -- the same silent
+    skip the rejections table exists to prevent. `state_digest` covers this table, so a
+    change in what the harness can see changes the digest and `replay` reports it.
+
+    Nothing is validated here that `events.validate` has not already enforced (V0-30):
+    this is a projection, and a projection that re-decides what is admissible would be a
+    second authority over the record.
+    """
+    data = event.data
+    common = (
+        position,
+        data["provider"],
+        data["kind"],
+        data["status"],
+        data["detail"],
+        data.get("observed_at"),
+    )
+    rows: list[tuple[object, ...]] = [
+        common + ("quota", q["window"], q["used_fraction"], q.get("resets_at"),
+                  None, None, None, q["provenance"])
+        for q in data.get("quotas", [])
+    ]
+    rows += [
+        common + ("spend", None, None, None,
+                  s["amount"], s["currency"], s["period"], s["provenance"])
+        for s in data.get("spend", [])
+    ]
+    if not rows:
+        rows = [common + ("none", None, None, None, None, None, None, None)]
+    conn.executemany(
+        "INSERT INTO usage (position, provider, kind, status, detail, observed_at,"
+        " measure, window_label, used_fraction, resets_at, amount, currency, period,"
+        " provenance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
 
 
 def _apply_outcome(conn: sqlite3.Connection, position: int, event: Event) -> None:

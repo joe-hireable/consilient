@@ -17,13 +17,16 @@ import shutil
 import sqlite3
 import sys
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from . import beta as beta_mod
 from . import dashboard as dashboard_mod
 from . import events as events_mod
+from . import budget
 from . import projection
+from . import usage as usage_mod
 from .events import EventError, append, read_all
 
 # Each CLI command has a different nested JSON result shape. Any is confined to this
@@ -101,6 +104,43 @@ def cmd_record(args: argparse.Namespace) -> CommandResult:
     path = Path(args.log) / f"{event.get('ts', '')[:10]}.jsonl"
     append(path, event)
     return {"recorded": True, "file": str(path), "event": event["event"]}
+
+
+def cmd_usage(args: argparse.Namespace) -> CommandResult:
+    """Every configured provider's usage, limits and spend in one place.
+
+    Read-only by default. `--record` puts the snapshot in the trajectory through
+    `append()`, which is opt-in because a dashboard polling this command must not write a
+    line every time somebody looks at it.
+    """
+    sources = usage_mod.Sources(payloads=Path(args.payloads), log=Path(args.log))
+    snapshot = usage_mod.fake_snapshot() if args.fake else usage_mod.snapshot(sources)
+    limits = usage_mod.load_limits(Path(args.limits))
+    if isinstance(limits, budget.BudgetRefusal):
+        snapshot["ceilings"] = {
+            "configured": False,
+            "refusal": limits.reason,
+            "limits": [],
+        }
+    else:
+        snapshot["ceilings"] = {
+            "configured": True,
+            "refusal": None,
+            "limits": [
+                {
+                    "period": ceiling.period,
+                    "amount": str(ceiling.amount),
+                    "currency": ceiling.currency,
+                }
+                for ceiling in limits
+            ],
+        }
+    snapshot["recorded"] = (
+        usage_mod.record(Path(args.log), snapshot)
+        if args.record and not args.fake
+        else 0
+    )
+    return snapshot
 
 
 def cmd_replay(args: argparse.Namespace) -> CommandResult:
@@ -731,6 +771,42 @@ def render(command: str, result: CommandResult) -> str:
                 "written by append(), so validate() never ran on them"
             )
         return line
+    if command == "usage":
+        lines = []
+        for provider in result["providers"]:
+            head = f"{provider['provider']:<12} {provider['status'].replace('_', ' ')}"
+            if provider["status"] != "ok":
+                lines.append(f"{head} — {provider['detail']}")
+                continue
+            lines.append(head)
+            for quota in provider["quotas"]:
+                percent = Decimal(quota["used_fraction"]) * 100
+                reset = quota["resets_at"] or "no reset time reported"
+                lines.append(
+                    f"    quota {quota['window']:<8} {percent:>6.1f}% used, "
+                    f"resets {reset}  [{quota['provenance']}]"
+                )
+            for item in provider["spend"]:
+                lines.append(
+                    f"    spend {item['period']:<8} {item['amount']} {item['currency']}"
+                    f"  [{item['provenance']}]"
+                )
+        ceilings = result["ceilings"]
+        if not ceilings["configured"]:
+            lines.append(
+                f"ceilings: NONE — {ceilings['refusal']}; every metered call refuses"
+            )
+        else:
+            stated = ", ".join(
+                f"{c['period']} {c['amount']} {c['currency']}"
+                for c in ceilings["limits"]
+            )
+            lines.append(f"ceilings: {stated}")
+        if result["recorded"]:
+            lines.append(
+                f"recorded {result['recorded']} observation(s) to the trajectory"
+            )
+        return "\n".join(lines)
     if command == "beta":
         return beta_mod.Beta(
             verdict=result["verdict"],
@@ -812,6 +888,31 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--task-family")
     b.add_argument("--verifier-version")
     b.set_defaults(handler=cmd_beta)
+
+    usage = sub.add_parser(
+        "usage",
+        parents=[common],
+        help="usage, limits and spend across every configured provider",
+    )
+    usage.add_argument(
+        "--payloads",
+        default=str(usage_mod.DEFAULT_PAYLOADS),
+        help="directory an out-of-tree probe drops provider payloads into",
+    )
+    usage.add_argument(
+        "--limits",
+        default=str(usage_mod.DEFAULT_LIMITS),
+        help="the instance spend-limit configuration; never committed",
+    )
+    usage.add_argument(
+        "--record", action="store_true", help="append the snapshot to the trajectory"
+    )
+    usage.add_argument(
+        "--fake",
+        action="store_true",
+        help="a fabricated snapshot for building a view against; records nothing",
+    )
+    usage.set_defaults(handler=cmd_usage)
 
     doctor = sub.add_parser(
         "doctor",

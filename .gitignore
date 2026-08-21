@@ -75,3 +75,9 @@ red-cells-evidence.json
 
 # Pseudonym maps back to private-corpus identifiers. Local only, never published.
 *.local.json
+
+# INSTANCE spend limits and captured provider payloads. The PRODUCT ships the shape in
+# .harness/limits.example.json; what a particular person is willing to spend, and any
+# payload observed from their account, is theirs and stays out of a public repository.
+.harness/limits.json
+.harness/usage/

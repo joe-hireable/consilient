@@ -9,6 +9,29 @@ The verifier outcome and human verdict are separate append-only events joined by
 `attempt_id`. [measured] Replay resolves them into one row for β; `task` is not the join key,
 because retries legitimately give one task several attempts. [measured]
 
+## The one-command version
+
+`scripts/verdict.py` writes both events below in one call, in the required order, sharing one
+generated `attempt_id`, through the same `append()` writer.
+
+```bash
+python scripts/verdict.py reject "fix pagination off-by-one" --checks pass
+python scripts/verdict.py accept "tighten the retry backoff"  --checks fail
+```
+
+It exists for two measured reasons. The hand-written form below **does not survive PowerShell**:
+5.1 strips the inner double quotes before Python sees them, and the documented command exits 2
+with `--event is not valid JSON`. [measured, 21 Aug 2026] And a verdict whose `attempt_id` has no
+recorded outcome appends with exit 0 and then refuses to project forever, on an append-only log
+— thirty hand-written pairs is thirty chances at that. [measured]
+
+`--checks` is required, not defaulted: if the only artefacts you review are the ones whose checks
+already passed, every rejected row carries `verifier_accept: true` and β is 1.000 by construction
+rather than by measurement. [cited, `src/consilient/beta.py`]
+
+The hand-written form below remains the schema of record, and is still the way to give a verdict
+on an attempt whose outcome another process already logged.
+
 ## First record the verifier outcome
 
 Replace the timestamp with the current RFC3339 clock value and allocate the attempt identifier

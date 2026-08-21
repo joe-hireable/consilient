@@ -1,0 +1,10 @@
+{
+  "_": "PRODUCT ships this shape. Copy to .harness/limits.json and put YOUR numbers there; that path is gitignored and must never be committed. No credential belongs in this file or anywhere else in the repository — collectors read local files only, and the harness has no network capability at all.",
+  "_ceilings": "The limits this harness enforces. Weekly and monthly are both supported and at least one is required: a missing ceiling is refused, not treated as unlimited. Amounts are strings so the comparison stays exact; a JSON number is refused.",
+  "ceilings": [
+    { "period": "weekly", "amount": "0.00", "currency": "USD" },
+    { "period": "monthly", "amount": "0.00", "currency": "USD" }
+  ],
+  "_account_cap": "OPTIONAL, and off by default on purpose. If you set a spend cap at the vendor, state it here and the harness refuses to run with any ceiling above it. ADR-0044 is explicit that the harness cannot read your vendor cap and must not assume it, so leaving this out is the honest default — a cap declared here that does not match the one you actually set is worse than none. Currencies are never converted: if your vendor cap is in GBP and the metered ceiling is enforced in USD, the harness refuses rather than inventing a rate.",
+  "account_cap": null
+}
