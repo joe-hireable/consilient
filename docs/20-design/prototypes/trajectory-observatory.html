@@ -39,7 +39,7 @@
       background-color: var(--bg);
       color: var(--fg-primary);
       font-family: var(--font-body);
-      font-size: 13.5px;
+      font-size: 14px;
       line-height: 1.55;
       min-height: 100vh;
       display: flex;
@@ -91,9 +91,9 @@
       border-bottom: 2px solid var(--action);
     }
 
-    /* Observatory Workspace Grid */
+    /* Observatory Workspace Grid — max-width 1280px per DESIGN.md §5 */
     .obs-layout {
-      max-width: 1540px;
+      max-width: 1280px;
       width: 100%;
       margin: 0 auto;
       padding: 24px;
@@ -159,20 +159,7 @@
     }
 
     .stat-pill .k { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); text-transform: uppercase; }
-    .stat-pill .v { font-size: 20px; font-weight: 700; color: var(--fg-primary); margin-top: 2px; }
-
-    /* SVG Matrix Visualizer */
-    .matrix-chart {
-      width: 100%;
-      height: 180px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
+    .stat-pill .v { font-size: 18px; font-weight: 700; color: var(--fg-primary); margin-top: 2px; }
 
     /* Time Scrubber Stream */
     .timeline-stream {
@@ -249,6 +236,28 @@
       font-size: 11px;
       color: var(--fg-muted);
     }
+
+    /* Responsive Queries per DESIGN.md §8 */
+    @media (max-width: 1024px) {
+      .obs-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .obs-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 16px;
+      }
+      .obs-layout {
+        padding: 16px;
+      }
+      .census-stat-row {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -266,7 +275,7 @@
       <a href="mobile-signer.html">03 &middot; Enclave Signer</a>
     </nav>
     <div class="mono" style="font-size: 11px; color: var(--fg-muted);">
-      SHA256: e7a9940 &middot; 108 EVENTS RECORDED
+      HEAD: a539081 &middot; PROJECTION DIGEST
     </div>
   </header>
 
@@ -281,7 +290,7 @@
       </div>
       <div class="card-body">
         <div style="font-size: 12px; color: var(--fg-muted);">
-          Every state transition is hash-chained. Replay identical verified over 108 events.
+          Every state transition is hash-chained. Replay identical verified over trajectory history.
         </div>
 
         <div class="timeline-stream">
@@ -328,11 +337,11 @@
       </div>
     </section>
 
-    <!-- Column 2: EXP-47/EXP-96 Mutation Census & Verifier Anchor -->
+    <!-- Column 2: EXP-47 Mutation Census & Verifier Anchor -->
     <section class="obs-card">
       <div class="card-head">
-        <span>02 &middot; Mutation Census &amp; Beta-Meter (EXP-47)</span>
-        <span class="tag valid">EMPIRICAL PROOF</span>
+        <span>02 &middot; Mutation Census &amp; Suite &beta; (EXP-47)</span>
+        <span class="tag valid">MEASURED [EXP-47]</span>
       </div>
       <div class="card-body">
 
@@ -343,12 +352,12 @@
               <div class="v mono num">1,931</div>
             </div>
             <div class="stat-pill">
-              <div class="k">True Defects</div>
+              <div class="k">Non-Equivalent</div>
               <div class="v mono num" style="color: var(--valid);">1,871</div>
             </div>
             <div class="stat-pill">
-              <div class="k">Measured &beta;</div>
-              <div class="v mono num" style="color: var(--action);">0.3132</div>
+              <div class="k">Suite &beta; [95% CI]</div>
+              <div class="v mono num" style="color: var(--action);">0.3132 <span style="font-size: 11px; font-weight: normal; color: var(--fg-muted);">[0.29, 0.33]</span></div>
             </div>
           </div>
 
@@ -367,7 +376,7 @@
 
         <div class="census-box">
           <div style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--fg-muted);">
-            Check Independence &middot; Chi-Square Matrix
+            Check Independence &middot; Chi-Square Matrix (pytest vs mypy)
           </div>
           <div style="font-size: 12px; color: var(--fg-secondary); line-height: 1.5;">
             Mutants surviving <span class="mono">pytest</span> survived <span class="mono">mypy</span> at <span class="mono" style="color: var(--fault);">87.89%</span> vs <span class="mono" style="color: var(--valid);">58.50%</span> for mutants pytest killed (<span class="mono">&chi;&sup2; = 187.28, p &lt; 1e-15</span>). Proves same-source static checks are strongly dependent.

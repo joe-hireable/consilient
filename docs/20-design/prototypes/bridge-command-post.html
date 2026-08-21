@@ -39,8 +39,8 @@
       background-color: var(--bg);
       color: var(--fg-primary);
       font-family: var(--font-body);
-      font-size: 13.5px;
-      line-height: 1.5;
+      font-size: 14px;
+      line-height: 1.55;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -108,14 +108,14 @@
       border-bottom: 2px solid var(--action);
     }
 
-    /* Main Bridge Layout */
+    /* Main Bridge Layout — max-width 1280px per DESIGN.md §5 */
     .bridge-grid {
       display: grid;
       grid-template-columns: 320px 1fr 340px;
       gap: 20px;
       padding: 24px;
       flex: 1;
-      max-width: 1600px;
+      max-width: 1280px;
       width: 100%;
       margin: 0 auto;
     }
@@ -264,7 +264,7 @@
 
     button.btn {
       font-family: var(--font-body);
-      font-size: 12.5px;
+      font-size: 13px;
       font-weight: 600;
       padding: 8px 16px;
       border-radius: 6px;
@@ -287,7 +287,7 @@
     table.fleet-tbl {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12.5px;
+      font-size: 13px;
     }
 
     table.fleet-tbl th {
@@ -350,6 +350,31 @@
       font-size: 11px;
       color: var(--fg-muted);
     }
+
+    /* Responsive Queries per DESIGN.md §8 */
+    @media (max-width: 1100px) {
+      .bridge-grid {
+        grid-template-columns: 1fr;
+      }
+      .affordability-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .bridge-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 16px;
+      }
+      .affordability-grid {
+        grid-template-columns: 1fr;
+      }
+      .bridge-grid {
+        padding: 16px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -379,14 +404,14 @@
     <!-- Column 1: Fleet Resource Radar & Concurrency Ceiling -->
     <aside class="panel">
       <div class="panel-header">
-        <span>01 &middot; Fleet Capacity Ceiling</span>
-        <span class="mono">n_max = 3.1</span>
+        <span>01 &middot; Fleet Concurrency</span>
+        <span class="mono">[asserted] placeholder</span>
       </div>
       <div class="panel-body">
         <div class="concurrency-meter">
           <div class="gauge-header">
-            <span class="mono">Active Slot Utilization</span>
-            <span class="mono">2 of 3 allocated</span>
+            <span class="mono">Allocated Slots</span>
+            <span class="mono">2 of 3 slots</span>
           </div>
           <div class="gauge-bar-track">
             <div class="gauge-fill active" style="width: 33.3%;"></div>
@@ -394,7 +419,7 @@
             <div class="gauge-fill" style="width: 0%;"></div>
           </div>
           <span style="font-size: 11px; color: var(--fg-muted);" class="mono">
-            T_cycle (25m) &divide; T_review (8m) &middot; math ceiling
+            Placeholder: T_cycle (25m) &divide; T_review (8m) = 3.125 max capacity. (At measured &beta;=0.31, &beta;-conditioned ceiling is 1 slot; EXP-08 pending).
           </span>
         </div>
 
@@ -457,14 +482,14 @@
             </div>
             <div class="aff-cell">
               <div class="k">04 &middot; Cost To Resolve</div>
-              <div class="v">No machine path; &beta; measures human agreement.</div>
+              <div class="v">No automated path; &beta; measures human agreement.</div>
             </div>
           </div>
 
           <div class="btn-group">
-            <button class="btn btn-sec mono" onclick="alert('Opening worktree branch in VSCode...');">Open Diff in Editor</button>
-            <button class="btn btn-danger mono" onclick="alert('Verdict REJECTED logged.');">Reject &amp; Provide Reason</button>
-            <button class="btn btn-primary mono" onclick="alert('Verdict ACCEPTED logged to trajectory.');">Accept Verdict</button>
+            <button class="btn btn-sec" onclick="alert('Opening worktree branch in VSCode...');">Open Diff in Editor</button>
+            <button class="btn btn-danger" onclick="alert('Verdict REJECTED logged.');">Reject &amp; Provide Reason</button>
+            <button class="btn btn-primary" onclick="alert('Verdict ACCEPTED logged to trajectory.');">Accept Verdict</button>
           </div>
         </div>
 

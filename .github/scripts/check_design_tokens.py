@@ -1,4 +1,4 @@
-"""Verify that CSS / UI source files use only hex colours declared in docs/20-design/DESIGN.md.
+"""Verify that CSS / UI source files use only colours declared in docs/20-design/DESIGN.md.
 
 Enforces the token lockdown contract (ADR-0060, using-open-design skill):
 "Tokens are non-negotiable once locked. An agent generating artefacts under a
@@ -26,15 +26,20 @@ STYLE_ATTRS_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Files governed by the official DESIGN.md
-GOVERNED_FILES = [
-    Path("src/consilient/dashboard.py"),
-    Path("docs/20-design/prototypes/web-workspace.html"),
-    Path("docs/20-design/prototypes/mobile-verdict.html"),
-    Path("docs/20-design/prototypes/bridge-command-post.html"),
-    Path("docs/20-design/prototypes/trajectory-observatory.html"),
-    Path("docs/20-design/prototypes/mobile-signer.html"),
-]
+
+def get_governed_files(repo_root: Path) -> list[Path]:
+    """Dynamically discover all prototype HTML files plus governed source files."""
+    governed: list[Path] = []
+    dashboard = repo_root / "src" / "consilient" / "dashboard.py"
+    if dashboard.exists():
+        governed.append(dashboard)
+
+    proto_dir = repo_root / "docs" / "20-design" / "prototypes"
+    if proto_dir.exists():
+        html_protos = sorted(proto_dir.glob("*.html"))
+        governed.extend(html_protos)
+
+    return governed
 
 
 def extract_declared_hexes(design_md_path: Path) -> set[str]:
@@ -50,7 +55,7 @@ def extract_declared_hexes(design_md_path: Path) -> set[str]:
 def extract_governed_hexes(file_path: Path) -> set[str]:
     """Extract all hex color codes used in CSS / SVG / styling of a governed file."""
     if not file_path.exists():
-        return set()
+        raise FileNotFoundError(f"Governed file missing: {file_path}")
     text = file_path.read_text(encoding="utf-8")
 
     if file_path.suffix == ".html":
@@ -71,6 +76,10 @@ def check_tokens(repo_root: Path) -> dict[str, object]:
     design_md = repo_root / "docs" / "20-design" / "DESIGN.md"
     declared = extract_declared_hexes(design_md)
 
+    governed = get_governed_files(repo_root)
+    if not governed:
+        raise RuntimeError("No governed files discovered for design token check")
+
     results: dict[str, object] = {
         "declared_tokens_count": len(declared),
         "declared_tokens": sorted(declared),
@@ -81,10 +90,8 @@ def check_tokens(repo_root: Path) -> dict[str, object]:
 
     total_violations = 0
 
-    for rel_path in GOVERNED_FILES:
-        full_path = repo_root / rel_path
-        if not full_path.exists():
-            continue
+    for full_path in governed:
+        rel_path = full_path.relative_to(repo_root)
         used = extract_governed_hexes(full_path)
         undeclared = used - declared
         results["governed_files"][str(rel_path)] = {
@@ -118,7 +125,7 @@ def main() -> int:
         print(f"DESIGN.md declared tokens: {declared_count}")
         clean = report["clean"]
         if clean:
-            print("OK: All governed files use strictly declared DESIGN.md color tokens.")
+            print(f"OK: All {len(report['governed_files'])} governed files use strictly declared DESIGN.md color tokens.")
         else:
             print("FAILED: Undeclared color tokens detected in governed files:")
             for file_name, undeclared in report["violations"].items():

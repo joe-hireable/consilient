@@ -2,12 +2,12 @@
 
 > Status: `[asserted]` — preliminary single-family self-review under Open Design Skill Protocol.
 > Reviewer: Claude (Consilient Agent & Open Design Skill Protocol).
-> Method note: This is a single-family review. Under the Nielsen & Molich (1990) heuristic evaluation prior, individual evaluators capture ~35% of usability issues; aggregating across 3–5 independent model families (EXP-95) is required to upgrade this review to a consilience test.
+> Method note: This is a single-family review. Under the Nielsen & Molich (1990) heuristic evaluation prior, individual evaluators capture ~35% of usability issues; aggregating across 2 independent model families under registered experiment EXP-95 is required to establish whether these scores are reliable or noise.
 > Governed by: `docs/20-design/DESIGN.md`, ADR-0060, ADR-0061, ADR-0062, and `.agents/skills/using-open-design/references/critique-upstream.md`.
 > Artefacts under review:
 > 1. `docs/20-design/prototypes/bridge-command-post.html` (Concept A: Mission Bridge & Capability Radar)
 > 2. `docs/20-design/prototypes/trajectory-observatory.html` (Concept B: Trajectory Scrubber & Mutation Census)
-> 3. `docs/20-design/prototypes/mobile-signer.html` (Concept C: Enclave Hardware Signer)
+> 3. `docs/20-design/prototypes/mobile-signer.html` (Concept C: Enclave Hardware Clear-Signer)
 > 4. `docs/20-design/prototypes/web-workspace.html` (Baseline Workspace)
 > 5. `docs/20-design/prototypes/mobile-verdict.html` (Baseline Mobile Client)
 
@@ -29,7 +29,7 @@ The entire suite systematically eradicates conversational AI-SaaS tropes (chat c
 
 **Evidence:**
 Clear spatial division across all concepts:
-- In `bridge-command-post.html`, the 3-column operational layout establishes immediate priority: Left = Resource/Concurrency bounds ($n_{\max} = 3.1$), Center = Mission Deck & Mandatory Asks, Right = Empirical Capability Radar (ADR-0054).
+- In `bridge-command-post.html`, the 3-column operational layout establishes immediate priority: Left = Resource/Concurrency bounds, Center = Mission Deck & Mandatory Asks, Right = Empirical Capability Radar (ADR-0054).
 - In `trajectory-observatory.html`, non-linear time scrubbing separates event stream causality from the mutation census visualizer.
 - Typography strictly enforces hierarchy: `Syne` / `Cabinet Grotesk` handles brand and section headers, `Plus Jakarta Sans` provides legible UI copy, and `Space Mono` handles all numerical telemetry with tabular alignment.
 
@@ -50,17 +50,17 @@ Clear spatial division across all concepts:
 
 **Evidence:**
 - Fully implements the 4-part ADR-0033 §3 affordability contract on every ask card: (1) Artefact & Checks, (2) What was tried, (3) Default consequence on expiry, (4) Cost to resolve without you.
-- Mobile signer prototypes (`mobile-signer.html`, `mobile-verdict.html`) provide dedicated "Open on Device" inspection paths prior to Ed25519 hardware key signing.
-- Concurrency ceiling derivation ($T_{\text{cycle}} / T_{\text{review}}$) is explicitly rendered on the mission bridge.
+- Mobile signer prototypes (`mobile-signer.html`, `mobile-verdict.html`) provide dedicated WYSIWYS inline diff inspection paths prior to Ed25519 hardware key signing, eliminating blind-signing failure modes.
+- Concurrency ceiling derivation ($T_{\text{cycle}} / T_{\text{review}}$) and $\beta$-conditioned bounds are explicitly rendered on the mission bridge.
 
 ---
 
-## 5. Innovation · 创新性
+## 5. Innovation / High-Performance Supervisory Design · 创新性
 
-**Score: 9 / 10 (Exceptional)**
+**Score: 8.5 / 10 (Strong)**
 
 **Evidence:**
-Pioneers a genuine departure from 2023–2026 conversational assistants. The replacement of the chat window with a spatial **Agent Command Post** bridge, time-scrubbable trajectory causality matrix, and hardware-attested verdict signing represents a true outlier paradigm for autonomous multi-agent orchestration.
+Applies mature supervisory control principles (ANSI/ISA-101.01 High-Performance HMI) to autonomous agent orchestration rather than adopting conversational chatbot tropes. The replacement of the chat window with a spatial **Agent Command Post** bridge, time-scrubbable trajectory causality matrix, and hardware-attested clear-signing represents a grounded, reliable paradigm for autonomous multi-agent orchestration.
 
 ---
 
@@ -76,5 +76,6 @@ Pioneers a genuine departure from 2023–2026 conversational assistants. The rep
 - Implement keyboard shortcut acceleration (`[A]` accept, `[R]` reject, `[D]` open diff) across desktop bridge views.
 
 ### Quick Wins (5–15 min tweaks)
-- Add live SVG pulse animation to active harness slot indicators when runs are in-flight.
+- Include subtle monospace checksum indicator next to trajectory event counter (`.harness/log#a7d005a`).
 - Add active workstream counter badge in top header for rapid multi-agent fleet overview.
+- Add local storage persistence for theme switching.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consilient Mobile Signer &middot; Concept C3</title>
+  <title>Consilient Mobile Signer &middot; Concept C3 Clear-Signing</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">
@@ -53,6 +53,7 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* Mobile Frame Mockup (Outer 40px radius is physical hardware mockup container) */
     .mobile-frame {
       width: 100%;
       max-width: 412px;
@@ -100,8 +101,9 @@
       padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
       flex: 1;
+      overflow-y: auto;
     }
 
     .head {
@@ -124,8 +126,7 @@
       padding: 18px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      flex: 1;
+      gap: 12px;
     }
 
     .meta-box {
@@ -159,11 +160,30 @@
       text-transform: uppercase;
     }
 
+    /* WYSIWYS Clear-Signing Diff Inspection Box */
+    .diff-inspect-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .diff-line.add { color: var(--valid); }
+    .diff-line.del { color: var(--fault); }
+
     .touch-actions {
       display: flex;
       flex-direction: column;
       gap: 10px;
       margin-top: auto;
+      padding-top: 8px;
     }
 
     button.touch-btn {
@@ -183,7 +203,6 @@
     }
 
     button.touch-btn:active { transform: scale(0.98); opacity: 0.9; }
-    button.btn-inspect { background: transparent; border: 1px solid var(--border); color: var(--fg-primary); }
     button.btn-sign-accept { background: var(--action); color: var(--bg); font-weight: 700; }
     button.btn-sign-reject { background: transparent; border: 1px solid var(--fault); color: var(--fault); }
 
@@ -204,7 +223,7 @@
   <div class="mobile-frame">
     <div class="notch">
       <span>19:42</span>
-      <div class="enclave-badge">Hardware Key Attached</div>
+      <div class="enclave-badge">Hardware Key Enrolled</div>
       <span>5G</span>
     </div>
 
@@ -216,46 +235,56 @@
 
       <div class="verdict-card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span class="tag">MANDATORY VERDICT</span>
+          <span class="tag">CLEAR-SIGNING VERDICT</span>
           <span class="mono" style="font-size: 11px; color: var(--fg-muted);">Task #143</span>
         </div>
 
         <div style="font-family: var(--font-display); font-size: 17px; font-weight: 600;">
-          Promote Command Post Bridge Prototype
+          Verify Verification Boundary Modification
         </div>
 
+        <!-- 4-Part Affordability Contract (ADR-0033 §3) -->
         <div class="meta-box">
           <div class="meta-row">
-            <span class="meta-k">Artefact</span>
-            <span class="mono" style="font-size: 11px;">docs/20-design/prototypes/bridge-command-post.html</span>
+            <span class="meta-k">01 &middot; Artefact</span>
+            <span class="mono" style="font-size: 11px;">src/consilient/dashboard.py (+184 &minus;22)</span>
           </div>
           <div class="meta-row">
             <span class="meta-k">Checks</span>
             <span class="mono" style="color: var(--valid);">pytest &middot; token-linter PASS</span>
           </div>
           <div class="meta-row">
-            <span class="meta-k">Tried</span>
+            <span class="meta-k">02 &middot; Tried</span>
             <span class="mono" style="font-size: 11px;">100% token lockdown verified</span>
           </div>
           <div class="meta-row">
-            <span class="meta-k">On Expiry</span>
+            <span class="meta-k">03 &middot; On Expiry</span>
             <span class="mono" style="color: var(--attention);">Hold branch; &pound;0 spend</span>
           </div>
           <div class="meta-row">
-            <span class="meta-k">Cost To Resolve</span>
+            <span class="meta-k">04 &middot; Cost To Resolve</span>
             <span style="font-size: 11px;">Ground truth requires human signature</span>
           </div>
         </div>
 
-        <div style="font-size: 11px; color: var(--fg-muted); line-height: 1.45;">
-          Hardware enclave signature (Ed25519) will be appended directly to .harness/log.
+        <!-- Clear Signing / WYSIWYS Inline Diff Inspection (Anti-Blind-Signing) -->
+        <div style="font-size: 10.5px; font-family: var(--font-mono); color: var(--fg-muted); text-transform: uppercase;">
+          WYSIWYS Diff Inspection (ERC-7730 Pattern)
+        </div>
+        <div class="diff-inspect-box">
+          <div class="diff-line del">&minus; --ground: #faf9f7; --surface: #fff;</div>
+          <div class="diff-line add">+ --ground: #0C0E12; --surface: #14171E;</div>
+          <div class="diff-line add">+ --accent: #E2B340; --pass: #2E9E66;</div>
+          <div class="diff-line">&nbsp;&nbsp;body { font-family: var(--sans); }</div>
+        </div>
+
+        <div style="font-size: 11px; color: var(--fg-muted); line-height: 1.4;">
+          Affordability latency floor: approvals submitted faster than inspection time are logged as unread (ADR-0033 &sect;4).
         </div>
 
         <div class="touch-actions">
-          <button class="touch-btn btn-inspect" onclick="alert('Opening rendered prototype preview on device...');">
-            Open Rendered View on Device
-          </button>
           <button class="touch-btn btn-sign-accept" onclick="alert('Hardware Enclave Key: Signed ACCEPTED.');">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
             Sign &amp; Accept Verdict
           </button>
           <button class="touch-btn btn-sign-reject" onclick="alert('Hardware Enclave Key: Signed REJECTED.');">
@@ -264,7 +293,7 @@
         </div>
 
         <div class="mono" style="text-align: center; font-size: 9px; color: var(--fg-muted);">
-          ED25519 SECURE ENCLAVE SIGNATURE ACTIVE
+          ED25519 SECURE ENCLAVE SIGNATURE ATTACHED
         </div>
       </div>
     </div>
