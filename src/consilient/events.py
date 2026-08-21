@@ -162,6 +162,7 @@ def validate(event: object) -> EventPayload:
     _check_attempt_contract(event)
     _check_human_authority(event)
     _check_evidence_class(event)
+    _check_dispatch_contract(event)
     return event
 
 
@@ -413,6 +414,14 @@ def _check_evidence_class(event: EventPayload) -> None:
                 f"evidence_class {ec.strip()!r} (V0-26)"
             )
         seen_classes.add(normalized)
+
+
+def _check_dispatch_contract(event: EventPayload) -> None:
+    """ADR-0039: every dispatch records whether it was supervised."""
+    if event["event"].startswith("dispatch.") and not isinstance(
+        event["data"].get("supervised"), bool
+    ):
+        raise EventError("dispatch events must record supervised as a boolean (ADR-0039)")
 
 
 def _check_attempt_identity(event: EventPayload) -> None:
