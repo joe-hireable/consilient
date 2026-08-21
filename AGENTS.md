@@ -125,6 +125,33 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
    "first", "only" — appearing in public-facing prose without a citation beside it. Beating a bar you
    never located is indistinguishable from not knowing where it was.
 
+10. **Reach for open data and public APIs before reasoning from memory.** Joe, 21 August 2026:
+    *"we should encourage the sourcing, downloading, manipulating and utilisation of open source data
+    as well... it should be a default practice to use open source data where it might be useful to
+    make a decision or build something for a user. Also plugging into public-apis for building stuff
+    as well and being able to help users do better than the best existing for anything they ever do."*
+
+    This is not a convenience; it is principle 6 applied. **A public dataset is a different class of
+    facts from a model's training**, so an answer derived from data downloaded and run is a genuinely
+    independent induction, while an answer recalled from weights is the same class as every other
+    answer that model gives. Whewell's test needs two classes, and open data is the cheapest second
+    one available.
+
+    It is also how principle 9 is actually done. **You cannot know where the bar is without the data
+    that measures it**, and you cannot beat it without something to measure against. EXP-96 pins
+    Pallets `itsdangerous` 2.2.0 as a second corpus for exactly this reason.
+
+    In practice: prefer a real dataset over a plausible estimate; prefer a public API over an
+    assumption about what it returns; record the source, the licence and the retrieval date, because
+    a dataset without provenance is an assertion wearing a number's clothes. **Check the licence
+    before use, not after** — a permissive licence is required for anything this project redistributes.
+
+    **Enforcement, stated honestly:** partly enforced, and the gap is real. `evidence_class` on
+    trajectory events and the `[measured]`/`[cited]`/`[asserted]` tags already force a claim to
+    declare where it came from, and CI checks those. **Nothing yet checks that a question answerable
+    from public data was answered that way** — that is a judgement no test currently makes, and until
+    one exists this principle binds by discipline, not by machinery.
+
 ## Boundaries
 
 ### Always do
