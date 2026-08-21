@@ -496,12 +496,14 @@ def make_run_id(ts: str, task: str, label: str) -> str:
 
 
 def _event(kind: str, ts: str, data: dict[str, object]) -> EventPayload:
+    payload = dict(data)
+    payload.setdefault("supervised", True)
     return {
         "v": SCHEMA_VERSION,
         "ts": ts,
         "event": kind,
         "actor": DISPATCH_ACTOR,
-        "data": data,
+        "data": payload,
     }
 
 

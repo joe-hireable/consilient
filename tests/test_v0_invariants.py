@@ -3384,7 +3384,14 @@ def test_the_loop_runtime_cannot_be_reached_from_the_observe_only_cli():
     subparsers = next(
         a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
     )
-    assert set(subparsers.choices) == {"record", "replay", "beta", "doctor"}
+    assert set(subparsers.choices) == {
+        "record",
+        "replay",
+        "beta",
+        "doctor",
+        "dashboard",
+        "usage",
+    }
 
 
 def test_a_command_that_will_not_start_is_refused_not_retried_forever(tmp_path):

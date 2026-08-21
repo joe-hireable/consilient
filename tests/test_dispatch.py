@@ -366,7 +366,14 @@ def test_dispatch_is_a_script_not_a_consil_subcommand():
     subparsers = next(
         action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
     )
-    assert set(subparsers.choices) == {"record", "replay", "beta", "doctor"}
+    assert set(subparsers.choices) == {
+        "record",
+        "replay",
+        "beta",
+        "doctor",
+        "dashboard",
+        "usage",
+    }
     assert DISPATCH_PATH.is_file()
     source = DISPATCH_PATH.read_text(encoding="utf-8")
     assert "silently" in source.lower() or "NOT retried" in source

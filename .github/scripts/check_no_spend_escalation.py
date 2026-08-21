@@ -20,9 +20,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+# GIT_DIR overrides cwd. A git subprocess that inherits it from a hook reads the wrong repo.
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 # Each token is split so this file never matches its own checker and needs no allowlist entry
 # of its own -- the same convention check_secrets.py uses, for the same reason.
@@ -65,6 +69,7 @@ def tracked_files(root: Path) -> list[str]:
     out = subprocess.run(
         ["git", "ls-files"],
         cwd=root,
+        env=GIT_ENV,
         capture_output=True,
         text=True,
         encoding="utf-8",
