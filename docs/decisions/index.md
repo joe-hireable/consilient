@@ -57,6 +57,8 @@ Read these before anything else. Everything downstream depends on them.
 | [0049](0049-experiments-inform-they-do-not-gate.md) | **Experiments inform; they do not gate construction** — an unrun experiment justifies a PROVISIONAL assumption with a falsifier, not a stop | ✅ |
 | [0050](0050-gate-on-effect-size-not-on-uncertainty.md) | **Gate on effect size, not on the mere existence of uncertainty** — an entry that does not state its largest plausible effect cannot block a build | ✅ |
 | [0051](0051-a-tick-is-an-attempt-and-only-execution-runs-unattended.md) | **A tick is an attempt, only execution-bearing work runs unattended, and there is no offline consolidation phase**; the retry ceiling is derived from β and is 1 today | 🟡 |
+| [0054](0054-route-by-measured-capability-against-a-verifier-contract-never-by-a-harness-label.md) | **Route by measured capability against a verifier contract, never by a harness label** | 🟡 |
+| [0056](0056-schedule-work-across-prepaid-quota-pools-and-never-shed-to-spend.md) | **Schedule work across prepaid quota pools and never shed onto spend** | 🟡 |
 | [0059](0059-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
 
 ## Behaviour and safety
@@ -110,3 +112,5 @@ to every ADR and every PR:
 - **0018** — decision 2 conditional on EXP-12 *and* EXP-13.
 - **0051** — PROVISIONAL pending EXP-70 (kills its schedule), EXP-71, EXP-72 (would write 0052)
   and EXP-73. **ADR number 0052 is deliberately unclaimed**; it is written only if EXP-72 fires.
+- **0054** — PROVISIONAL pending EXP-90 … EXP-93.
+- **0056** — PROVISIONAL pending EXP-94 for the allocation clauses; D5 ships with its check.

@@ -3673,3 +3673,65 @@ def test_the_dashboard_adds_no_dependency_outside_the_standard_library():
                 continue
             external.update(n for n in names if n and n not in sys.stdlib_module_names)
     assert not external, "consilient imports outside stdlib: " + repr(sorted(external))
+
+# ---------------------------------------------------------------- V0-39
+# ADR-0056 D5: On-Demand Spending stays Disabled and only the principal may change that.
+# It is the one control by which this system could spend real money, so it ships with a lint
+# rule rather than a convention (I1). The tests below are the rule's own check.
+_spend_scripts = str(Path(__file__).resolve().parent.parent / ".github" / "scripts")
+if _spend_scripts not in sys.path:
+    sys.path.insert(0, _spend_scripts)
+
+import check_no_spend_escalation as spend  # noqa: E402
+
+
+def test_v0_39_a_spend_escalation_call_is_caught_and_located():
+    """The token is taken from the checker, so this test cannot drift from what it enforces."""
+    call = f"client.{spend.BANNED[0]}(9999)"
+    found = spend.scan_text("src/consilient/router.py", "x = 1\n" + call)
+
+    assert found == [("src/consilient/router.py", 2, spend.BANNED[0])]
+
+
+def test_v0_39_documentation_may_name_the_control_it_forbids():
+    """Without this, neither ADR-0056 nor its design note could describe the ban."""
+    call = f"client.{spend.BANNED[0]}(9999)"
+
+    assert spend.ALLOWED_PREFIXES and all(
+        not spend.scan_text(path, call) for path in spend.ALLOWED_PREFIXES
+    )
+    assert not spend.is_allowed("src/consilient/budget.py")
+
+
+def test_v0_39_the_read_only_usage_oracle_is_not_blocked():
+    """EXP-94 must be able to call GetFilteredUsageEvents on the same service. A ban so wide
+    that it forbids reading the counter would stop the experiment that settles ADR-0056."""
+    assert not spend.scan_text("src/consilient/usage.py", "Get" + "FilteredUsageEvents(req)")
+
+
+def test_v0_39_no_tracked_file_escalates_spend():
+    script = Path(".github/scripts/check_no_spend_escalation.py")
+    if not script.exists():  # pragma: no cover - repository-only check
+        pytest.skip("checker not present in this checkout")
+    result = subprocess.run(
+        [sys.executable, str(script), "--check", "--self-test"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+    )
+
+    # The artefact, not the exit code: a checker that silently found nothing to scan would
+    # also exit 0. This project has shipped a check that could not fail twice already.
+    assert "V0-39 ok" in result.stdout, result.stdout + result.stderr
+    assert result.returncode == 0
+
+
+def test_v0_39_is_wired_into_ci_and_cannot_be_silently_unwired():
+    workflow = Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
+    step = workflow.partition("- name: Spend escalation invariant check")[2].partition(
+        "- name:"
+    )[0]
+
+    assert "run: python .github/scripts/check_no_spend_escalation.py --check" in step
