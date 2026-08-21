@@ -34,11 +34,17 @@ built and run.
    *build* orchestration; it is the evidence that the harness is trustworthy to *depend
    on* for work on a repository other than this one. **Gate B is not passed.** Nothing
    here may be pointed at `../hireable-3.0` or `../jobboard-v2`.
-2. **Gate A is not passed either.** A1, A2 and B1 pass; A3 needs seven consecutive days of
-   capture and stands at two; B2 needs the critic's own β measured; B3 needs the fallback
-   exercised. `consil doctor` is the authority on all of it, and
-   `routing_orchestration_enabled` is still `false` — **the flag reports the gates, and the
-   gates are not open.** Entering the stage permits the work; it does not pass the gates.
+2. **Gate A is not passed either.** Do not take the condition-by-condition state from this
+   file — run `consil doctor` and read what it says. This paragraph previously listed
+   "A1, A2 and B1 pass … B3 needs the fallback exercised", and on 21 August 2026 three of
+   those four were wrong: A1 **fails** (EXP-01's stopping rule fired), A2 reports
+   **unknown** on a fresh checkout, and B3 **passes**. [measured] `consil doctor` is the
+   authority; a hand-maintained copy of its output in a governance file is a second source
+   of truth that drifts, which is what happened here. Since 21 August it also **exits
+   non-zero** while the gates are shut, so `consil doctor && …` no longer runs the next
+   step. `routing_orchestration_enabled` remains `false` — **the flag reports the gates,
+   and the gates are not open.** Entering the stage permits the work; it does not pass the
+   gates.
 
 Product code in `src/consilient/` remains observe-only *today* because nothing else has
 been built yet, not because it is forbidden.

@@ -30,6 +30,46 @@ before routing work to cheaper models or running agents in parallel.
 
 MIT. Fully open source. No capability is ever withheld from the open-source version.
 
+## Install and run
+
+Python **3.13 or newer** — the only version the suite has been run on, and the version
+`mypy.ini` type-checks against. No runtime dependencies: `consilient` is standard library
+only.
+
+```bash
+git clone https://github.com/joe-hireable/consilient
+cd consilient
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"                            # drop [dev] if you only want the CLI
+
+consil --help
+consil beta        # -> "insufficient data (0 human rejections, need 30)" on a fresh clone
+consil doctor      # gate status; exits non-zero while the gates are shut
+```
+
+`consil` is observe-only. It records trajectory events, projects them into SQLite and
+computes β. It cannot route, block or accept anything, and a test asserts the CLI exposes
+no surface that could.
+
+Before proposing a change, run every gate at once:
+
+```bash
+python scripts/release_check.py
+```
+
+It reports PASSED, FAILED or **UNAVAILABLE** per gate and exits non-zero unless all of them
+passed. `UNAVAILABLE` is deliberately not a pass — the private-corpus leak scan can only run
+on the maintainer's machine, and a release approved without it running is not an approval.
+Do not pipe it into `tail`; a pipeline's exit status is the last command's, and this project
+has already lost a day to that.
+
+**Cross-platform status.** `src/consilient/`, `tests/`, `scripts/` and `.github/scripts/`
+are portable and CI runs them on Linux. The research instruments under
+`docs/10-research/experiments/` are **Windows-only** in places — WSL invocation, `cmd.exe`,
+`taskkill`, absolute `C:\` paths — and CI never executes them. See
+`docs/00-context/cross-platform-status.md` for the itemised list. If you are on Linux or
+macOS, the CLI, the suite and the gates work; the experiment runners may not.
+
 ## Scope — what v0 is, and what it is not
 
 | | Scope | Gate |

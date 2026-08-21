@@ -330,19 +330,43 @@ def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResul
 
 
 def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResult:
+    """Gate A condition 2. A comparison over zero events is not a pass.
+
+    A1's repair gave `replay` a subject -- whatever state was already on disk -- instead of
+    comparing two rebuilds. But every state on disk was itself written by a rebuild from the
+    same log, so on an empty trajectory `identical: true` says only that nothing equals
+    nothing. Measured 21 August 2026: two `consil doctor` runs in an empty directory, with
+    no log and no configuration, reported A2 `pass` with the reason "Compared 0 events;
+    canonical state is identical." A gate condition satisfied by an empty comparison is A1
+    one invocation further out.
+
+    An empty trajectory is now `unknown` -- the status for a check that did not run --
+    rather than `pass`. Divergence still fails and a non-empty identical comparison still
+    passes, so the condition is unchanged wherever there is anything to compare.
+    """
     identical = replay["identical"]
-    status = "pass" if identical is True else "fail" if identical is False else "unknown"
+    events = replay["events"]
+    evidence = (f"{log.as_posix()}/*.jsonl", db.as_posix())
     if identical is None:
         reason = (
             f"State covers {replay['events_projected']} of {replay['events']} events; not compared."
             if replay["stale"]
             else "No prior projection existed; replay was not compared."
         )
-    else:
-        reason = f"Compared {replay['events']} events; canonical state " + (
-            "is identical." if identical else "diverged."
+        return _condition("A2", "unknown", reason, *evidence)
+    if not identical:
+        reason = f"Compared {events} events; canonical state diverged."
+        return _condition("A2", "fail", reason, *evidence)
+    if events == 0:
+        return _condition(
+            "A2",
+            "unknown",
+            "The trajectory is empty; comparing zero events establishes nothing about "
+            "replay. Capture at least one event before this condition means anything.",
+            *evidence,
         )
-    return _condition("A2", status, reason, f"{log.as_posix()}/*.jsonl", db.as_posix())
+    reason = f"Compared {events} events; canonical state is identical."
+    return _condition("A2", "pass", reason, *evidence)
 
 
 def is_this_repository(name: str) -> bool:
@@ -766,6 +790,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.json
         else render(args.command, result)
     )
+    if args.command == "doctor":
+        # ADR-0015's Enforcement clause calls `consil doctor` the authority on gate status
+        # and "Not advisory". Until 21 August 2026 it printed `Gate A: FAIL` and
+        # `Gate B: FAIL` and exited 0 [measured], so `consil doctor && <next step>` ran the
+        # next step and any caller reading `$?` was told the gates were open. That is B9 in
+        # this repository's own catalogue -- a failing gate reporting success through a
+        # discarded status -- made structural rather than accidental. The payload was
+        # always honest; the exit code now agrees with it.
+        return 0 if result["routing_orchestration_enabled"] else 1
     return 0 if result.get("identical", True) else 1
 
 
