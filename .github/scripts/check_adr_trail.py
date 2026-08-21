@@ -166,8 +166,16 @@ def check_history() -> tuple[list[str], list[str]]:
             if parent.returncode != 0 or child.returncode != 0:
                 continue  # added or deleted in this commit; not an edit
             diff = _git(["diff", "--ignore-all-space", f"{sha}^", sha, "--", rel])
-            added = [l[1:] for l in diff.stdout.splitlines() if l.startswith("+") and not l.startswith("+++")]
-            removed = [l[1:] for l in diff.stdout.splitlines() if l.startswith("-") and not l.startswith("---")]
+            added = [
+                ln[1:]
+                for ln in diff.stdout.splitlines()
+                if ln.startswith("+") and not ln.startswith("+++")
+            ]
+            removed = [
+                ln[1:]
+                for ln in diff.stdout.splitlines()
+                if ln.startswith("-") and not ln.startswith("---")
+            ]
             verdict = classify_edit(_status_of(parent.stdout), added, removed)
             if verdict != "violation":
                 continue
