@@ -27,7 +27,9 @@ paid it.
 
 ## Log
 
-*(empty — no bypasses yet)*
+| date | PR | tier | what was skipped | why | debt | paid by |
+|---|---|---|---|---|---|---|
+| 2026-08-21 | #1 | T2 | I1: token-lockdown invariant stated in ADR-0060 §1 without a shipped CI check | Aesthetic invariants are harder to lint than structural ones; the CI check requires implementation | Ship the check in the same commit as the first governed artefact | PR #3 (`check_design_tokens.py`) |
 
 ## When this log is the problem
 

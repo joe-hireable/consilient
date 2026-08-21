@@ -18,4 +18,6 @@ jobs:
           python-version: '3.12'
       - run: pip install dco-check
       - name: Check DCO sign-off on all commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dco-check --verbose
