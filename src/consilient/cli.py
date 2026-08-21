@@ -37,6 +37,17 @@ DEFAULT_LOG = Path(".harness/log")
 DEFAULT_DB = Path(".harness/state.db")
 DEFAULT_DASHBOARD = Path(".harness/dashboard.html")
 EXPERIMENT_REGISTER = Path("docs/10-research/experiment-register.md")
+# Every default above is relative to the working directory; the code that reads them comes
+# from wherever the interpreter found `consilient`. Those are two independent inputs, and
+# nothing compared them. Measured 21 August 2026: one interpreter-global editable install
+# pointed at a different worktree, so `consil doctor` run inside this one reported its Gate
+# A1 as PASS and exited 0 while the code actually standing in this tree reported FAIL and
+# exited 1 -- same directory, same log, the other tree's answers. Two agents were misled by
+# it in one night. The interpreter chooses which `consilient` to import before any line of
+# this module runs, so nothing here can make the wrong tree impossible. `_foreign_tree`
+# makes it loud, and doctor's provenance lines make it visible when it cannot be refused.
+_PACKAGE = Path(__file__).resolve().parent
+CODE_TREE = _PACKAGE.parents[1] if _PACKAGE.parent.name == "src" else _PACKAGE
 GATE_B2_ADR = Path(
     "docs/decisions/0045-give-gate-b2-and-b3-success-criteria-they-never-had.md"
 )
@@ -709,7 +720,18 @@ def cmd_doctor(args: argparse.Namespace) -> CommandResult:
         )
         for name, identifiers in expected.items()
     )
-    return {"gates": gates, "routing_orchestration_enabled": enabled}
+    return {
+        "gates": gates,
+        # Which code answered, and which directory it answered about. Unconditional: the
+        # refusal below cannot fire when the measured directory is an ordinary repository,
+        # and there this is the whole defence.
+        "provenance": {
+            "code": str(CODE_TREE),
+            "data": str(Path.cwd().resolve()),
+            "log": str(log.resolve()),
+        },
+        "routing_orchestration_enabled": enabled,
+    }
 
 
 def cmd_dashboard(args: argparse.Namespace) -> CommandResult:
@@ -832,7 +854,11 @@ def render(command: str, result: CommandResult) -> str:
             f"{unanswerable} question(s) the record cannot answer"
         )
     if command == "doctor":
-        lines = []
+        provenance = result["provenance"]
+        lines = [
+            f"code: {provenance['code']}",
+            f"data: {provenance['data']}  log: {provenance['log']}",
+        ]
         for name, gate in result["gates"].items():
             lines.append(f"Gate {name}: {gate['status'].replace('_', '-').upper()}")
             for condition in gate["conditions"]:
@@ -945,11 +971,36 @@ DEFAULTS: dict[str, object] = {
 }
 
 
+def _foreign_tree() -> str | None:
+    """Refuse when the directory being measured is a checkout other than the code's own.
+
+    Fires only in the ambiguous case. An ordinary repository has no `src/consilient/cli.py`
+    and is left alone, which matters because measuring other people's repositories is what
+    this tool is for -- a check that fired there would be refusing its own purpose.
+    """
+    cwd = Path.cwd().resolve()
+    if cwd == CODE_TREE or not (cwd / "src" / "consilient" / "cli.py").exists():
+        return None
+    return (
+        f"refusing to measure {cwd} with code from {CODE_TREE}. Those are not the same "
+        "tree, so anything reported would be the second one's answer about the first "
+        "one's data. Install this checkout in its own virtualenv, or set "
+        f"PYTHONPATH={cwd / 'src'}."
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     for name, value in DEFAULTS.items():
         if not hasattr(args, name):
             setattr(args, name, value)
+    refusal = _foreign_tree()
+    if refusal is not None:
+        print(
+            json.dumps({"error": refusal}) if args.json else f"error: {refusal}",
+            file=sys.stderr,
+        )
+        return 2
     try:
         result = args.handler(args)
     except (EventError, projection.ProjectionError) as exc:

@@ -4398,3 +4398,79 @@ def test_verdict_script_refuses_to_guess_what_the_checks_said(tmp_path):
         # --log is passed only so that a regression here writes to a temporary
         # directory rather than into the real trajectory.
         module.main(["reject", "no checks named", "--log", str(tmp_path / "log")])
+
+# ------------------------------- which tree measured which tree, 21 August 2026
+
+
+def test_consil_refuses_to_measure_a_checkout_other_than_its_own(
+    tmp_path, monkeypatch, capsys
+):
+    """The instrument may not report one worktree's answers about another's data.
+
+    Measured 21 August 2026 on the machine this was written on: a single interpreter-global
+    editable install put one worktree's `src` on `sys.path` for every process, and no
+    tree's own `src` was on it, because a src layout means the working directory never
+    contains `consilient/`. Standing in this checkout, `python -m consilient.cli doctor`
+    read this checkout's log with the other checkout's code and reported Gate A1 `PASS`,
+    exit 0; the code in this tree reported A1 `FAIL`, exit 1, on the same log in the same
+    directory. Two agents were misled by it in one night, one reporting the wrong gate
+    state and one reading the wrong exit code.
+
+    Code identity is settled by `sys.path` before any of this runs and data identity by the
+    working directory, so this cannot be made impossible from inside the package -- only
+    refused once both are known.
+    """
+    from consilient import cli as cli_mod
+
+    foreign = tmp_path / "consilient-w-other"
+    (foreign / "src" / "consilient").mkdir(parents=True)
+    (foreign / "src" / "consilient" / "cli.py").write_text("", encoding="utf-8")
+    monkeypatch.chdir(foreign)
+
+    code = main(["--json", "doctor"])
+
+    out, err = capsys.readouterr()
+    assert code == 2, "a foreign checkout was measured and the caller was not told"
+    assert out == "", "a refused run printed a gate report anyway"
+    message = json.loads(err)["error"]
+    assert str(foreign.resolve()) in message, message
+    assert str(cli_mod.CODE_TREE) in message, message
+
+    # The two cases that must NOT be refused. Without these the guard could be an
+    # unconditional refusal, which would be refusing the tool's own purpose.
+    ordinary = tmp_path / "someones-repository"
+    ordinary.mkdir()
+    monkeypatch.chdir(ordinary)
+    assert cli_mod._foreign_tree() is None, (
+        "measuring somebody else's repository is what this tool is for"
+    )
+    monkeypatch.chdir(cli_mod.CODE_TREE)
+    assert cli_mod._foreign_tree() is None, "the code's own checkout must measure itself"
+
+
+def test_doctor_states_which_code_measured_which_directory(tmp_path, capsys):
+    """The refusal cannot fire in an ordinary repository, so doctor says it unprompted.
+
+    An ordinary repository has no `src/consilient/cli.py`, so the wrong-tree case there is
+    undetectable from inside the package and the only defence is that the report names the
+    code it came from. `consil doctor --json` carried no provenance at all until 21 August
+    2026 [measured]: its keys were exactly `gates` and `routing_orchestration_enabled`, so
+    a transcript of a run could not be audited for which tree produced it.
+    """
+    from consilient import cli as cli_mod
+
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+    payload = doctor_payload(tmp_path, capsys)
+
+    assert payload["provenance"] == {
+        "code": str(cli_mod.CODE_TREE),
+        "data": str(Path.cwd().resolve()),
+        "log": str((tmp_path / "log").resolve()),
+    }
+    rendered = cli_mod.render("doctor", payload).splitlines()
+    assert rendered[0] == f"code: {cli_mod.CODE_TREE}", (
+        "the human rendering lost the provenance line; that is the form an agent pastes "
+        "into a transcript, and the only place the wrong tree stays visible afterwards"
+    )
+    assert str((tmp_path / "log").resolve()) in rendered[1], rendered[1]
