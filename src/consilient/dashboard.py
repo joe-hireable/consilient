@@ -626,9 +626,9 @@ CSS = """
   --ground:#0C0E12; --surface:#14171E; --raised:#1C202A;
   --ink:#F0F2F5; --ink-2:#C4C9D4; --muted:#8B93A5; --rule:#2A2F3D;
   --accent:#E2B340; --accent-soft:#2A2412;
-  --pass:#22C55E; --pass-bg:#0F2418;
-  --fail:#EF4444; --fail-bg:#2D1416;
-  --unknown:#F59E0B; --unknown-bg:#2B1F0E;
+  --pass:#2E9E66; --pass-bg:#11261C;
+  --fail:#E05349; --fail-bg:#2D1617;
+  --unknown:#DDA136; --unknown-bg:#2B2012;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
   --sans:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --serif:"Syne","Cabinet Grotesk",ui-sans-serif,system-ui,-apple-system,sans-serif;
@@ -638,27 +638,27 @@ CSS = """
   --ground:#F6F7F9; --surface:#FFFFFF; --raised:#ECEEF2;
   --ink:#0C0E12; --ink-2:#3D4453; --muted:#6F778A; --rule:#D6DAE2;
   --accent:#B88714; --accent-soft:#FAF2DE;
-  --pass:#16A34A; --pass-bg:#E9F8EE;
-  --fail:#DC2626; --fail-bg:#FEE8E8;
-  --unknown:#D97706; --unknown-bg:#FEF3DC;
+  --pass:#23864F; --pass-bg:#E9F6EF;
+  --fail:#C53030; --fail-bg:#FDE8E8;
+  --unknown:#B57414; --unknown-bg:#FCF4E4;
   --shadow:0 1px 2px rgba(12,14,18,.04),0 8px 20px -8px rgba(12,14,18,.12);
 }}
 :root[data-theme="dark"]{
   --ground:#0C0E12; --surface:#14171E; --raised:#1C202A;
   --ink:#F0F2F5; --ink-2:#C4C9D4; --muted:#8B93A5; --rule:#2A2F3D;
   --accent:#E2B340; --accent-soft:#2A2412;
-  --pass:#22C55E; --pass-bg:#0F2418;
-  --fail:#EF4444; --fail-bg:#2D1416;
-  --unknown:#F59E0B; --unknown-bg:#2B1F0E;
+  --pass:#2E9E66; --pass-bg:#11261C;
+  --fail:#E05349; --fail-bg:#2D1617;
+  --unknown:#DDA136; --unknown-bg:#2B2012;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
 }
 :root[data-theme="light"]{
   --ground:#F6F7F9; --surface:#FFFFFF; --raised:#ECEEF2;
   --ink:#0C0E12; --ink-2:#3D4453; --muted:#6F778A; --rule:#D6DAE2;
   --accent:#B88714; --accent-soft:#FAF2DE;
-  --pass:#16A34A; --pass-bg:#E9F8EE;
-  --fail:#DC2626; --fail-bg:#FEE8E8;
-  --unknown:#D97706; --unknown-bg:#FEF3DC;
+  --pass:#23864F; --pass-bg:#E9F6EF;
+  --fail:#C53030; --fail-bg:#FDE8E8;
+  --unknown:#B57414; --unknown-bg:#FCF4E4;
   --shadow:0 1px 2px rgba(12,14,18,.04),0 8px 20px -8px rgba(12,14,18,.12);
 }
 body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
@@ -670,7 +670,8 @@ h2{font-size:21px;margin:0 0 4px}
 h3{font-size:16px;margin:0 0 2px}
 p{margin:0 0 12px;max-width:68ch}
 a{color:var(--accent)}
-code,.mono{font-family:var(--mono);font-size:.87em}
+code,.mono{font-family:var(--mono);font-size:.87em;font-variant-numeric:tabular-nums}
+td.num,.stat .n{font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)}
 .eyebrow{font-family:var(--sans);font-size:11px;font-weight:650;letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted)}

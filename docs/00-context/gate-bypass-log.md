@@ -29,7 +29,7 @@ paid it.
 
 | date | PR | tier | what was skipped | why | debt | paid by |
 |---|---|---|---|---|---|---|
-| 2026-08-21 | #1 | T2 | I1: token-lockdown invariant stated in ADR-0060 §1 without a shipped CI check | Aesthetic invariants are harder to lint than structural ones; the CI check (hex/font/radius verification against a declared DESIGN.md palette) requires implementation that is not yet scoped | Ship the check in the same commit as the first governed artefact | — |
+| 2026-08-21 | #1 | T2 | I1: token-lockdown invariant stated in ADR-0060 §1 without a shipped CI check | Aesthetic invariants are harder to lint than structural ones; the CI check (hex/font/radius verification against a declared DESIGN.md palette) requires implementation that is not yet scoped | Ship the check in the same commit as the first governed artefact | PR #2 (`check_design_tokens.py`) |
 
 ## When this log is the problem
 

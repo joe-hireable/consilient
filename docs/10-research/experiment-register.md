@@ -3305,29 +3305,35 @@ noise dressed as structure. If scores across independent reviewers do not correl
 claim that critique provides a structured second reading fails, and the critique is retired from
 the workflow.
 
-**Precondition:** (a) 5 rendered HTML artefacts representing diverse design states: 1 unstyled
-functional HTML, 1 generic AI-SaaS median layout, 1 polished compliant layout, 1 intentionally broken
-hierarchy/alignment fixture, and 1 distinctive outlier design. (b) 2 independent model families
-(e.g. Claude Code via Sonnet 4.5 and Cursor via Composer 2.5 / Gemini 3.7) with zero shared context
-or prompt reasoning. (c) A frozen scoring harness extracting the 5 dimension scores (0–10).
+**Precondition:** (a) $n = 25$ rendered HTML artefacts representing diverse design states: 5 unstyled
+functional HTML, 5 generic AI-SaaS median layouts, 5 polished compliant layouts, 5 intentionally broken
+hierarchy/alignment fixtures, and 5 distinctive outlier designs. ($n = 25$ gives null SD $\sigma_\tau \approx 0.14$,
+ensuring $\tau = 0.40$ sits $>2.8\sigma$ from chance; $n = 5$ is underpowered at $0.98\sigma$).
+(b) 2 independent model families (e.g. Claude Code via Sonnet 4.5 and Cursor via Composer 2.5 / Gemini 3.7)
+with zero shared context or prompt reasoning. (c) A frozen scoring harness extracting the 5 dimension scores (0–10).
 
-**Procedure:** each model family scores each of the 5 artefacts independently against the 5 dimensions
+**Procedure:** each model family scores each of the 25 artefacts independently against the 5 dimensions
 (Philosophy consistency, Visual hierarchy, Detail execution, Functionality, Innovation), with cited
 evidence.
 
 **Measures:**
-- Kendall's rank correlation coefficient (τ) and Cohen's κ across all (artefact × dimension) pairs.
-- Per-dimension agreement rates: which dimensions show convergent signal vs divergence.
+- **Within-dimension Kendall's rank correlation ($\tau$)** computed separately per dimension (ranks taken
+  within dimension, eliminating the between-dimension baseline offset bias that inflates pooled correlations).
+- **Krippendorff's ordinal $\alpha$** (Krippendorff 2004) across the 0–10 ordinal scale — evaluating agreement
+  penalised by rank distance.
+- **Between-dimension vs within-dimension offset discrepancy:** $\tau_{\text{pooled}} - \bar{\tau}_{\text{within}}$,
+  measuring the extent to which pooled agreement is driven by shared pretraining priors rather than artefact discernment.
 - Citation validity rate: percentage of cited lines/elements that actually exist in the fixture.
 
 **Stopping rules (fixed before the run):**
-- Kendall τ ≥ **0.40** across dimensions and citation validity ≥ **0.85** ⟹ **confirms reliability**.
-  The critique is a weak but real structured observation. ADR-0060 §2 stands. [asserted]
-- Kendall τ < **0.20** across dimensions ⟹ **critique is noise**. Two models scoring the same page
-  produce unrelated numbers. ADR-0060 is superseded; the critique skill is retired from the active
-  workflow and reduced to an un-scored checklist. [asserted]
-- 0.20 ≤ τ < 0.40 ⟹ **marginal signal**. Keep Functionality and Detail (which track mechanical
-  properties); deprecate Philosophy and Innovation scoring. [asserted]
+- Mean within-dimension Kendall $\bar{\tau} \ge \mathbf{0.40}$ (Landis & Koch 1977 "fair/moderate" band)
+  and Krippendorff $\alpha \ge \mathbf{0.40}$ with citation validity $\ge \mathbf{0.85}$ ⟹
+  **confirms weak structured observation**. The critique provides a modest, verifiable second reading. ADR-0060 §2 stands. [asserted]
+- Mean within-dimension $\bar{\tau} < \mathbf{0.30}$ (matching ADR-0060 overturn condition) or Krippendorff $\alpha < \mathbf{0.30}$ ⟹
+  **critique is noise**. Two models scoring the same page produce unrelated rankings. ADR-0060 is superseded; the critique
+  skill is retired from the active workflow and reduced to an un-scored checklist. [asserted]
+- $0.30 \le \bar{\tau} < 0.40$ ⟹ **marginal signal**. Keep Functionality and Detail execution (which track
+  deterministic/mechanical properties); deprecate Philosophy and Innovation scoring. [asserted]
 
 **Blocks implementation? No.** ADR-0060 is PROVISIONAL; construction of the frontend DESIGN.md
 proceeds under the brand constraints regardless of the critique's inter-rater reliability.
