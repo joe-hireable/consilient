@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consilient Trajectory Observatory &middot; Causality &amp; Mutation Radar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0C0E12;
+      --surface-0: #14171E;
+      --surface-1: #1C202A;
+      --border: #2A2F3D;
+      --fg-primary: #F0F2F5;
+      --fg-secondary: #C4C9D4;
+      --fg-muted: #8B93A5;
+      --fg-tertiary: #8B93A5;
+
+      --action: #E2B340;
+      --action-tint: #2A2412;
+      --valid: #2E9E66;
+      --valid-tint: #11261C;
+      --attention: #DDA136;
+      --attention-tint: #2B2012;
+      --fault: #E05349;
+      --fault-tint: #2D1617;
+
+      --font-display: "Syne", "Cabinet Grotesk", ui-sans-serif, system-ui, sans-serif;
+      --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+      --font-mono: "Space Mono", "Fragment Mono", ui-monospace, SFMono-Regular, monospace;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg-primary);
+      font-family: var(--font-body);
+      font-size: 13.5px;
+      line-height: 1.55;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono, code, .num {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Top Bar */
+    header.obs-header {
+      background: var(--surface-0);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-group h1 {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 18px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .nav-links a {
+      color: var(--fg-muted);
+      text-decoration: none;
+    }
+
+    .nav-links a.active {
+      color: var(--fg-primary);
+      border-bottom: 2px solid var(--action);
+    }
+
+    /* Observatory Workspace Grid */
+    .obs-layout {
+      max-width: 1540px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 20px;
+      flex: 1;
+    }
+
+    .obs-card {
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card-head {
+      background: var(--surface-1);
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--fg-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    /* Mutation Census Visualizer */
+    .census-box {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .census-stat-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .stat-pill {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .stat-pill .k { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); text-transform: uppercase; }
+    .stat-pill .v { font-size: 20px; font-weight: 700; color: var(--fg-primary); margin-top: 2px; }
+
+    /* SVG Matrix Visualizer */
+    .matrix-chart {
+      width: 100%;
+      height: 180px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Time Scrubber Stream */
+    .timeline-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .event-row {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--valid);
+      border-radius: 6px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .event-row.decision {
+      border-left-color: var(--action);
+    }
+
+    .event-row.rejection {
+      border-left-color: var(--fault);
+    }
+
+    .event-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .event-kind {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--fg-primary);
+    }
+
+    .event-meta {
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    .event-hash {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--fg-muted);
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .tag.valid { color: var(--valid); background: var(--valid-tint); border-color: var(--valid); }
+    .tag.action { color: var(--action); background: var(--action-tint); border-color: var(--action); }
+
+    footer.bottom-bar {
+      background: var(--surface-0);
+      border-top: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="obs-header">
+    <div class="brand-group">
+      <h1>CONSILIENT</h1>
+      <span class="tag action">TRAJECTORY OBSERVATORY</span>
+      <span class="mono" style="color: var(--fg-muted);">audit &amp; causality matrix</span>
+    </div>
+    <nav class="nav-links">
+      <a href="bridge-command-post.html">01 &middot; Mission Bridge</a>
+      <a href="trajectory-observatory.html" class="active">02 &middot; Trajectory Observatory</a>
+      <a href="mobile-signer.html">03 &middot; Enclave Signer</a>
+    </nav>
+    <div class="mono" style="font-size: 11px; color: var(--fg-muted);">
+      SHA256: e7a9940 &middot; 108 EVENTS RECORDED
+    </div>
+  </header>
+
+  <!-- Observatory Layout -->
+  <main class="obs-layout">
+
+    <!-- Column 1: Time-Scrubbable Trajectory Stream -->
+    <section class="obs-card">
+      <div class="card-head">
+        <span>01 &middot; Trajectory Stream (.harness/log)</span>
+        <span class="tag valid">IMMUTABLE LOG</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size: 12px; color: var(--fg-muted);">
+          Every state transition is hash-chained. Replay identical verified over 108 events.
+        </div>
+
+        <div class="timeline-stream">
+          <div class="event-row decision">
+            <div class="event-content">
+              <span class="event-kind">verdict.human_accepted</span>
+              <span class="event-meta">Actor: joe-brown &middot; Task #142 (DESIGN.md token contract)</span>
+            </div>
+            <span class="event-hash">pos:108 &middot; c21cea8</span>
+          </div>
+
+          <div class="event-row">
+            <div class="event-content">
+              <span class="event-kind">harness.artefact_emitted</span>
+              <span class="event-meta">Actor: cursor-agent &middot; src/consilient/dashboard.py</span>
+            </div>
+            <span class="event-hash">pos:107 &middot; 7c68260</span>
+          </div>
+
+          <div class="event-row">
+            <div class="event-content">
+              <span class="event-kind">verifier.check_passed</span>
+              <span class="event-meta">Oracle: pytest (96) + mypy + check_design_tokens</span>
+            </div>
+            <span class="event-hash">pos:106 &middot; 18e7b4d</span>
+          </div>
+
+          <div class="event-row rejection">
+            <div class="event-content">
+              <span class="event-kind" style="color: var(--fault);">gate.refusal_enforced</span>
+              <span class="event-meta">Enforcement: foreign repository path boundary blocked</span>
+            </div>
+            <span class="event-hash">pos:105 &middot; a7d005a</span>
+          </div>
+
+          <div class="event-row">
+            <div class="event-content">
+              <span class="event-kind">dispatch.session_spawned</span>
+              <span class="event-meta">Composition: (coding, claude-code, anthropic, sonnet-4.5)</span>
+            </div>
+            <span class="event-hash">pos:104 &middot; b2e75e7</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Column 2: EXP-47/EXP-96 Mutation Census & Verifier Anchor -->
+    <section class="obs-card">
+      <div class="card-head">
+        <span>02 &middot; Mutation Census &amp; Beta-Meter (EXP-47)</span>
+        <span class="tag valid">EMPIRICAL PROOF</span>
+      </div>
+      <div class="card-body">
+
+        <div class="census-box">
+          <div class="census-stat-row">
+            <div class="stat-pill">
+              <div class="k">Seeded Mutants</div>
+              <div class="v mono num">1,931</div>
+            </div>
+            <div class="stat-pill">
+              <div class="k">True Defects</div>
+              <div class="v mono num" style="color: var(--valid);">1,871</div>
+            </div>
+            <div class="stat-pill">
+              <div class="k">Measured &beta;</div>
+              <div class="v mono num" style="color: var(--action);">0.3132</div>
+            </div>
+          </div>
+
+          <!-- Synthetic SVG Bar Breakdown -->
+          <div style="margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono); color: var(--fg-muted); margin-bottom: 6px;">
+              <span>Killed by Suite (1,285)</span>
+              <span>False Accepts / Escapes (586)</span>
+            </div>
+            <div style="height: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; display: flex;">
+              <div style="width: 68.7%; background: var(--valid);"></div>
+              <div style="width: 31.3%; background: var(--fault);"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="census-box">
+          <div style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--fg-muted);">
+            Check Independence &middot; Chi-Square Matrix
+          </div>
+          <div style="font-size: 12px; color: var(--fg-secondary); line-height: 1.5;">
+            Mutants surviving <span class="mono">pytest</span> survived <span class="mono">mypy</span> at <span class="mono" style="color: var(--fault);">87.89%</span> vs <span class="mono" style="color: var(--valid);">58.50%</span> for mutants pytest killed (<span class="mono">&chi;&sup2; = 187.28, p &lt; 1e-15</span>). Proves same-source static checks are strongly dependent.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Bar -->
+  <footer class="bottom-bar">
+    <div>CONSILIENT OBSERVATORY &middot; TRUTH DERIVED FROM APPEND-ONLY TRAJECTORY</div>
+    <div>MATHEMATICAL ORACLE BOUNDS &middot; NO LEARNED CONFIDENCE GRAPHS</div>
+  </footer>
+
+</body>
+</html>

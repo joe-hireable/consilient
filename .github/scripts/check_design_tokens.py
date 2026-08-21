@@ -31,6 +31,9 @@ GOVERNED_FILES = [
     Path("src/consilient/dashboard.py"),
     Path("docs/20-design/prototypes/web-workspace.html"),
     Path("docs/20-design/prototypes/mobile-verdict.html"),
+    Path("docs/20-design/prototypes/bridge-command-post.html"),
+    Path("docs/20-design/prototypes/trajectory-observatory.html"),
+    Path("docs/20-design/prototypes/mobile-signer.html"),
 ]
 
 
