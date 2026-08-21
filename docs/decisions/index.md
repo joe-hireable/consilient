@@ -120,4 +120,4 @@ to every ADR and every PR:
 - **0055** — PROVISIONAL pending EXP-74, EXP-75 and EXP-76; owes three enforcement checks (V0-30, V0-31, V0-32), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
 - **0056** — PROVISIONAL pending EXP-94 for the allocation clauses; D5 ships with its check.
 - **0060** — PROVISIONAL pending EXP-95 (critique inter-rater reliability); token-lockdown
-  CI check owed (I1 deviation logged in `gate-bypass-log.md`).
+  CI check shipped in PR #2 (`check_design_tokens.py`).
