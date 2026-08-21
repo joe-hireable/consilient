@@ -7,6 +7,7 @@ It is a small repository invariant check, not a general secret-management produc
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -34,10 +35,19 @@ COMBINED = "(" + ")|(".join(PATTERNS) + ")"
 SECRET_RE = re.compile(COMBINED)
 
 
+# Git exports GIT_DIR, GIT_INDEX_FILE and GIT_WORK_TREE into every hook it runs, and GIT_DIR
+# overrides cwd. Measured 21 August 2026: an unscrubbed `git ls-files` in
+# check_private_corpus.py read the hook's repository instead of the private corpus it was
+# pointed at, and the gate reported on a tree it had never opened. Every git subprocess in
+# .github/scripts now runs with these removed.
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def git(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
         cwd=ROOT,
+        env=GIT_ENV,
         text=True,
         encoding="utf-8",
         errors="replace",

@@ -6,6 +6,7 @@ the check that bans bypassing it, in the same commit.
 
 import argparse
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -2571,4 +2572,183 @@ def test_foreign_commit_identifiers_may_only_decrease():
     assert total <= 14, (
         f"foreign commit identifiers rose to {total}; publishing them would put another "
         "repository's commit history into a public one. Aggregate them instead."
+    )
+
+# ------------------------------------ the 21 Aug 2026 environment-leak repair, three invariants
+GATE_SCRIPTS = sorted(Path(".github/scripts").glob("check_*.py"))
+
+
+def _load_gate(name):
+    """Import a .github/scripts checker by path, without putting it on sys.path for good."""
+    import importlib.util
+
+    path = Path(".github/scripts") / name
+    if not path.exists():  # pragma: no cover - repository-only check
+        pytest.skip(f"{name} not present in this checkout")
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _tiny_repo(directory):
+    """A real git repository with one commit, for binding tests."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "kept.txt").write_text("x", encoding="utf-8")
+    for command in (
+        ["init", "-q"],
+        ["config", "user.email", "t@example.invalid"],
+        ["config", "user.name", "t"],
+        ["add", "."],
+        ["commit", "-qm", "c"],
+    ):
+        subprocess.run(
+            ["git", *command], cwd=directory, env=env, capture_output=True, check=True
+        )
+    return directory
+
+
+def test_gate_scripts_scrub_the_git_environment(tmp_path, monkeypatch):
+    """Git hands every hook GIT_DIR, and GIT_DIR overrides cwd.
+
+    Measured 21 August 2026: run standalone, `check_private_corpus.py` enumerated 2854
+    distinctive needles from the two private corpora and passed. Run from the `pre-push` hook
+    it enumerated **17**, because the inherited GIT_DIR sent both `git ls-files` calls to the
+    repository the hook came from. It then reported 2123 findings that were this repository's
+    own files matching themselves -- and, worse, would have reported PASS on a tree where those
+    seventeen wrong needles happened not to match.
+
+    Two assertions. The first is behavioural on the script that was actually unsound: poison
+    GIT_DIR and the enumeration must still describe the directory it was handed. The second is
+    structural across every checker, because behavioural coverage of all four is expensive and
+    the leak is a one-line omission that reappears the moment someone adds a git call.
+    """
+    module = _load_gate("check_private_corpus.py")
+    wanted = _tiny_repo(tmp_path / "wanted")
+    decoy = _tiny_repo(tmp_path / "decoy")
+    (decoy / "decoy-only.txt").write_text("y", encoding="utf-8")
+
+    monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
+    # GIT_ENV is captured at import; re-derive it the way the module does so the test proves
+    # the scrub itself and not a stale snapshot taken before monkeypatch ran.
+    monkeypatch.setattr(
+        module,
+        "GIT_ENV",
+        {k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    )
+    assert module.ls_files(wanted) == ["kept.txt"], (
+        "an inherited GIT_DIR redirected the enumeration to another repository"
+    )
+
+    assert len(GATE_SCRIPTS) >= 4, (
+        "the structural half of this test found nothing to check"
+    )
+    for script in GATE_SCRIPTS:
+        source = script.read_text(encoding="utf-8")
+        assert source.count("subprocess.run(") == source.count("env=GIT_ENV"), (
+            f"{script.name} spawns a subprocess without env=GIT_ENV; a git call that "
+            "inherits GIT_DIR reads whatever repository the hook came from"
+        )
+
+
+def test_corpus_enumeration_is_bound_to_the_corpus(tmp_path, monkeypatch):
+    """`--require-corpora` must mean "I read those corpora", not "those directories exist".
+
+    The old check was `(corpus / ".git").exists()` and nothing more. Under the environment leak
+    it printed "from 2 corpora" while enumerating a different repository entirely, so on a tree
+    where the wrong needles did not match, the one gate protecting private commercial code
+    would have reported PASS having read neither corpus. [measured 21 Aug 2026]
+
+    `cwd=` is a request. `git rev-parse --show-toplevel` is the answer, and a mismatch is now a
+    hard failure rather than a quiet substitution.
+    """
+    module = _load_gate("check_private_corpus.py")
+    repo = _tiny_repo(tmp_path / "repo")
+    inner = repo / "inner"
+    inner.mkdir()
+    # Tracked content inside `inner`, so `git ls-files` run from there returns a NON-EMPTY
+    # listing. Without it this test passes through the empty-listing branch instead of the
+    # binding check, and is inert against the mutation it exists to catch. Measured.
+    (inner / "inner.txt").write_text("y", encoding="utf-8")
+    for command in (["add", "."], ["commit", "-qm", "inner"]):
+        subprocess.run(
+            ["git", *command],
+            cwd=repo,
+            env=module.GIT_ENV,
+            capture_output=True,
+            check=True,
+        )
+
+    # A subdirectory of a repository: git answers happily, with the WRONG toplevel.
+    with pytest.raises(module.BindingError):
+        module.ls_files(inner)
+
+    # An empty listing is refused too: a corpus that yields no paths yields no needles, and a
+    # gate that checked nothing must never report PASS.
+    empty = _tiny_repo(tmp_path / "empty")
+    subprocess.run(
+        ["git", "rm", "-q", "kept.txt"],
+        cwd=empty,
+        env=module.GIT_ENV,
+        capture_output=True,
+        check=True,
+    )
+    with pytest.raises(module.BindingError):
+        module.ls_files(empty)
+
+    # And the failure must reach the exit status, not just the stack.
+    monkeypatch.setattr(module, "CORPORA", [inner])
+    monkeypatch.setattr(sys, "argv", ["check_private_corpus.py", "--require-corpora"])
+    (inner / ".git").mkdir()  # satisfies the old, insufficient presence test
+    assert module.main() == 1, (
+        "a corpus that could not be bound to its enumeration must fail the gate"
+    )
+
+
+def test_foreign_identifier_gate_can_pass_and_still_refuses_the_unknown():
+    """A condition that can never pass teaches people to bypass it.
+
+    `check_foreign_identifiers.py` exited non-zero on fourteen occurrences that had already
+    been examined and cleared, and `pre-push` refuses on any non-zero exit -- so the gate could
+    never pass, which is the defect catalogued in
+    `docs/00-context/four-of-seven-gate-conditions-cannot-pass-2026-08-20.md`.
+
+    The allowlist is the ratchet: it may shrink, never grow, and every entry carries a
+    justification. Entries are SHA-256 digests, so the allowlist cannot itself become the leak
+    and cannot trip its own detector.
+    """
+    module = _load_gate("check_foreign_identifiers.py")
+
+    assert len(module.ALLOWLIST) <= 12, (
+        f"the foreign-identifier allowlist grew to {len(module.ALLOWLIST)}; each entry means a "
+        "human tested that identifier against both private corpora. A ratchet only goes down."
+    )
+    assert all(reason.strip() for reason in module.ALLOWLIST.values()), (
+        "an allowlist entry without a justification is an unexplained exemption"
+    )
+    assert not module.allowlisted("0" * 40), (
+        "an unexamined identifier must never be allowlisted"
+    )
+    for digest in module.ALLOWLIST:
+        assert not module.SHA_RE.search(digest), (
+            "a stored digest that reads as a commit id would make this file its own finding"
+        )
+
+    # The gate must actually pass. This is the half that a wall fails.
+    script = Path(".github/scripts/check_foreign_identifiers.py")
+    if not script.exists():  # pragma: no cover - repository-only check
+        pytest.skip("checker not present in this checkout")
+    result = subprocess.run(
+        [sys.executable, str(script), "--self-test"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=600,
+    )
+    assert result.returncode == 0, (
+        "the foreign-identifier gate cannot pass on a clean tree, so pre-push can only ever "
+        f"refuse:\n{result.stdout}\n{result.stderr}"
     )
