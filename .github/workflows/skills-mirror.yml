@@ -1,13 +1,9 @@
 name: skills-mirror
-# ADR-0014: .agents/ is the source of truth; .claude/ holds symlinks into it.
-# A symlink cannot drift, so the only failure mode is someone replacing one with a
-# stale copy — this asserts they are still resolving symlinks (I1: the invariant
-# ships with its check).
+# ADR-0014: .agents/ is the source of truth. The Claude skills mirror is normally
+# a symlink, with an exact-copy fallback for Windows clones that cannot create one.
+# The checker accepts either representation and rejects content or tree drift.
 #
-# .claude/agents added 21 Aug 2026 on the same scheme. Note what this workflow CANNOT
-# see: a Windows clone with core.symlinks=false checks both paths out as ordinary text
-# files, so Claude Code loads nothing while this job stays green on a Linux runner. The
-# repair is per clone and is documented in .agents/skills/README.md.
+# .claude/agents remains symlink-only; its existing assertions stay separate.
 on:
   pull_request:
   push:
@@ -18,11 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: .claude mirrors are symlinks resolving into .agents
+      - name: .claude mirrors resolve into .agents without drift
         run: |
-          test -L .claude/skills
-          test -f .claude/skills/README.md
-          [ "$(readlink .claude/skills)" = "../.agents/skills" ]
+          python scripts/sync_skills.py --check
           test -L .claude/agents
           test -f .claude/agents/consilient-worker.md
           [ "$(readlink .claude/agents)" = "../.agents/agents" ]
