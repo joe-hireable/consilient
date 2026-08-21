@@ -1,0 +1,286 @@
+from __future__ import annotations
+
+import ast
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+CORE = ROOT / "src" / "consilient" / "capabilities.py"
+SCRIPT = ROOT / "scripts" / "capability_context.py"
+sys.path.insert(0, str(ROOT / "src"))
+
+from consilient.capabilities import (  # noqa: E402
+    CAPABILITY_KINDS,
+    CapabilityError,
+    select_capabilities,
+)
+
+
+def _inventory(*items: dict[str, object]) -> dict[str, object]:
+    return {"allowlist": list(items)}
+
+
+def _available(
+    kind: str,
+    name: str,
+    *,
+    provenance: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "kind": kind,
+        "name": name,
+        "available": True,
+        "provenance": provenance or [f"probe:{kind}:{name}"],
+    }
+
+
+def _request(*items: dict[str, object]) -> dict[str, object]:
+    return {"capabilities": list(items)}
+
+
+def _wanted(kind: str, name: str, reason: str = "needed by this task") -> dict[str, object]:
+    return {"kind": kind, "name": name, "reason": reason}
+
+
+def test_selects_exactly_the_five_capability_kinds_with_explanations() -> None:
+    assert CAPABILITY_KINDS == ("tool", "mcp", "skill", "plugin", "connection")
+    inventory = _inventory(
+        _available("connection", "github"),
+        _available("plugin", "obsidian"),
+        _available("skill", "citing-sources"),
+        _available("mcp", "filesystem"),
+        _available("tool", "pytest"),
+    )
+    task = _request(
+        _wanted("skill", "citing-sources", "attribute claims"),
+        _wanted("tool", "pytest", "run the verifier"),
+        _wanted("connection", "github", "read the named repository"),
+        _wanted("mcp", "filesystem", "read task files"),
+        _wanted("plugin", "obsidian", "use the requested note format"),
+    )
+
+    result = select_capabilities(inventory, task)
+
+    assert result == {
+        "schema_version": 1,
+        "capabilities": [
+            {
+                "kind": "tool",
+                "name": "pytest",
+                "provenance": ["probe:tool:pytest"],
+                "reason": "run the verifier",
+            },
+            {
+                "kind": "mcp",
+                "name": "filesystem",
+                "provenance": ["probe:mcp:filesystem"],
+                "reason": "read task files",
+            },
+            {
+                "kind": "skill",
+                "name": "citing-sources",
+                "provenance": ["probe:skill:citing-sources"],
+                "reason": "attribute claims",
+            },
+            {
+                "kind": "plugin",
+                "name": "obsidian",
+                "provenance": ["probe:plugin:obsidian"],
+                "reason": "use the requested note format",
+            },
+            {
+                "kind": "connection",
+                "name": "github",
+                "provenance": ["probe:connection:github"],
+                "reason": "read the named repository",
+            },
+        ],
+    }
+
+
+def test_unknown_and_unavailable_capabilities_refuse() -> None:
+    inventory = _inventory(
+        _available("tool", "pytest"),
+        {
+            "kind": "connection",
+            "name": "github",
+            "available": False,
+            "provenance": ["probe:connection:github"],
+        },
+    )
+
+    with pytest.raises(CapabilityError, match=r"unknown capability: mcp:missing"):
+        select_capabilities(inventory, _request(_wanted("mcp", "missing")))
+    with pytest.raises(CapabilityError, match=r"unavailable capability: connection:github"):
+        select_capabilities(inventory, _request(_wanted("connection", "github")))
+
+
+@pytest.mark.parametrize(
+    ("inventory", "task", "message"),
+    (
+        (_inventory(), {"capabilities": [], "domain": "code"}, "task request keys"),
+        (_inventory(), _request(_wanted("service", "github")), "kind"),
+        (_inventory(), _request({"kind": "tool", "name": "pytest"}), "keys"),
+        (_inventory(), _request(_wanted("tool", "bad name")), "name"),
+        (
+            _inventory(
+                {
+                    "kind": "tool",
+                    "name": "pytest",
+                    "available": "yes",
+                    "provenance": ["probe:tool:pytest"],
+                }
+            ),
+            _request(),
+            "available",
+        ),
+        (
+            _inventory(
+                {
+                    "kind": "tool",
+                    "name": "pytest",
+                    "available": True,
+                    "provenance": [],
+                }
+            ),
+            _request(),
+            "provenance",
+        ),
+    ),
+)
+def test_malformed_inventory_or_request_refuses(
+    inventory: object,
+    task: object,
+    message: str,
+) -> None:
+    with pytest.raises(CapabilityError, match=message):
+        select_capabilities(inventory, task)
+
+
+@pytest.mark.parametrize(
+    ("inventory", "task"),
+    (
+        (
+            _inventory(_available("tool", "pytest"), _available("tool", "pytest")),
+            _request(),
+        ),
+        (
+            _inventory(_available("tool", "pytest"), _available("tool", "PyTest")),
+            _request(),
+        ),
+        (
+            _inventory(_available("tool", "pytest")),
+            _request(_wanted("tool", "pytest"), _wanted("tool", "pytest")),
+        ),
+    ),
+)
+def test_duplicate_or_case_ambiguous_capabilities_refuse(
+    inventory: object,
+    task: object,
+) -> None:
+    with pytest.raises(CapabilityError, match="duplicate or ambiguous"):
+        select_capabilities(inventory, task)
+
+
+def test_selection_is_canonical_across_input_order() -> None:
+    entries = [_available("plugin", "zeta"), _available("plugin", "alpha")]
+    wanted = [_wanted("plugin", "zeta"), _wanted("plugin", "alpha")]
+    forward = select_capabilities(_inventory(*entries), _request(*wanted))
+    reverse = select_capabilities(
+        _inventory(*reversed(entries)),
+        _request(*reversed(wanted)),
+    )
+    assert forward == reverse
+    assert [item["name"] for item in forward["capabilities"]] == ["alpha", "zeta"]
+
+
+def test_script_emits_the_same_portable_json_without_network(tmp_path: Path) -> None:
+    inventory = tmp_path / "inventory.json"
+    task = tmp_path / "task.json"
+    inventory.write_text(
+        json.dumps(_inventory(_available("tool", "pytest"))), encoding="utf-8"
+    )
+    task.write_text(
+        json.dumps(_request(_wanted("tool", "pytest", "run checks"))),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [sys.executable, str(SCRIPT), str(inventory), str(task)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == select_capabilities(
+        json.loads(inventory.read_text(encoding="utf-8")),
+        json.loads(task.read_text(encoding="utf-8")),
+    )
+    assert set(json.loads(completed.stdout)) == {"schema_version", "capabilities"}
+
+
+def test_policy_module_is_pure_stdlib_policy() -> None:
+    tree = ast.parse(CORE.read_text(encoding="utf-8"))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".", 1)[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            imported.add((node.module or "").split(".", 1)[0])
+    assert imported <= {"__future__", "dataclasses", "re", "typing"}
+
+    forbidden_calls = {
+        "connect",
+        "getenv",
+        "open",
+        "read_text",
+        "request",
+        "run",
+        "urlopen",
+        "write_text",
+    }
+    called = {
+        node.func.id
+        if isinstance(node.func, ast.Name)
+        else node.func.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, (ast.Name, ast.Attribute))
+    }
+    assert called.isdisjoint(forbidden_calls)
+
+
+def test_policy_has_no_domain_or_document_mode_branch() -> None:
+    forbidden = {"code", "document", "domain", "mode"}
+    violations: list[str] = []
+    for path in (CORE, SCRIPT):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        predicates: list[ast.AST] = []
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.If, ast.IfExp, ast.While)):
+                predicates.append(node.test)
+            elif isinstance(node, ast.Match):
+                predicates.append(node.subject)
+            elif isinstance(node, ast.comprehension):
+                predicates.extend(node.ifs)
+        for predicate in predicates:
+            words: set[str] = set()
+            for part in ast.walk(predicate):
+                if isinstance(part, ast.Name):
+                    words.update(re.findall(r"[a-z]+", part.id.casefold()))
+                elif isinstance(part, ast.Attribute):
+                    words.update(re.findall(r"[a-z]+", part.attr.casefold()))
+                elif isinstance(part, ast.Constant) and isinstance(part.value, str):
+                    words.update(re.findall(r"[a-z]+", part.value.casefold()))
+            if words & forbidden:
+                violations.append(f"{path.name}:{predicate.lineno}")
+    assert not violations, f"domain-keyed branch found: {violations}"
