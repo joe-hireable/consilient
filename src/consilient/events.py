@@ -4,12 +4,20 @@ The append-only JSONL log is the record; everything else is a projection of it (
 
 Invariants enforced here, each with a test in the same commit:
   V0-01  every event is schema-versioned and append-only.
-  V0-18  a human decision is valid only when the human principal authored it.
+  V0-18  a human decision (approval, consent, gate lift, spend authorisation
+         or verdict) is valid only when the human principal authored it.
+  V0-22  every autonomous decision records a reversal path.
+  V0-23  an autonomous decision cannot claim a class reserved to the user.
+  V0-24  a recorded reversal has a machine-checkable executable shape.
   V0-26  multi-contributor events must declare a distinct evidence_class per contributor.
   V0-27  attempt outcomes and their later human verdicts share one stable identity.
   V0-28  a declared non-local channel cannot deliver a human decision.
   V0-30  a usage figure names its provenance; a provider that could not be read
          reports 'unavailable' and carries no number.
+  V0-31  a knowledge retrieval names its source, licence and retrieval date; an
+         unreachable source reports 'unavailable' and carries no invented content.
+  V0-41  a capability gap names what was asked, what was tried and how it failed, and
+         declares its closure; failure classes no retry can close must escalate.
 """
 
 from __future__ import annotations
@@ -37,6 +45,20 @@ REQUIRED = ("v", "ts", "event", "actor", "data")
 OUTCOME_KIND = "attempt.outcome"
 VERDICT_KIND = "attempt.verdict"
 VERDICT_CORRECTION_KIND = "attempt.verdict.correction"
+DECISION_KIND = "decision.autonomous"
+REVERSAL_KINDS = frozenset({"revert", "command", "inverse"})
+# ADR-0033 section 2: these are the exhaustive classes only the user may decide.
+USER_ONLY = frozenset(
+    {
+        "spend",  # Money leaving an account, or metered spend beyond an authorised cap | Not the harness's money
+        "credential",  # A credential, permission or authentication only the user holds | The harness cannot obtain it
+        "preference",  # A preferential question no fact settles | No experiment substitutes for a value judgement
+        "outside_safety_floor",  # An action outside the safety floor | Reserved by construction
+        "beta_verdict",  # The β verdict on an artefact | Human judgement is the ground truth being measured
+        "external_exposure",  # Publishing, transmitting or exposing anything beyond the machine | Irreversible and outward-facing
+        "gate_or_spec_approval",  # Lifting a gate, or approving a specification | Reserved to the principal
+    }
+)
 BUDGET_STATE_KIND = "budget.state"
 USAGE_KIND = "usage.observed"
 SPEND_RESERVED_KIND = "spend.reserved"
@@ -45,6 +67,12 @@ METERED_CURRENCY = "USD"
 BUDGET_STATE_ACTOR = "openrouter-probe"
 BUDGET_RESERVATION_ACTOR = "consilient.budget"
 USAGE_ACTOR = "consilient.usage"
+KNOWLEDGE_RETRIEVED_KIND = "knowledge.retrieved"
+KNOWLEDGE_ACTOR = "consilient.knowledge"
+KNOWLEDGE_STATUSES = frozenset({"ok", "unavailable", "not_configured"})
+CAPABILITY_GAP_KIND = "capability.gap"
+GAP_FAILURES = frozenset({"failed", "silent", "refused", "not_implemented"})
+GAP_CLOSURES = frozenset({"retry", "escalate"})
 # The project's evidence tags (AGENTS.md working principle 1). A usage figure that
 # cannot name which of these it is has no business being displayed as a number.
 PROVENANCE = frozenset({"measured", "cited", "asserted"})
@@ -63,11 +91,20 @@ TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\
 HUMAN_ONLY = frozenset(
     {
         "approval",
+        "consent",
         "gate_lift",
         "spend_authorisation",
         "verdict",
     }
 )
+
+# ADR-0057: sharing is opt-in, one purpose, private, used to improve Consilient only.
+# Pinning the set makes bundling a failing test rather than a comment. Expanding it is
+# an explicit decision; an existing grant does not become authority for a new purpose.
+CONSENT_GRANTED = "consent.granted"
+CONSENT_WITHDRAWN = "consent.withdrawn"
+CONSENT_KINDS = frozenset({CONSENT_GRANTED, CONSENT_WITHDRAWN})
+CONSENT_PURPOSES = frozenset({"improve-consilient"})
 
 
 class EventError(ValueError):
@@ -158,8 +195,12 @@ def validate(event: object) -> EventPayload:
 
     _check_budget_contract(event)
     _check_usage_contract(event)
+    _check_knowledge_contract(event)
+    _check_capability_gap_contract(event)
     _check_attempt_identity(event)
     _check_attempt_contract(event)
+    _check_consent_contract(event)
+    _check_decision_contract(event)
     _check_human_authority(event)
     _check_evidence_class(event)
     _check_dispatch_contract(event)
@@ -371,6 +412,82 @@ def _check_provenance(value: object, where: str) -> None:
         )
 
 
+def _check_knowledge_contract(event: EventPayload) -> None:
+    """V0-31: every retrieval carries source, licence and date; failures stay empty."""
+    if event["event"] != KNOWLEDGE_RETRIEVED_KIND:
+        return
+    if event["actor"] != KNOWLEDGE_ACTOR:
+        raise EventError(
+            f"{KNOWLEDGE_RETRIEVED_KIND} must be attributed to {KNOWLEDGE_ACTOR!r}"
+        )
+    data = event["data"]
+    for field in ("source_id", "source_url", "licence", "category", "retrieved_at", "status"):
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise EventError(f"{KNOWLEDGE_RETRIEVED_KIND} must carry a non-empty string {field}")
+    status = data["status"]
+    if status not in KNOWLEDGE_STATUSES:
+        raise EventError(
+            f"{KNOWLEDGE_RETRIEVED_KIND} status must be one of {sorted(KNOWLEDGE_STATUSES)}, "
+            f"got {status!r}"
+        )
+    retrieved_at = data["retrieved_at"]
+    if not TS.match(retrieved_at):
+        raise EventError(
+            f"{KNOWLEDGE_RETRIEVED_KIND} retrieved_at must be RFC3339 with an explicit offset"
+        )
+    if status == "ok":
+        if not isinstance(data.get("uri"), str) or not data["uri"].strip():
+            raise EventError(f"{KNOWLEDGE_RETRIEVED_KIND} with status 'ok' must carry uri")
+        digest = data.get("content_digest")
+        if not isinstance(digest, str) or len(digest) != 64:
+            raise EventError(
+                f"{KNOWLEDGE_RETRIEVED_KIND} with status 'ok' must carry a 64-char "
+                "content_digest"
+            )
+        if data.get("reason"):
+            raise EventError(
+                f"{KNOWLEDGE_RETRIEVED_KIND} with status 'ok' must not carry a failure reason"
+            )
+        return
+    reason = data.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise EventError(
+            f"{KNOWLEDGE_RETRIEVED_KIND} with status {status!r} must carry a non-empty reason"
+        )
+    if data.get("content_digest"):
+        raise EventError(
+            f"{KNOWLEDGE_RETRIEVED_KIND} with status {status!r} must not carry content_digest"
+        )
+
+
+def _check_capability_gap_contract(event: EventPayload) -> None:
+    """V0-41: a capability gap is a first-class record, not a conversation that vanished."""
+    if event["event"] != CAPABILITY_GAP_KIND:
+        return
+    data = event["data"]
+    for field in ("asked", "attempted", "detail", "repair", "run_id", "source"):
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise EventError(f"{CAPABILITY_GAP_KIND} must carry a non-empty string {field}")
+    failure = data.get("failure")
+    if failure not in GAP_FAILURES:
+        raise EventError(
+            f"{CAPABILITY_GAP_KIND} failure must be one of {sorted(GAP_FAILURES)}, "
+            f"got {failure!r}"
+        )
+    closure = data.get("closure")
+    if closure not in GAP_CLOSURES:
+        raise EventError(
+            f"{CAPABILITY_GAP_KIND} closure must be one of {sorted(GAP_CLOSURES)}, "
+            f"got {closure!r}"
+        )
+    if failure in {"silent", "not_implemented"} and closure == "retry":
+        raise EventError(
+            f"{CAPABILITY_GAP_KIND} with failure {failure!r} must escalate, not retry"
+        )
+
+
 def _check_evidence_class(event: EventPayload) -> None:
     """V0-26: multi-contributor events must declare a distinct evidence_class per contributor.
 
@@ -472,6 +589,90 @@ def _check_attempt_contract(event: EventPayload) -> None:
         raise EventError(f"{VERDICT_CORRECTION_KIND} must carry a non-empty reason")
 
 
+def _check_consent_contract(event: EventPayload) -> None:
+    """A consent event names a permitted purpose; a grant states a retention period.
+
+    ADR-0057 forbids shipping sharing until consent, retention and a checkable use
+    limit exist. The exporter is not in this commit. These two fields are the part
+    of that bar that can be enforced on the record itself: a grant with no purpose
+    or no retention is the gap the ADR named, and omitting `human_decision` must
+    not dodge V0-18 the way omitting it once dodged a verdict.
+    """
+    kind = event["event"]
+    if kind not in CONSENT_KINDS:
+        return
+    data = event["data"]
+    purpose = data.get("purpose")
+    if purpose not in CONSENT_PURPOSES:
+        raise EventError(
+            f"{kind} must declare purpose as one of {sorted(CONSENT_PURPOSES)}; "
+            "ADR-0057 permits sharing only to improve Consilient, and purposes "
+            "are not bundled"
+        )
+    if kind != CONSENT_GRANTED:
+        return
+    retention = data.get("retention_days")
+    if not isinstance(retention, int) or isinstance(retention, bool) or retention <= 0:
+        raise EventError(
+            f"{kind} must carry retention_days as a positive integer; "
+            "a grant with no stated retention is the gap ADR-0057 forbids shipping"
+        )
+
+
+def _check_decision_contract(event: EventPayload) -> None:
+    """V0-22/23/24: autonomous decisions are reversible and outside user-only classes."""
+    if event["event"] != DECISION_KIND:
+        return
+    data = event["data"]
+    for field in ("decision", "reasoning", "falsifier"):
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise EventError(
+                f"{DECISION_KIND} must carry {field} as a non-empty string"
+            )
+
+    if "reversal" not in data:
+        raise EventError(f"{DECISION_KIND} must carry reversal (V0-22)")
+    reversal = data["reversal"]
+    if not isinstance(reversal, dict):
+        raise EventError("reversal must be an object carrying kind and value")
+    kind = reversal.get("kind")
+    if not isinstance(kind, str) or kind not in REVERSAL_KINDS:
+        raise EventError(
+            f"reversal kind must be one of {sorted(REVERSAL_KINDS)}, got {kind!r}"
+        )
+    if "value" not in reversal:
+        raise EventError("reversal must carry value")
+
+    value = reversal["value"]
+    if kind == "revert":
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{7,40}", value) is None:
+            raise EventError(
+                "revert reversal value must be a 7-40 character commit sha"
+            )
+    elif kind == "command":
+        if (
+            not isinstance(value, list)
+            or not value
+            or any(not isinstance(token, str) or not token.strip() for token in value)
+        ):
+            raise EventError(
+                "command reversal value must be a non-empty argv token list"
+            )
+    elif (
+        not isinstance(value, str)
+        or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+", value)
+        is None
+    ):
+        raise EventError("inverse reversal value must be a dotted importable symbol")
+
+    decision_class = data.get("class")
+    if isinstance(decision_class, str) and decision_class in USER_ONLY:
+        raise EventError(
+            f"decision class {decision_class!r} is reserved to the user (V0-23)"
+        )
+
+
 def _check_human_authority(event: EventPayload) -> None:
     """V0-18: an agent may never author a human's decision.
 
@@ -501,6 +702,20 @@ def _check_human_authority(event: EventPayload) -> None:
             raise EventError(
                 f"event carries a human_verdict but declares human_decision {decision!r}; "
                 "a human verdict is a verdict and may not be filed as anything else (V0-18)"
+            )
+
+    # Same shape for consent. A `consent.granted` event *is* a human decision; if we
+    # returned early whenever `human_decision` was absent, an agent could author a
+    # share grant by omitting the field — the verdict hole, reproduced on the event
+    # that would authorise data leaving the machine.
+    if event["event"] in CONSENT_KINDS:
+        if decision is None:
+            decision = "consent"
+        elif decision != "consent":
+            raise EventError(
+                f"event {event['event']} carries human_decision {decision!r}; "
+                "a consent event is a consent and may not be filed as anything else "
+                "(V0-18)"
             )
 
     if decision is None:

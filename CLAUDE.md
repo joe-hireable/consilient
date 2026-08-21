@@ -15,7 +15,8 @@ research instruments, CI invariants, 45 ADRs and 47 registered experiments.
 **Entering the stage is not passing the gates**, and the distinction is the whole of your job
 here. `consil doctor` reports `routing_orchestration_enabled: false` and will keep doing so
 until every condition passes. Gate B governs *depending* on the harness for work on another
-repository — nothing may be pointed at `../hireable-3.0` or `../jobboard-v2`.
+repository. Supervised `--cwd` into a principal-named instance root is ADR-0063, not a
+gate pass. The unattended loop still refuses any workspace that is not this repository.
 
 Read in this order before doing anything:
 
@@ -51,8 +52,8 @@ Brainstorm, adversarially. Specifically:
 
 ## What not to do
 
-- Don't point the harness at any repository other than this one. Building orchestration is
-  authorised; depending on it elsewhere is Gate B, and Gate B is not passed.
+- Don't treat an instance cwd allowlist as Gate B passing. Building orchestration is
+  authorised; depending on it unattended elsewhere is Gate B, and Gate B is not passed.
 - **Don't put a secret anywhere a public repository can reach it** — not a commit, not
   repository settings, not Actions secrets. A capability needing one runs locally or not at
   all. (Joe, 20 Aug 2026.)

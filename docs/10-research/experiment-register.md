@@ -3295,53 +3295,184 @@ forbids waiting on it.
 **What it cannot decide:** k = 8 is an existence floor, not a rate. Nothing about the general
 population, about assistive technology, or about whether anyone returns a second time.
 
-### EXP-95 · Inter-rater reliability of the 5-dimension design critique `READY`
+---
 
-**Pre-registered 21 Aug 2026 under ADR-0060. Not run.**
+### EXP-96 · Two-corpus mutation proxy for verifier β `READY`
 
-**Decides:** whether the 5-dimension critique (`using-open-design/references/critique-upstream.md`)
-produces an inter-rater reliable signal across independent model families, or whether it is
-noise dressed as structure. If scores across independent reviewers do not correlate, ADR-0060 §2's
-claim that critique provides a structured second reading fails, and the critique is retired from
-the workflow.
+**Pre-registered 21 Aug 2026; no mutant verifier outcome inspected.** EXP-94 and EXP-95 were already
+claimed outside this register, so the collision rule in the dispatch brief assigned the next
+unused identifier. [measured]
 
-**Precondition:** (a) $n = 25$ rendered HTML artefacts representing diverse design states: 5 unstyled
-functional HTML, 5 generic AI-SaaS median layouts, 5 polished compliant layouts, 5 intentionally broken
-hierarchy/alignment fixtures, and 5 distinctive outlier designs. ($n = 25$ gives null SD $\sigma_\tau \approx 0.14$,
-ensuring $\tau = 0.40$ sits $>2.8\sigma$ from chance; $n = 5$ is underpowered at $0.98\sigma$).
-(b) 2 independent model families (e.g. Claude Code via Sonnet 4.5 and Cursor via Composer 2.5 / Gemini 3.7)
-with zero shared context or prompt reasoning. (c) A frozen scoring harness extracting the 5 dimension scores (0–10).
+**Decides:** whether a fixed seeded-fault instrument can produce a decision-grade estimate of
+the automated verifier's false-accept rate on two unrelated Python corpora, while exposing rather
+than absorbing semantically inert or ambiguous mutants. This is mutation-proxy β, a different
+estimand from human-verdict β; it cannot close Gate A1 and no gate reads it. [asserted]
 
-**Procedure:** each model family scores each of the 25 artefacts independently against the 5 dimensions
-(Philosophy consistency, Visual hierarchy, Detail execution, Functionality, Innovation), with cited
-evidence.
+**Precondition:** both pinned baselines pass their native local composites before mutation:
 
-**Measures:**
-- **Within-dimension Kendall's rank correlation ($\tau$)** computed separately per dimension (ranks taken
-  within dimension, eliminating the between-dimension baseline offset bias that inflates pooled correlations).
-- **Krippendorff's ordinal $\alpha$** (Krippendorff 2004) across the 0–10 ordinal scale — evaluating agreement
-  penalised by rank distance.
-- **Between-dimension vs within-dimension offset discrepancy:** $\tau_{\text{pooled}} - \bar{\tau}_{\text{within}}$,
-  measuring the extent to which pooled agreement is driven by shared pretraining priors rather than artefact discernment.
-- Citation validity rate: percentage of cited lines/elements that actually exist in the fixture.
+- Consilient at `e7a9940`, `src/consilient/*.py`, checked by `pytest tests -q`, strict `mypy`
+  over `src/consilient`, and `ruff check .`. [measured: revision and declared checks]
+- Pallets `itsdangerous` 2.2.0 at `096c8d42545d3b68ea21a4f890fb2b2d8979c0bd`,
+  `src/itsdangerous/*.py`, checked by its pytest suite, strict mypy configuration, and Ruff.
+  It was named before the run because it is a public, production Python library with a real
+  behaviour-oriented suite, multi-version CI, no relationship to Consilient, and a verification
+  history independent of this project's invariant-heavy suite. The shared check families keep
+  the composite comparable; the independently authored corpus and tests provide the different
+  verification regime ADR-0013 requires. [measured: repository metadata; asserted: selection]
 
-**Stopping rules (fixed before the run):**
-- Mean within-dimension Kendall $\bar{\tau} \ge \mathbf{0.40}$ (Landis & Koch 1977 "fair/moderate" band)
-  and Krippendorff $\alpha \ge \mathbf{0.40}$ with citation validity $\ge \mathbf{0.85}$ ⟹
-  **confirms weak structured observation**. The critique provides a modest, verifiable second reading. ADR-0060 §2 stands. [asserted]
-- Mean within-dimension $\bar{\tau} < \mathbf{0.30}$ (matching ADR-0060 overturn condition) or Krippendorff $\alpha < \mathbf{0.30}$ ⟹
-  **critique is noise**. Two models scoring the same page produce unrelated rankings. ADR-0060 is superseded; the critique
-  skill is retired from the active workflow and reduced to an un-scored checklist. [asserted]
-- $0.30 \le \bar{\tau} < 0.40$ ⟹ **marginal signal**. Keep Functionality and Detail execution (which track
-  deterministic/mechanical properties); deprecate Philosophy and Innovation scoring. [asserted]
+**Pre-run amendment, before any mutant verifier outcome:** `itsdangerous` sets Ruff `fix = true`, so its
+Ruff command is fixed as `ruff check --no-fix .` and the runner refuses any check that changes the
+complete input manifest. Its isolated experiment environment uses the repository's historical pins
+`pytest==8.1.1`, `mypy==1.9.0`, and `ruff==0.3.7`, plus its pinned test requirements; none is added
+to Consilient. Consilient uses the already-installed `pytest==9.0.3`, `mypy==2.3.1`, and
+`ruff==0.15.10`. Both tool contracts refuse version drift; pytest plugin autoload and ambient
+Git/tool-control variables are disabled. [measured: configurations and host versions; asserted:
+isolated-environment contract]
 
-**Blocks implementation? No.** ADR-0060 is PROVISIONAL; construction of the frontend DESIGN.md
-proceeds under the brand constraints regardless of the critique's inter-rater reliability.
+**Pre-run instrument-hardening amendment, before any mutant verifier outcome:** the pinned
+Consilient corpus is a local history-preserving clone because its native tests read older public
+Git objects. Every mutant runs in a new temporary working tree; only read-only Git object storage
+is shared. Check processes are contained in a kill-on-close Windows Job Object or a POSIX process
+group, and unexpected tool exit codes are execution errors rather than rejections. An atomic
+`O_EXCL` output lock refuses concurrent writers. A CLI mutant enters the frozen help-metadata class
+only when the mutated LibCST node is the keyword's string value, not merely because another
+mutation shares a line containing `help=`. [measured: native test and EXP-49/EXP-31 failure modes;
+asserted: instrument controls]
 
-**What it cannot decide:** whether model critique correlates with human aesthetic preference. It
-measures inter-model convergence only. Human preference is an external oracle (Q24).
+`mutmut==3.7.0` with LibCST generates a complete first-order census using the six operator
+families fixed by EXP-47: comparison, boolean/logical, binary/arithmetic, unary,
+constant/literal, and statement mutation. No test file is mutated. [cited: EXP-47]
+
+**Procedure:**
+
+1. Record each corpus revision, source/test manifest, engine version, baseline outputs, generated
+   mutant receipt, and every per-mutant verifier outcome. Refuse input drift, a failed baseline,
+   an execution error, a timeout, or an incomplete census; none is counted as a killed mutant.
+   Subprocess timeouts kill the process tree. [asserted]
+2. Generate each mutant once with mutmut/LibCST, then run the three checks independently in a fresh
+   temporary copy. Composite acceptance means all three checks accept. [asserted]
+3. Freeze EXP-47's four equivalent classes exactly:
+   `docstring_mutation`, `sql_case_insensitive_mutation`, `cli_help_metadata_string`, and
+   `dataclass_default_caveat_string`. No fifth class may be added after outcomes are visible.
+   [cited: EXP-47]
+4. Classify every mutant before its verifier outcome is inspected, so rejected ambiguous or
+   equivalent mutants cannot silently enter the known-bad denominator. A frozen-class match is
+   `equivalent`; a pure string/presentation or annotation/default-metadata mutation outside those
+   classes is `unclassifiable`, never silently equivalent; other mutations are `true_defect` under
+   the seeded-fault proxy. Report the accepted survivors in those same three classes per corpus.
+   Do not pool β: the two repositories use different verifier versions and configurations, so a
+   mutant-count-weighted mixture would not estimate either corpus-verifier pair. [asserted]
+5. Let `K` and `D` be rejected and accepted `true_defect` mutants, `E` all frozen equivalents,
+   and `U_R` and `U_A` rejected and accepted unclassifiable mutants. On a complete run assert
+   `N = K + D + E + U_R + U_A`. Report classifiable proxy β as `D / (K + D)` with a Wilson
+   95% interval. Never fold an unclassifiable into the point estimate. Its partial-identification
+   range is `D / (K + D + U_R)` to `(D + U_A) / (K + D + U_A)`. [algebra]
+6. Report known-inert contamination `E/N`, unresolved contamination `(U_R+U_A)/N`, the possible
+   inertness range `[E/N, (E+U_R+U_A)/N]`, and the corresponding survivor shares. EXP-48's
+   75.41% is only
+   P2-unmatched spatial clusters (46/61), not this contamination measure. [cited: EXP-48]
+
+**Measures:** per-corpus classifiable mutation-proxy β with Wilson 95% intervals and sample counts;
+partial-identification ranges; `E`, `U`, and contamination rates; per-check and
+composite outcomes; census completeness; wall-clock cost. No result is human-verdict β. [asserted]
+
+**Stopping rule:** the measurement completes only if both baselines pass, both censuses complete,
+each corpus has at least 50 classifiable non-equivalent mutants, and every per-corpus Wilson 95%
+interval for classifiable composite β has half-width at most 0.05. Otherwise record
+`insufficient_evidence`. If `U/N > 0.10` in either corpus or that
+corpus's partial-identification range is wider than 0.10, the contamination rule fires: retain the
+measurement but mark it non-decision-grade. Either outcome leaves A1 and
+`routing_orchestration_enabled` unchanged. [asserted]
+
+**Largest plausible effect:** the proxy could range from 0 to 1 and could establish or retire this
+mutation instrument for verifier hardening. It cannot validate human labels, identify the natural
+distribution of developer faults, close Gate A1, or authorise routing. [asserted]
+
+**What it cannot decide:** generalisation beyond Python; higher-order or multi-file defects;
+whether mutmut's operator distribution resembles real bad artefacts; whether an unclassifiable
+mutant is actually inert; human-verdict β; or any gate condition. The nominal Wilson coverage
+treats classified mutants as binomial trials, while mutations from the same source are clustered
+and not independent; the half-width may therefore be pseudo-precision. [asserted]
 
 ---
+
+### EXP-78 · Does the native promoter false-accept independently-known-bad self-modifications? `DONE 21 Aug 2026 — insufficient_evidence, see experiments/exp78/findings-exp78.md`
+
+**Pre-registered 21 Aug 2026; no promoter outcome inspected.** EXP-94 and EXP-95 are claimed
+outside this register, EXP-96 is the in-flight two-corpus mutation instrument, EXP-90–93 and
+EXP-70–77 are taken. EXP-78 is the first unused identifier in the 65–89 block the EXP-90 note
+left free; it is not highest-plus-one. [measured: register headings]
+
+**Decides:** whether the native self-improvement promoter (ADR-0018, ADR-0065) can ever accept
+a candidate, or must stay refuse-closed. The loop itself is not the claim. The claim is the
+promoter's false-accept rate against a population of self-modifications known to be bad
+*independently of the promoter*. [asserted]
+
+**Precondition:** (a) `src/consilient/promote.py` exists, native, AST-locked, disabled by
+default. (b) a fixture solver and its **visible** training tasks are committed under
+`experiments/exp78/` before any mutant is generated, and are never edited afterwards.
+(c) a held-out oracle is committed in the same directory, **imported only by the experiment
+runner**, never by the promoter. (d) seeded-fault operators are frozen to EXP-47's six
+families: comparison, boolean/logical, binary/arithmetic, unary, constant/literal, statement.
+No seventh family may be added after outcomes are visible. [cited: EXP-47] EXP-96's live
+runner and corpora are not imported: another agent owns those untracked files. This experiment
+reuses the operator families, the Wilson estimator in `consilient.beta`, and the
+true_defect / equivalent / unclassifiable classification, on a fixture the promoter can
+execute without colliding with EXP-96. [asserted]
+
+**Procedure:**
+
+1. Classify each candidate against the held-out oracle *before* the promoter sees it. A
+   candidate whose held-out score is below the helpful parent's is `true_defect`. One that
+   matches the parent on both training and held-out is `equivalent`. Anything else is
+   `unclassifiable`. The promoter never receives the oracle or the class. [asserted]
+2. Execute every candidate on the visible training tasks. That execution is the only
+   improvement evidence the promoter may see. A candidate that is not executed cannot be
+   promoted. [asserted]
+3. Present every `true_defect` to the **production** promoter: `enabled=False`, live β from
+   `consilient.beta.compute` on an empty trajectory (insufficient_data). [asserted]
+4. Present the same population to the **counterfactual** promoter: `enabled=True`, with a
+   fabricated `measured` β of 0.19 from 30 rejections — below ADR-0018's 0.20 persistence
+   threshold and labelled counterfactual in the result artefact. This arm cannot write a
+   promotion into the real trajectory and cannot authorise `--apply`. [asserted]
+5. Include one Goodhart parent that raises the visible training score while scoring 0 on
+   the held-out oracle (the Live-SWE-agent shape). It is a `true_defect` by rule 1. [asserted]
+
+**Measures:** production and counterfactual false-accept rates on `true_defect` candidates,
+each with a Wilson 95% interval; `n` true_defect / equivalent / unclassifiable; whether any
+production promotion was recorded; whether `routing_orchestration_enabled` moved. This is a
+mutation-proxy of *promoter* β, a different estimand from EXP-96's verifier β and from
+human-verdict β. It cannot close Gate A1. [asserted]
+
+**Stopping rule, fixed before any promoter outcome:**
+
+- Complete only if `n_true_defect >= 30`. Otherwise record `insufficient_evidence`, no point
+  estimate, and the live loop stays refuse-closed.
+- **Production promoter:** any true_defect promoted is an invariant failure, not an experiment
+  outcome — the test suite must fail. Expected false-accepts = 0. Report the Wilson interval
+  on 0/`n`.
+- **Counterfactual promoter:** if the Wilson 95% lower bound on false-accept rate is `> 0.20`,
+  the inner predicate is too weak to ever open and the loop stays refuse-closed. If the upper
+  bound is `< 0.05`, the fixture predicate is provisionally tight — **not** a licence to open
+  the live loop, because a fixture is not the harness. Otherwise report the interval and do
+  not open the loop.
+- Either outcome leaves `routing_orchestration_enabled` unchanged. [asserted]
+
+**Largest plausible effect (ADR-0050):** the inner predicate could false-accept every Goodhart
+candidate (rate 1) or none (rate 0). That changes whether the loop may ever be *opened*, not
+whether the refuse-closed promoter gets built. A high rate is the Live-SWE-agent 44%→14%
+shape on this fixture. [asserted]
+
+**Blocks construction? No** for the refuse-closed loop (ADR-0050 test 2: the largest effect
+does not change *what* is built). **Yes** for opening the loop: an unmeasured promoter β is
+a fabricated measurement, and the loop must refuse. [asserted]
+
+**What it cannot decide:** human-verdict promoter β; generalisation from the fixture to
+`src/consilient`; whether a real multi-generation archive would degrade the harness; Gate A
+or Gate B; EXP-12's compounding claim. [asserted]
+
+---
+
 
 ## Not experiments
 

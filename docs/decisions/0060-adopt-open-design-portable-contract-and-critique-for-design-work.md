@@ -310,20 +310,19 @@ design work should respect the ban list and the brand constraints.
 
 ## Enforcement
 
-- **Token-lockdown check:** shipped in `.github/scripts/check_design_tokens.py` and run in
-  `invariants.yml`. Verifies that all governed UI/CSS files strictly adhere to the declared
-  `DESIGN.md` color palette without undeclared inventions.
-- **Fails CI:** yes (`check_design_tokens.py --check`).
-- **Added in the same commit:** yes — shipped with PR #2 / `DESIGN.md`. Debt recorded in
-  `gate-bypass-log.md` is paid.
+- **Token-lockdown check:** owed, not shipped. The check would verify that colour hex
+  values, font-family declarations, and border-radius values in governed files match the
+  declared palette. When shipped, it goes in the same commit as the implementation (I1).
+  Until then, the deviation is logged in `docs/00-context/gate-bypass-log.md`.
+- **Fails CI:** not yet.
+- **Added in the same commit:** no — owed. This is an acknowledged I1 deviation.
 
 ## What would overturn this
 
-- **EXP-95 (critique inter-rater reliability):** two model families score 25 rendered HTML
-  fixtures on the five dimensions. If within-dimension rank correlations do not correlate
-  (mean within-dimension Kendall $\bar{\tau} < 0.30$ or Krippendorff $\alpha < 0.30$), the
-  critique is noise. If they correlate ($\bar{\tau} \ge 0.40$), the critique is a weak but real
-  signal and §2's framing is vindicated.
+- **EXP-95 (critique inter-rater reliability):** two model families score the same five
+  rendered artefacts on the five dimensions. If scores do not correlate (Kendall τ < 0.3
+  across dimensions), the critique is noise. If they correlate, the critique is a weak but
+  real signal and §2's framing is vindicated.
 - **A systematic measurement of visual output convergence** across frontier models on a
   design-generation task. Doshi & Hauser measured text; if visual output does not converge,
   the ban list loses its empirical motivation. If it does converge on different elements than

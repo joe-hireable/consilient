@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from .events import Event, Rejection
+from .events import CAPABILITY_GAP_KIND, Event, Rejection
 
 # Every panel's payload is a differently-shaped JSON object at the render boundary, exactly
 # as `cli.CommandResult` is. Values are escaped at emit, never trusted here.
@@ -248,6 +248,84 @@ def _count_field(events: list[Event], fields: tuple[str, ...]) -> dict[str, int]
     return {f: sum(1 for e in events if f in e.data) for f in fields}
 
 
+def _capability_gaps(events: list[Event]) -> Payload:
+    """Capability gaps ranked by repetition — the strongest signal a gap carries.
+
+    Grouping is by the policy-normalised triple (failure, repair, attempted), never by
+    the verbatim detail, which embeds run-specific text. Two events with the same triple
+    are the same gap hit again; the view counts and orders, and performs no other
+    arithmetic. Per-user repetition — the same gap hit by several users — is the other
+    half of the ranking rule and is NOT recorded today: the trajectory has one
+    principal and gap events carry no user field. That absence is stated, not filled in.
+    """
+    groups: dict[tuple[str, str, str], Payload] = {}
+    total = 0
+    for event in events:
+        if event.kind != CAPABILITY_GAP_KIND:
+            continue
+        total += 1
+        data = event.data
+        key = (
+            str(data.get("failure", "")),
+            str(data.get("repair", "")),
+            str(data.get("attempted", "")),
+        )
+        row = groups.setdefault(
+            key,
+            {
+                "failure": key[0],
+                "repair": key[1],
+                "attempted": key[2],
+                "closure": str(data.get("closure", "")),
+                "count": 0,
+                "first_seen": event.raw["ts"],
+                "last_seen": event.raw["ts"],
+                "latest_asked": "",
+                "latest_detail": "",
+                "sources": [],
+            },
+        )
+        row["count"] += 1
+        if event.raw["ts"] < row["first_seen"]:
+            row["first_seen"] = event.raw["ts"]
+        if event.raw["ts"] >= row["last_seen"]:
+            row["last_seen"] = event.raw["ts"]
+            row["latest_asked"] = str(data.get("asked", ""))
+            row["latest_detail"] = str(data.get("detail", ""))
+            row["closure"] = str(data.get("closure", ""))
+        source = str(data.get("source", ""))
+        if source and source not in row["sources"]:
+            row["sources"].append(source)
+
+    rows = list(groups.values())
+    # Stable two-pass: recency order within an equal count, repetition dominating.
+    rows.sort(key=lambda r: str(r["last_seen"]), reverse=True)
+    rows.sort(key=lambda r: int(r["count"]), reverse=True)
+    return {
+        "total": total,
+        "distinct": len(rows),
+        "rows": rows,
+        "boundary": {
+            "retry": (
+                "The system may attempt these itself, and every attempt is recorded: a "
+                "pool window resetting, a live claim expiring, or one recorded "
+                "re-dispatch of a loudly failed run."
+            ),
+            "escalate": (
+                "A human must act: silent runs (the measured laundering path), "
+                "capabilities that are not implemented, and every refusal the policy "
+                "does not recognise. The record is the deliverable — an honest "
+                "escalation beats a quiet failure to self-heal."
+            ),
+            "per_user": (
+                "Repetition across several users is not recorded: the trajectory has "
+                "one principal and gap events carry no user field. Counts below are "
+                "per-installation."
+            ),
+        },
+    }
+
+
 def _gap(
     question: str, fields: tuple[str, ...], counts: dict[str, int], fix: str
 ) -> Payload:
@@ -459,6 +537,7 @@ def build_payload(
             for v, n in sorted(annotations.items(), key=lambda kv: -kv[1])
         ],
         "raci": _build_raci(events, roster, raci_counts, item_counts),
+        "capability_gaps": _capability_gaps(events),
         "usage": {
             "windows": [w.as_dict() for w in (usage_windows or [])],
             "note": usage_note or "",
@@ -622,56 +701,46 @@ def _short(value: object, limit: int = 46) -> str:
 CSS = """
 *,*::before,*::after{box-sizing:border-box}
 :root{
-  color-scheme:dark light;
-  --ground:#0C0E12; --surface:#14171E; --raised:#1C202A;
-  --ink:#F0F2F5; --ink-2:#C4C9D4; --muted:#8B93A5; --rule:#2A2F3D;
-  --accent:#E2B340; --accent-soft:#2A2412;
-  --pass:#2E9E66; --pass-bg:#11261C;
-  --fail:#E05349; --fail-bg:#2D1617;
-  --unknown:#DDA136; --unknown-bg:#2B2012;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
-  --sans:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-  --serif:"Syne","Cabinet Grotesk",ui-sans-serif,system-ui,-apple-system,sans-serif;
-  --mono:"Space Mono","Fragment Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light dark;
+  --ground:#faf9f7; --surface:#fff; --raised:#f3f1ed;
+  --ink:#1a1a18; --ink-2:#4a4843; --muted:#75726b; --rule:#e2ded7;
+  --accent:#2c6560; --accent-soft:#e3efed;
+  --pass:#2b6b3f; --pass-bg:#e8f2e9;
+  --fail:#a02c25; --fail-bg:#fbe9e7;
+  --unknown:#8a6314; --unknown-bg:#faf0dc;
+  --shadow:0 1px 2px rgba(26,26,24,.05),0 8px 24px -12px rgba(26,26,24,.18);
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --serif:ui-serif,Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
-  --ground:#F6F7F9; --surface:#FFFFFF; --raised:#ECEEF2;
-  --ink:#0C0E12; --ink-2:#3D4453; --muted:#6F778A; --rule:#D6DAE2;
-  --accent:#B88714; --accent-soft:#FAF2DE;
-  --pass:#23864F; --pass-bg:#E9F6EF;
-  --fail:#C53030; --fail-bg:#FDE8E8;
-  --unknown:#B57414; --unknown-bg:#FCF4E4;
-  --shadow:0 1px 2px rgba(12,14,18,.04),0 8px 20px -8px rgba(12,14,18,.12);
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#131417; --surface:#1a1c20; --raised:#22252a;
+  --ink:#eceae4; --ink-2:#c3c0b8; --muted:#918d84; --rule:#2e3138;
+  --accent:#5fb3ab; --accent-soft:#1b3330;
+  --pass:#74c288; --pass-bg:#16281c;
+  --fail:#f0897f; --fail-bg:#2e1817;
+  --unknown:#d9a441; --unknown-bg:#2b2213;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
 }}
 :root[data-theme="dark"]{
-  --ground:#0C0E12; --surface:#14171E; --raised:#1C202A;
-  --ink:#F0F2F5; --ink-2:#C4C9D4; --muted:#8B93A5; --rule:#2A2F3D;
-  --accent:#E2B340; --accent-soft:#2A2412;
-  --pass:#2E9E66; --pass-bg:#11261C;
-  --fail:#E05349; --fail-bg:#2D1617;
-  --unknown:#DDA136; --unknown-bg:#2B2012;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
-}
-:root[data-theme="light"]{
-  --ground:#F6F7F9; --surface:#FFFFFF; --raised:#ECEEF2;
-  --ink:#0C0E12; --ink-2:#3D4453; --muted:#6F778A; --rule:#D6DAE2;
-  --accent:#B88714; --accent-soft:#FAF2DE;
-  --pass:#23864F; --pass-bg:#E9F6EF;
-  --fail:#C53030; --fail-bg:#FDE8E8;
-  --unknown:#B57414; --unknown-bg:#FCF4E4;
-  --shadow:0 1px 2px rgba(12,14,18,.04),0 8px 20px -8px rgba(12,14,18,.12);
+  --ground:#131417; --surface:#1a1c20; --raised:#22252a;
+  --ink:#eceae4; --ink-2:#c3c0b8; --muted:#918d84; --rule:#2e3138;
+  --accent:#5fb3ab; --accent-soft:#1b3330;
+  --pass:#74c288; --pass-bg:#16281c;
+  --fail:#f0897f; --fail-bg:#2e1817;
+  --unknown:#d9a441; --unknown-bg:#2b2213;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
 }
 body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
   font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1180px;margin:0 auto;padding:32px 24px 96px}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 24px 96px}
 h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.011em;margin:0}
 h1{font-size:31px;line-height:1.2}
 h2{font-size:21px;margin:0 0 4px}
 h3{font-size:16px;margin:0 0 2px}
 p{margin:0 0 12px;max-width:68ch}
 a{color:var(--accent)}
-code,.mono{font-family:var(--mono);font-size:.87em;font-variant-numeric:tabular-nums}
-td.num,.stat .n{font-variant-numeric:tabular-nums}
+code,.mono{font-family:var(--mono);font-size:.87em}
 .muted{color:var(--muted)}
 .eyebrow{font-family:var(--sans);font-size:11px;font-weight:650;letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted)}
@@ -699,11 +768,13 @@ header.top .sub{color:var(--muted);font-size:13.5px;margin-top:6px}
 #t-agents:checked~.tabbar label[for=t-agents],
 #t-raci:checked~.tabbar label[for=t-raci],
 #t-usage:checked~.tabbar label[for=t-usage],
+#t-capgaps:checked~.tabbar label[for=t-capgaps],
 #t-gaps:checked~.tabbar label[for=t-gaps]{color:var(--ink);border-bottom-color:var(--accent)}
 #t-fleet:checked~.panels>#p-fleet,
 #t-agents:checked~.panels>#p-agents,
 #t-raci:checked~.panels>#p-raci,
 #t-usage:checked~.panels>#p-usage,
+#t-capgaps:checked~.panels>#p-capgaps,
 #t-gaps:checked~.panels>#p-gaps{display:block}
 
 /* ---- view-style switch inside the agents panel ---- */
@@ -1068,6 +1139,64 @@ def _raci_panel(payload: Payload) -> str:
     )
 
 
+def _capability_gaps_panel(payload: Payload) -> str:
+    gaps = payload["capability_gaps"]
+    head = (
+        "<h2>Capability gaps</h2>"
+        "<p>What users asked for that the harness could not do, recorded at the boundary "
+        "that detected it. Ranked by repetition: the same gap hit again outranks a novel "
+        "one. Each names what would close it and which side of the self-healing boundary "
+        "it sits on.</p>"
+    )
+    boundary = (
+        '<div class="card" style="border-left:3px solid var(--accent)">'
+        "<h3>The self-healing boundary</h3>"
+        f'<p style="font-size:13.5px"><strong>May retry:</strong> {_e(gaps["boundary"]["retry"])}</p>'
+        f'<p style="font-size:13.5px"><strong>Must escalate:</strong> {_e(gaps["boundary"]["escalate"])}</p>'
+        f'<p class="muted" style="font-size:12.5px">{_e(gaps["boundary"]["per_user"])}</p>'
+        "</div>"
+    )
+    if not gaps["rows"]:
+        return (
+            head
+            + boundary
+            + '<div class="empty">No capability gaps recorded. That is an absence of '
+            "records, not proof none occurred — a gap is only visible where a boundary "
+            "already detects it.</div>"
+        )
+    rows = []
+    for row in gaps["rows"]:
+        closure = str(row["closure"])
+        chip_colour = "--unknown" if closure == "retry" else "--fail"
+        rows.append(
+            "<tr>"
+            f'<td class="num"><strong>{_e(row["count"])}</strong></td>'
+            f'<td><span class="chip" style="color:var(--fail)">{_e(row["failure"])}</span></td>'
+            f"<td>{_e(row['attempted'])}</td>"
+            f"<td>{_e(_short(row['repair'], 72))}</td>"
+            f'<td><span class="chip" style="color:var({chip_colour})">{_e(closure)}</span></td>'
+            f'<td class="mono" style="font-size:11.5px">{_e(row["last_seen"])}</td>'
+            f"<td>{_e(_short(row['latest_detail'], 88))}"
+            f"<details><summary>latest ask</summary>"
+            f'<div class="body mono" style="font-size:12px">{_e(_short(row["latest_asked"], 400))}</div>'
+            f"</details></td>"
+            "</tr>"
+        )
+    return (
+        head
+        + boundary
+        + f'<p class="muted" style="font-size:13px">{_e(gaps["total"])} gap event(s), '
+        + _e(gaps["distinct"])
+        + " distinct gap(s). The full record is the trajectory; this view ranks and "
+        "points.</p>"
+        + '<div class="scroll"><table><thead><tr><th>Times</th><th>Failure</th>'
+        "<th>Attempted</th><th>What closes it</th><th>Closure</th><th>Last seen</th>"
+        "<th>Latest detail</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+    )
+
+
 def _gaps_panel(payload: Payload) -> str:
     cards = []
     for gap in payload["schema_gaps"]:
@@ -1210,12 +1339,14 @@ def render_html(payload: Payload) -> str:
   <input type="radio" name="tab" id="t-agents">
   <input type="radio" name="tab" id="t-raci">
   <input type="radio" name="tab" id="t-usage">
+  <input type="radio" name="tab" id="t-capgaps">
   <input type="radio" name="tab" id="t-gaps">
   <div class="tabbar">
     <label for="t-fleet">Readiness</label>
     <label for="t-agents">Agents</label>
     <label for="t-raci">RACI</label>
     <label for="t-usage">Usage &amp; limits</label>
+    <label for="t-capgaps">Capability gaps</label>
     <label for="t-gaps">Blind spots</label>
   </div>
   <div class="panels">
@@ -1257,6 +1388,7 @@ def render_html(payload: Payload) -> str:
 
     <section class="panel" id="p-raci">{_raci_panel(payload)}</section>
     <section class="panel" id="p-usage">{_usage_panel(payload)}</section>
+    <section class="panel" id="p-capgaps">{_capability_gaps_panel(payload)}</section>
     <section class="panel" id="p-gaps">{_gaps_panel(payload)}</section>
   </div>
 </div>

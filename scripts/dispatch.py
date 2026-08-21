@@ -7,7 +7,14 @@ surface stays {record, replay, beta, doctor} until the principal settles it.
     python scripts/dispatch.py --probe
     python scripts/dispatch.py "reply with the single word pong"
     python scripts/dispatch.py "reply with the single word pong" --fan-out
-    python scripts/dispatch.py --task-file brief.md --cwd C:/path/to/repo
+    python scripts/dispatch.py --task-file brief.md --cwd <this repository, or a subdirectory>
+
+`--cwd` accepts this repository (root, a git worktree of it, or a directory inside one
+of those) and, additionally, any directory named in the instance file
+`.harness/allowed-cwds.json` (ADR-0063). Any other path is refused, including on
+`--dry-run`. There is no override flag: Gate B, which governs *depending* on this
+harness for work on another repository, is not passed. Listing a root is supervised
+dispatch, not a gate pass.
 
 Never silently spends the exhausted pool. A harness that exits 0 having done nothing
 is recorded `silent` and is not retried on another pool.
@@ -25,18 +32,23 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from consilient import coordination  # noqa: E402
+from consilient.events import EventError, read_all  # noqa: E402
 from consilient.harness import (  # noqa: E402
+    DEFAULT_PERMISSION_MODE,
     DEFAULT_POOLS,
     HARNESSES,
     Decision,
     FanoutDecision,
     Harness,
+    PermissionMode,
     PoolState,
     Probe,
     classify_artefact,
@@ -44,17 +56,21 @@ from consilient.harness import (  # noqa: E402
     describe_registry,
     harness_by_id,
     judge_fanout,
+    load_permission_mode,
     load_pools,
     make_run_id,
     now_ts,
     parse_status,
+    permission_flags,
     record_fanout,
     record_outcome,
     record_refusal,
     select,
     select_fanout,
+    select_model,
     snapshot_mapping,
 )
+from consilient.recall import pack as pack_recall  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -64,6 +80,9 @@ if hasattr(sys.stderr, "reconfigure"):
 DEFAULT_LOG = ROOT / ".harness" / "log"
 DEFAULT_HEADROOM = ROOT / ".harness" / "headroom.json"
 DEFAULT_RUNS = ROOT / ".harness" / "dispatch"
+DEFAULT_PERMISSIONS = ROOT / ".harness" / "permissions.json"
+DEFAULT_ALLOWED_CWDS = ROOT / ".harness" / "allowed-cwds.json"
+DEFAULT_CURSOR_LOCK = ROOT / ".harness" / "cursor-agent.lock"
 CURSOR_WSL_BINARY = Path("/home/jpbpr/.local/bin/cursor-agent")
 GROK_CANDIDATES = (
     Path.home() / ".grok" / "bin" / "grok.exe",
@@ -100,6 +119,129 @@ def to_wsl_path(path: Path) -> str:
     if len(text) > 1 and text[1] == ":":
         return f"/mnt/{text[0].lower()}{text[2:]}"
     return text
+
+
+class ExclusiveFileLock:
+    """Process-exclusive lock. Two cursor-agent processes race ~/.cursor/cli-config.json
+    [measured]; this is the check that forbids that overlap. Dry-run must not enter it.
+    """
+
+    def __init__(self, path: Path, *, timeout_s: float) -> None:
+        self.path = path
+        self.timeout_s = timeout_s
+        self._fh: Any = None
+
+    def __enter__(self) -> ExclusiveFileLock:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        handle = open(self.path, "a+b")
+        self._fh = handle
+        deadline = time.monotonic() + max(0.0, self.timeout_s)
+        while True:
+            try:
+                self._lock_nonblocking()
+                return self
+            except OSError:
+                if time.monotonic() >= deadline:
+                    handle.close()
+                    self._fh = None
+                    raise TimeoutError(
+                        f"cursor-agent lock held: could not acquire {self.path} "
+                        f"within {self.timeout_s}s"
+                    ) from None
+                time.sleep(0.05)
+
+    def _lock_nonblocking(self) -> None:
+        handle = self._fh
+        if handle is None:
+            raise OSError("lock file is not open")
+        handle.seek(0)
+        if handle.read(1) == b"":
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def __exit__(self, *_exc: object) -> None:
+        handle = self._fh
+        if handle is None:
+            return
+        try:
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
+            self._fh = None
+
+
+def git_workspace(cwd: Path) -> tuple[Path, Path] | None:
+    """Return (absolute git dir, work tree) for cwd, or None if git cannot answer.
+
+    A linked worktree's `.git` is a file containing a Windows path. WSL git cannot
+    resolve that path (R4, measured again 21 August 2026 on a jobboard worktree).
+    Dispatch owns the translation; the child is not asked to.
+    """
+    git = which_binary("git")
+    if git is None:
+        return None
+    try:
+        completed = subprocess.run(
+            [
+                git,
+                "-C",
+                str(cwd.resolve()),
+                "rev-parse",
+                "--absolute-git-dir",
+                "--show-toplevel",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            env=GIT_ENV,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    lines = [line.strip() for line in (completed.stdout or "").splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    git_dir = Path(lines[0])
+    work_tree = Path(lines[1])
+    try:
+        git_dir = git_dir.resolve()
+        work_tree = work_tree.resolve()
+    except OSError:
+        return None
+    if not git_dir.exists() or not work_tree.is_dir():
+        return None
+    return git_dir, work_tree
+
+
+def wsl_git_exports(cwd: Path) -> str:
+    workspace = git_workspace(cwd)
+    if workspace is None:
+        return ""
+    git_dir, work_tree = workspace
+    return (
+        f"export GIT_DIR={shlex.quote(to_wsl_path(git_dir))} "
+        f"GIT_WORK_TREE={shlex.quote(to_wsl_path(work_tree))}; "
+    )
 
 
 def which_binary(name: str) -> str | None:
@@ -371,10 +513,47 @@ def git_diff_bytes(cwd: Path) -> int:
     return len((completed.stdout or "").encode("utf-8"))
 
 
-def write_brief(run_dir: Path, task: str) -> Path:
+RECALL_LIMIT_CHARS = 8000
+
+
+def write_brief(
+    run_dir: Path, task: str, *, log_dir: Path | None = None, in_flight: str = ""
+) -> Path:
+    """Write the task, plus a verbatim recall pack so the child is not amnesiac.
+
+    Cross-harness memory is the trajectory. Until 21 August 2026 this function
+    wrote the task alone, so Cursor could not see what Codex had just done.
+
+    The pack is written to `recall.md` beside the brief and referenced from the
+    brief, and also embedded — the embed is what a child that reads only its brief
+    still sees. Both are bounded at RECALL_LIMIT_CHARS; the bound is the point,
+    because an unbounded coordination section crowds the task out of the context
+    window. `in_flight` is the live-claims table rendered by the caller.
+    """
     path = (run_dir / "brief.md").resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(task, encoding="utf-8", newline="\n")
+    body = task if task.endswith("\n") else task + "\n"
+    if log_dir is not None:
+        try:
+            recall = pack_recall(
+                Path(log_dir), query=task[:240], limit_chars=RECALL_LIMIT_CHARS
+            )
+        except (OSError, ValueError):
+            recall = ""
+        if recall.strip() and "No events in log" not in recall:
+            recall_path = (run_dir / "recall.md").resolve()
+            recall_path.write_text(recall, encoding="utf-8", newline="\n")
+            body += (
+                "\n---\n\n## Context from the trajectory\n\n"
+                "A verbatim recall pack is recorded at `recall.md` beside this brief "
+                f"(bound: {RECALL_LIMIT_CHARS} characters) and embedded below.\n\n"
+            )
+            if in_flight.strip():
+                body += in_flight.strip() + "\n\n"
+            body += "---\n\n" + recall
+            if not body.endswith("\n"):
+                body += "\n"
+    path.write_text(body, encoding="utf-8", newline="\n")
     return path
 
 
@@ -392,15 +571,23 @@ def build_command(
     cwd: Path,
     brief: Path,
     model: str | None,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> list[str] | str:
     """Return argv, or a refusal reason string."""
     cwd = cwd.resolve()
     brief = brief.resolve()
+    bypass = list(permission_flags(harness.id, permissions))
+    instruction = (
+        f"Read the file {brief.as_posix()} and do exactly that task. "
+        "Do not wait for confirmation."
+    )
     if harness.id == "claude":
         binary = find_claude()
         if binary is None:
             return "claude is not on PATH"
-        return [binary, "-p", task]
+        return [binary, *bypass, "-p", instruction]
     if harness.id == "grok":
         metered = metered_grok_reason()
         if metered is not None:
@@ -409,29 +596,40 @@ def build_command(
         if binary is None:
             return "grok is not on PATH or in ~/.grok/bin"
         extra = optional_flags(help_text([binary]), "--always-approve")
-        return [binary, "-p", task, "--cwd", str(cwd), *extra]
+        for flag in bypass:
+            if flag not in extra:
+                extra.append(flag)
+        return [binary, "-p", instruction, "--cwd", str(cwd), *extra]
     if harness.id == "codex":
         binary = find_codex()
         if binary is None:
             return "codex is not on PATH"
         extra = optional_flags(help_text([binary, "exec"]), "--skip-git-repo-check")
+        for flag in bypass:
+            if flag not in extra:
+                extra.append(flag)
         # Insert extra flags before the prompt so they are not eaten as the task.
-        return [binary, "exec", "-C", str(cwd), *extra, task]
+        return [binary, "exec", "-C", str(cwd), *extra, instruction]
     if harness.id == "cursor-composer":
         chosen = model or DEFAULT_CURSOR_MODEL
-        if cursor_pool_for_model(chosen) == "cursor-other":
+        if model is None and (pools or family is not None):
+            selected = select_model(harness.id, pools=pools, family=family)
+            if isinstance(selected, str):
+                return selected
+            chosen = selected.id
+        if cursor_pool_for_model(chosen) == "cursor-other" and model is None:
             return (
-                f"refusing cursor model {chosen!r}: it draws on the Cursor Other Models "
-                "pool (claude-*/gpt-*/gemini-*), which the operator asked to avoid"
+                f"refusing default cursor model {chosen!r}: it draws on the Cursor Other "
+                "Models pool (claude-*/gpt-*/gemini-*). Automatic selection avoids that "
+                "pool; pass --model explicitly if you mean to spend it."
             )
         native = cursor_native()
-        instruction = (
-            f"Read the file {brief.as_posix()} and do exactly that task. "
-            "Do not wait for confirmation."
-        )
         extra: list[str] = []
         if native is not None:
             extra = optional_flags(help_text([native]), "--force", "--trust")
+            for flag in bypass:
+                if flag not in extra:
+                    extra.append(flag)
             return [
                 native,
                 "-p",
@@ -456,11 +654,17 @@ def build_command(
             "--force",
             "--trust",
         )
+        for flag in bypass:
+            if flag not in extra:
+                extra.append(flag)
         extra_s = (" " + " ".join(extra)) if extra else ""
         # The task body never enters the shell: only paths we created do.
+        # GIT_DIR/GIT_WORK_TREE are WSL paths so linked worktrees are repositories
+        # to WSL git (R4). Native cursor-agent is unchanged — it already sees NT paths.
         inner = (
-            f"cd {shlex.quote(wsl_cwd)} && cursor-agent -p --model {shlex.quote(chosen)} "
-            f"--output-format text{extra_s} {shlex.quote(wsl_instruction)}"
+            f"{wsl_git_exports(cwd)}cd {shlex.quote(wsl_cwd)} && cursor-agent -p "
+            f"--model {shlex.quote(chosen)} --output-format text{extra_s} "
+            f"{shlex.quote(wsl_instruction)}"
         )
         return [bridge, "-e", "bash", "-lc", inner]
     return f"no invocation for harness {harness.id}"
@@ -475,13 +679,27 @@ def run_harness(
     timeout_s: int,
     model: str | None,
     run_id: str,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    log_dir: Path | None = None,
+    in_flight: str = "",
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
-    brief = write_brief(run_dir, task)
+    brief = write_brief(run_dir, task, log_dir=log_dir, in_flight=in_flight)
     stdout_path = (run_dir / "stdout.txt").resolve()
     stderr_path = (run_dir / "stderr.txt").resolve()
-    built = build_command(harness, task=task, cwd=cwd, brief=brief, model=model)
+    built = build_command(
+        harness,
+        task=task,
+        cwd=cwd,
+        brief=brief,
+        model=model,
+        permissions=permissions,
+        family=family,
+        pools=pools,
+    )
     if isinstance(built, str):
         return RunResult(
             harness=harness,
@@ -500,16 +718,45 @@ def run_harness(
             stderr_path=str(stderr_path),
         )
     argv = built
-    env = dict(os.environ)
+    env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    code, timed_out, duration = run_process(
-        argv,
-        cwd=cwd,
-        stdout_path=stdout_path,
-        stderr_path=stderr_path,
-        timeout_s=timeout_s,
-        env=env,
-    )
+    try:
+        if harness.id == "cursor-composer":
+            with ExclusiveFileLock(DEFAULT_CURSOR_LOCK, timeout_s=float(timeout_s)):
+                code, timed_out, duration = run_process(
+                    argv,
+                    cwd=cwd,
+                    stdout_path=stdout_path,
+                    stderr_path=stderr_path,
+                    timeout_s=timeout_s,
+                    env=env,
+                )
+        else:
+            code, timed_out, duration = run_process(
+                argv,
+                cwd=cwd,
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+                timeout_s=timeout_s,
+                env=env,
+            )
+    except TimeoutError as exc:
+        return RunResult(
+            harness=harness,
+            status="refused",
+            reason=str(exc),
+            exit_code=None,
+            stdout="",
+            stderr="",
+            artefact_bytes=0,
+            diff_bytes=0,
+            timed_out=False,
+            duration_s=0.0,
+            command=tuple(argv),
+            run_id=run_id,
+            stdout_path=str(stdout_path),
+            stderr_path=str(stderr_path),
+        )
     stdout = _read(stdout_path)
     stderr = _read(stderr_path)
     artefact_bytes = len(stdout.encode("utf-8")) + len(stderr.encode("utf-8"))
@@ -636,9 +883,101 @@ def ensure_default_headroom(path: Path) -> None:
     )
 
 
-def resolve_cwd(value: str | None) -> Path:
-    path = Path(value) if value else Path.cwd()
-    return path.resolve()
+def repo_roots() -> tuple[Path, ...]:
+    """This repository's root, plus every git worktree checked out from the same repository.
+
+    `git worktree list` is the only enumeration that stays true when a worktree is added or
+    removed; a hard-coded list would drift. If git cannot answer, the answer is ROOT alone,
+    which refuses more rather than less.
+    """
+    roots = [ROOT]
+    git = which_binary("git")
+    if git is not None:
+        try:
+            completed = subprocess.run(
+                [git, "-C", str(ROOT), "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                env=GIT_ENV,
+            )
+            listing = completed.stdout if completed.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            listing = ""
+        for line in (listing or "").splitlines():
+            if not line.startswith("worktree "):
+                continue
+            candidate = Path(line[len("worktree ") :].strip())
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                continue
+            if resolved.is_dir():
+                roots.append(resolved)
+    return tuple(dict.fromkeys(roots))
+
+
+def load_allowed_roots(path: Path | None = None) -> tuple[Path, ...]:
+    """Instance cwd allowlist. Missing file means no extra roots. Malformed file fails closed.
+
+    This does not pass Gate B. The principal names supervised roots; the product default is
+    still refuse-everything-else. A filesystem root in the list is refused so a typo cannot
+    authorise the machine.
+    """
+    source = path if path is not None else DEFAULT_ALLOWED_CWDS
+    if not source.is_file():
+        return ()
+    try:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"allowed-cwds file {source} is not valid JSON: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"allowed-cwds file {source} must be a JSON object with a roots list")
+    listed = raw.get("roots", [])
+    if not isinstance(listed, list):
+        raise ValueError(f"allowed-cwds file {source} field 'roots' must be a list of paths")
+    roots: list[Path] = []
+    for item in listed:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"allowed-cwds file {source} roots must be non-empty strings")
+        try:
+            candidate = Path(item).expanduser().resolve()
+        except OSError as exc:
+            raise ValueError(f"allowed-cwds file {source} has an unresolvable root {item!r}: {exc}") from exc
+        if candidate.parent == candidate:
+            raise ValueError(
+                f"refusing filesystem root {candidate} in allowed-cwds: name a repository, "
+                "not a volume"
+            )
+        if candidate.is_dir():
+            roots.append(candidate)
+    return tuple(dict.fromkeys(roots))
+
+
+def resolve_cwd(value: str | None, *, allowed_file: Path | None = None) -> Path:
+    """Resolve the working directory, refusing unnamed foreign roots.
+
+    Default is this repository and its worktrees. Extra roots come only from the gitignored
+    instance allowlist (ADR-0063). There is deliberately no override flag — a second path
+    to the same state is the same hole. Naming a root is supervised dispatch under
+    ADR-0039; it does not pass Gate B.
+    """
+    path = (Path(value) if value else Path.cwd()).resolve()
+    roots = list(repo_roots())
+    roots.extend(load_allowed_roots(allowed_file))
+    for root in roots:
+        if path == root or root in path.parents:
+            return path
+    raise ValueError(
+        f"refusing to dispatch with cwd {path}: this harness runs only inside its own "
+        f"repository ({ROOT}), a git worktree of the same repository, a directory "
+        "within one of those, or a root named in the instance allowlist "
+        f"({DEFAULT_ALLOWED_CWDS.name}). Gate B — depending on this harness for work on "
+        "another repository — is not passed. Listing a root is supervised dispatch "
+        "(ADR-0039/ADR-0063), not a gate pass, and no command-line flag reopens Gate B."
+    )
 
 
 def load_task(positional: str | None, task_file: str | None) -> str:
@@ -667,6 +1006,52 @@ def _exit_for(status: str) -> int:
     return 1
 
 
+def _claim_conflict_refusal(
+    *,
+    log_dir: Path,
+    ts: str,
+    run_id: str,
+    task: str,
+    cwd: Path,
+    hit: tuple[coordination.Claim, str, str],
+    live: tuple[coordination.Claim, ...],
+) -> tuple[dict[str, object], int]:
+    """A second dispatch claiming an overlapping path is refused, and the refusal is
+    recorded like every other — the refusal IS the coordination mechanism working."""
+    claim, requested, held = hit
+    reason = (
+        f"claims overlap a live dispatch: {claim.ticket} (run {claim.run_id}, "
+        f"{claim.actor}) holds {held!r} until {claim.expires_at}; this dispatch asked "
+        f"for {requested!r}. Refusing rather than admitting two agents to the same "
+        "path — re-dispatch when the live claim completes or expires."
+    )
+    considered = [
+        f"{item.ticket} holds {list(item.paths) or ['(no paths declared)']}"
+        for item in live
+    ]
+    recorded = record_refusal(
+        log_dir,
+        ts=ts,
+        run_id=run_id,
+        task=task,
+        cwd=str(cwd),
+        reason=reason,
+        considered=considered,
+        attempted=f"dispatch claiming {requested!r}",
+    )
+    payload = {
+        "status": "refused",
+        "reason": reason,
+        "considered": considered,
+        "run_id": run_id,
+        "cwd": str(cwd),
+        "conflict": {"ticket": claim.ticket, "requested": requested, "held": held},
+        "recorded": str(log_dir / f"{ts[:10]}.jsonl"),
+        "event": recorded["event"],
+    }
+    return payload, _exit_for("refused")
+
+
 def dispatch_one(
     *,
     decision: Decision,
@@ -677,6 +1062,10 @@ def dispatch_one(
     timeout_s: int,
     model: str | None,
     dry_run: bool,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    claims: tuple[str, ...] = (),
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "dispatch")
@@ -703,11 +1092,28 @@ def dispatch_one(
         return payload, _exit_for("refused")
 
     harness = decision.harness
+    now = datetime.now(timezone.utc)
+    events, rejected = read_all(log_dir)
+    live = coordination.live_claims(events, now=now)
+    in_flight = coordination.render_in_flight(live, now=now)
+
     if dry_run:
-        brief = write_brief((runs_dir / run_id).resolve(), task)
-        built = build_command(harness, task=task, cwd=cwd, brief=brief, model=model)
+        brief = write_brief(
+            (runs_dir / run_id).resolve(), task, log_dir=log_dir, in_flight=in_flight
+        )
+        built = build_command(
+            harness,
+            task=task,
+            cwd=cwd,
+            brief=brief,
+            model=model,
+            permissions=permissions,
+            family=family,
+            pools=pools,
+        )
         command = built if isinstance(built, list) else []
         reason = built if isinstance(built, str) else decision.reason
+        hit = coordination.conflict(claims, live, cwd=cwd) if claims else None
         payload = {
             "status": "dry-run",
             "selected": decision.reason,
@@ -718,8 +1124,39 @@ def dispatch_one(
             "command": command,
             "cwd": str(cwd),
             "run_id": run_id,
+            "claims": list(claims),
+            "claim_conflict": (
+                {"ticket": hit[0].ticket, "requested": hit[1], "held": hit[2]}
+                if hit is not None
+                else None
+            ),
+            "in_flight": len(live),
         }
         return payload, 0 if isinstance(built, list) else _exit_for("refused")
+
+    if claims:
+        hit = coordination.conflict(claims, live, cwd=cwd)
+        if hit is not None:
+            return _claim_conflict_refusal(
+                log_dir=log_dir,
+                ts=ts,
+                run_id=run_id,
+                task=task,
+                cwd=cwd,
+                hit=hit,
+                live=live,
+            )
+
+    claim_event = coordination.open_claim(
+        log_dir,
+        run_id=run_id,
+        paths=claims,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        harness=harness.id,
+        task=task,
+        now=now,
+    )
 
     run_dir = (runs_dir / run_id).resolve()
     result = run_harness(
@@ -730,6 +1167,11 @@ def dispatch_one(
         timeout_s=timeout_s,
         model=model,
         run_id=run_id,
+        permissions=permissions,
+        log_dir=log_dir,
+        in_flight=in_flight,
+        family=family,
+        pools=pools,
     )
     recorded = record_outcome(
         log_dir,
@@ -747,11 +1189,27 @@ def dispatch_one(
         duration_s=result.duration_s,
         command=result.command,
     )
+    # Three release paths and any one suffices: this completion, the outcome event
+    # above (live_claims treats a terminal dispatch event as a release), or the claim's
+    # own expiry. A close failure therefore degrades to the other two, never to a hang.
+    try:
+        coordination.close_claim(log_dir, run_id=run_id)
+        claim_released: bool | str = True
+    except EventError as exc:
+        claim_released = f"close failed ({exc}); expiry and the outcome event release it"
     payload = {
         "status": result.status,
         "selected": decision.reason,
         "cwd": str(cwd),
         "recorded": str(log_dir / f"{recorded['ts'][:10]}.jsonl"),
+        "claim": {
+            "ticket": coordination.claim_ticket(run_id),
+            "paths": claim_event["data"].get("paths", []),
+            "expires_at": claim_event["data"].get("expires_at"),
+            "released": claim_released,
+        },
+        "in_flight": len(live),
+        **({"log_rejected_lines": len(rejected)} if rejected else {}),
         **_result_payload(result),
     }
     # Deliberate: a silent or failed run is NOT retried on another pool. That would
@@ -769,6 +1227,10 @@ def dispatch_fanout(
     timeout_s: int,
     model: str | None,
     dry_run: bool,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    claims: tuple[str, ...] = (),
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "fanout")
@@ -782,6 +1244,7 @@ def dispatch_fanout(
             cwd=str(cwd),
             reason=decision.reason,
             considered=decision.considered,
+            attempted="fan-out selection (two families)",
         )
         payload = {
             "status": "refused",
@@ -794,7 +1257,13 @@ def dispatch_fanout(
         }
         return payload, _exit_for("refused")
 
+    now = datetime.now(timezone.utc)
+    events, rejected = read_all(log_dir)
+    live = coordination.live_claims(events, now=now)
+    in_flight = coordination.render_in_flight(live, now=now)
+
     if dry_run:
+        hit = coordination.conflict(claims, live, cwd=cwd) if claims else None
         payload = {
             "status": "dry-run",
             "selected": decision.reason,
@@ -802,8 +1271,39 @@ def dispatch_fanout(
             "second": decision.second.id,
             "cwd": str(cwd),
             "run_id": run_id,
+            "claims": list(claims),
+            "claim_conflict": (
+                {"ticket": hit[0].ticket, "requested": hit[1], "held": hit[2]}
+                if hit is not None
+                else None
+            ),
+            "in_flight": len(live),
         }
         return payload, 0
+
+    if claims:
+        hit = coordination.conflict(claims, live, cwd=cwd)
+        if hit is not None:
+            return _claim_conflict_refusal(
+                log_dir=log_dir,
+                ts=ts,
+                run_id=run_id,
+                task=task,
+                cwd=cwd,
+                hit=hit,
+                live=live,
+            )
+
+    claim_event = coordination.open_claim(
+        log_dir,
+        run_id=run_id,
+        paths=claims,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        harness=f"{decision.first.id},{decision.second.id}",
+        task=task,
+        now=now,
+    )
 
     results: list[RunResult] = []
     for harness in (decision.first, decision.second):
@@ -816,6 +1316,11 @@ def dispatch_fanout(
             timeout_s=timeout_s,
             model=model if harness.id == "cursor-composer" else None,
             run_id=child_id,
+            permissions=permissions,
+            log_dir=log_dir,
+            in_flight=in_flight,
+            family=family,
+            pools=pools,
         )
         record_outcome(
             log_dir,
@@ -856,6 +1361,13 @@ def dispatch_fanout(
         first_run_id=first.run_id,
         second_run_id=second.run_id,
     )
+    # As in dispatch_one: completion, the terminal fanout event, and expiry are three
+    # independent release paths; any one suffices.
+    try:
+        coordination.close_claim(log_dir, run_id=run_id)
+        claim_released: bool | str = True
+    except EventError as exc:
+        claim_released = f"close failed ({exc}); expiry and the fanout event release it"
     payload = {
         "status": verdict,
         "verdict": verdict,
@@ -863,6 +1375,14 @@ def dispatch_fanout(
         "cwd": str(cwd),
         "run_id": run_id,
         "recorded": str(log_dir / f"{recorded['ts'][:10]}.jsonl"),
+        "claim": {
+            "ticket": coordination.claim_ticket(run_id),
+            "paths": claim_event["data"].get("paths", []),
+            "expires_at": claim_event["data"].get("expires_at"),
+            "released": claim_released,
+        },
+        "in_flight": len(live),
+        **({"log_rejected_lines": len(rejected)} if rejected else {}),
         "first": _result_payload(first),
         "second": _result_payload(second),
     }
@@ -878,7 +1398,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("task", nargs="?", help="the task to run")
     parser.add_argument("--task-file", help="read the task from this file (preferred for long briefs)")
-    parser.add_argument("--cwd", help="working directory (resolved to an absolute path)")
+    parser.add_argument(
+        "--cwd",
+        help="working directory; this repository, a worktree of it, or an instance-allowlisted root",
+    )
     parser.add_argument(
         "--harness",
         help="run this harness; still refuses an exhausted pool without --allow-exhausted",
@@ -894,6 +1417,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="spend an exhausted pool; default is to refuse",
     )
     parser.add_argument("--model", help="model id (cursor-composer defaults to composer-2.5)")
+    parser.add_argument(
+        "--family",
+        help="model family to pick from (e.g. grok, kimi, composer); automatic selection "
+        "prefers the idlest registered pool within the family",
+    )
+    parser.add_argument(
+        "--claim",
+        action="append",
+        default=None,
+        metavar="PATH",
+        help="declare a path this dispatch intends to touch; repeatable. A second live "
+        "dispatch claiming an overlapping path is refused. Claims are trajectory events "
+        "with an expiry (timeout + grace), so a crashed dispatcher cannot hold one.",
+    )
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_S)
     parser.add_argument("--log", default=str(DEFAULT_LOG))
     parser.add_argument("--headroom", default=str(DEFAULT_HEADROOM))
@@ -901,16 +1438,34 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--probe", action="store_true", help="probe installed harnesses and exit")
     parser.add_argument("--dry-run", action="store_true", help="select (and print argv) without running")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--permissions",
+        choices=("bypass", "prompt"),
+        default=None,
+        help="bypass (default) runs children without per-tool prompts; prompt leaves their ask-loop on. "
+        "Overrides .harness/permissions.json.",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    cwd = resolve_cwd(args.cwd)
+    try:
+        cwd = resolve_cwd(args.cwd)
+    except ValueError as exc:
+        # Before anything else, and before --dry-run can print a command that names
+        # another repository. A refused boundary must not leave a runnable artefact.
+        emit({"status": "refused", "reason": str(exc)}, args.json)
+        return 2
     log_dir = Path(args.log).resolve()
     runs_dir = Path(args.runs).resolve()
     headroom_path = Path(args.headroom).resolve()
     ensure_default_headroom(headroom_path)
+    permissions: PermissionMode = (
+        args.permissions
+        if args.permissions is not None
+        else load_permission_mode(DEFAULT_PERMISSIONS)
+    )
 
     try:
         pools: tuple[PoolState, ...] = load_pools(headroom_path)
@@ -974,6 +1529,10 @@ def main(argv: list[str] | None = None) -> int:
             timeout_s=args.timeout,
             model=args.model,
             dry_run=args.dry_run,
+            permissions=permissions,
+            claims=tuple(args.claim or ()),
+            family=args.family,
+            pools=pools,
         )
         emit(payload, args.json)
         return code
@@ -993,6 +1552,10 @@ def main(argv: list[str] | None = None) -> int:
         timeout_s=args.timeout,
         model=args.model,
         dry_run=args.dry_run,
+        permissions=permissions,
+        claims=tuple(args.claim or ()),
+        family=args.family,
+        pools=pools,
     )
     emit(payload, args.json)
     return code
