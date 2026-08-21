@@ -274,9 +274,15 @@ def test_human_decision_must_record_its_channel():
         )
 
 
-def test_consent_purposes_are_exactly_improve_consilient():
-    """ADR-0057 authorises one purpose. Adding another is a decision, not a silent widen."""
-    assert events_mod.CONSENT_PURPOSES == {"improve-consilient"}
+def test_consent_purposes_are_exactly_the_three_named_purposes():
+    """R19: improvement and training consent are separately obtained, never bundled;
+    commercial training exists only as per-use grants. Adding a fourth purpose is a
+    decision, not a silent widen."""
+    assert events_mod.CONSENT_PURPOSES == {
+        "improve-consilient",
+        "train-consilient",
+        "commercial-training",
+    }
 
 
 def _consent_grant(actor, **data_over):
@@ -323,7 +329,40 @@ def test_consent_grant_with_non_positive_retention_is_refused():
 
 def test_consent_grant_with_unknown_purpose_is_refused():
     with pytest.raises(EventError, match="purposes are not bundled"):
+        validate(_consent_grant(HUMAN, purpose="marketing"))
+
+
+def test_commercial_training_consent_is_per_use_or_refused():
+    """R19's third limb: commercial gain requires fresh consent for each use."""
+    with pytest.raises(EventError, match="per_use"):
         validate(_consent_grant(HUMAN, purpose="commercial-training"))
+    with pytest.raises(EventError, match="use_ref"):
+        validate(_consent_grant(HUMAN, purpose="commercial-training", per_use=True))
+    validate(
+        _consent_grant(
+            HUMAN,
+            purpose="commercial-training",
+            per_use=True,
+            use_ref="the one named authorised use",
+        )
+    )
+
+
+def test_consent_withdrawal_carries_no_commercial_grant_fields():
+    with pytest.raises(EventError, match="withdrawal"):
+        validate(
+            ev(
+                event="consent.withdrawn",
+                actor=HUMAN,
+                data={
+                    "purpose": "commercial-training",
+                    "principal": HUMAN,
+                    "via": "cli",
+                    "per_use": True,
+                    "use_ref": "sneaking a grant into a withdrawal",
+                },
+            )
+        )
 
 
 def test_consent_event_cannot_be_filed_as_a_different_decision():
