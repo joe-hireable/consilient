@@ -41,8 +41,9 @@ A skill may *reference* a check. It may not *be* one.
 
 ## Keeping the mirror honest
 
-`.claude/skills/` and `.claude/agents/` must be byte-identical to their sources, or symlinks.
-Both are symlinks, and `skills-mirror.yml` asserts both still resolve.
+`.claude/skills/` is a relative symlink when the platform supports one, or an exact copy
+otherwise. `scripts/sync_skills.py` accepts either representation and CI rejects tree or
+content drift. `.claude/agents/` remains symlink-only.
 
 **A resolving symlink in the index is not a resolving symlink in your working tree.** A clone
 made with `core.symlinks=false` -- Git for Windows' default without developer mode -- checks
@@ -51,13 +52,15 @@ loads no project skill and no project agent at all, silently.** Measured in this
 21 August 2026: the index held mode 120000, CI passed on Linux runners, and the Windows working
 tree had a plain file. [measured]
 
-Repair, per clone, and it is a local config change that commits nothing:
+Repair the skills mirror, per clone:
 
 ```
-git config core.symlinks true
-rm -rf .claude/skills .claude/agents && git checkout -- .claude/skills .claude/agents
-ls -la .claude/          # both must show as l--------- arrows, not directories or files
+python scripts/sync_skills.py
+python scripts/sync_skills.py --check
 ```
+
+The repair prefers a relative symlink and falls back to an exact copy when symlinks are
+unavailable. `.claude/agents/` still requires `core.symlinks=true`.
 
 `ln -s` from Git Bash is not a substitute: without `MSYS=winsymlinks:nativestrict` it produces
 a copy or a junction, git reports the path as deleted, and committing that removes the mirror
