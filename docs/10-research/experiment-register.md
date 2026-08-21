@@ -1592,8 +1592,6 @@ routing system the claim will eventually be about. **Measure 2 does not depend o
 first.**
 
 
-### EXP-56 · Per-model β on a label-free corpus, and the CEILING on what routing can buy `READY`
-**Pre-registered 20 Aug 2026. Not run.** Flagship of the routing programme.
 ### EXP-56 · Per-model β on a label-free corpus, and the CEILING on what routing can buy `STOPPED 20 Aug 2026 — see experiments/exp56/findings-exp56.md`
 **Pre-registered 20 Aug 2026. Preflight stopped; scoring not run.** Flagship of the routing programme.
 **Decides:** which model family should do which task — and, before that, whether the question has an
@@ -1683,8 +1681,8 @@ served-weight identity and is recorded as `unknown:not-reported-by-runtime`. [me
 pre-registration above is preserved unchanged apart from this status and result note. See
 `experiments/exp56/findings-exp56.md`.
 
-### EXP-57 · The marginal value of context — does more context buy accuracy, or cost? `READY`
-**Pre-registered 20 Aug 2026. Not run.**
+#### Pre-registration (preserved; do not re-allocate EXP-57)
+**Pre-registered 20 Aug 2026. Not run.** The live record is the `DONE` heading above.
 **Decides:** whether just-in-time context engineering is worth building. Joe asked for
 "dynamic/just-in-time prompting/context engineering"; this asks first whether context volume
 changes the answer at all.
