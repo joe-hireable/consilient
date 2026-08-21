@@ -300,10 +300,17 @@ than this one.
 
 ## Enforcement
 
-Three invariants. Each is checkable, each has been confirmed buildable against the code as it
-stands, and none is written, for the reason stated at the end.
+Three invariants, numbered **V0-30 to V0-32**. V0-27, V0-28 and V0-29 were the obvious next
+numbers and are all already live in `src/consilient/events.py` and `tests/test_v0_invariants.py`;
+this draft used them until the code was checked. `[measured]` It is the same collision the
+experiment register records five times over, in a second identifier space, and the same lesson:
+taking the next number that looks free from wherever you happen to be reading is the step that
+feels sufficient and is not.
 
-**V0-27 · An unmeasured verifier's pass is not an acceptance.**
+Each check below states honestly whether it is buildable **today**, and none is written, for the
+reason at the end.
+
+**V0-30 · An unmeasured verifier's pass is not an acceptance.**
 A verifier whose β is `insufficient_data` may contribute a rejection and may never appear as a
 disjunct in, or a substitution for, the acceptance predicate.
 - Check: `tests/test_v0_invariants.py::test_an_unmeasured_verifier_cannot_accept` — seed a verifier
@@ -315,17 +322,20 @@ disjunct in, or a substitution for, the acceptance predicate.
 - Fails CI: **yes**, via `.github/workflows/invariants.yml`.
 - Added in the same commit as the implementation: **yes** (see debt below).
 
-**V0-28 · Every ask is answerable by someone who has not read the code.**
+**V0-31 · Every ask is answerable by someone who has not read the code.**
 `dreamers-and-the-bootstrap-problem-2026-08-20.md` states this as a design instruction with no
 check. This gives it one.
 - Check: a test over the registered ask templates asserting that none contains a file path, an
   identifier matching a code symbol, a line reference, an ADR number, or a gate condition
   identifier.
-- Buildable today: V0-23 already loads an enumerated set of ask classes and rejects unlisted ones,
-  so the templates are already a finite, addressable set. `[measured]`
-- Fails CI: **yes**. Same commit: **yes**.
+- **Not buildable today, and the earlier draft of this line was wrong.** `grep -rn "ask_class" src/
+  tests/` returns nothing: the ask path does not exist. V0-23 *declares* the enumerated ask classes as
+  a required invariant; it does not implement them. `[measured]` The check is buildable the moment the
+  ask path is, and it is a string assertion over a finite template set, so the cost is minutes.
+  `[asserted]`
+- Fails CI: **yes, once the ask path exists**. Same commit as that path: **yes**.
 
-**V0-29 · The human surface speaks only the admitted concepts.**
+**V0-32 · The human surface speaks only the admitted concepts.**
 - Check: a denylist assertion over everything `cli.render()` can emit — `wilson`, `interval`,
   `alpha`/`α`, gate identifiers `A1`–`B4`, `ADR-`, the five bracketed evidence tags, `stopping
   rule`, `supersede` — with the `--json` payload and `docs/` explicitly exempt, because the

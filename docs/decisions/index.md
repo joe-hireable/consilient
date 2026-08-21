@@ -100,4 +100,4 @@ to every ADR and every PR:
 - **0029** — PROVISIONAL pending EXP-27.
 - **0030** — PROVISIONAL pending EXP-30.
 - **0018** — decision 2 conditional on EXP-12 *and* EXP-13.
-- **0055** — PROVISIONAL pending EXP-70, EXP-71 and EXP-72; owes three enforcement checks (V0-27, V0-28, V0-29), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
+- **0055** — PROVISIONAL pending EXP-70, EXP-71 and EXP-72; owes three enforcement checks (V0-30, V0-31, V0-32), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
