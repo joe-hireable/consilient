@@ -33,7 +33,7 @@ binary, daemon, MCP server, or `od` CLI exists on this machine.
 - **When reviewing a design artefact** — run the 5-dimension critique
   (`references/critique-upstream.md`) as a structured review.
 - **When a brief says "make it look good"** without stating what "good" means.
-  The DESIGN.md contract forces the eight decisions a designer makes before any
+  The DESIGN.md contract forces the nine decisions a designer makes before any
   pixel is placed.
 
 ## What you produce
