@@ -277,13 +277,26 @@ structural reference". It reports Connected under Claude Code on 21 August. That
 change, and under ADR-0029 it invalidates the old row rather than being inferred from it — the
 capability must be re-probed, not upgraded by reading this sentence.
 
-**Open Design** was named in the instruction. No Open Design integration, plugin, MCP server or
-binary was found anywhere on this machine. `[measured]` negative. A **portable skill**
-(`.agents/skills/using-open-design/`) now exists, carrying the 9-section `DESIGN.md` contract
-format and a vendored 5-dimension critique with provenance (`references/critique-upstream.md`,
-pinned to upstream blob `0e8d6cc`). The skill requires no desktop app, daemon, or runtime
-dependency. `[measured]` — the skill file is committed and readable by any harness that reads
-`.agents/skills/` or receives the portable core in a brief.
+**Open Design** (nexu-io/open-design, Apache-2.0, ~90 k stars, 811 open issues, actively merged
+PRs as of 21 August 2026). The desktop app was **not** found on this machine on 21 August
+`[measured]` negative. Joe reported installing it on 21 August; **not re-probed** — the
+installation is `[asserted]` until a probe confirms the binary, its version, and which harnesses
+can reach it. A **portable skill** (`.agents/skills/using-open-design/`) now exists, carrying
+the 9-section `DESIGN.md` contract format and a vendored 5-dimension critique with provenance
+(`references/critique-upstream.md`, pinned to upstream blob `0e8d6cc`). The skill requires no
+desktop app, daemon, or runtime dependency. `[measured]` — the skill file is committed and
+readable by any harness that reads `.agents/skills/` or receives the portable core in a brief.
+
+**Claude Design** (Anthropic, proprietary). Claude Code has a built-in `claude_design` MCP
+server at `https://api.anthropic.com/v1/design/mcp`, but its OAuth flow is **broken** as of
+21 August 2026 — the `/authorize` endpoint returns HTTP 410 and a misleading "Server Turned
+Down" page. `[cited]` Three independent bug reports confirm this:
+`anthropics/claude-code#69317`, `#77620`, `#84798`. Two community workarounds exist:
+`kuatecno/mcp-design` (reads the `designOauth` keychain token directly, imports projects +
+full chat history) and `e-brokenc0de/claude-design-mcp` (drives Claude Design via CDP/Chrome,
+~30 tools, unofficial). Neither is installed here. The orchestration gap Joe reported —
+Claude Design cannot easily talk to Cowork or Claude Code — is a **measured** Anthropic
+product limitation, not a Consilient integration problem. `[cited]`
 
 ### Document drafting
 
