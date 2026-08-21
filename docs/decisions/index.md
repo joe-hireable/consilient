@@ -25,9 +25,10 @@ Read these before anything else. Everything downstream depends on them.
 | # | Decision | Status |
 |---|---|---|
 | [0003](0003-no-learned-routing-policy-in-v0.md) | No learned routing policy in v0 | ✅ |
-| [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary; category word retired by [0060](0060-call-consilient-a-command-post-not-a-meta-harness.md)) | ⛔ |
-| [0060](0060-call-consilient-a-command-post-not-a-meta-harness.md) | Consilient is a command post; child runtimes stay harnesses — descriptor superseded by [0061](0061-the-descriptor-is-agent-command-post.md) | ⛔ |
+| [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary; category word retired by [0062](0062-call-consilient-a-command-post-not-a-meta-harness.md)) | ⛔ |
+| [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) | Adopt Open Design's portable contract for design work; desktop app optional | 🟡 |
 | [0061](0061-the-descriptor-is-agent-command-post.md) | **The descriptor is Agent Command Post** — product Consilient; children are harnesses | ✅ |
+| [0062](0062-call-consilient-a-command-post-not-a-meta-harness.md) | Command post as category; descriptor superseded by 0061 | ⛔ |
 | [0005](0005-local-model-library-with-hardware-gating.md) | Local model library with hardware gating (superseded by 0026) | ⛔ |
 | [0006](0006-ticket-store-sqlite-plus-git-log.md) | Ticket store: SQLite for coordination, append-only JSONL in git for the record | ✅ |
 | [0007](0007-cli-only-no-review-surface.md) | CLI only, and build no review surface (the diff-review half stands; the no-visibility half superseded by 0053) | ⛔ |

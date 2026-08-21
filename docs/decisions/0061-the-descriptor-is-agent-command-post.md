@@ -3,7 +3,7 @@
 - **Status:** **ACCEPTED 21 August 2026.** Joe, in writing: *"Agent Command Post i think is the descriptor."*
 - **Date:** 2026-08-21
 - **Deciders:** Joe Brown. The orchestrator had recommended dropping "Agent"; he kept it.
-- **Supersedes:** the public category phrase in [`0060`](0060-call-consilient-a-command-post-not-a-meta-harness.md). 0060's other decisions stand and are restated here: child runtimes stay *harnesses*; Consilient is not one; "meta-harness" stays retired in operator-facing prose; the product name is still Consilient (ADR-0038).
+- **Supersedes:** the public category phrase in [`0062`](0062-call-consilient-a-command-post-not-a-meta-harness.md). 0062's other decisions stand and are restated here: child runtimes stay *harnesses*; Consilient is not one; "meta-harness" stays retired in operator-facing prose; the product name is still Consilient (ADR-0038). [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) is Open Design, a different decision.
 - **Inquiry tier reached:** T1 ground — a preference the principal is the only valid decider for (ADR-0033).
 - **Executable model:** none. Naming convention.
 

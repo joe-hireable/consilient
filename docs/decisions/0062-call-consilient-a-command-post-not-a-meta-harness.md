@@ -1,6 +1,6 @@
-# 0060. Call Consilient a command post, not a meta-harness
+# 0062. Call Consilient a command post, not a meta-harness
 
-- **Status:** **ACCEPTED 21 August 2026.** Public descriptor **superseded by [0061](0061-the-descriptor-is-agent-command-post.md)** (*Agent Command Post*). Child = harness, meta-harness retired, and product = Consilient still stand.
+- **Status:** **ACCEPTED 21 August 2026.** Public descriptor **superseded by [0061](0061-the-descriptor-is-agent-command-post.md)** (*Agent Command Post*). Number **0062** because public `main` had already taken [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) for Open Design. Child = harness, meta-harness retired, and product = Consilient still stand.
 - **Date:** 2026-08-21
 - **Deciders:** Joe Brown (the instruction to choose and adopt; the operator sentence "don't ask ChatGPT, ask Consilient"). Grok (the choice among his list, recorded here).
 - **Amends category language in:** [`0001`](0001-build-a-meta-harness-not-a-harness.md) (the *meta-harness* label only; the "sit above existing agents" decision stands). Does **not** supersede [`0038`](0038-rename-the-project-consilient.md).
