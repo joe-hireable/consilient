@@ -2546,6 +2546,8 @@ def test_historical_refusal_digests_pin_real_log_rejections():
     log = Path(".harness/log")
     if not log.exists():  # pragma: no cover - repository-only check
         pytest.skip("no repository trajectory in this checkout")
+    if not (log / "2026-08-20.jsonl").exists():
+        pytest.skip("historical repository trajectory is not present in this checkout")
     real = {rejection.content_digest for rejection in read_all(log)[1]}
     assert real == set(HISTORICAL_REFUSAL_DIGESTS), (
         "the tolerated baseline and the trajectory's actual refusals have diverged; "
