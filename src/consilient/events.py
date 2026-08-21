@@ -8,6 +8,8 @@ Invariants enforced here, each with a test in the same commit:
   V0-26  multi-contributor events must declare a distinct evidence_class per contributor.
   V0-27  attempt outcomes and their later human verdicts share one stable identity.
   V0-28  a declared non-local channel cannot deliver a human decision.
+  V0-30  a usage figure names its provenance; a provider that could not be read
+         reports 'unavailable' and carries no number.
 """
 
 from __future__ import annotations
@@ -36,11 +38,17 @@ OUTCOME_KIND = "attempt.outcome"
 VERDICT_KIND = "attempt.verdict"
 VERDICT_CORRECTION_KIND = "attempt.verdict.correction"
 BUDGET_STATE_KIND = "budget.state"
+USAGE_KIND = "usage.observed"
 SPEND_RESERVED_KIND = "spend.reserved"
 METERED_PROVIDER = "openrouter"
 METERED_CURRENCY = "USD"
 BUDGET_STATE_ACTOR = "openrouter-probe"
 BUDGET_RESERVATION_ACTOR = "consilient.budget"
+USAGE_ACTOR = "consilient.usage"
+# The project's evidence tags (AGENTS.md working principle 1). A usage figure that
+# cannot name which of these it is has no business being displayed as a number.
+PROVENANCE = frozenset({"measured", "cited", "asserted"})
+USAGE_STATUSES = frozenset({"ok", "unavailable", "not_configured"})
 BUDGET_LOCK = ".budget.lock"
 _BUDGET_LOCK_HELD: ContextVar[Path | None] = ContextVar(
     "consilient_budget_lock", default=None
@@ -149,10 +157,12 @@ def validate(event: object) -> EventPayload:
         raise EventError("data must be an object")
 
     _check_budget_contract(event)
+    _check_usage_contract(event)
     _check_attempt_identity(event)
     _check_attempt_contract(event)
     _check_human_authority(event)
     _check_evidence_class(event)
+    _check_dispatch_contract(event)
     return event
 
 
@@ -245,6 +255,122 @@ def _check_budget_contract(event: EventPayload) -> None:
     _decimal_field(kind, data, "amount", positive=True)
 
 
+def _check_usage_contract(event: EventPayload) -> None:
+    """V0-30: a usage figure names its provenance, and no figure is invented.
+
+    This is the failure this event kind exists to make impossible. A dashboard that shows
+    "0%" for a provider it could not read is worse than one that shows nothing: it reports
+    headroom that was never observed, and the reader cannot tell the two apart. It is the
+    same shape as the 20 August 2026 OpenRouter reading, where the key-status counter read
+    $0 immediately and $0.045138255 once billing settled -- the zero was real as a *counter
+    value* and false as a *statement about spend*. [measured]
+
+    So the rule is structural rather than advisory: a provider whose status is not `ok`
+    may carry no figures at all, and every figure that does exist names which of the
+    project's evidence tags it was obtained under. There is no code path that writes a
+    number without one.
+
+    Subscription quota and metered spend are kept apart on purpose (ADR-0044, and
+    `backends.md` "Resource windows remain provider-native"). A quota has a window and a
+    reset and no currency; spend has a currency and no window. Collapsing them into one
+    "usage" number would lose the reset time, which is the field a human actually needs.
+    """
+    if event["event"] != USAGE_KIND:
+        return
+    if event["actor"] != USAGE_ACTOR:
+        raise EventError(
+            f"{USAGE_KIND} must be attributed to declared writer {USAGE_ACTOR!r}"
+        )
+    if datetime.fromisoformat(event["ts"]).utcoffset() != timedelta(0):
+        raise EventError(f"{USAGE_KIND} ts must use UTC so trajectory order is unambiguous")
+
+    data = event["data"]
+    for field in ("provider", "detail"):
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise EventError(f"{USAGE_KIND} must carry a non-empty string {field}")
+    status = data.get("status")
+    if status not in USAGE_STATUSES:
+        raise EventError(
+            f"{USAGE_KIND} status must be one of {sorted(USAGE_STATUSES)}, got {status!r}"
+        )
+    if data.get("kind") not in ("subscription", "metered"):
+        raise EventError(
+            f"{USAGE_KIND} must declare kind 'subscription' or 'metered'; a flat-fee "
+            "window and a metered charge are not the same measurement"
+        )
+    quotas = data.get("quotas", [])
+    spend = data.get("spend", [])
+    if not isinstance(quotas, list) or not isinstance(spend, list):
+        raise EventError(f"{USAGE_KIND} quotas and spend must be lists")
+
+    if status != "ok":
+        if quotas or spend:
+            raise EventError(
+                f"{USAGE_KIND} for {data['provider']!r} reports status {status!r} but "
+                "carries a figure; a provider that could not be read reports no number "
+                "(V0-30)"
+            )
+        return
+    if not quotas and not spend:
+        raise EventError(
+            f"{USAGE_KIND} for {data['provider']!r} reports status 'ok' with no figure; "
+            "say 'unavailable' rather than reporting an empty success (V0-30)"
+        )
+
+    for quota in quotas:
+        if not isinstance(quota, dict):
+            raise EventError(f"{USAGE_KIND} quota must be an object")
+        window = quota.get("window")
+        if not isinstance(window, str) or not window.strip():
+            raise EventError(
+                f"{USAGE_KIND} quota must name its provider-native window; a five-hour "
+                "and a seven-day bucket are not one generic reset"
+            )
+        _decimal_field(f"{USAGE_KIND} quota", quota, "used_fraction", positive=False)
+        if Decimal(quota["used_fraction"]) > 1:
+            raise EventError(f"{USAGE_KIND} quota used_fraction must lie in [0, 1]")
+        _check_reset(quota.get("resets_at"))
+        _check_provenance(quota.get("provenance"), "quota")
+
+    for item in spend:
+        if not isinstance(item, dict):
+            raise EventError(f"{USAGE_KIND} spend must be an object")
+        _decimal_field(f"{USAGE_KIND} spend", item, "amount", positive=False)
+        currency = item.get("currency")
+        if not isinstance(currency, str) or not currency.strip():
+            raise EventError(
+                f"{USAGE_KIND} spend must name its currency; a metered figure without one "
+                "cannot be compared with a ceiling"
+            )
+        if item.get("period") not in ("weekly", "monthly"):
+            raise EventError(f"{USAGE_KIND} spend period must be 'weekly' or 'monthly'")
+        _check_provenance(item.get("provenance"), "spend")
+
+
+def _check_reset(value: object) -> None:
+    """A window that has lost its reset time is not a window."""
+    if value is None:
+        return
+    if not isinstance(value, str) or not TS.match(value):
+        raise EventError(
+            f"{USAGE_KIND} resets_at must be RFC3339 with an explicit offset, or absent"
+        )
+    try:
+        datetime.fromisoformat(value).astimezone(timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise EventError(f"{USAGE_KIND} resets_at cannot be normalised to UTC") from exc
+
+
+def _check_provenance(value: object, where: str) -> None:
+    if value not in PROVENANCE:
+        raise EventError(
+            f"{USAGE_KIND} {where} must tag its provenance with one of "
+            f"{sorted(PROVENANCE)}, got {value!r}; an untagged number is presented as "
+            "authoritative and this project does not have one to present (V0-30)"
+        )
+
+
 def _check_evidence_class(event: EventPayload) -> None:
     """V0-26: multi-contributor events must declare a distinct evidence_class per contributor.
 
@@ -288,6 +414,14 @@ def _check_evidence_class(event: EventPayload) -> None:
                 f"evidence_class {ec.strip()!r} (V0-26)"
             )
         seen_classes.add(normalized)
+
+
+def _check_dispatch_contract(event: EventPayload) -> None:
+    """ADR-0039: every dispatch records whether it was supervised."""
+    if event["event"].startswith("dispatch.") and not isinstance(
+        event["data"].get("supervised"), bool
+    ):
+        raise EventError("dispatch events must record supervised as a boolean (ADR-0039)")
 
 
 def _check_attempt_identity(event: EventPayload) -> None:

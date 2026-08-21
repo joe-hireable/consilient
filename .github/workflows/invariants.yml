@@ -25,6 +25,11 @@ jobs:
         run: python -m pytest tests -q
       - name: Rename safety invariant check
         run: python .github/scripts/check_rename_safety.py --check
+      - name: Spend escalation invariant check
+        # V0-39 / ADR-0056 D5. On-Demand Spending is the one control that spends real money and
+        # only the principal may change it. Ships before EXP-94, which must call the same Cursor
+        # service read-only -- the spend-escalation methods sit on it.
+        run: python .github/scripts/check_no_spend_escalation.py --check
       - name: Replay invariant on the real trajectory, with a drift control
         # Until 21 Aug 2026 this step ran `beta` first, "so that `replay` has a subject to
         # compare against", then required `compared && identical`. The subject `beta` leaves

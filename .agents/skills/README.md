@@ -41,31 +41,72 @@ A skill may *reference* a check. It may not *be* one.
 
 ## Keeping the mirror honest
 
-`.claude/skills/` must be byte-identical to this directory, or a symlink. Symlinks are
-cleaner but need developer mode on Windows; if that is off, copy and let CI catch drift.
+`.claude/skills/` and `.claude/agents/` must be byte-identical to their sources, or symlinks.
+Both are symlinks, and `skills-mirror.yml` asserts both still resolve.
 
-## Skills worth writing next
+**A resolving symlink in the index is not a resolving symlink in your working tree.** A clone
+made with `core.symlinks=false` -- Git for Windows' default without developer mode -- checks
+both out as ordinary 17-byte text files containing the target path, and **Claude Code then
+loads no project skill and no project agent at all, silently.** Measured in this repository on
+21 August 2026: the index held mode 120000, CI passed on Linux runners, and the Windows working
+tree had a plain file. [measured]
 
-**Before writing any of these: check whether one already exists.** The ecosystem passed
-~351,000 skills by March 2026. `npx skills find <topic>` first — see
-`../../docs/decisions/0016-skill-distribution-mcp-plugins.md`. "Someone already built this"
-has been the right answer three times on this project already.
+Repair, per clone, and it is a local config change that commits nothing:
 
-Ordered by how often they would fire:
+```
+git config core.symlinks true
+rm -rf .claude/skills .claude/agents && git checkout -- .claude/skills .claude/agents
+ls -la .claude/          # both must show as l--------- arrows, not directories or files
+```
 
-1. `writing-adrs` — **done**, and doubles as the worked example of this format
-2. `running-experiments` — the register discipline: precondition, measurement, **stopping
-   rule**, apply it honestly even when it kills a decision you like
-3. `evidence-tagging` — `[measured]` / `[simulated]` / `[cited]` / `[algebra]` /
-   `[asserted]`, and never reporting a simulated figure as a fact
-4. `checking-prior-art` — "someone already built this, MIT-licensed" has been the right
-   answer three times running; search before designing
-5. `exogenous-signal-check` — before proposing any multi-agent structure, name the different
-   class of facts (`0010`), or cut it
-6. `beta-verdict` — how the merge-time verdict prompt works and why the label matters
+`ln -s` from Git Bash is not a substitute: without `MSYS=winsymlinks:nativestrict` it produces
+a copy or a junction, git reports the path as deleted, and committing that removes the mirror
+for everyone.
 
-Skills 2–6 are unwritten. Write them as they are needed, not speculatively — an unused skill
-is context cost with no benefit.
+## What is here
+
+**Before writing a new one: check whether one already exists.** The ecosystem passed ~351,000
+skills by March 2026 `[SNIP]` — `npx skills find <topic>` first, see
+`../../docs/decisions/0016-skill-distribution-mcp-plugins.md`. "Someone already built this" has
+been the right answer three times on this project.
+
+| Skill | The one behaviour it changes |
+|---|---|
+| `writing-adrs` | An ADR without an *Evidence against* section does not get written |
+| `citing-sources` | A `[SNIP]` or `[2ND]` source never reaches a published claim |
+| `measuring-beta` | β is not quoted below 30 rejections, and never from a verifier-conditioned sample |
+| `running-experiments` | The number comes from the brief; the stopping rule is written before the run |
+| `adversarial-audit` | The auditor is a different family from the author, and is asked about second paths |
+| `pre-publication-gate` | "All the checks passed" stops being an argument for publishing |
+| `dispatching-workers` | A fan-out that cannot name its different class of facts does not happen |
+| `operating-the-harness` | Orchestration is `python scripts/dispatch.py`, not a chat window |
+
+Written 21 August 2026: the five after `citing-sources`, adapted from proven public collections
+rather than invented — see each skill's *Adapted from* section for source and licence.
+
+Deliberately **not** written, and why:
+
+- `evidence-tagging` — `AGENTS.md` is always in context and already states it. A skill that
+  restates always-loaded context is cost with no benefit.
+- `checking-prior-art` — folded into `adversarial-audit`, where the novelty search already lives.
+- `exogenous-signal-check` — folded into `dispatching-workers`, which is where it fires.
+- `beta-verdict` — folded into `measuring-beta`.
+
+## Agents
+
+`../agents/` holds subagent definitions, mirrored at `.claude/agents/` by the same symlink
+scheme. **Skills are the portable artefact; agent files are Claude Code wiring.** Codex, Cursor
+and Grok CLI do not read `.claude/agents/`, so nothing load-bearing may live only there — an
+agent file states which skill it follows and adds isolation, tool limits and a report shape.
+
+| Agent | Why it is a separate context rather than an inline skill |
+|---|---|
+| `consilient-auditor` | Must not see the reasoning that produced the artefact, and must not be able to repair what it finds |
+| `consilient-gate` | A clean pass/fail on the working tree, unmixed with the argument for publishing |
+| `consilient-worker` | The dispatchee half of the worker contract, so a fan-out returns a reviewable shape |
+
+`consilient-auditor` is the same model family as almost every artefact here, so it is a weaker
+instrument than the method wants. It is required to say so in its first paragraph.
 
 ## Getting skills in and out
 
@@ -87,6 +128,14 @@ verdict schema; git-based distribution lets that drift.
 
 ## Where these run
 
-- **Now:** Claude Code, via the `.claude/skills/` mirror.
+- **Now:** Claude Code, via the `.claude/skills/` and `.claude/agents/` mirrors.
 - **After Gate A/B (`0015`):** Consilient, reading this directory directly.
+- **Codex, Cursor, Grok CLI:** they read `AGENTS.md`, not this directory. `.agents/skills/` is a
+  Codex/Copilot/Gemini-CLI-side path and is **not** a Claude Code convention -- Claude Code only
+  ever reads `.claude/`. [cited] Each skill therefore carries a *Harness support* section stating
+  its portable core, and briefs paste that core in where a runtime cannot read the file.
 - **Elsewhere:** OpenHarness and DeepSeek Harness read `SKILL.md` today, unmodified.
+
+`AGENTS.md` itself is a genuine cross-harness standard, stewarded by the Agentic AI Foundation
+and read natively by Codex, Cursor, Copilot, Gemini CLI and others. [cited] It carries no schema.
+That is why the load-bearing rules live there and the procedures live here.

@@ -1,6 +1,10 @@
 # Decision index
 
-39 ADRs, 20 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+51 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
+`python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
+catches a row missing from this table, which is the argument for generating it rather than
+editing it. 0002 and 0027 appear twice by design, in the highlight section and in their own.
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED/DEPRECATED
@@ -24,7 +28,8 @@ Read these before anything else. Everything downstream depends on them.
 | [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary) | ⛔ |
 | [0005](0005-local-model-library-with-hardware-gating.md) | Local model library with hardware gating (superseded by 0026) | ⛔ |
 | [0006](0006-ticket-store-sqlite-plus-git-log.md) | Ticket store: SQLite for coordination, append-only JSONL in git for the record | ✅ |
-| [0007](0007-cli-only-no-review-surface.md) | CLI only, and **build no review surface** | ✅ |
+| [0007](0007-cli-only-no-review-surface.md) | CLI only, and build no review surface (the diff-review half stands; the no-visibility half superseded by 0053) | ⛔ |
+| [0053](0053-build-one-local-observability-surface-that-renders-the-record.md) | **One local observability surface that renders the record** — `consil dashboard` writes a self-contained file; no server, no port, still no diff review | ✅ |
 | [0009](0009-route-per-task-not-per-step.md) | Route per task, not per step | 🟡 |
 | [0011](0011-evidence-merge-not-meeting.md) | Evidence merge (superseded by 0020) | ⛔ |
 | [0012](0012-composite-beta-with-per-check-diagnostics.md) | Measure composite β directly; per-check as diagnostics | ✅ |
@@ -49,6 +54,15 @@ Read these before anything else. Everything downstream depends on them.
 | [0046](0046-gate-b3-is-evidenced-by-a-dated-result-not-by-a-schedule-trigger.md) | **Gate B3 is evidenced by a dated result, not a schedule trigger** — no secret may reach a public repository, so the exercise runs locally | ✅ |
 | [0047](0047-promote-the-adapter-contract-and-retire-adapter-count-as-evidence.md) | **Promote the adapter contract; retire adapter count as evidence** — seven backends fit unchanged, but the newest adapter is 3.8× the smallest | ✅ |
 | [0048](0048-open-source-first-and-facilitation-is-prepaid-never-in-arrears.md) | **Open source first; paid facilitation is prepaid, never in arrears** — every capability usable by someone who pays nothing and contacts no server | ✅ |
+| [0049](0049-experiments-inform-they-do-not-gate.md) | **Experiments inform; they do not gate construction** — an unrun experiment justifies a PROVISIONAL assumption with a falsifier, not a stop | ✅ |
+| [0050](0050-gate-on-effect-size-not-on-uncertainty.md) | **Gate on effect size, not on the mere existence of uncertainty** — an entry that does not state its largest plausible effect cannot block a build | ✅ |
+| [0051](0051-a-tick-is-an-attempt-and-only-execution-runs-unattended.md) | **A tick is an attempt, only execution-bearing work runs unattended, and there is no offline consolidation phase**; the retry ceiling is derived from β and is 1 today | 🟡 |
+| [0054](0054-route-by-measured-capability-against-a-verifier-contract-never-by-a-harness-label.md) | **Route by measured capability against a verifier contract, never by a harness label** | 🟡 |
+| [0055](0055-simulated-users-produce-runs-not-verdicts.md) | **Simulated users produce runs, not verdicts** — an unmeasured verifier's *pass* is not evidence, only its *fail* is; the same instrument tests whether a non-expert can use the harness | 🟡 |
+| [0056](0056-schedule-work-across-prepaid-quota-pools-and-never-shed-to-spend.md) | **Schedule work across prepaid quota pools and never shed onto spend** | 🟡 |
+| [0057](0057-a-users-trajectory-is-their-data.md) | **A user's trajectory is their data** — private by default, never tracked, shared only by explicit consent | ✅ |
+| [0058](0058-orchestration-ships-as-a-script-until-the-cli-surface-is-settled.md) | **Orchestration ships as `scripts/dispatch.py`**; the `consil` CLI surface stays the principal's to settle | ✅ |
+| [0059](0059-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
 
 ## Behaviour and safety
 
@@ -99,3 +113,8 @@ to every ADR and every PR:
 - **0029** — PROVISIONAL pending EXP-27.
 - **0030** — PROVISIONAL pending EXP-30.
 - **0018** — decision 2 conditional on EXP-12 *and* EXP-13.
+- **0051** — PROVISIONAL pending EXP-70 (kills its schedule), EXP-71, EXP-72 (would write 0052)
+  and EXP-73. **ADR number 0052 is deliberately unclaimed**; it is written only if EXP-72 fires.
+- **0054** — PROVISIONAL pending EXP-90 … EXP-93.
+- **0055** — PROVISIONAL pending EXP-74, EXP-75 and EXP-76; owes three enforcement checks (V0-30, V0-31, V0-32), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
+- **0056** — PROVISIONAL pending EXP-94 for the allocation clauses; D5 ships with its check.

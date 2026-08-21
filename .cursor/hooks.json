@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "python .githooks/protect-files.py"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "python .githooks/auto-format.py"
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Refuse to create a commit containing credential-shaped material.
+# Tracked under .githooks/ so a clone can install it with:
+#   python scripts/install_hooks.py
+# Reversal: git config --unset core.hooksPath
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+checker="$root/.github/scripts/check_secrets.py"
+if [ ! -f "$checker" ]; then
+  echo "pre-commit: REFUSED — check_secrets.py is missing." >&2
+  exit 1
+fi
+
+if ! python "$checker" --staged >/dev/null 2>&1; then
+  echo "pre-commit: REFUSED — credential-shaped material is staged." >&2
+  python "$checker" --staged >&2
+  echo "" >&2
+  echo "Nothing was committed. Unstage the file, or --no-verify with a reason." >&2
+  exit 1
+fi
+exit 0

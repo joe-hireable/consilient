@@ -1,0 +1,40 @@
+#!/bin/sh
+# Gate pushes to the PUBLIC repository. Missing checkers FAIL, they do not skip.
+# Tracked under .githooks/. Reversal: git config --unset core.hooksPath
+
+remote_url="$2"
+
+case "$remote_url" in
+  *joe-hireable/consilient.git|*joe-hireable/consilient)
+    root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+    failed=0
+    echo "pre-push: public remote — running publication gates." >&2
+    for check in check_foreign_identifiers check_private_corpus check_secrets; do
+      script="$root/.github/scripts/$check.py"
+      if [ ! -f "$script" ]; then
+        echo "  FAIL  $check - checker missing at $script" >&2
+        failed=1
+        continue
+      fi
+      case "$check" in
+        check_private_corpus) args="--require-corpora" ;;
+        check_secrets)       args="--history --untracked --self-test" ;;
+        *)                   args="" ;;
+      esac
+      # shellcheck disable=SC2086
+      if python "$script" $args >/dev/null 2>&1; then
+        echo "  PASS  $check" >&2
+      else
+        echo "  FAIL  $check" >&2
+        python "$script" $args >&2
+        failed=1
+      fi
+    done
+    if [ "$failed" -ne 0 ]; then
+      echo "pre-push: REFUSED. A gate failed and publishing is irreversible." >&2
+      exit 1
+    fi
+    echo "pre-push: all publication gates pass - allowing." >&2
+    ;;
+esac
+exit 0

@@ -1,0 +1,17 @@
+---
+description: Consilient project rules for Cursor — load AGENTS.md and operate through dispatch
+alwaysApply: true
+---
+
+Read `AGENTS.md` and `CONSILIENCE.md` before acting. They are the source; this file is a pointer.
+
+Orchestrate with `python scripts/dispatch.py`, not a side chat. Probe first
+(`python scripts/dispatch.py --probe`). Do not spend an exhausted pool.
+Do not add `dispatch` to `consil` — that surface is pinned.
+
+Decide technical questions. Ask only for money, credentials, anything published
+outside the machine, irrecoverable deletion, or a preference no fact settles.
+
+Verify by artefact. Ship the check with the claim. Do not invent EXP or ADR numbers.
+
+Skills live in `.agents/skills/`. Procedures go there; invariants go in a check.

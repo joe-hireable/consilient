@@ -917,7 +917,11 @@ def test_the_cli_exposes_no_routing_or_blocking_surface():
     for sub in subparsers.choices.values():
         actions |= {a.dest for a in sub._actions}
 
-    assert commands == {"record", "replay", "beta", "doctor"}, commands
+    # `dashboard` added 21 Aug 2026 by ADR-0053. It renders and writes one HTML file;
+    # it accepts nothing, routes nothing and blocks nothing, so it passes the
+    # forbidden-verb check below on its own merits rather than by exemption. The exact
+    # set is asserted so that surface growth is a decision someone had to make here.
+    assert commands == {"record", "replay", "beta", "doctor", "dashboard", "usage"}, commands
     for forbidden in (
         "route",
         "dispatch",
@@ -2546,6 +2550,8 @@ def test_historical_refusal_digests_pin_real_log_rejections():
     log = Path(".harness/log")
     if not log.exists():  # pragma: no cover - repository-only check
         pytest.skip("no repository trajectory in this checkout")
+    if not (log / "2026-08-20.jsonl").exists():
+        pytest.skip("historical repository trajectory is not present in this checkout")
     real = {rejection.content_digest for rejection in read_all(log)[1]}
     assert real == set(HISTORICAL_REFUSAL_DIGESTS), (
         "the tolerated baseline and the trajectory's actual refusals have diverged; "
@@ -2922,3 +2928,1558 @@ def test_ci_replay_step_carries_a_control_that_can_fail():
     assert "identical'] is False" in step or 'identical"] is False' in step, (
         "the replay step lost the drift control that proves it can fail"
     )
+
+
+# ------------------------------------------------ V0-33, privacy of the trajectory, 21 Aug 2026
+def test_no_user_trajectory_is_tracked():
+    """A user's trajectory is their data and is never tracked, so it cannot be published.
+
+    Joe Brown, 21 August 2026: "Obviously we shouldn't be shipping anyones personal logs to
+    the public repo ... my usage of consilient should remain private just like anyone elses
+    unless they agree to share data in which case that is private and used to improve
+    consilient only."
+
+    Two days of trajectory -- `.harness/log/2026-08-19.jsonl` and `2026-08-20.jsonl` -- were
+    tracked and reached the public repository before this check existed. Only `state.db` and
+    `dispatch/` had ever been ignored. [measured] Publishing is one-way, so those two are not
+    retractable; this stops the third.
+
+    The project's own provenance -- which ADRs were accepted, what the gates measured -- is a
+    DIFFERENT artefact and may be published deliberately. What must never happen is a user's
+    log being published as a side effect of living in a tracked path. Today they are the same
+    file only because this project is its own only user; that stops being true the moment
+    anyone else runs it, and the fix belongs here rather than after it has a victim.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    tracked = subprocess.run(
+        ["git", "ls-files", ".harness/log/"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=True,
+    ).stdout.split()
+    assert tracked == [], (
+        "a user trajectory file is tracked and would be published on the next release: "
+        f"{tracked}. The trajectory is private by default; publish a curated provenance "
+        "record instead."
+    )
+
+# ------------------------------------------- V0-29, V0-30, V0-20, V0-25 · the loop runtime
+def _loop_runner():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "run_loop", Path("scripts/run_loop.py").resolve()
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _workspace(tmp_path):
+    """A directory the loop will accept as a Consilient checkout, and its trajectory."""
+    (tmp_path / "CONSILIENCE.md").write_text("marker\n", encoding="utf-8")
+    return tmp_path, tmp_path / "log"
+
+
+def _loop(tmp_path, *script, **over):
+    from consilient.loop import Loop
+
+    root, log = _workspace(tmp_path)
+    settings = {
+        "name": "probe",
+        "root": root,
+        "log_dir": log,
+        "command": (sys.executable, "-c", *script),
+        "interval_s": 0.0,
+        "timeout_s": 60.0,
+        "max_ticks": 1,
+    }
+    settings.update(over)
+    return Loop(**settings)
+
+
+def _wait_for(predicate, seconds=60):
+    import time
+
+    until = time.monotonic() + seconds
+    while time.monotonic() < until:
+        if predicate():
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def _loop_events(log, kind=None):
+    events, rejected = read_all(log)
+    assert not rejected, [r.reason for r in rejected]
+    return [e for e in events if kind is None or e.kind == kind]
+
+
+def test_every_loop_tick_is_recorded_through_the_single_append_writer(tmp_path):
+    """V0-29. A loop whose activity is invisible to the trajectory is worthless here.
+
+    Both halves matter: the events are present, and they came through `append()`. 92 of the
+    93 events in the real trajectory were written straight to the file by something else,
+    which is how three events V0-18 forbids reached an authoritative record whose sole
+    writer rejects them. `bypassed()` is the check that would have caught it.
+    """
+    from consilient import loop as loop_mod
+
+    runner = _loop_runner()
+    loop = _loop(tmp_path, "print('tick')", max_ticks=2)
+
+    runner.run(loop)
+
+    kinds = [(e.kind, e.data["tick"]) for e in _loop_events(loop.log_dir)]
+    assert kinds == [
+        (loop_mod.TICK_STARTED, 1),
+        (loop_mod.TICK_FINISHED, 1),
+        (loop_mod.TICK_STARTED, 2),
+        (loop_mod.TICK_FINISHED, 2),
+        (loop_mod.LOOP_STOPPED, 3),
+    ]
+    assert events_mod.bypassed(loop.log_dir) == [], "a tick was written past append()"
+    for finished in _loop_events(loop.log_dir, loop_mod.TICK_FINISHED):
+        assert finished.data["outcome"] == "completed"
+        assert finished.data["produced_bytes"] > 0
+
+
+def test_a_tick_that_exits_zero_without_producing_anything_is_recorded_as_silent(
+    tmp_path,
+):
+    """R1 and R13. Exit 0 is not evidence that the work happened.
+
+    Two dispatches on this machine returned 0 immediately and never started; a third was
+    alive for twelve minutes with a 0-byte log because a runtime's interactive default was
+    waiting for a terminal. `silent` is a distinct outcome from `completed` so that the
+    liveness signal is about produced work rather than about a return code.
+    """
+    from consilient import loop as loop_mod
+
+    runner = _loop_runner()
+    loop = _loop(tmp_path, "pass")
+
+    result = runner.run(loop)
+
+    finished = _loop_events(loop.log_dir, loop_mod.TICK_FINISHED)[0]
+    assert finished.data["exit_code"] == 0
+    assert finished.data["produced_bytes"] == 0
+    assert finished.data["outcome"] == "silent"
+    assert result["ticks_silent"] == 1
+    assert result["working"] is False
+
+
+def test_a_killed_loop_loses_no_record_and_never_re_executes_the_tick(tmp_path):
+    """V0-29, verified by artefact rather than by an exit code.
+
+    A real loop process is killed as a tree, mid-tick, after its side effect has run. Two
+    properties are then read off the trajectory file on disk — never off a return value:
+
+    1. the intent record for the interrupted tick is still there, because it was appended
+       and closed before the side effect started;
+    2. restarting does not run that tick again. The side-effect file still holds exactly
+       one mark, and the tick is recorded as abandoned with its outcome unknown.
+
+    What is NOT guaranteed, and is deliberately not asserted: that the outcome of the
+    interrupted tick was recorded. The process died before it could write one. This is
+    at-most-once, not exactly-once.
+    """
+    from consilient.loop import TICK_ABANDONED, TICK_FINISHED, TICK_STARTED
+
+    runner = _loop_runner()
+    root, log = _workspace(tmp_path)
+    marker = root / "side-effect.txt"
+    slow = (
+        "import pathlib, sys, time\n"
+        "target = pathlib.Path(sys.argv[1])\n"
+        "target.write_text((target.read_text() if target.exists() else '') + 'x')\n"
+        "print('working', flush=True)\n"
+        "time.sleep(600)\n"
+    )
+    argv = [
+        sys.executable,
+        str(Path("scripts/run_loop.py").resolve()),
+        "--root",
+        str(root),
+        "--log",
+        str(log),
+        "--name",
+        "probe",
+        "--interval",
+        "0",
+        "--timeout",
+        "600",
+        "--max-ticks",
+        "5",
+        "--",
+        sys.executable,
+        "-c",
+        slow,
+        str(marker),
+    ]
+    first = subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        assert _wait_for(lambda: marker.exists()), "the tick never ran"
+    finally:
+        runner.kill_tree(first)
+        first.wait(timeout=60)
+
+    started = _loop_events(log, TICK_STARTED)
+    assert [e.data["tick"] for e in started] == [1], "the intent record did not survive"
+    assert _loop_events(log, TICK_FINISHED) == [], (
+        "the tick was not actually interrupted"
+    )
+    assert marker.read_text(encoding="utf-8") == "x"
+
+    argv[argv.index("--max-ticks") + 1] = "1"
+    second = subprocess.run(
+        argv,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+    )
+
+    assert marker.read_text(encoding="utf-8") == "x", (
+        f"the interrupted tick was executed a second time: {second.stdout}"
+    )
+    assert [e.data["tick"] for e in _loop_events(log, TICK_STARTED)] == [1]
+    abandoned = _loop_events(log, TICK_ABANDONED)
+    assert [e.data["tick"] for e in abandoned] == [1]
+    assert abandoned[0].data["outcome"] == "unknown"
+
+
+def test_the_stop_file_ends_a_tick_that_is_already_wedged(tmp_path):
+    """The kill switch has to work when the loop is stuck, or it is decoration.
+
+    A stop checked only between ticks cannot stop a tick that never returns, and a
+    `subprocess` timeout does not reach grandchildren — overruns of 10 to 269 seconds past
+    the deadline have been measured on this machine. The stop is checked inside the tick
+    and the kill is a tree kill.
+    """
+    import threading
+
+    from consilient import loop as loop_mod
+
+    runner = _loop_runner()
+    loop = _loop(
+        tmp_path,
+        "import time\nprint('up', flush=True)\ntime.sleep(600)\n",
+        timeout_s=600.0,
+    )
+
+    thread = threading.Thread(target=runner.run, args=(loop,), daemon=True)
+    thread.start()
+    try:
+        assert _wait_for(
+            lambda: loop.transcript.exists() and loop.transcript.stat().st_size > 0
+        ), "the wedged tick never produced its first byte"
+
+        live = loop_mod.status(loop)
+        assert live["in_flight"] is True and live["ticks_finished"] == 0
+        assert live["working"] is True and live["bytes_since_tick_started"] > 0
+
+        loop.stop_file.parent.mkdir(parents=True, exist_ok=True)
+        loop.stop_file.write_text("stop\n", encoding="utf-8")
+        thread.join(timeout=120)
+        assert not thread.is_alive(), "the stop file did not end a wedged tick"
+    finally:
+        loop.stop_file.unlink(missing_ok=True)
+
+    finished = _loop_events(loop.log_dir, loop_mod.TICK_FINISHED)
+    assert [e.data["outcome"] for e in finished] == ["killed"]
+    stopped = _loop_events(loop.log_dir, loop_mod.LOOP_STOPPED)
+    assert stopped and "mid-tick" in stopped[0].data["reason"]
+
+
+def test_a_standing_stop_is_not_cleared_by_restarting_the_loop(tmp_path):
+    """A kill switch a scheduled restart lifts by itself is not a kill switch."""
+    runner = _loop_runner()
+    loop = _loop(tmp_path, "print('tick')")
+    loop.stop_file.parent.mkdir(parents=True, exist_ok=True)
+    loop.stop_file.write_text("stop\n", encoding="utf-8")
+
+    with pytest.raises(runner.LoopError, match="a stop is in force"):
+        runner.run(loop)
+
+    assert _loop_events(loop.log_dir) == []
+
+
+def test_loop_liveness_is_computed_from_produced_work_not_a_process_identity(tmp_path):
+    """V0-25, which the specification has declared since 19 August with no check.
+
+    No process exists anywhere in this test. The loop reports `working` from the bytes the
+    current tick has put on its transcript and from the outcomes already recorded, so a
+    live process producing nothing reads as not working — which is the state a process
+    check reported as healthy for twelve minutes on this machine.
+
+    Honest limit: this covers V0-25's first clause. "A terminal artefact record outranks a
+    stale liveness signal" and "detection escalates rather than terminating" remain
+    unenforced.
+    """
+    import ast
+    import inspect
+
+    from consilient import loop as loop_mod
+
+    loop = _loop(tmp_path, "pass")
+    loop.log_dir.mkdir(parents=True, exist_ok=True)
+    loop.transcript.parent.mkdir(parents=True, exist_ok=True)
+    loop.transcript.write_text("", encoding="utf-8")
+
+    assert loop_mod.status(loop)["working"] is False
+
+    loop_mod.record(loop, loop_mod.TICK_STARTED, 1, {"transcript_bytes": 0})
+    in_flight = loop_mod.status(loop)
+    assert in_flight["in_flight"] is True
+    assert in_flight["working"] is False, in_flight["reason"]
+    assert "produced nothing" in in_flight["reason"]
+
+    with loop.transcript.open("ab") as sink:
+        sink.write(b"progress\n")
+    producing = loop_mod.status(loop)
+    assert producing["working"] is True
+    assert producing["bytes_since_tick_started"] == len(b"progress\n")
+
+    # Names, not prose: the docstring is allowed to say the word, the code is not.
+    tree = ast.parse(inspect.getsource(loop_mod))
+    identifiers = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)} | {
+        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+    }
+    process_shaped = {
+        name
+        for name in identifiers
+        if "pid" in name.lower() or "process" in name.lower()
+    }
+    assert not process_shaped, (
+        f"the loop resolves liveness from a process identity: {sorted(process_shaped)}"
+    )
+
+
+def _budget_state(log_dir, weekly_spent, monthly_spent):
+    from consilient.events import rejection_digest
+
+    now = datetime.now(timezone.utc)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    append(
+        log_dir / f"{now.date().isoformat()}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": now.isoformat(),
+            "event": "budget.state",
+            "actor": "openrouter-probe",
+            "data": {
+                "provider": "openrouter",
+                "currency": "USD",
+                "weekly_spent": weekly_spent,
+                "monthly_spent": monthly_spent,
+                "observed_at": now.isoformat(),
+                "rejection_digest": rejection_digest(read_all(log_dir)[1]),
+            },
+        },
+    )
+
+
+def test_a_loop_stops_rather_than_spending_past_its_ceiling(tmp_path):
+    """V0-20, which the specification has declared since 19 August with no check.
+
+    The ceiling is enforced before the tick runs, so an exhausted budget cannot execute the
+    side effect and then discover the problem. No metered vendor is involved: the state the
+    ceiling is measured against is a fixture, which is all a spend limit needs to be tested.
+    """
+    from decimal import Decimal
+
+    from consilient import loop as loop_mod
+    from consilient.budget import Ceiling
+
+    runner = _loop_runner()
+    marker = tmp_path / "spent.txt"
+    loop = _loop(
+        tmp_path,
+        f"open({str(marker)!r}, 'a').write('x')",
+        cost_per_tick=Decimal("2.00"),
+        ceilings=(Ceiling("weekly", Decimal("10.00"), "USD"),),
+    )
+    _budget_state(loop.log_dir, weekly_spent="9.00", monthly_spent="9.00")
+
+    result = runner.run(loop)
+
+    assert not marker.exists(), "the loop spent past its ceiling"
+    assert _loop_events(loop.log_dir, loop_mod.TICK_STARTED) == []
+    stopped = _loop_events(loop.log_dir, loop_mod.LOOP_STOPPED)
+    assert "weekly ceiling would be breached" in stopped[0].data["reason"]
+    assert result["working"] is False
+
+
+def test_a_permitted_metered_tick_records_its_reservation_before_it_runs(tmp_path):
+    """The other half of V0-20: a tick inside the ceiling runs, and the spend is recorded."""
+    from decimal import Decimal
+
+    from consilient import loop as loop_mod
+    from consilient.budget import Ceiling
+
+    runner = _loop_runner()
+    loop = _loop(
+        tmp_path,
+        "print('tick')",
+        cost_per_tick=Decimal("2.00"),
+        ceilings=(Ceiling("weekly", Decimal("10.00"), "USD"),),
+    )
+    _budget_state(loop.log_dir, weekly_spent="1.00", monthly_spent="1.00")
+
+    runner.run(loop)
+
+    reserved = _loop_events(loop.log_dir, "spend.reserved")
+    assert [e.data["run_id"] for e in reserved] == ["probe#1"]
+    assert reserved[0].data["amount"] == "2.00"
+    started = _loop_events(loop.log_dir, loop_mod.TICK_STARTED)
+    assert started and started[0].line > reserved[0].line, (
+        "the tick was recorded as started before its spend was reserved"
+    )
+
+
+def test_the_loop_refuses_a_workspace_that_is_not_this_repository(tmp_path):
+    """V0-30. Gate B forbids pointing the harness at any repository other than this one."""
+    import dataclasses
+
+    from consilient import loop as loop_mod
+    from consilient.loop import Loop
+
+    elsewhere = tmp_path / "another-repo"
+    (elsewhere / "src").mkdir(parents=True)
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    foreign = Loop(
+        name="probe",
+        root=elsewhere,
+        log_dir=elsewhere / "log",
+        command=(sys.executable, "-c", "pass"),
+        interval_s=0.0,
+        timeout_s=60.0,
+    )
+
+    refused = loop_mod.refusal(foreign)
+    assert refused is not None and "Gate B" in refused and "V0-30" in refused
+
+    reaching_out = dataclasses.replace(
+        _loop(workspace, "pass"),
+        command=(sys.executable, "-c", "pass", str(elsewhere / "src")),
+    )
+    outward = loop_mod.refusal(reaching_out)
+    assert outward is not None and "outside the workspace" in outward
+
+
+def test_the_loop_runtime_cannot_be_reached_from_the_observe_only_cli():
+    """Stage 3 permits building this; it does not put it behind `consil`.
+
+    The loop is an operator surface with a kill switch, not a reporting command, and the
+    scope test that pins the CLI to four commands stays untouched by it.
+    """
+    parser = build_parser()
+    subparsers = next(
+        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
+    )
+    assert set(subparsers.choices) == {
+        "record",
+        "replay",
+        "beta",
+        "doctor",
+        "dashboard",
+        "usage",
+    }
+
+
+def test_a_command_that_will_not_start_is_refused_not_retried_forever(tmp_path):
+    """R12. A refusal is a repairable dispatch fault, and it is not a failure.
+
+    Without this the loop would spin: a mistyped command raises on every `Popen`, the tick
+    is recorded as started and never settled, and an always-on runtime turns into an
+    always-on crash loop that fills the trajectory with abandoned ticks.
+    """
+    import dataclasses
+
+    from consilient import loop as loop_mod
+
+    runner = _loop_runner()
+    loop = dataclasses.replace(
+        _loop(tmp_path, "pass"), command=("consilient-no-such-executable",)
+    )
+
+    runner.run(loop)
+
+    finished = _loop_events(loop.log_dir, loop_mod.TICK_FINISHED)
+    assert [e.data["outcome"] for e in finished] == ["refused"]
+    stopped = _loop_events(loop.log_dir, loop_mod.LOOP_STOPPED)
+    assert stopped and "will not start" in stopped[0].data["reason"]
+
+
+def test_only_one_instance_of_a_loop_can_hold_it_at_a_time(tmp_path):
+    """The other half of no-double-execution: two supervisors are two side effects.
+
+    The lock is an OS lock rather than a file that exists, because a lock a crash leaves
+    behind would stop the loop restarting — which is the failure mode an always-on runtime
+    can least afford. `test_a_killed_loop_...` restarts after a kill and proves it.
+    """
+    runner = _loop_runner()
+    loop = _loop(tmp_path, "pass")
+    loop.log_dir.mkdir(parents=True, exist_ok=True)
+
+    with runner.single_instance(loop):
+        with pytest.raises(runner.LoopError, match="already holds"):
+            with runner.single_instance(loop):
+                pass  # pragma: no cover - the guard above is what is under test
+
+    with runner.single_instance(loop):
+        pass  # the lock is released when the holder lets go
+
+# ------------------------------------------------------ V0-30, ADR-0053 (observability)
+# The surface renders the record and never forms an opinion of its own. Three properties
+# make that real rather than promised: it cannot disagree with the CLI about an
+# authoritative number, it cannot render a failing gate in the passing style, and it cannot
+# reach outside the file it wrote. The fifth test pins the honesty of the RACI panel, which
+# is the claim most likely to rot into an invented graph once someone wants one.
+def dashboard_payload(tmp_path, capsys, log=None, db=None):
+    """Run `consil dashboard --json` the way a user would, and return its one contract.
+
+    `db` is a parameter because A2 is legitimately order-dependent: the first `doctor` run
+    against a database that does not exist reports "no prior projection existed" and cannot
+    compare, while the second compares against what the first wrote. Two runs sharing one
+    database therefore differ for a correct reason, and a comparison test must give each
+    run its own so it is measuring drift rather than measuring history.
+    """
+    out = tmp_path / "dash.html"
+    code = main(
+        [
+            "--log",
+            str(log or (tmp_path / "log")),
+            "--db",
+            str(db or (tmp_path / "state.db")),
+            "--json",
+            "dashboard",
+            # `--out` is dashboard-specific, so unlike --json/--log/--db it is only valid
+            # after the subcommand.
+            "--out",
+            str(out),
+        ]
+    )
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert out.exists(), "dashboard reported success without writing the file"
+    return payload, out.read_text(encoding="utf-8")
+
+
+def _seeded_log(tmp_path):
+    log = tmp_path / "log"
+    log.mkdir(parents=True, exist_ok=True)
+    day = datetime.now(timezone.utc).date().isoformat()
+    work = ev(
+        event="work.completed",
+        actor="agent-one",
+        data={
+            "runtime_identity": "claude-code/session-a",
+            "logical_identity": "builder",
+            "work_role": "implementer",
+            "artefacts": ["src/consilient/dashboard.py", "docs/decisions/0053.md"],
+            "principal": HUMAN,
+        },
+    )
+    lines = [
+        canonical(work),
+        canonical(outcome("a-1", "task-one", True)),
+        canonical(verdict("a-1", "reject")),
+    ]
+    (log / (day + ".jsonl")).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return log
+
+
+def test_the_dashboard_cannot_disagree_with_doctor_about_the_gates(tmp_path, capsys):
+    """The page's gate block is `cmd_doctor`'s result, not a second reading of the gates.
+
+    Two surfaces reporting the same thing is two chances to be wrong. This asserts equality
+    of the whole structure rather than of a summary line, so a divergence anywhere in it —
+    a status, a reason, an evidence path — fails here rather than being discovered by
+    someone reading a green page about a stopped system.
+    """
+    log = _seeded_log(tmp_path)
+    payload, _ = dashboard_payload(tmp_path, capsys, log=log)
+    # A2 names the database it compared, in both its reason and its evidence, and it reports
+    # differently on a first run than on a second. So the two runs must start from the same
+    # path AND the same absence, or the test measures ordering rather than drift.
+    (tmp_path / "state.db").unlink()
+    truth = doctor_payload(tmp_path, capsys)
+    assert payload["gates"] == truth["gates"]
+    assert (
+        payload["routing_orchestration_enabled"]
+        == truth["routing_orchestration_enabled"]
+    )
+
+
+def test_the_dashboard_cannot_disagree_with_the_beta_command(tmp_path, capsys):
+    log = _seeded_log(tmp_path)
+    payload, html_text = dashboard_payload(tmp_path, capsys, log=log)
+    code = main(
+        ["--log", str(log), "--db", str(tmp_path / "state.db"), "--json", "beta"]
+    )
+    assert code == 0
+    truth = json.loads(capsys.readouterr().out)
+    for field in ("verdict", "n_rejected", "n_false_accept", "point", "interval"):
+        assert payload["beta"][field] == truth[field], field
+    # The rendered sentence is `Beta.render()`'s own output, so the expert disclosure cannot
+    # paraphrase the number into something friendlier than it is.
+    assert payload["beta_line"] in html_text
+
+
+def test_a_failing_gate_condition_never_renders_in_the_passing_style(tmp_path, capsys):
+    """The defect this project exists to catch, applied to its own dashboard.
+
+    A surface that showed green where a gate fails would be a verifier accepting a bad
+    artefact — beta, committed by the instrument that measures beta.
+    """
+    from consilient import dashboard as dash
+
+    payload, _ = dashboard_payload(tmp_path, capsys, log=_seeded_log(tmp_path))
+    conditions = [c for g in payload["gates"].values() for c in g["conditions"]]
+    assert any(c["status"] != "pass" for c in conditions), (
+        "fixture no longer exercises a failing condition; this test would pass vacuously"
+    )
+
+    rendered = dash.render_html(payload)
+    for condition in conditions:
+        marker = 'class="cond s-' + condition["status"] + '"'
+        assert marker in rendered, condition["id"] + " did not render its own state"
+    assert 'class="verdict is-on"' not in rendered, (
+        "the page declared the system enabled while a condition was failing"
+    )
+    assert "Consilient is watching, not acting." in rendered
+
+    # And the converse: with every condition passing it must be willing to say so, or this
+    # test would be satisfied by a page that is simply always red.
+    happy = json.loads(json.dumps(payload))
+    for gate in happy["gates"].values():
+        for condition in gate["conditions"]:
+            condition["status"] = "pass"
+    happy["routing_orchestration_enabled"] = True
+    assert 'class="verdict is-on"' in dash.render_html(happy)
+
+
+def test_the_rendered_page_references_nothing_outside_itself(tmp_path, capsys):
+    """ADR-0007's surviving prohibitions, enforced rather than promised.
+
+    "A rendered file, not a web app" is only true while the file is self-contained. One
+    `<script src>` or one font URL turns it into a page that needs the network, and every
+    objection ADR-0007 raised about a local server comes back.
+    """
+    _, rendered = dashboard_payload(tmp_path, capsys, log=_seeded_log(tmp_path))
+    for forbidden in ("<script", "src=", "http://", "https://", "@import", "url("):
+        assert forbidden not in rendered, "page reached outside itself via " + forbidden
+
+
+def test_the_dashboard_renders_from_an_empty_trajectory(tmp_path, capsys):
+    """No data is a state to render, not a crash and not a zero.
+
+    The real trajectory has no budget events and no human verdicts, so several panels are
+    already exercising their empty path in production. This pins the fully-empty case.
+    """
+    empty = tmp_path / "log"
+    empty.mkdir(parents=True, exist_ok=True)
+    payload, rendered = dashboard_payload(tmp_path, capsys, log=empty)
+    assert payload["trajectory"]["events"] == 0
+    assert payload["agents"] == []
+    assert payload["beta"]["verdict"] == "insufficient_data"
+    assert payload["usage"]["windows"] == []
+    assert "absence of observation, not an observation of zero" in rendered
+    assert "<h1>" in rendered
+
+
+def test_raci_is_reported_as_underivable_while_the_record_lacks_its_fields(
+    tmp_path, capsys
+):
+    """The honest-absence claim, pinned so it cannot quietly become an invented matrix.
+
+    RACI attaches to a piece of work (ADR-0020), and the trajectory carries no stable
+    work-item identifier, no `accountable`, no `consulted` and no `informed`. The panel must
+    say so. If someone later derives a matrix anyway, this fails — and if the schema gains
+    the fields, the second half fails, which is the reminder to rebuild the panel rather
+    than leave it asserting an absence that is no longer true.
+    """
+    from consilient import dashboard as dash
+
+    payload, rendered = dashboard_payload(tmp_path, capsys, log=_seeded_log(tmp_path))
+    assert payload["raci"]["derivable"] is False
+    assert "cannot be derived" in rendered
+
+    informed = next(x for x in payload["raci"]["letters"] if x["letter"] == "I")
+    assert informed["derivable"] == "no"
+    assert informed["coverage"] == 0
+
+    events, _ = read_all(tmp_path / "log")
+    for field in dash.RACI_FIELDS + dash.WORK_ITEM_FIELDS:
+        assert not any(field in e.data for e in events), (
+            field + " now appears in the trajectory; the RACI panel's claim that it is "
+            "absent is stale and must be rebuilt"
+        )
+
+
+def test_a_non_path_value_is_never_drawn_as_a_directory(tmp_path, capsys):
+    """`artefacts` is free text, and on the real log four of its values are not files.
+
+    Drawing a bare commit identifier as a directory node would state a fact the record does
+    not contain. They are excluded from the graph and reported under their own heading, so
+    neither the invention nor a silent drop is possible.
+    """
+    from consilient import dashboard as dash
+
+    assert dash._is_path("docs/decisions/0053.md")
+    assert dash._is_path("AGENTS.md")
+    assert not dash._is_path("6088e3e")
+    assert not dash._is_path("private handoff memo only")
+
+    log = tmp_path / "log"
+    log.mkdir(parents=True, exist_ok=True)
+    day = datetime.now(timezone.utc).date().isoformat()
+    noisy = ev(
+        event="work.completed",
+        actor="agent-one",
+        data={
+            "runtime_identity": "claude-code/session-a",
+            "artefacts": ["docs/decisions/0053.md", "6088e3e"],
+        },
+    )
+    (log / (day + ".jsonl")).write_text(canonical(noisy) + "\n", encoding="utf-8")
+
+    payload, rendered = dashboard_payload(tmp_path, capsys, log=log)
+    assert [a["path"] for a in payload["artefacts"]] == ["docs/decisions/0053.md"]
+    assert [a["value"] for a in payload["annotations"]] == ["6088e3e"]
+    assert not any(e["group"] == "6088e3e" for e in payload["edges"])
+    # Excluded from the graph, but not lost: it is still reported to the reader.
+    assert "6088e3e" in rendered
+
+
+def test_the_dashboard_adds_no_dependency_outside_the_standard_library():
+    """ADR-0031's stdlib-only core, checked over the whole package.
+
+    ADR-0007 named "no frontend dependency" as its enforcement, and ADR-0053 keeps it. The
+    dashboard is where that rule is most tempting to break.
+    """
+    import ast
+
+    root = Path(__file__).resolve().parents[1] / "src" / "consilient"
+    external = set()
+    for source in sorted(root.glob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name.split(".")[0] for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                # level > 0 is a relative import: our own package, not a dependency.
+                names = [] if node.level else [(node.module or "").split(".")[0]]
+            else:
+                continue
+            external.update(n for n in names if n and n not in sys.stdlib_module_names)
+    assert not external, "consilient imports outside stdlib: " + repr(sorted(external))
+
+# ---------------------------------------------------------------- V0-39
+# ADR-0056 D5: On-Demand Spending stays Disabled and only the principal may change that.
+# It is the one control by which this system could spend real money, so it ships with a lint
+# rule rather than a convention (I1). The tests below are the rule's own check.
+_spend_scripts = str(Path(__file__).resolve().parent.parent / ".github" / "scripts")
+if _spend_scripts not in sys.path:
+    sys.path.insert(0, _spend_scripts)
+
+import check_no_spend_escalation as spend  # noqa: E402
+
+
+def test_v0_39_a_spend_escalation_call_is_caught_and_located():
+    """The token is taken from the checker, so this test cannot drift from what it enforces."""
+    call = f"client.{spend.BANNED[0]}(9999)"
+    found = spend.scan_text("src/consilient/router.py", "x = 1\n" + call)
+
+    assert found == [("src/consilient/router.py", 2, spend.BANNED[0])]
+
+
+def test_v0_39_documentation_may_name_the_control_it_forbids():
+    """Without this, neither ADR-0056 nor its design note could describe the ban."""
+    call = f"client.{spend.BANNED[0]}(9999)"
+
+    assert spend.ALLOWED_PREFIXES and all(
+        not spend.scan_text(path, call) for path in spend.ALLOWED_PREFIXES
+    )
+    assert not spend.is_allowed("src/consilient/budget.py")
+
+
+def test_v0_39_the_read_only_usage_oracle_is_not_blocked():
+    """EXP-94 must be able to call GetFilteredUsageEvents on the same service. A ban so wide
+    that it forbids reading the counter would stop the experiment that settles ADR-0056."""
+    assert not spend.scan_text("src/consilient/usage.py", "Get" + "FilteredUsageEvents(req)")
+
+
+def test_v0_39_no_tracked_file_escalates_spend():
+    script = Path(".github/scripts/check_no_spend_escalation.py")
+    if not script.exists():  # pragma: no cover - repository-only check
+        pytest.skip("checker not present in this checkout")
+    result = subprocess.run(
+        [sys.executable, str(script), "--check", "--self-test"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+    )
+
+    # The artefact, not the exit code: a checker that silently found nothing to scan would
+    # also exit 0. This project has shipped a check that could not fail twice already.
+    assert "V0-39 ok" in result.stdout, result.stdout + result.stderr
+    assert result.returncode == 0
+
+
+def test_v0_39_is_wired_into_ci_and_cannot_be_silently_unwired():
+    workflow = Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
+    step = workflow.partition("- name: Spend escalation invariant check")[2].partition(
+        "- name:"
+    )[0]
+
+    assert "run: python .github/scripts/check_no_spend_escalation.py --check" in step
+
+# ------------------------------------------------ V0-30 / V0-31, usage, limits and spend
+# PRODUCT, not instance. Nothing below names an account, a credential or a real balance.
+from decimal import Decimal  # noqa: E402
+
+from consilient import budget as budget_mod  # noqa: E402
+from consilient import usage as usage_mod  # noqa: E402
+
+
+def usage_event(**over):
+    data = {
+        "provider": "codex",
+        "kind": "subscription",
+        "status": "ok",
+        "detail": "account/rateLimits/read",
+        "observed_at": None,
+        "quotas": [
+            {
+                "window": "10080m",
+                "used_fraction": "0.05",
+                "resets_at": now_ts(3600),
+                "provenance": "measured",
+            }
+        ],
+        "spend": [],
+    }
+    data.update(over)
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": "usage.observed",
+        "actor": "consilient.usage",
+        "data": data,
+    }
+
+
+def as_event(result):
+    """A collector's answer, in the form the one writer would have to accept."""
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": "usage.observed",
+        "actor": "consilient.usage",
+        "data": usage_mod.as_payload(result),
+    }
+
+
+def test_a_provider_that_could_not_be_read_may_not_carry_a_figure():
+    """V0-30. The invented number is how this feature goes wrong, so it is unwritable.
+
+    A dashboard showing "0%" for a provider nobody could read is worse than one showing
+    nothing: it reports headroom that was never observed, and the reader cannot tell the
+    two apart. The rule is enforced at `append()` rather than at the renderer, because a
+    renderer is one of several things that could display the number and the writer is the
+    only thing all of them go through -- working principle 3.
+    """
+    for status in ("unavailable", "not_configured"):
+        with pytest.raises(EventError, match="carries a figure"):
+            validate(usage_event(status=status))
+        with pytest.raises(EventError, match="carries a figure"):
+            validate(
+                usage_event(
+                    status=status,
+                    quotas=[],
+                    spend=[
+                        {
+                            "amount": "0",
+                            "currency": "USD",
+                            "period": "monthly",
+                            "provenance": "measured",
+                        }
+                    ],
+                )
+            )
+    # And the mirror image: "ok" carrying nothing is a success claim about no evidence.
+    with pytest.raises(EventError, match="no figure"):
+        validate(usage_event(quotas=[], spend=[]))
+
+
+def test_a_usage_figure_must_name_one_of_the_projects_evidence_tags():
+    """V0-30. `[measured]`, `[cited]` or `[asserted]`. An untagged number reads as fact."""
+    for bad in (None, "", "probably", "MEASURED", 1):
+        quota = dict(usage_event()["data"]["quotas"][0])
+        quota["provenance"] = bad
+        with pytest.raises(EventError, match="provenance"):
+            validate(usage_event(quotas=[quota]))
+
+    for tag in sorted(events_mod.PROVENANCE):
+        quota = dict(usage_event()["data"]["quotas"][0])
+        quota["provenance"] = tag
+        validate(usage_event(quotas=[quota]))
+
+
+def test_a_quota_keeps_its_window_and_reset_and_spend_keeps_its_currency():
+    """V0-30. A subscription window and a metered charge are different measurements.
+
+    `backends.md`: "Resource windows remain provider-native and separately keyed; a
+    five-hour, seven-day or monthly bucket is not flattened into one generic reset." The
+    reset time is the part a human acts on, so collapsing a window into one percentage
+    would delete the only half of the answer that says when it stops being a problem.
+    """
+    quota = dict(usage_event()["data"]["quotas"][0])
+    del quota["window"]
+    with pytest.raises(EventError, match="provider-native window"):
+        validate(usage_event(quotas=[quota]))
+
+    quota = dict(usage_event()["data"]["quotas"][0])
+    quota["resets_at"] = "2026-08-28 09:00:00"  # no offset: unreadable across machines
+    with pytest.raises(EventError, match="resets_at"):
+        validate(usage_event(quotas=[quota]))
+
+    # Spend that cannot be compared with a ceiling is not spend.
+    with pytest.raises(EventError, match="currency"):
+        validate(
+            usage_event(
+                kind="metered",
+                quotas=[],
+                spend=[
+                    {"amount": "1.00", "period": "weekly", "provenance": "measured"}
+                ],
+            )
+        )
+
+
+def test_a_used_fraction_outside_zero_to_one_is_refused():
+    """V0-30. A percentage written into a fraction field is a factor-of-100 error."""
+    quota = dict(usage_event()["data"]["quotas"][0])
+    quota["used_fraction"] = "5"
+    with pytest.raises(EventError, match="0, 1"):
+        validate(usage_event(quotas=[quota]))
+
+
+def test_providers_with_no_counter_say_unavailable_and_give_the_reason(tmp_path):
+    """V0-30, at the collector rather than at the writer.
+
+    Measured 20 August 2026: `cursor-agent about --format json` returns `subscriptionTier`
+    with no quota, no consumed figure and no reset window; `grok inspect --json` exposes no
+    individual remaining-quota percentage, allowance counter or reset timestamp. These are
+    the two providers most likely to acquire a fabricated zero, because a dashboard row
+    that says nothing looks like a bug to whoever is asked to fix it.
+
+    The reason string is asserted too. An "unavailable" with no reason is exactly as
+    unfalsifiable as an invented number: nobody can tell whether it is a fact about the
+    vendor or a collector somebody never finished.
+    """
+    (tmp_path / "cursor.json").write_text(
+        '{"subscriptionTier": "ultra"}', encoding="utf-8"
+    )
+    (tmp_path / "grok.json").write_text('{"model": "grok-4.6"}', encoding="utf-8")
+    sources = usage_mod.Sources(payloads=tmp_path, log=tmp_path / "log")
+
+    for provider in ("cursor", "grok"):
+        result = usage_mod.COLLECTORS[provider](sources)
+        assert result.status == "unavailable", provider
+        assert result.quotas == () and result.spend == (), provider
+        assert len(result.detail) > 40, f"{provider} gave no reason for unavailable"
+        validate(as_event(result))
+
+
+def test_an_absent_provider_degrades_to_not_configured_rather_than_failing(tmp_path):
+    """A collector must never raise. An empty directory is an installation, not an error."""
+    sources = usage_mod.Sources(payloads=tmp_path / "nothing", log=tmp_path / "nolog")
+    for name, collector in sorted(usage_mod.COLLECTORS.items()):
+        result = collector(sources)
+        assert result.status in ("not_configured", "unavailable"), name
+        assert result.quotas == () and result.spend == (), name
+        validate(as_event(result))
+
+    snapshot = usage_mod.snapshot(sources)
+    assert [p["provider"] for p in snapshot["providers"]] == sorted(
+        usage_mod.COLLECTORS
+    )
+    assert all(p["status"] != "ok" for p in snapshot["providers"])
+
+
+def test_the_measured_codex_payload_parses_to_a_quota_that_keeps_its_reset(tmp_path):
+    """The one subscription whose headroom schema this repository actually measured.
+
+    EXP-07 queried `codex app-server --stdio` with `account/rateLimits/read` and committed
+    the response. These are its field names and its values, so this fails if the parser
+    drifts from the shape that was really observed. [measured]
+    """
+    (tmp_path / "codex.json").write_text(
+        json.dumps(
+            {
+                "result": {
+                    "rateLimits": {
+                        "planType": "pro",
+                        "primary": {
+                            "usedPercent": 5,
+                            "resetsAt": 1787767120,
+                            "windowDurationMins": 10080,
+                        },
+                        "rateLimitReachedType": None,
+                        "spendControlReached": False,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = usage_mod.COLLECTORS["codex"](
+        usage_mod.Sources(payloads=tmp_path, log=tmp_path)
+    )
+
+    assert result.status == "ok"
+    assert result.spend == (), "a flat-fee subscription window is not money"
+    (quota,) = result.quotas
+    assert quota.used_fraction == Decimal("0.05")
+    assert quota.window == "10080m", "the seven-day window must stay provider-native"
+    assert quota.resets_at == datetime.fromtimestamp(1787767120, timezone.utc)
+    assert quota.provenance == "measured"
+    validate(as_event(result))
+
+
+def test_a_payload_present_but_carrying_no_counter_is_unavailable_not_zero(tmp_path):
+    """The exact failure this layer exists to prevent, at the parser."""
+    (tmp_path / "codex.json").write_text(
+        '{"result": {"rateLimits": {}}}', encoding="utf-8"
+    )
+    (tmp_path / "claude.json").write_text('{"windows": []}', encoding="utf-8")
+    sources = usage_mod.Sources(payloads=tmp_path, log=tmp_path)
+
+    for provider in ("codex", "claude"):
+        result = usage_mod.COLLECTORS[provider](sources)
+        assert result.status == "unavailable", provider
+        assert result.quotas == (), provider
+
+
+def test_claude_figures_are_cited_because_the_schema_was_never_verified_here(tmp_path):
+    """V0-30. `[cited]` is not pedantry; it is the difference from `[measured]`.
+
+    Anthropic documents five-hour and seven-day utilisation and reset fields. EXP-27
+    recorded Claude's quota surface as the *string* "status_line_json", inferred from the
+    CLI being installed -- this repository has never parsed one. Tagging these figures
+    `measured` would upgrade an evidence class without new evidence, which working
+    principle 1 forbids in as many words.
+    """
+    (tmp_path / "claude.json").write_text(
+        json.dumps(
+            {
+                "windows": [
+                    {"window": "5h", "used_percentage": 42, "resets_at": now_ts(3600)},
+                    {"window": "7d", "used_percentage": 8, "resets_at": now_ts(86400)},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = usage_mod.COLLECTORS["claude"](
+        usage_mod.Sources(payloads=tmp_path, log=tmp_path)
+    )
+
+    assert result.status == "ok"
+    assert [q.window for q in result.quotas] == ["5h", "7d"]
+    assert {q.provenance for q in result.quotas} == {"cited"}
+    assert all(q.resets_at is not None for q in result.quotas)
+
+
+def budget_state_event(weekly, monthly):
+    stamp = datetime.now(timezone.utc)
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": stamp.isoformat(),
+        "event": "budget.state",
+        "actor": "openrouter-probe",
+        "data": {
+            "provider": "openrouter",
+            "currency": "USD",
+            "weekly_spent": weekly,
+            "monthly_spent": monthly,
+            "observed_at": stamp.isoformat(),
+            "rejection_digest": events_mod.rejection_digest([]),
+        },
+    }
+
+
+def write_budget_state(log, weekly, monthly):
+    log.mkdir(parents=True, exist_ok=True)
+    name = f"{datetime.now(timezone.utc).date().isoformat()}.jsonl"
+    append(log / name, budget_state_event(weekly, monthly))
+
+
+def test_openrouter_spend_is_unknown_rather_than_zero_without_an_observation(tmp_path):
+    """Measured 20 Aug 2026: the key-status counter read $0, then $0.045138255 later.
+
+    The zero was a true counter value and a false statement about spend. Reporting "no
+    observation" is the only reading of an empty trajectory that is not a claim about
+    money, which is why this collector reads recorded observations rather than a counter.
+    """
+    log = tmp_path / "log"
+    log.mkdir()
+    result = usage_mod.COLLECTORS["openrouter"](
+        usage_mod.Sources(payloads=tmp_path, log=log)
+    )
+    assert result.status == "unavailable"
+    assert "not zero" in result.detail
+    assert result.spend == ()
+
+    write_budget_state(log, "1.50", "4.25")
+    result = usage_mod.COLLECTORS["openrouter"](
+        usage_mod.Sources(payloads=tmp_path, log=log)
+    )
+    assert result.status == "ok"
+    assert result.quotas == (), "metered spend is not a subscription window"
+    assert {(s.period, str(s.amount), s.currency) for s in result.spend} == {
+        ("weekly", "1.50", "USD"),
+        ("monthly", "4.25", "USD"),
+    }
+    assert {s.provenance for s in result.spend} == {"measured"}
+    validate(as_event(result))
+
+
+def test_the_fake_snapshot_obeys_the_same_contract_as_a_real_one():
+    """The dashboard's fixture must not be able to drift from what the writer accepts.
+
+    A fake a renderer can display but `append()` would refuse is a fake that teaches the
+    renderer to handle shapes the real system never produces.
+    """
+    snapshot = usage_mod.fake_snapshot()
+    statuses = {p["status"] for p in snapshot["providers"]}
+    assert statuses == {"ok", "unavailable", "not_configured"}, (
+        "the fixture must exercise every case a renderer has to handle"
+    )
+    for provider in snapshot["providers"]:
+        validate(
+            {
+                "v": SCHEMA_VERSION,
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "usage.observed",
+                "actor": "consilient.usage",
+                "data": provider,
+            }
+        )
+    figures = [
+        figure
+        for provider in snapshot["providers"]
+        for figure in list(provider["quotas"]) + list(provider["spend"])
+    ]
+    assert figures and all(f["provenance"] == "asserted" for f in figures), (
+        "a fabricated figure that leaks into a screenshot must read as fabricated"
+    )
+
+
+def test_usage_observations_reach_the_trajectory_and_project_including_silent_ones(
+    tmp_path,
+):
+    """V0-02 and V0-30 together: the projection is rebuilt from the log, and shows absence.
+
+    A provider that could not be read still gets a row. Projecting only the readable ones
+    would make "unobserved" indistinguishable from "never asked", which is the silent skip
+    the rejections table already exists to prevent.
+    """
+    log, db = tmp_path / "log", tmp_path / "state.db"
+    log.mkdir()
+    assert usage_mod.record(log, usage_mod.fake_snapshot()) == 4
+    assert not events_mod.bypassed(log), "usage must be written through append() only"
+
+    conn = projection.build(log, db)
+    rows = conn.execute(
+        "SELECT provider, status, measure, window_label, used_fraction, resets_at,"
+        " amount, currency, period, provenance FROM usage ORDER BY id"
+    ).fetchall()
+    by_provider: dict[str, list[tuple[object, ...]]] = {}
+    for row in rows:
+        by_provider.setdefault(row[0], []).append(row)
+
+    (silent,) = by_provider["fake-no-counter"]
+    assert silent[1] == "unavailable" and silent[2] == "none"
+    assert silent[9] is None, "a provider that reported nothing must carry no provenance"
+    (absent,) = by_provider["fake-absent"]
+    assert absent[1] == "not_configured" and absent[2] == "none"
+    assert {row[2] for row in by_provider["fake-metered"]} == {"spend"}
+    assert {row[7] for row in by_provider["fake-metered"]} == {"USD"}
+    assert {row[8] for row in by_provider["fake-metered"]} == {"weekly", "monthly"}
+    windows = by_provider["fake-subscription"]
+    assert {row[3] for row in windows} == {"10080m", "300m"}, (
+        "provider-native windows were flattened into one"
+    )
+    assert all(row[5] is not None for row in windows), "a reset time was lost"
+    assert all(row[6] is None for row in windows), "a quota acquired a money column"
+
+    digest = projection.state_digest(conn)
+    conn.close()
+    rebuilt = projection.build(log, db)
+    assert projection.state_digest(rebuilt) == digest
+    rebuilt.close()
+
+
+# --------------------------------------------------------------- V0-31, the spend ceiling
+def limits_file(tmp_path, ceilings, cap=None, name="limits.json"):
+    body = {"ceilings": ceilings}
+    if cap is not None:
+        body["account_cap"] = cap
+    path = tmp_path / name
+    path.write_text(json.dumps(body), encoding="utf-8")
+    return path
+
+
+def test_an_absent_or_malformed_limits_file_refuses_rather_than_meaning_unlimited(
+    tmp_path,
+):
+    """V0-31. Fail-closed: no ceiling is not "unlimited", it is "no" (ADR-0044).
+
+    A default this module chose would be a number the principal never approved, standing
+    where his own should be. Every one of these refusals is reached, not assumed.
+    """
+    assert isinstance(
+        usage_mod.load_limits(tmp_path / "absent.json"), budget_mod.BudgetRefusal
+    )
+
+    (tmp_path / "bad.json").write_text("{not json", encoding="utf-8")
+    assert isinstance(
+        usage_mod.load_limits(tmp_path / "bad.json"), budget_mod.BudgetRefusal
+    )
+
+    empty = usage_mod.load_limits(limits_file(tmp_path, [], name="empty.json"))
+    assert isinstance(empty, budget_mod.BudgetRefusal)
+    assert "no weekly or monthly ceiling is configured" in empty.reason
+
+    # A JSON float has already lost the exactness a money comparison depends on.
+    floaty = limits_file(
+        tmp_path,
+        [{"period": "weekly", "amount": 10.0, "currency": "USD"}],
+        name="float.json",
+    )
+    assert isinstance(usage_mod.load_limits(floaty), budget_mod.BudgetRefusal)
+
+    unknown = limits_file(
+        tmp_path,
+        [{"period": "daily", "amount": "1", "currency": "USD"}],
+        name="daily.json",
+    )
+    assert isinstance(usage_mod.load_limits(unknown), budget_mod.BudgetRefusal)
+
+
+def test_a_configured_ceiling_above_the_declared_account_cap_is_refused(tmp_path):
+    """V0-31. The harness ceiling sits at or below what the principal declared.
+
+    Refused, never clamped. Silently lowering the ceiling to the cap would let a
+    configuration asking for more than the principal allows still run, just quietly, and
+    the operator would never learn that the file they edited does not say what the harness
+    is doing. A boundary that edits your request instead of rejecting it is a preference.
+    """
+    over = limits_file(
+        tmp_path,
+        [{"period": "monthly", "amount": "150.00", "currency": "USD"}],
+        cap={"period": "monthly", "amount": "100.00", "currency": "USD"},
+        name="over.json",
+    )
+    refusal = usage_mod.load_limits(over)
+    assert isinstance(refusal, budget_mod.BudgetRefusal)
+    assert "exceeds the declared" in refusal.reason
+
+    under = limits_file(
+        tmp_path,
+        [
+            {"period": "weekly", "amount": "20.00", "currency": "USD"},
+            {"period": "monthly", "amount": "80.00", "currency": "USD"},
+        ],
+        cap={"period": "monthly", "amount": "100.00", "currency": "USD"},
+        name="under.json",
+    )
+    ceilings = usage_mod.load_limits(under)
+    assert isinstance(ceilings, tuple)
+    assert {c.period for c in ceilings} == {"weekly", "monthly"}
+
+
+def test_a_cap_and_a_ceiling_in_different_currencies_refuse_rather_than_convert(
+    tmp_path,
+):
+    """V0-31. The account cap is stated in pounds and this harness meters in dollars.
+
+    There is no exchange rate in this repository and there must not be one: a rate this
+    module invented would be a number nobody measured, standing between the principal and
+    his money. The honest outcome is a refusal telling him to state the cap in the currency
+    the ceiling is enforced in -- not a silent conversion that looks like it worked.
+    """
+    mixed = limits_file(
+        tmp_path,
+        [{"period": "monthly", "amount": "80.00", "currency": "USD"}],
+        cap={"period": "monthly", "amount": "100.00", "currency": "GBP"},
+    )
+    refusal = usage_mod.load_limits(mixed)
+    assert isinstance(refusal, budget_mod.BudgetRefusal)
+    assert "no conversion is performed" in refusal.reason
+
+
+def test_the_configured_ceiling_actually_refuses_the_spend_that_would_breach_it(
+    tmp_path,
+):
+    """V0-31 end to end. A limit that only warns is not a limit.
+
+    This is the test that separates an enforced ceiling from a displayed one: the same
+    configuration is loaded from the instance file, handed to `check_budget`, and the
+    request that would cross it comes back refused with nothing reserved. Refusing while
+    still writing the reservation would be the subtler version of the same failure.
+    """
+    log = tmp_path / "log"
+    write_budget_state(log, "9.00", "30.00")
+    ceilings = usage_mod.load_limits(
+        limits_file(
+            tmp_path,
+            [
+                {"period": "weekly", "amount": "10.00", "currency": "USD"},
+                {"period": "monthly", "amount": "40.00", "currency": "USD"},
+            ],
+            cap={"period": "monthly", "amount": "100.00", "currency": "USD"},
+        )
+    )
+    assert isinstance(ceilings, tuple)
+
+    before = sorted(path.read_bytes() for path in log.glob("*.jsonl"))
+    breaching = budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-over", Decimal("1.50"), "USD")
+    )
+    assert breaching == budget_mod.BudgetRefusal("weekly ceiling would be breached")
+    assert sorted(path.read_bytes() for path in log.glob("*.jsonl")) == before, (
+        "a refused request reserved something anyway"
+    )
+
+    permitted = budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-under", Decimal("0.50"), "USD")
+    )
+    assert isinstance(permitted, budget_mod.BudgetPermission)
+
+    # ...and the reservation it wrote counts against the next request.
+    assert budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-next", Decimal("0.75"), "USD")
+    ) == budget_mod.BudgetRefusal("weekly ceiling would be breached")
+
+
+def test_the_monthly_ceiling_refuses_independently_of_the_weekly_one(tmp_path):
+    """V0-31. Both limits are real; neither is decoration for the other.
+
+    A monthly ceiling alone would let one week consume the month, and a weekly ceiling
+    alone would let four weeks exceed it. ADR-0044 requires both, so both are exercised.
+    """
+    log = tmp_path / "log"
+    write_budget_state(log, "0.00", "39.90")
+    ceilings = usage_mod.load_limits(
+        limits_file(
+            tmp_path,
+            [
+                {"period": "weekly", "amount": "10.00", "currency": "USD"},
+                {"period": "monthly", "amount": "40.00", "currency": "USD"},
+            ],
+        )
+    )
+    assert isinstance(ceilings, tuple)
+    assert budget_mod.check_budget(
+        log, ceilings, budget_mod.SpendRequest("run-month", Decimal("0.20"), "USD")
+    ) == budget_mod.BudgetRefusal("monthly ceiling would be breached")
+
+
+def test_no_instance_limits_or_captured_payload_is_committed():
+    """PRODUCT ships the shape; INSTANCE keeps the numbers. Only the example is tracked.
+
+    A limits file names what the principal is willing to spend and a captured payload is
+    an observation of his account. Neither is a credential, and neither belongs in a public
+    repository.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+    ).stdout.splitlines()
+    assert ".harness/limits.example.json" in tracked, "the shape must ship"
+    assert ".harness/limits.json" not in tracked, (
+        "an instance limits file was committed"
+    )
+    assert not [name for name in tracked if name.startswith(".harness/usage/")], (
+        "a captured provider payload was committed; those are instance observations"
+    )
+    ignored = Path(".gitignore").read_text(encoding="utf-8")
+    assert ".harness/limits.json" in ignored and ".harness/usage/" in ignored
+
+
+def test_the_shipped_example_limits_file_is_a_shape_not_a_configuration():
+    """The example must parse and must not be usable as a real ceiling by accident."""
+    example = json.loads(
+        Path(".harness/limits.example.json").read_text(encoding="utf-8")
+    )
+    assert example["ceilings"], "the example must show at least one ceiling"
+    assert usage_mod.DEFAULT_LIMITS.name == "limits.json", (
+        "the example must not be the path the harness reads"
+    )
+
+
+# ------------------------------------------- the cost of recording one verdict
+def _verdict_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "verdict", Path("scripts/verdict.py").resolve()
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_verdict_script_cannot_orphan_a_verdict_and_counts_only_rejections(tmp_path):
+    """One reviewed attempt, one command, and no way to brick the trajectory with it.
+
+    `attempt.verdict` naming an attempt with no recorded outcome passes `validate()` and
+    appends with exit 0, after which `beta`, `replay` and `doctor` all raise
+    ProjectionError forever — the log is append-only, so appending the missing outcome
+    afterwards does not repair it, because position order still puts the verdict first.
+    Thirty hand-written pairs is thirty chances at that. The script writes both events
+    itself, outcome first, sharing one generated identity, so the orphan is unreachable.
+
+    The second property is beta's denominator: rejections only. The accepted attempt here
+    must move `window` and nothing else, or the meter is counting the wrong thing.
+    """
+    module = _verdict_module()
+    log = tmp_path / "log"
+    common = ["--log", str(log), "--principal", "reviewer"]
+    assert module.main(["reject", "fix pagination", "--checks", "pass", *common]) == 0
+    assert module.main(["accept", "retry backoff", "--checks", "fail", *common]) == 0
+
+    events, rejected = read_all(log)
+    assert not rejected, [r.reason for r in rejected]
+    recorded = set()
+    for event in events:
+        attempt_id = event.raw["data"]["attempt_id"]
+        if event.kind == events_mod.OUTCOME_KIND:
+            recorded.add(attempt_id)
+        else:
+            assert attempt_id in recorded, (
+                f"verdict for {attempt_id!r} precedes its outcome; the trajectory is "
+                "unrecoverable from here"
+            )
+
+    checks = [
+        event.raw["data"]["verifier_accept"]
+        for event in events
+        if event.kind == events_mod.OUTCOME_KIND
+    ]
+    assert checks == [True, False], "--checks must record what the checks said, both ways"
+
+    conn = projection.build(log, tmp_path / "state.db")
+    result = beta_mod.from_connection(conn, None, None)
+    conn.close()
+    assert result.n_rejected == 1, "an accepted attempt is not part of beta's denominator"
+    assert result.n_false_accept == 1, "the checks accepted what the reviewer rejected"
+
+
+def test_verdict_script_refuses_to_guess_what_the_checks_said(tmp_path):
+    """`--checks` is required so that beta cannot be 1.000 by construction.
+
+    Review only what the checks already passed and every rejected row carries
+    verifier_accept=True, so beta is 1 by sampling rather than by measurement
+    (`src/consilient/beta.py`). A default would make that the silent path.
+    """
+    module = _verdict_module()
+    with pytest.raises(SystemExit):
+        # --log is passed only so that a regression here writes to a temporary
+        # directory rather than into the real trajectory.
+        module.main(["reject", "no checks named", "--log", str(tmp_path / "log")])
+
+# ------------------------------- which tree measured which tree, 21 August 2026
+
+
+def test_consil_refuses_to_measure_a_checkout_other_than_its_own(
+    tmp_path, monkeypatch, capsys
+):
+    """The instrument may not report one worktree's answers about another's data.
+
+    Measured 21 August 2026 on the machine this was written on: a single interpreter-global
+    editable install put one worktree's `src` on `sys.path` for every process, and no
+    tree's own `src` was on it, because a src layout means the working directory never
+    contains `consilient/`. Standing in this checkout, `python -m consilient.cli doctor`
+    read this checkout's log with the other checkout's code and reported Gate A1 `PASS`,
+    exit 0; the code in this tree reported A1 `FAIL`, exit 1, on the same log in the same
+    directory. Two agents were misled by it in one night, one reporting the wrong gate
+    state and one reading the wrong exit code.
+
+    Code identity is settled by `sys.path` before any of this runs and data identity by the
+    working directory, so this cannot be made impossible from inside the package -- only
+    refused once both are known.
+    """
+    from consilient import cli as cli_mod
+
+    foreign = tmp_path / "consilient-w-other"
+    (foreign / "src" / "consilient").mkdir(parents=True)
+    (foreign / "src" / "consilient" / "cli.py").write_text("", encoding="utf-8")
+    monkeypatch.chdir(foreign)
+
+    code = main(["--json", "doctor"])
+
+    out, err = capsys.readouterr()
+    assert code == 2, "a foreign checkout was measured and the caller was not told"
+    assert out == "", "a refused run printed a gate report anyway"
+    message = json.loads(err)["error"]
+    assert str(foreign.resolve()) in message, message
+    assert str(cli_mod.CODE_TREE) in message, message
+
+    # The two cases that must NOT be refused. Without these the guard could be an
+    # unconditional refusal, which would be refusing the tool's own purpose.
+    ordinary = tmp_path / "someones-repository"
+    ordinary.mkdir()
+    monkeypatch.chdir(ordinary)
+    assert cli_mod._foreign_tree() is None, (
+        "measuring somebody else's repository is what this tool is for"
+    )
+    monkeypatch.chdir(cli_mod.CODE_TREE)
+    assert cli_mod._foreign_tree() is None, "the code's own checkout must measure itself"
+
+
+def test_doctor_states_which_code_measured_which_directory(tmp_path, capsys):
+    """The refusal cannot fire in an ordinary repository, so doctor says it unprompted.
+
+    An ordinary repository has no `src/consilient/cli.py`, so the wrong-tree case there is
+    undetectable from inside the package and the only defence is that the report names the
+    code it came from. `consil doctor --json` carried no provenance at all until 21 August
+    2026 [measured]: its keys were exactly `gates` and `routing_orchestration_enabled`, so
+    a transcript of a run could not be audited for which tree produced it.
+    """
+    from consilient import cli as cli_mod
+
+    write_capture_days(tmp_path / "log", "2026-08-20")
+
+    payload = doctor_payload(tmp_path, capsys)
+
+    assert payload["provenance"] == {
+        "code": str(cli_mod.CODE_TREE),
+        "data": str(Path.cwd().resolve()),
+        "log": str((tmp_path / "log").resolve()),
+    }
+    rendered = cli_mod.render("doctor", payload).splitlines()
+    assert rendered[0] == f"code: {cli_mod.CODE_TREE}", (
+        "the human rendering lost the provenance line; that is the form an agent pastes "
+        "into a transcript, and the only place the wrong tree stays visible afterwards"
+    )
+    assert str((tmp_path / "log").resolve()) in rendered[1], rendered[1]

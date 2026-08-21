@@ -1,6 +1,12 @@
 # 0007. CLI only, and build no review surface
 
-- **Status:** ACCEPTED
+- **Status:** SUPERSEDED IN PART by 0053 (21 Aug 2026)
+- **Superseded because:** the diff-review arithmetic in this ADR still holds and 0053
+  does not attempt a diff-review UI. What 0053 supersedes is the generalisation from
+  "a diff-review UI is a poor use of effort" to "build no visibility surface at all".
+  That step priced the human's cost of *reviewing* work and never priced the cost of
+  *finding out what is running*, which was zero at one agent and binding at nineteen.
+  The prohibitions on a TUI, a desktop app and a local web server survive intact.
 - **Date:** 2026-08-19
 - **Deciders:** Claude, at Joe's request ("you decide, argue for it")
 - **Inquiry tier reached:** T2 model — the conclusion is forced by `findings.md` §5

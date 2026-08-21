@@ -29,11 +29,26 @@ entities.json
 
 # derived: the SQLite projection is rebuildable from the trajectory (V0-02)
 .harness/state.db
+
+# A user's trajectory is THEIR data and is private by default. Joe Brown, 21 August 2026:
+# "Obviously we shouldn't be shipping anyones personal logs to the public repo ... my usage of
+# consilient should remain private just like anyone elses unless they agree to share data in
+# which case that is private and used to improve consilient only."
+# Two days of trajectory were tracked and published before this line existed. The project's own
+# provenance (which ADRs were accepted, what the gates measured) is a DIFFERENT artefact and may
+# be published deliberately; it must never be published as a side effect of a user's log living
+# in a tracked path. Enforced by test_no_user_trajectory_is_tracked.
+.harness/log/
 .harness/state.db-wal
 .harness/state.db-shm
 # `replay` sets aside a stale projection before rebuilding; it is a local artefact,
 # reproducible from the log, and not part of the record.
 .harness/state.db.stale-*
+
+# derived: the observability surface is a rendering of the trajectory (ADR-0053).
+# It embeds the record's contents verbatim, so committing it would duplicate the log
+# into an unreviewed artefact and hand the secret scanner a second copy to miss.
+.harness/dashboard.html
 
 # Transient runner state: a pid and a run id, meaningful only while a run is live.
 # Committing it would assert a lock that is not held.
@@ -47,6 +62,8 @@ docs/10-research/experiments/exp27/collector-state.json
 # them belongs in the record, and a single `git add -A` would commit all of them — which is not
 # hypothetical, because `git add -A` swept four brief files into a commit on 20 August 2026.
 .harness/dispatch/
+# Operator quota snapshot. Local to this machine; not evidence and not publishable.
+.harness/headroom.json
 # Briefs written for a dispatched agent, which live in a clone's root by convention.
 brief-*.md
 
@@ -60,3 +77,9 @@ red-cells-evidence.json
 
 # Pseudonym maps back to private-corpus identifiers. Local only, never published.
 *.local.json
+
+# INSTANCE spend limits and captured provider payloads. The PRODUCT ships the shape in
+# .harness/limits.example.json; what a particular person is willing to spend, and any
+# payload observed from their account, is theirs and stays out of a public repository.
+.harness/limits.json
+.harness/usage/
