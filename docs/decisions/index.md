@@ -1,6 +1,6 @@
 # Decision index
 
-64 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+65 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
 `python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
 catches a row missing from this table, which is the argument for generating it rather than
@@ -68,6 +68,9 @@ Read these before anything else. Everything downstream depends on them.
 | [0059](0059-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
 | [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) | **Adopt Open Design's portable contract and critique; desktop is an optional local tool, not a runtime dependency**; brand direction: outlier identity, anti-median, minimalist distinction | 🟡 |
 | [0063](0063-instance-cwd-allowlist-is-supervised-dispatch-not-a-gate-pass.md) | **Instance cwd allowlist is supervised dispatch, not a Gate B pass** — no override flag; doctor stays red; the loop still refuses foreign workspaces | ✅ |
+| [0064](0064-add-training-providers-and-supersede-openrouter-as-sole-metered-vendor.md) | **Add training providers and supersede OpenRouter as sole metered vendor** | ✅ |
+| [0065](0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md) | **What is native, what is adopted, and what is a marketplace** — a component whose error rate must be measured is native; one whose errors are self-evident may be adopted | ✅ |
+| [0066](0066-principal-harvest-is-a-private-training-corpus.md) | **The principal's harvest is a private training corpus**; 30–35B fine-tunes are native backends; the data is never published | ✅ |
 
 ## Behaviour and safety
 

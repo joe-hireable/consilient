@@ -37,7 +37,7 @@ def _as_text(value: object, name: str) -> str:
     return value.strip()
 
 
-def _looks_like_verdict(payload: Mapping[str, Any]) -> str | None:
+def looks_like_verdict(payload: Mapping[str, Any]) -> str | None:
     kind = payload.get("event")
     if isinstance(kind, str) and kind.strip().casefold() in {
         item.casefold() for item in _VERDICT_KINDS
@@ -100,7 +100,7 @@ def admit(
     missing = [name for name in REQUIRED if name not in payload]
     if missing:
         raise TransportAdmitError(f"payload missing {', '.join(missing)}")
-    verdict = _looks_like_verdict(payload)
+    verdict = looks_like_verdict(payload)
     if verdict is not None:
         raise TransportAdmitError(
             f"refusing verdict-shaped payload ({verdict!r}): untrusted transports "

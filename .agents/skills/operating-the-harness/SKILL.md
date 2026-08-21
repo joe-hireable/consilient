@@ -35,6 +35,10 @@ python scripts/ingest_transport.py --log .harness/log --file payload.json
 python scripts/harvest.py
 python scripts/harvest.py --out <a folder outside this repository>
 consilient-harvest
+python scripts/outbound.py email --to a@b.c --subject "s" --body "t" --authorise-egress "why"
+python scripts/outbound.py sms --to +447... --body "t" --authorise-egress "why" --authorise-spend "Twilio SMS 0.04 GBP"
+python scripts/computer_use.py --url https://example.com --task "open home" --authorise-egress "look"
+consilient-outbound email --to a@b.c --subject "s" --body "t" --authorise-egress "why"
 python scripts/verdict.py reject "what was wrong" --checks pass
 ```
 
@@ -78,7 +82,10 @@ Cursor launches take an exclusive lock at `.harness/cursor-agent.lock`
 It is not a licence to put a secret in a public remote, and it is not a
 licence to commit another repository's contents into this one. Harvest
 (`scripts/harvest.py`) is a private local corpus (ADR-0057); it does not
-publish, and it does not start a training run.
+publish, and it does not start a training run. Outbound email/SMS and
+computer-use live in `consilient_connectors`, not the refuse-only product
+package. Playwright is instance, not a Consilient dependency. A screenshot
+is not a human verdict.
 
 ## Harness support
 

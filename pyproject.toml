@@ -41,6 +41,8 @@ Source = "https://github.com/joe-hireable/consilient"
 [project.scripts]
 consil = "consilient.cli:main"
 consilient-harvest = "consilient.harvest:main"
+consilient-outbound = "consilient_connectors.outbound:main"
+consilient-computer = "consilient_connectors.computer_use:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

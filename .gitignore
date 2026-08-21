@@ -101,6 +101,8 @@ red-cells-evidence.json
 .harness/cursor-agent.lock
 # INSTANCE private harvest (ADR-0057). Never published.
 .harness/training/
+# Computer-use screenshots and session dirs. Playwright is instance.
+.harness/computer-use/
 # INSTANCE knowledge materialisation and operator briefs. PRODUCT is the scripts.
 .harness/knowledge/
 .harness/briefs/
