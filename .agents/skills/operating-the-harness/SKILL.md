@@ -31,6 +31,7 @@ python scripts/dispatch.py --task-file brief.md --cwd <this repo, or an instance
 python scripts/dispatch.py --permissions prompt "ask me before tools"
 python scripts/work.py open --ticket PM-1 --accountable joe-brown "the task"
 python scripts/recall.py --log .harness/log --query dispatch
+python scripts/ingest_transport.py --log .harness/log --file payload.json
 python scripts/verdict.py reject "what was wrong" --checks pass
 ```
 
