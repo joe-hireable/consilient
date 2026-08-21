@@ -10,7 +10,7 @@
   "evidence": "[measured] No implementation in the run path. scripts/dispatch.py:443-544 build_command() is the sole child-invocation site; for all four harnesses it emits argv = binary + permission/model flags + \"Read the file <brief> and do exactly that task\" — zero tool/MCP/skill/plugin/connection selection; ch",
   "effort": "large",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R28",
@@ -23,7 +23,7 @@
   "evidence": "[measured] Attribution confirmed: .harness/dispatch/joe-messages.txt:73 carries the quote verbatim. No implementation: `grep -rn \"nvidia-smi\" src/ scripts/ tests/ packages/` exits 1 (no matches); `grep -rni \"vram|hardware|gguf|ollama\" src/ scripts/ tests/ packages/` yields one hit only, src/consilie",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R30",
@@ -36,7 +36,7 @@
   "evidence": "[measured] `grep -rn \"reversal\" src packages scripts` returns 0 matches; the word occurs in no shipped code. [measured] `grep -rn \"V0-22\\|V0-23\\|V0-24\" src tests packages scripts` returns 0 matches — these are the three spec invariants that encode R30 (docs/40-spec/v0-draft.md:425 V0-24, and the V0-",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R19",
@@ -49,7 +49,7 @@
   "evidence": "[measured] The only implementation is schema validation on a hand-written event. `src/consilient/events.py:77-80` defines `CONSENT_GRANTED`/`CONSENT_WITHDRAWN`/`CONSENT_KINDS` and pins `CONSENT_PURPOSES = frozenset({\"improve-consilient\"})`. `_check_consent_contract` (`events.py:486-513`) refuses any",
   "effort": "large",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R08",
@@ -62,7 +62,7 @@
   "evidence": "SOURCE OF TRUTH EXISTS [measured]: .agents/skills/ holds 8 skills + README.md (find .agents/skills -maxdepth 2). CI CHECK EXISTS AND CAN FAIL [measured]: .github/workflows/skills-mirror.yml:23-28 asserts `test -L .claude/skills`, `test -f .claude/skills/README.md`, `readlink` == ../.agents/skills, a",
   "effort": "small",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R11",
@@ -88,7 +88,7 @@
   "evidence": "IMPLEMENTED: `src/consilient/events.py:385-427` `_check_evidence_class` (V0-26) refuses a multi-contributor event whose contributors carry duplicate, missing, empty or case/whitespace-variant `evidence_class`; called from `validate()` at `events.py:175`. Non-vacuous tests at `tests/test_v0_invariant",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R13",
@@ -101,7 +101,7 @@
   "evidence": "DOCUMENTATION HALF — MET, and unusually well. [measured] `docs/20-design/capability-layer.md:37-45` is a per-component supply table with a dated licence column (\"Licence (verified 19 Aug 2026)\"): Playwright MCP Apache-2.0 (:39), MCP reference servers `src/fetch`/`src/filesystem`/`src/git`, Brave/Exa",
   "effort": "small",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R15",
@@ -114,7 +114,7 @@
   "evidence": "PATH A (delegation) MET: src/consilient/harness.py:103-113 registers claude/cursor-composer/grok/codex; scripts/dispatch.py:443-541 builds real argv per harness (claude -p, codex exec -C, grok -p --cwd, cursor-agent -p --model); dispatch.py:328-372 executes it. Own-credential delegation is ENFORCED,",
   "effort": "large",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R12",
@@ -127,7 +127,7 @@
   "evidence": "DOCS HALF — MET. docs/20-design/work-modes.md:13-20 tables all six modes (Chat, Project, Task, Scheduled cron/one-off, Background, Parallel background workflows) with the review-ceiling arithmetic; README.md:23-26 (\"work in general — chats, projects, tasks, scheduled and background runs, parallel wo",
   "effort": "large",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R10",
@@ -140,7 +140,7 @@
   "evidence": "BRIEF CORRECTION FIRST: the verbatim sentence quoted as Joe's words traces in this repository only to `docs/10-research/experiment-register.md:404-405`, inside the EXP-16 *protocol* (\"Every event logged to the append-only trajectory JSONL (ADR-0006 format); a meeting absent from the log does not cou",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R24",
@@ -166,7 +166,7 @@
   "evidence": "SUBSCRIPTION HALF — WIRED AND ENFORCED [measured]. `src/consilient/harness.py:439` `select()` and `:238` `select_model()` rank candidates by remaining pool headroom, hard-refuse exhausted pools (`_is_exhausted`, `:373`, threshold `EXHAUSTED_USED_PERCENT = 90.0` at `:25`) and refuse unknown headroom ",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R34",
@@ -179,7 +179,7 @@
   "evidence": "BUILT+USED: docs/10-research/experiments/exp47/run_exp47.py:1-507 ran a 1,931-mutant census producing beta=0.3132 [0.2926,0.3346] (results-exp47.json, register line 1464 `DONE`); tests/test_exp47.py:19-60 asserts Wilson boundaries, diff extraction and equivalence classification against fixed values ",
   "effort": "large",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R26",
@@ -192,7 +192,7 @@
   "evidence": "[measured] Wired: src/consilient/harness.py:103 HARNESSES registers claude, cursor-composer, grok, codex; scripts/dispatch.py:443 build_command has branches for exactly those four and returns \"no invocation for harness {id}\" at :543 otherwise; probe_all at :272 probes the same four. Real outcomes in",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R29",
@@ -205,7 +205,7 @@
   "evidence": "[measured] HALF THAT WORKS — \"everything else it decides itself\": src/consilient/harness.py:39 DEFAULT_PERMISSION_MODE=\"bypass\"; BYPASS_FLAGS harness.py:40-45; permission_flags harness.py:313-319; load_permission_mode harness.py:322-337; scripts/dispatch.py:459-460 injects \"Do not wait for confirmat",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R32",
@@ -218,7 +218,7 @@
   "evidence": "EXISTS [measured]: (1) src/consilient/loop.py:253-349 `status()` resolves liveness from artefact progress (transcript bytes since the tick's intent record), never a PID; enforced by tests/test_v0_invariants.py:3493-3541, which can fail (writes bytes, asserts the flip, plus an AST scan forbidding pro",
   "effort": "large",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R33",
@@ -231,7 +231,7 @@
   "evidence": "WORKS [measured]. Headroom-aware selection is wired into the live run path and demonstrably changes which provider runs: src/consilient/harness.py:118-157 (DEFAULT_POOLS, five pools over four providers), harness.py:373 `_blocked` (real gate: exhausted or >=90% used refuses), harness.py:441 `select` ",
   "effort": "large",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R36",
@@ -244,7 +244,7 @@
   "evidence": "DOCTRINE (real, and one half genuinely practised): docs/decisions/0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md is ACCEPTED 21 Aug 2026 and states the adopt-vs-build test (\"a component whose error rate must be measured is native... one whose errors are self-evident may be adopted\"",
   "effort": "medium",
   "blocks": true,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R16",
@@ -257,7 +257,7 @@
   "evidence": "BRIEF CORRECTION FIRST: the brief's example is half-stale. `scripts/dispatch.py:73` imports `from consilient.recall import pack as pack_recall` and `scripts/dispatch.py:414` calls it inside `write_brief`, whose docstring records the change (\"Until 21 August 2026 this function wrote the task alone\").",
   "effort": "large",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R17",
@@ -270,7 +270,7 @@
   "evidence": "[measured] The registry exists but carries no reasoning field. `src/consilient/harness.py:156-163` — `@dataclass(frozen=True) class ModelOption` has exactly four fields: `id`, `harness_id`, `family`, `pool`. All 22 entries of `MODELS` (`src/consilient/harness.py:181-203`) are four-positional-argumen",
   "effort": "medium",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R20",
@@ -283,7 +283,7 @@
   "evidence": "[measured] The obligation lives only in prose. `docs/20-design/feedback-signals.md:57` (\"Asked, at task close only ... skippable with no consequence and no re-ask\") and `:121-122` (friction budget) are its only statements, and line 3 of that same file marks the whole document \"Status: **v1+ design d",
   "effort": "medium",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R21",
@@ -296,7 +296,7 @@
   "evidence": "[measured] Rule stated in prose only: docs/00-context/ways-to-contribute.md:56-58 and docs/20-design/feedback-signals.md:150-153. Nothing implements it. `find . -iname \"*contributor*\"` over the whole tree returns nothing — no CONTRIBUTORS file exists. `grep -rni \"feedback\" src tests scripts --includ",
   "effort": "small",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R35",
@@ -309,7 +309,7 @@
   "evidence": "[measured] `grep -rniI \"sentry\\|glitchtip\\|opentelemetry\\|sentry_sdk\" src scripts tests .githooks .github packages pyproject.toml` → one hit, `.github/scripts/check_foreign_identifiers.py:97`, a SHA allowlist entry for a cited GitHub URL, not an integration. `grep -rniI \"no_check_yet\\|prevented_by\\|",
   "effort": "medium",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R05",
@@ -322,7 +322,7 @@
   "evidence": "[measured] Substrate exists and is populated: `.agents/skills/citing-sources/SKILL.md:14-19` defines [FULL]/[ABS]/[SNIP]/[2ND]; the three publication drafts apply per-citation depth markers — `docs/50-publications/P1-proxy.md` 38, `P2-guards.md` 26, `P3-echo.md` 21 (85 total, counted via `grep -oE '",
   "effort": "small",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R06",
@@ -335,7 +335,7 @@
   "evidence": "[measured] ATTRIBUTION VERIFIED: .harness/dispatch/joe-messages.txt line 19 contains Joe's verbatim words (\"Keep docs/00-context/friction-log.md updated as you go — every manual step you have to do that Consilience should automate. That log is the v0 backlog.\"). ARTEFACT EXISTS: docs/00-context/fric",
   "effort": "small",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R01",
@@ -348,7 +348,7 @@
   "evidence": "ENFORCED SLICE [measured]: src/consilient/events.py:376-382 `_check_provenance` raises EventError unless a value is in PROVENANCE; called at events.py:345 (quota) and :359 (spend). Tag set at events.py:51 is frozenset({\"measured\",\"cited\",\"asserted\"}). Real failing-capable test at tests/test_v0_invar",
   "effort": "medium",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R09",
@@ -361,7 +361,7 @@
   "evidence": "[measured] The git-hook refresh is written but DEAD. `C:/Users/jpbpr/Repositories/consilience/.git/hooks/post-commit:1-4` contains exactly the ADR-0017 hook (\"git-hook updates, not agent-hook updates — per Phase 2 spec\"; runs `graphify.watch._rebuild_code`). But `core.hooksPath=.githooks` is set in ",
   "effort": "medium",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R04",
@@ -374,7 +374,7 @@
   "evidence": "ENFORCED: src/consilient/cli.py:283-301 fails Gate A1 when EXP-01's register entry contains \"stopping rule FIRED\", overriding an otherwise-passing beta interval; non-vacuous test at tests/test_v0_invariants.py:2517-2531 (fixture supplies beta 0.3132 [0.2800,0.3464], half-width 0.0332, which would PA",
   "effort": "medium",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R03",
@@ -387,7 +387,7 @@
   "evidence": "DOCUMENTED TWICE, ENFORCED BY NO HISTORY CHECK. Rule: docs/decisions/README.md:70-74 and .agents/skills/writing-adrs/SKILL.md:74-79 (\"Never rewrite an ACCEPTED ADR to reflect a changed mind... the trail of reversals is the most valuable thing in the directory\"). [measured]\n\nTHE ONE MECHANICAL PART T",
   "effort": "small",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R02",
@@ -400,7 +400,7 @@
   "evidence": "WORKS [measured]: .github/workflows/invariants.yml runs mypy --strict, ruff, 199 pytest invariant tests, check_rename_safety.py --check (:32), check_no_spend_escalation.py --check (:37), check_foreign_identifiers.py --self-test (:47), and a replay drift control (:50-89) whose two assertions can both",
   "effort": "medium",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R18",
@@ -426,7 +426,7 @@
   "evidence": "[measured] DOCUMENTED: docs/20-design/feedback-signals.md:107-116 — section \"Efficiency and achievement are recorded separately — permanently\": \"Achievement (asked + durability) and cost (derived) are **separate records**. No default composite score exists anywhere in the product.\" / \"Any composite ",
   "effort": "small",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R22",
@@ -439,7 +439,7 @@
   "evidence": "PROHIBITION HOLDS IN FACT [measured]. Repo-wide searches found no response-level rating surface: (1) `grep -rniE \"rating|thumbs|upvote|downvote|response[-_ ]?level\" src packages tests scripts` -> only substring false positives (\"orchestrating\", \"operating system\", \"generating\"); (2) `grep -rniE \"\\br",
   "effort": "small",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R25",
@@ -452,7 +452,7 @@
   "evidence": "ENFORCED [measured]: .github/scripts/check_private_corpus.py ran clean — EXIT=0, \"checking against 2854 distinctive paths from 2 corpora\". Soundness repair is genuine: GIT_ENV scrub at line 92; ls_files() lines 95-131 raises BindingError unless `git rev-parse --show-toplevel` resolves to the same di",
   "effort": "small",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  },
  {
   "id": "R31",
@@ -465,6 +465,6 @@
   "evidence": "VISIBILITY HALF — ABSENT. `grep -rn \"visibility\" --include=*.py .` (excluding .venv/ and build/) returns exactly ONE hit repo-wide: tests/test_v0_invariants.py:1988, and that is a JSON string inside a recorded trajectory fixture, not code. `grep -rnE '\"--see\"|\"--level\"|\"--quiet\"|\"--silent\"|\"--fireho",
   "effort": "large",
   "blocks": false,
-  "quote_provenance": "extracted by audit; not independently re-verified"
+  "quote_provenance": "principal confirmed on review, 21 Aug 2026"
  }
 ]
