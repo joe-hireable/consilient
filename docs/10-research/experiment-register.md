@@ -3092,6 +3092,213 @@ measured.
 **What it cannot decide:** anything about task streams unlike Joe's. n = 1 user, and the result
 is an **INSTANCE** finding until a second user's stream is measured.
 
+## Simulated users and the accessibility claim — EXP-74 to EXP-77
+
+> **Renumbered on merge, 21 August 2026.** `wt/loops-theory` claimed EXP-70…EXP-73 two minutes earlier. These four keep their designs; only the identifiers moved. [measured]
+
+> **Numbers claimed before the designs were written**, per this register's own rule. Highest
+> allocated at claim time was EXP-64; `grep -rn "EXP-[0-9]" docs/` confirmed 65–89 unused.
+> **65–69 are deliberately left unallocated** for agents working concurrently in other
+> worktrees on 21 August 2026 — a gap costs nothing and a collision costs a cross-reference.
+> This file already records five-way and two-way collisions; **EXP-58 is still one of them and
+> currently names five different experiments in this file.** [measured] That is not fixed here
+> because renumbering another agent's entries mid-flight is how the first collision happened.
+>
+> All four entries are **PRODUCT** — they measure the harness anyone would ship, not Joe's
+> configuration of it. EXP-77 additionally requires an **INSTANCE** input (Joe recruiting
+> people), which is why it is registered separately rather than folded into EXP-75.
+>
+> Registered by ADR-0055. **None of the four gates construction** (ADR-0049), and each states
+> why under ADR-0050's magnitude test.
+
+### EXP-74 · Does a driven session find defects the suite and a static verifier both miss — and what is its own false-accept rate? `READY`
+
+**Decides:** whether a simulated user may be admitted as a **defect finder**, and whether it may
+ever be admitted as an **acceptance oracle**. These are separate admissions and this experiment
+answers both with separate numbers. It is the experiment ADR-0055 rests on.
+
+**Precondition — and the reason this is `READY` rather than `BLOCKED`.** Every previous route to
+this question ran through the fixed human-labelled bad-artefact holdout that
+`qa-automation-and-the-anchor-problem.md` §2–3 identifies as the blocker and that does not exist.
+This design does not need it. EXP-47 produced **1,931 mutants of `src/consilient` in 104 s**, and
+`cli.py` alone yielded **440 composite survivors, 400 of them classified true defects**.
+[measured] A composite survivor is bad *by construction* and *confirmed not caught by the
+existing suite* — a mechanically labelled bad-artefact population, free of the anchoring problem,
+requiring no human verdict. It is narrower than the holdout (mutants, not real defects) and does
+not replace it for the general β question; it is sufficient for this one.
+
+**Arms**, all against the same survivor set, each survivor built into a working tree and exercised:
+
+| Arm | What it sees | Role |
+|---|---|---|
+| A · existing suite | the code | control; kill rate is 0 by the definition of "survivor" |
+| B · static verifier | the code | `mypy --strict` + `ruff check`; how much of the survivor set the cheap checks already reach |
+| C · driven session | **the built CLI only** — no source, no diff, no mutant description | the simulated user under test |
+| D · bug-known control | the source diff, and asked "is this a defect?" | the echo detector; by construction it should score far higher than C |
+
+Arm D exists because of the bug-known/bug-unknown discriminator in
+`qa-automation-and-the-anchor-problem.md` §2. If C scores near D, C is reading the code rather
+than operating the artefact, and the run is void.
+
+**Measures:**
+- **Marginal yield** — |C \ (A ∪ B)|, survivors reported by C that neither cheap check reaches.
+  Wilson 95%.
+- **β_sim** — over non-equivalent survivors presented to C in acceptance mode ("this build is
+  meant to do X; does it?"), P(C accepts | artefact bad). Wilson 95%, n ≥ 30, matching the
+  `MIN_REJECTIONS` floor already enforced in `beta.py`.
+- **α_sim** — over the unmutated artefact and over equivalent mutants (fields the surface cannot
+  express), the rate at which C reports a defect that is not there. This is the triage-cost
+  number that `qa-automation-and-the-anchor-problem.md` §3 says can consume the whole verdict
+  budget.
+- **Anchor label per report**, using Canedo's vocabulary: implicit (crash, hang, traceback,
+  non-zero exit, dead affordance), specification (the log, the `--json` contract), or state (the
+  code). Recorded per report, before triage.
+- Wall-clock and tokens per confirmed defect.
+
+**Stopping rules, fixed before the first run and unmovable afterwards. All thresholds `[asserted]`.**
+1. Stop at **120 non-equivalent survivors presented** or **8 hours wall clock**, whichever first.
+2. **Kills the defect-finder claim:** marginal yield with a Wilson **upper** bound below **0.10**
+   means the driven session reaches nothing the cheap checks miss. It is not admitted; write more
+   checks instead. This is `interface-beta-2026-08-20.md` §3's rule — *write the checks, do not
+   start a research programme* — applied to this case.
+3. **Kills the acceptance-oracle claim, and is expected to fire:** **β_sim ≥ 0.30** is no better
+   than the suite EXP-47 measured at 0.3132, and the driven session may never enter an acceptance
+   predicate. **β_sim < 0.10 with n ≥ 30** permits it to be *proposed* as one — a separate
+   decision, Joe-only under V0-18, never automatic.
+4. **Voids the run as echo:** C's reports ≥ **50%** state-anchored, **or** C's yield within
+   **10 points** of D's. Re-run behind a hard filesystem boundary or abandon.
+5. **Affordability floor:** **α_sim > 0.50** (more false reports than true) means an ungated loop
+   is unaffordable at solo-founder volume, and only implicit-oracle-gated reporting proceeds.
+   This absorbs Candidate B of `qa-automation-and-the-anchor-problem.md` §4; that candidate is
+   not separately registered.
+
+**Does it block construction? No.** Its largest possible effect is that the driven session is
+refused admission as a verifier — and ADR-0055's invariant refuses it by default already, so the
+experiment can only *lift* a default, never change what gets built. ADR-0050 test 2 fails; it
+does not gate.
+
+**What it cannot decide:** whether simulated users find the defects *real users* hit — no source
+found in this repository measures that, and the absence is recorded in
+`qa-automation-and-the-anchor-problem.md`. Nothing about a browser or GUI: arm C drives a CLI.
+Nothing about the harness's general β. Nothing about whether the defects found are worth fixing.
+Mutants are not real defects and the transfer is unmeasured.
+
+**Dependencies:** none. Arm C drives `consil` through `subprocess` with
+`encoding="utf-8", errors="replace"`. A browser arm would need Playwright or an existing
+browser-driving harness and **is not registered here**; adding one is a dependency decision under
+`AGENTS.md` and needs Joe.
+
+### EXP-75 · Can an operator holding only the five admitted concepts complete the core tasks? `READY`
+
+**Decides:** whether ADR-0055's minimum concept set is *sufficient*, and whether the current
+documentation is the barrier the ADR claims it is.
+
+**Arms**, same seven tasks, fresh context per run, no run may see another's transcript:
+
+| Arm | Material given |
+|---|---|
+| A | the one-page guide at `../20-design/minimum-user-guide-draft-2026-08-21.md` (five concepts) and `consil --help` |
+| B | the current `README.md`, `AGENTS.md` and `CONSILIENCE.md` |
+| C | `consil --help` alone — the floor |
+
+**Tasks.** Each has an artefact-checkable success criterion; none is graded on a self-report, and
+none is graded on exit code (this machine has recorded failures from grading on exit code or
+process identity):
+1. Produce a β number for this repository and state in one sentence what it implies about
+   trusting a green build.
+2. State whether routing is on, and name the single thing that would turn it on.
+3. Identify what the harness refused to read, and why.
+4. Reverse the most recent autonomous decision.
+5. State what the harness will not decide without a person.
+6. State whether a given line of output is measured or not.
+7. Identify a task for which the harness's own check is too weak to be relied on.
+
+**Measures:** completion rate per task per arm (Wilson 95%); time to first correct answer; and
+the count of distinct materials the operator tried to open that it was not given — a mechanical
+count of file-access attempts from the run record, never a self-report.
+
+**Stopping rules, fixed before collection:**
+- **n = 20 independent runs per arm.**
+- **The one-sided interpretation rule, fixed now and not negotiable after the result:** a
+  simulated **failure** is evidence a person would also fail; a simulated **success** is **not**
+  evidence a person would succeed, and may not be reported as an accessibility result. The
+  simulated operator reads faster, never tires, never fears looking foolish and pays nothing to
+  abandon — every one of those biases points toward over-success. [asserted] EXP-77 is the only
+  thing that can lift this rule.
+- **Kills the five-concept claim:** arm A below arm B on any single task. The reduced set dropped
+  something load-bearing, and that concept goes back.
+- **Kills the premise of ADR-0055's second half:** arm B completes ≥ 6 of 7 tasks at ≥ 80%. The
+  current documentation is then not the barrier, and the ADR's accessibility half is wrong.
+- **Kills the guide:** arm C within 5 points of arm A. The guide adds nothing over `--help` and
+  should be deleted rather than maintained.
+
+**Does it block construction? No.** Largest effect is that a one-page guide is rewritten or
+deleted. ADR-0050 test 2 fails.
+
+**What it cannot decide:** whether a person finds it confusing, frustrating, or worth returning
+to — that is the human row in `interface-beta-2026-08-20.md` §1 and no simulation reaches it.
+Whether five is the *right* set rather than a *sufficient* one. Anything about non-English
+operators or assistive technology.
+
+### EXP-76 · Does collapsing five evidence tags to two user-facing states change a decision? `READY`
+
+**Decides:** whether the discipline survives the surface simplification. This is the central risk
+of ADR-0055's second half: the ADR claims the record keeps all five tags while the surface shows
+two, and that the user loses nothing they would have acted on.
+
+**Procedure:** take **40** real user-facing outputs and asks from this repository. Render each
+twice — **full** (five tags, interval, gate condition IDs, ADR numbers) and **collapsed** (two
+states, "measured here, n = N" or "not measured yet", no interval, no gate ID, no ADR number).
+One rendering per operator, operators independent and cold. Record the **decision** each makes:
+act, do not act, or ask a person.
+
+**Measures:** decision agreement between renderings, per output class. The **dangerous cell** —
+collapsed says *act* where full says *ask* or *do not act* — is counted and reported separately
+and is never averaged into the agreement rate.
+
+**Stopping rules, fixed before collection:** 40 outputs × 2 renderings × 3 operators.
+- **Kills the collapse:** dangerous cell above **10%**. Collapsing loses decision-relevant
+  information; the tags must reach the surface and the concept budget is wrong.
+- **Confirms it:** dangerous cell below **2%** at n = 40.
+- Between the two: insufficient data, and the tags stay. The default is the safe direction.
+
+**Does it block construction? This is the nearest thing to a blocker among the four, and it is
+still not one.** Its largest effect changes a rendering. The record keeps five tags either way,
+so nothing that gets built changes. ADR-0050 test 2 fails.
+
+**What it cannot decide:** anything about human operators — the EXP-75 one-sided rule applies and
+is *weaker* here, because the outcome is a judgement rather than an artefact.
+
+### EXP-77 · Does the simulated accessibility result transfer to people? `BLOCKED: Joe-only recruitment decision`
+
+**Decides:** whether EXP-75 measures anything about people. Registered now, unrun, precisely so
+that EXP-75's number can never be quoted as the accessibility answer while this is outstanding.
+
+**Precondition:** recruitment, consent and any payment are Joe-only under ADR-0033 — money
+leaving an account, and people outside the machine. This is an **INSTANCE** input to a
+**PRODUCT** measurement.
+
+**Procedure:** k ≥ 8 people who hold a numerate job and do not write code professionally. Same
+seven tasks, same material as EXP-75 arm A, unmoderated, artefact-checked, no assistance.
+
+**Measures:** completion per task; the point at which each person abandoned; and the two transfer
+statistics — P(person fails | simulation failed) and P(person succeeds | simulation succeeded).
+
+**Stopping rules, fixed before collection:** stop at **k = 8** or **4 weeks**.
+- **Confirms the one-sided rule:** P(fails | sim failed) ≥ **0.8** *and*
+  P(succeeds | sim succeeded) ≤ **0.8**.
+- **Kills simulation as a proxy outright:** P(fails | sim failed) < **0.5**. Simulated failure
+  does not transfer either; EXP-75 measures nothing about people; delete the claim and say
+  plainly that only real humans can answer this.
+
+**Does it block construction? No, and it must not** — it needs people and weeks, and ADR-0049
+forbids waiting on it.
+
+**What it cannot decide:** k = 8 is an existence floor, not a rate. Nothing about the general
+population, about assistive technology, or about whether anyone returns a second time.
+
+---
+
 ## Not experiments
 
 **Q4** (what v0 optimises for), **Q14** (does the Inquiry tier belong in v0), **Q15/Q23**
