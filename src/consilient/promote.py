@@ -42,13 +42,20 @@ KINDS = (ACCEPTED, REFUSED, REVERSED)
 THRESHOLD = 0.20
 ENABLED_BY_DEFAULT = False
 
-ALLOWLIST_PREFIXES = (".agents/skills/",)
+# `.harness/adapted/` is the adapted instruction layer's logical home (instructions.py).
+# Admitting it lets a proposal reach the β gate and be refused for the honest reason —
+# unmeasured β — rather than for a bookkeeping artefact. Persistence there is trajectory
+# events under the gitignored log, so the allowlist grants no publishable surface (ADR-0057).
+ALLOWLIST_PREFIXES = (".agents/skills/", ".harness/adapted/")
 PROTECTED_PREFIXES = (
     "src/consilient/beta.py",
     "src/consilient/promote.py",
     "src/consilient/events.py",
     "src/consilient/budget.py",
     "src/consilient/cli.py",
+    # instructions.py holds the invariant core of the assembled system instructions.
+    # The one layer that may never be adapted lives where the promoter cannot reach.
+    "src/consilient/instructions.py",
     "tests/",
     "docs/10-research/",
     ".github/",
