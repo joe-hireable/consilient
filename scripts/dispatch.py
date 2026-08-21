@@ -580,6 +580,16 @@ def refresh_default_headroom(path: Path) -> str | None:
     """Refresh the default snapshot through the bounded, non-inference probe."""
     if path != DEFAULT_HEADROOM.resolve():
         return None
+    if path.exists():
+        try:
+            current = load_pools(path)
+        except ValueError:
+            pass
+        else:
+            if headroom_freshness_refusal(
+                current, now=datetime.now(timezone.utc)
+            ) is None:
+                return None
     with tempfile.TemporaryDirectory(prefix="consilient-headroom-") as directory:
         temporary = Path(directory)
         code, timed_out, _duration = run_process(

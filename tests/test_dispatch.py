@@ -626,6 +626,39 @@ def test_default_headroom_refresh_is_bounded_and_uses_the_local_probe(
     assert captured["kwargs"]["timeout_s"] == 45
 
 
+def test_recent_default_headroom_is_reused_without_another_probe(
+    monkeypatch, tmp_path
+):
+    script = _load_script()
+    output = (tmp_path / "headroom.json").resolve()
+    monkeypatch.setattr(script, "DEFAULT_HEADROOM", output)
+    observed_at = datetime.now(timezone.utc).isoformat()
+    output.write_text(
+        json.dumps(
+            {
+                "observed_at": observed_at,
+                "source": "fresh test probe",
+                "pools": {
+                    pool.name: {
+                        "used_percent": None,
+                        "exhausted": False,
+                        "note": "unknown",
+                    }
+                    for pool in DEFAULT_POOLS
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        script,
+        "run_process",
+        lambda *_args, **_kwargs: pytest.fail("fresh headroom must be reused"),
+    )
+
+    assert script.refresh_default_headroom(output) is None
+
+
 def test_non_ok_dispatch_emits_only_a_privacy_bounded_error_identity(tmp_path):
     from consilient.error_tracking import read_records
 
