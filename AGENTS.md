@@ -167,6 +167,8 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 - Changing anything in `docs/10-research/` — that's the evidence base.
 
 ### Never do
+- **Publish a user's private harvest.** `.harness/training/` and any `--out` dest of
+  `scripts/harvest.py` is instance data under ADR-0057; never track or publish it.
 - **Publish anything from `../hireable-3.0` or `../jobboard-v2`.** They are strictly
   private commercial repos, usable as inspiration and as measurement corpora only
   (EXP-01 runs on their histories). Their code, file contents, excerpts, detailed file paths

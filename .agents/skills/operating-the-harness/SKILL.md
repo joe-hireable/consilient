@@ -32,6 +32,9 @@ python scripts/dispatch.py --permissions prompt "ask me before tools"
 python scripts/work.py open --ticket PM-1 --accountable joe-brown "the task"
 python scripts/recall.py --log .harness/log --query dispatch
 python scripts/ingest_transport.py --log .harness/log --file payload.json
+python scripts/harvest.py
+python scripts/harvest.py --out <a folder outside this repository>
+consilient-harvest
 python scripts/verdict.py reject "what was wrong" --checks pass
 ```
 
@@ -73,7 +76,9 @@ Cursor launches take an exclusive lock at `.harness/cursor-agent.lock`
 (they race a shared CLI config). WSL cursor exports `GIT_DIR` and
 `GIT_WORK_TREE` so a linked worktree is a repository to WSL git.
 It is not a licence to put a secret in a public remote, and it is not a
-licence to commit another repository's contents into this one.
+licence to commit another repository's contents into this one. Harvest
+(`scripts/harvest.py`) is a private local corpus (ADR-0057); it does not
+publish, and it does not start a training run.
 
 ## Harness support
 
