@@ -161,6 +161,157 @@ DEFAULT_POOLS: tuple[PoolState, ...] = (
 CURSOR_OTHER_PREFIXES: tuple[str, ...] = ("claude-", "gpt-", "gemini-")
 
 
+@dataclass(frozen=True)
+class ModelOption:
+    """One selectable model on one harness, and the quota pool it draws on."""
+
+    id: str
+    harness_id: str
+    family: str
+    pool: str
+
+
+# `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids. The
+# Cursor Models pool serves the non-vendor families below; claude-*/gpt-*/gemini-* bill
+# to the avoided Other Models pool (CURSOR_OTHER_PREFIXES). Only cursor-composer has a
+# measured multi-model surface today; the other harnesses expose no probed model list
+# here, so they register none rather than an invented one. `auto` is deliberately absent:
+# selection must name what it spends. Registry order is the preference order within a
+# family when pools tie — highest measured tier first [asserted].
+MODELS: tuple[ModelOption, ...] = (
+    ModelOption("composer-2.5", "cursor-composer", "composer", "cursor-models"),
+    ModelOption("composer-2.5-fast", "cursor-composer", "composer", "cursor-models"),
+    ModelOption("kimi-k3-max", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("kimi-k3-high", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("kimi-k3-low", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("kimi-k2.7-code", "cursor-composer", "kimi", "cursor-models"),
+    ModelOption("cursor-grok-4.6-xhigh", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-xhigh-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-high", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-high-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-medium", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-medium-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-low", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.6-low-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-high", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-high-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-medium", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-medium-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-low", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("cursor-grok-4.5-low-fast", "cursor-composer", "grok", "cursor-models"),
+    ModelOption("glm-5.2-max", "cursor-composer", "glm", "cursor-models"),
+    ModelOption("glm-5.2-high", "cursor-composer", "glm", "cursor-models"),
+)
+
+
+def models_for_harness(
+    harness_id: str, models: tuple[ModelOption, ...] = MODELS
+) -> tuple[ModelOption, ...]:
+    return tuple(item for item in models if item.harness_id == harness_id)
+
+
+def model_family(model_id: str) -> str:
+    """The model family an id belongs to. A heuristic for unregistered ids."""
+    lowered = model_id.strip().casefold()
+    if lowered.startswith("cursor-grok"):
+        return "grok"
+    return lowered.split("-", 1)[0]
+
+
+def pool_for_model(
+    harness_id: str,
+    model_id: str,
+    *,
+    models: tuple[ModelOption, ...] = MODELS,
+    harnesses: tuple[Harness, ...] = HARNESSES,
+) -> str:
+    """The pool a model draws on: the registry first, then the prefix rule."""
+    for item in models:
+        if item.harness_id == harness_id and item.id == model_id:
+            return item.pool
+    if harness_id == "cursor-composer":
+        return cursor_pool_for_model(model_id)
+    harness = harness_by_id(harness_id, harnesses)
+    return harness.pool if harness is not None else "unknown"
+
+
+def select_model(
+    harness_id: str,
+    *,
+    pools: Sequence[PoolState],
+    requested: str | None = None,
+    family: str | None = None,
+    models: tuple[ModelOption, ...] = MODELS,
+    harnesses: tuple[Harness, ...] = HARNESSES,
+) -> ModelOption | str:
+    """Pick a model within a harness, or return a refusal reason string.
+
+    An explicit `requested` id is attended naming, like an explicit `--harness`: it is
+    returned with its pool resolved, unblocked. Automatic selection is stricter: only
+    registered models on a pool with known, unexhausted headroom, most remaining
+    headroom first, registry order within a tie. It never falls to the avoided
+    cursor-other pool on its own — that is the silent-fallback shape at model level.
+    """
+    harness = harness_by_id(harness_id, harnesses)
+    if harness is None:
+        known = ", ".join(item.id for item in harnesses)
+        return f"unknown harness {harness_id!r}; known: {known}"
+    if requested is not None:
+        return ModelOption(
+            requested,
+            harness_id,
+            model_family(requested),
+            pool_for_model(harness_id, requested, models=models, harnesses=harnesses),
+        )
+    registered = list(models_for_harness(harness_id, models))
+    if not registered:
+        return (
+            f"no models registered for {harness_id}; pass --model explicitly "
+            "(an unregistered default would be an invented capability)"
+        )
+    if family is not None:
+        registered = [item for item in registered if item.family == family]
+        if not registered:
+            known_families = sorted(
+                {item.family for item in models_for_harness(harness_id, models)}
+            )
+            return (
+                f"no {family!r} family models registered for {harness_id}; "
+                f"known families: {', '.join(known_families)}"
+            )
+    pool_tuple = tuple(pools)
+    eligible: list[tuple[int, ModelOption]] = []
+    considered: list[str] = []
+    for index, option in enumerate(registered):
+        pool = pool_by_name(option.pool, pool_tuple)
+        if pool is None:
+            considered.append(f"{option.id}: pool {option.pool} has no headroom snapshot")
+            continue
+        if _is_exhausted(pool):
+            considered.append(f"{option.id}: {option.pool} is exhausted")
+            continue
+        if pool.used_percent is None:
+            considered.append(f"{option.id}: {option.pool} headroom is unknown")
+            continue
+        eligible.append((index, option))
+    if not eligible:
+        detail = "; ".join(considered) if considered else "no registered models"
+        return (
+            f"no eligible model for {harness_id}: every registered model draws on an "
+            f"exhausted or unmeasured pool. {detail}. Pass --model explicitly to spend "
+            "an avoided pool attended."
+        )
+
+    def rank(pair: tuple[int, ModelOption]) -> tuple[float, int]:
+        index, option = pair
+        pool = pool_by_name(option.pool, pool_tuple)
+        assert pool is not None and pool.used_percent is not None
+        return (pool.used_percent, index)
+
+    eligible.sort(key=rank)
+    return eligible[0][1]
+
+
 def permission_flags(
     harness_id: str, mode: PermissionMode = DEFAULT_PERMISSION_MODE
 ) -> tuple[str, ...]:

@@ -32,12 +32,15 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from consilient import coordination  # noqa: E402
+from consilient.events import EventError, read_all  # noqa: E402
 from consilient.harness import (  # noqa: E402
     DEFAULT_PERMISSION_MODE,
     DEFAULT_POOLS,
@@ -64,6 +67,7 @@ from consilient.harness import (  # noqa: E402
     record_refusal,
     select,
     select_fanout,
+    select_model,
     snapshot_mapping,
 )
 from consilient.recall import pack as pack_recall  # noqa: E402
@@ -389,12 +393,18 @@ RECALL_LIMIT_CHARS = 8000
 
 
 def write_brief(
-    run_dir: Path, task: str, *, log_dir: Path | None = None
+    run_dir: Path, task: str, *, log_dir: Path | None = None, in_flight: str = ""
 ) -> Path:
     """Write the task, plus a verbatim recall pack so the child is not amnesiac.
 
     Cross-harness memory is the trajectory. Until 21 August 2026 this function
     wrote the task alone, so Cursor could not see what Codex had just done.
+
+    The pack is written to `recall.md` beside the brief and referenced from the
+    brief, and also embedded — the embed is what a child that reads only its brief
+    still sees. Both are bounded at RECALL_LIMIT_CHARS; the bound is the point,
+    because an unbounded coordination section crowds the task out of the context
+    window. `in_flight` is the live-claims table rendered by the caller.
     """
     path = (run_dir / "brief.md").resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -407,7 +417,16 @@ def write_brief(
         except (OSError, ValueError):
             recall = ""
         if recall.strip() and "No events in log" not in recall:
-            body = body + "\n---\n\n" + recall
+            recall_path = (run_dir / "recall.md").resolve()
+            recall_path.write_text(recall, encoding="utf-8", newline="\n")
+            body += (
+                "\n---\n\n## Context from the trajectory\n\n"
+                "A verbatim recall pack is recorded at `recall.md` beside this brief "
+                f"(bound: {RECALL_LIMIT_CHARS} characters) and embedded below.\n\n"
+            )
+            if in_flight.strip():
+                body += in_flight.strip() + "\n\n"
+            body += "---\n\n" + recall
             if not body.endswith("\n"):
                 body += "\n"
     path.write_text(body, encoding="utf-8", newline="\n")
@@ -429,6 +448,8 @@ def build_command(
     brief: Path,
     model: str | None,
     permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> list[str] | str:
     """Return argv, or a refusal reason string."""
     cwd = cwd.resolve()
@@ -467,6 +488,11 @@ def build_command(
         return [binary, "exec", "-C", str(cwd), *extra, instruction]
     if harness.id == "cursor-composer":
         chosen = model or DEFAULT_CURSOR_MODEL
+        if model is None and (pools or family is not None):
+            selected = select_model(harness.id, pools=pools, family=family)
+            if isinstance(selected, str):
+                return selected
+            chosen = selected.id
         if cursor_pool_for_model(chosen) == "cursor-other" and model is None:
             return (
                 f"refusing default cursor model {chosen!r}: it draws on the Cursor Other "
@@ -528,10 +554,13 @@ def run_harness(
     run_id: str,
     permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
     log_dir: Path | None = None,
+    in_flight: str = "",
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
-    brief = write_brief(run_dir, task, log_dir=log_dir)
+    brief = write_brief(run_dir, task, log_dir=log_dir, in_flight=in_flight)
     stdout_path = (run_dir / "stdout.txt").resolve()
     stderr_path = (run_dir / "stderr.txt").resolve()
     built = build_command(
@@ -541,6 +570,8 @@ def run_harness(
         brief=brief,
         model=model,
         permissions=permissions,
+        family=family,
+        pools=pools,
     )
     if isinstance(built, str):
         return RunResult(
@@ -819,6 +850,51 @@ def _exit_for(status: str) -> int:
     return 1
 
 
+def _claim_conflict_refusal(
+    *,
+    log_dir: Path,
+    ts: str,
+    run_id: str,
+    task: str,
+    cwd: Path,
+    hit: tuple[coordination.Claim, str, str],
+    live: tuple[coordination.Claim, ...],
+) -> tuple[dict[str, object], int]:
+    """A second dispatch claiming an overlapping path is refused, and the refusal is
+    recorded like every other — the refusal IS the coordination mechanism working."""
+    claim, requested, held = hit
+    reason = (
+        f"claims overlap a live dispatch: {claim.ticket} (run {claim.run_id}, "
+        f"{claim.actor}) holds {held!r} until {claim.expires_at}; this dispatch asked "
+        f"for {requested!r}. Refusing rather than admitting two agents to the same "
+        "path — re-dispatch when the live claim completes or expires."
+    )
+    considered = [
+        f"{item.ticket} holds {list(item.paths) or ['(no paths declared)']}"
+        for item in live
+    ]
+    recorded = record_refusal(
+        log_dir,
+        ts=ts,
+        run_id=run_id,
+        task=task,
+        cwd=str(cwd),
+        reason=reason,
+        considered=considered,
+    )
+    payload = {
+        "status": "refused",
+        "reason": reason,
+        "considered": considered,
+        "run_id": run_id,
+        "cwd": str(cwd),
+        "conflict": {"ticket": claim.ticket, "requested": requested, "held": held},
+        "recorded": str(log_dir / f"{ts[:10]}.jsonl"),
+        "event": recorded["event"],
+    }
+    return payload, _exit_for("refused")
+
+
 def dispatch_one(
     *,
     decision: Decision,
@@ -830,6 +906,9 @@ def dispatch_one(
     model: str | None,
     dry_run: bool,
     permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    claims: tuple[str, ...] = (),
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "dispatch")
@@ -856,8 +935,15 @@ def dispatch_one(
         return payload, _exit_for("refused")
 
     harness = decision.harness
+    now = datetime.now(timezone.utc)
+    events, rejected = read_all(log_dir)
+    live = coordination.live_claims(events, now=now)
+    in_flight = coordination.render_in_flight(live, now=now)
+
     if dry_run:
-        brief = write_brief((runs_dir / run_id).resolve(), task, log_dir=log_dir)
+        brief = write_brief(
+            (runs_dir / run_id).resolve(), task, log_dir=log_dir, in_flight=in_flight
+        )
         built = build_command(
             harness,
             task=task,
@@ -865,9 +951,12 @@ def dispatch_one(
             brief=brief,
             model=model,
             permissions=permissions,
+            family=family,
+            pools=pools,
         )
         command = built if isinstance(built, list) else []
         reason = built if isinstance(built, str) else decision.reason
+        hit = coordination.conflict(claims, live, cwd=cwd) if claims else None
         payload = {
             "status": "dry-run",
             "selected": decision.reason,
@@ -878,8 +967,39 @@ def dispatch_one(
             "command": command,
             "cwd": str(cwd),
             "run_id": run_id,
+            "claims": list(claims),
+            "claim_conflict": (
+                {"ticket": hit[0].ticket, "requested": hit[1], "held": hit[2]}
+                if hit is not None
+                else None
+            ),
+            "in_flight": len(live),
         }
         return payload, 0 if isinstance(built, list) else _exit_for("refused")
+
+    if claims:
+        hit = coordination.conflict(claims, live, cwd=cwd)
+        if hit is not None:
+            return _claim_conflict_refusal(
+                log_dir=log_dir,
+                ts=ts,
+                run_id=run_id,
+                task=task,
+                cwd=cwd,
+                hit=hit,
+                live=live,
+            )
+
+    claim_event = coordination.open_claim(
+        log_dir,
+        run_id=run_id,
+        paths=claims,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        harness=harness.id,
+        task=task,
+        now=now,
+    )
 
     run_dir = (runs_dir / run_id).resolve()
     result = run_harness(
@@ -892,6 +1012,9 @@ def dispatch_one(
         run_id=run_id,
         permissions=permissions,
         log_dir=log_dir,
+        in_flight=in_flight,
+        family=family,
+        pools=pools,
     )
     recorded = record_outcome(
         log_dir,
@@ -909,11 +1032,27 @@ def dispatch_one(
         duration_s=result.duration_s,
         command=result.command,
     )
+    # Three release paths and any one suffices: this completion, the outcome event
+    # above (live_claims treats a terminal dispatch event as a release), or the claim's
+    # own expiry. A close failure therefore degrades to the other two, never to a hang.
+    try:
+        coordination.close_claim(log_dir, run_id=run_id)
+        claim_released: bool | str = True
+    except EventError as exc:
+        claim_released = f"close failed ({exc}); expiry and the outcome event release it"
     payload = {
         "status": result.status,
         "selected": decision.reason,
         "cwd": str(cwd),
         "recorded": str(log_dir / f"{recorded['ts'][:10]}.jsonl"),
+        "claim": {
+            "ticket": coordination.claim_ticket(run_id),
+            "paths": claim_event["data"].get("paths", []),
+            "expires_at": claim_event["data"].get("expires_at"),
+            "released": claim_released,
+        },
+        "in_flight": len(live),
+        **({"log_rejected_lines": len(rejected)} if rejected else {}),
         **_result_payload(result),
     }
     # Deliberate: a silent or failed run is NOT retried on another pool. That would
@@ -932,6 +1071,9 @@ def dispatch_fanout(
     model: str | None,
     dry_run: bool,
     permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    claims: tuple[str, ...] = (),
+    family: str | None = None,
+    pools: tuple[PoolState, ...] = (),
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "fanout")
@@ -957,7 +1099,13 @@ def dispatch_fanout(
         }
         return payload, _exit_for("refused")
 
+    now = datetime.now(timezone.utc)
+    events, rejected = read_all(log_dir)
+    live = coordination.live_claims(events, now=now)
+    in_flight = coordination.render_in_flight(live, now=now)
+
     if dry_run:
+        hit = coordination.conflict(claims, live, cwd=cwd) if claims else None
         payload = {
             "status": "dry-run",
             "selected": decision.reason,
@@ -965,8 +1113,39 @@ def dispatch_fanout(
             "second": decision.second.id,
             "cwd": str(cwd),
             "run_id": run_id,
+            "claims": list(claims),
+            "claim_conflict": (
+                {"ticket": hit[0].ticket, "requested": hit[1], "held": hit[2]}
+                if hit is not None
+                else None
+            ),
+            "in_flight": len(live),
         }
         return payload, 0
+
+    if claims:
+        hit = coordination.conflict(claims, live, cwd=cwd)
+        if hit is not None:
+            return _claim_conflict_refusal(
+                log_dir=log_dir,
+                ts=ts,
+                run_id=run_id,
+                task=task,
+                cwd=cwd,
+                hit=hit,
+                live=live,
+            )
+
+    claim_event = coordination.open_claim(
+        log_dir,
+        run_id=run_id,
+        paths=claims,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        harness=f"{decision.first.id},{decision.second.id}",
+        task=task,
+        now=now,
+    )
 
     results: list[RunResult] = []
     for harness in (decision.first, decision.second):
@@ -981,6 +1160,9 @@ def dispatch_fanout(
             run_id=child_id,
             permissions=permissions,
             log_dir=log_dir,
+            in_flight=in_flight,
+            family=family,
+            pools=pools,
         )
         record_outcome(
             log_dir,
@@ -1021,6 +1203,13 @@ def dispatch_fanout(
         first_run_id=first.run_id,
         second_run_id=second.run_id,
     )
+    # As in dispatch_one: completion, the terminal fanout event, and expiry are three
+    # independent release paths; any one suffices.
+    try:
+        coordination.close_claim(log_dir, run_id=run_id)
+        claim_released: bool | str = True
+    except EventError as exc:
+        claim_released = f"close failed ({exc}); expiry and the fanout event release it"
     payload = {
         "status": verdict,
         "verdict": verdict,
@@ -1028,6 +1217,14 @@ def dispatch_fanout(
         "cwd": str(cwd),
         "run_id": run_id,
         "recorded": str(log_dir / f"{recorded['ts'][:10]}.jsonl"),
+        "claim": {
+            "ticket": coordination.claim_ticket(run_id),
+            "paths": claim_event["data"].get("paths", []),
+            "expires_at": claim_event["data"].get("expires_at"),
+            "released": claim_released,
+        },
+        "in_flight": len(live),
+        **({"log_rejected_lines": len(rejected)} if rejected else {}),
         "first": _result_payload(first),
         "second": _result_payload(second),
     }
@@ -1062,6 +1259,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="spend an exhausted pool; default is to refuse",
     )
     parser.add_argument("--model", help="model id (cursor-composer defaults to composer-2.5)")
+    parser.add_argument(
+        "--family",
+        help="model family to pick from (e.g. grok, kimi, composer); automatic selection "
+        "prefers the idlest registered pool within the family",
+    )
+    parser.add_argument(
+        "--claim",
+        action="append",
+        default=None,
+        metavar="PATH",
+        help="declare a path this dispatch intends to touch; repeatable. A second live "
+        "dispatch claiming an overlapping path is refused. Claims are trajectory events "
+        "with an expiry (timeout + grace), so a crashed dispatcher cannot hold one.",
+    )
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_S)
     parser.add_argument("--log", default=str(DEFAULT_LOG))
     parser.add_argument("--headroom", default=str(DEFAULT_HEADROOM))
@@ -1161,6 +1372,9 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             dry_run=args.dry_run,
             permissions=permissions,
+            claims=tuple(args.claim or ()),
+            family=args.family,
+            pools=pools,
         )
         emit(payload, args.json)
         return code
@@ -1181,6 +1395,9 @@ def main(argv: list[str] | None = None) -> int:
         model=args.model,
         dry_run=args.dry_run,
         permissions=permissions,
+        claims=tuple(args.claim or ()),
+        family=args.family,
+        pools=pools,
     )
     emit(payload, args.json)
     return code

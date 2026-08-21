@@ -59,10 +59,22 @@ def open_item(
     accountable: str,
     actor: str = DEFAULT_ACTOR,
     text: str | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> events.EventPayload:
-    data = {"ticket": ticket, "accountable": accountable}
+    data: dict[str, Any] = {"ticket": ticket, "accountable": accountable}
     if text is not None:
         data["text"] = text
+    if extra is not None:
+        # Extra fields extend an opened item (a dispatch claim's paths and expiry, for
+        # instance); they may never restate the item's identity or smuggle in human
+        # authority. validate() forbids the authority fields again below.
+        reserved = set(data) | {"human_decision", "human_verdict"}
+        collision = reserved & set(extra)
+        if collision:
+            raise events.EventError(
+                f"work_item.opened extra fields may not override {sorted(collision)}"
+            )
+        data.update(extra)
     return _append(log, OPENED, actor, data)
 
 

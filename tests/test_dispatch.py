@@ -586,7 +586,10 @@ def test_silent_run_is_not_retried_on_another_pool(tmp_path, monkeypatch):
     assert code == 3
     events, rejected = read(tmp_path / "log" / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl")
     assert not rejected
-    assert events[-1].data["status"] == "silent"
+    # The claim lifecycle (open before the run, complete after) means the outcome is
+    # no longer the last event in the file; find it by kind, not position.
+    outcomes = [event for event in events if event.kind == "dispatch.outcome"]
+    assert outcomes[-1].data["status"] == "silent"
 
 
 def test_resolve_cwd_allows_this_repository_root():
