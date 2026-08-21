@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consilient Mobile &middot; Hardware-Attested Verdict Client</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0C0E12;
+      --surface-0: #14171E;
+      --surface-1: #1C202A;
+      --border: #2A2F3D;
+      --fg-primary: #F0F2F5;
+      --fg-secondary: #C4C9D4;
+      --fg-muted: #8B93A5;
+      --fg-tertiary: #757E91;
+
+      --action: #E2B340;
+      --action-tint: #2A2412;
+      --valid: #2E9E66;
+      --valid-tint: #11261C;
+      --attention: #DDA136;
+      --attention-tint: #2B2012;
+      --fault: #E05349;
+      --fault-tint: #2D1617;
+
+      --font-display: "Syne", -apple-system, system-ui, sans-serif;
+      --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+      --font-mono: "Space Mono", ui-monospace, SFMono-Regular, monospace;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg-primary);
+      font-family: var(--font-body);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 12px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Mobile Frame Mockup */
+    .mobile-frame {
+      width: 100%;
+      max-width: 412px;
+      min-height: 840px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 8px var(--surface-1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Status Notch Area */
+    .mobile-notch {
+      padding: 14px 24px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-muted);
+      border-bottom: 1px solid rgba(42, 47, 61, 0.4);
+    }
+
+    .enclave-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--valid);
+      font-size: 10px;
+    }
+
+    .enclave-badge::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--valid);
+    }
+
+    /* Screen Content */
+    .mobile-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .app-header h1 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .sync-status {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    /* Telemetry Pill */
+    .summary-card {
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .summary-card .label {
+      font-size: 11px;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+    }
+
+    .summary-card .value {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--fg-primary);
+    }
+
+    /* Active Ask Verdict Container */
+    .verdict-card {
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--action);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+    }
+
+    .verdict-tag {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chip-ask {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--action-tint);
+      border: 1px solid var(--action);
+      color: var(--action);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .verdict-title {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .meta-box {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--fg-secondary);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid rgba(42, 47, 61, 0.5);
+      padding-bottom: 6px;
+    }
+
+    .meta-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .meta-k {
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .meta-v {
+      font-family: var(--font-mono);
+      text-align: right;
+    }
+
+    .pass-check {
+      color: var(--valid);
+      font-weight: 600;
+    }
+
+    .explanation-callout {
+      font-size: 11px;
+      color: var(--fg-muted);
+      line-height: 1.45;
+      padding: 4px 2px;
+    }
+
+    /* Attested Touch Action Targets (Min 48px Touch Height) */
+    .touch-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    button.touch-btn {
+      width: 100%;
+      height: 50px;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.05s, opacity 0.15s;
+    }
+
+    button.touch-btn:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    button.btn-sign-accept {
+      background: var(--action);
+      color: var(--bg);
+      font-weight: 700;
+    }
+
+    button.btn-sign-reject {
+      background: transparent;
+      border: 1px solid var(--fault);
+      color: var(--fault);
+    }
+
+    .enclave-notice {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--fg-tertiary);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-frame">
+
+    <!-- Notch / Attestation Status -->
+    <div class="mobile-notch">
+      <span>17:48</span>
+      <div class="enclave-badge">Secure Enclave Ready</div>
+      <span>5G</span>
+    </div>
+
+    <!-- Main Mobile Content -->
+    <div class="mobile-content">
+
+      <!-- Header -->
+      <div class="app-header">
+        <h1>CONSILIENT</h1>
+        <span class="sync-status mono">synced 12s ago</span>
+      </div>
+
+      <!-- Quick Telemetry Summary -->
+      <div class="summary-card">
+        <div>
+          <div class="label">System &beta; (mutation)</div>
+          <div class="value">0.3132</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="label">Fleet Activity</div>
+          <div class="value" style="color: var(--valid);">2 / 3 slots</div>
+        </div>
+      </div>
+
+      <!-- Single Urgent Verdict Card (Concept C3) -->
+      <div class="verdict-card">
+        <div class="verdict-tag">
+          <span class="chip-ask">Mandatory Verdict</span>
+          <span class="sync-status mono">Task #142</span>
+        </div>
+
+        <div class="verdict-title">
+          Verify Verification Boundary Modification
+        </div>
+
+        <!-- 3 Affordability Fields Encoded for Mobile Review -->
+        <div class="meta-box">
+          <div class="meta-row">
+            <span class="meta-k">Artefact</span>
+            <span class="meta-v">src/consilient/dashboard.py (+124 -18)</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-k">Checks</span>
+            <span class="meta-v pass-check">pytest &middot; mypy &middot; linter PASS</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-k">Tried</span>
+            <span class="meta-v" style="font-size: 11px;">Autonomous token validation OK</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-k">On Expiry</span>
+            <span class="meta-v" style="color: var(--attention);">Hold work; $0 spend</span>
+          </div>
+        </div>
+
+        <div class="explanation-callout">
+          Only your hardware key can sign this verdict into the immutable trajectory log.
+        </div>
+
+        <!-- Mobile Touch Action Buttons (48px+ touch targets) -->
+        <div class="touch-actions">
+          <button class="touch-btn btn-sign-accept" onclick="alert('Hardware Key Enclave Signing: ACCEPTED verdict logged via Ed25519.');">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+            Sign &amp; Accept Verdict
+          </button>
+          <button class="touch-btn btn-sign-reject" onclick="alert('Hardware Key Enclave Signing: REJECTED verdict logged.');">
+            Sign &amp; Reject
+          </button>
+        </div>
+
+        <div class="enclave-notice">
+          ED25519 SIGNATURE ATTACHED &middot; VIA MOBILE ENCLAVE
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>
