@@ -99,6 +99,8 @@ red-cells-evidence.json
 .harness/allowed-cwds.json
 # Exclusive lock around cursor-agent. Two processes race ~/.cursor/cli-config.json.
 .harness/cursor-agent.lock
+# INSTANCE private harvest (ADR-0057). Never published.
+.harness/training/
 # INSTANCE knowledge materialisation and operator briefs. PRODUCT is the scripts.
 .harness/knowledge/
 .harness/briefs/
