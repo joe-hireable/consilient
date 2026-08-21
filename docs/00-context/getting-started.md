@@ -13,6 +13,122 @@ You do not need to have read anything else. Links at the bottom are for when you
 
 ---
 
+## 0. Install from scratch
+
+> **Machine-local.** Substitute your own checkout path. `<checkout>` is the consilient working
+> tree you want to measure.
+
+The floor is **`requires-python = ">=3.13"`** in `pyproject.toml` `[cited]`. That is the tested
+floor, not a measured minimum — the suite has only been run on 3.13.
+
+**On an older interpreter**, pip refuses before anything is installed `[measured]` 21 August 2026,
+against this tree with Python 3.11.15:
+
+```
+ERROR: Package 'consilient' requires a different Python: 3.11.15 not in '>=3.13'
+```
+
+### PowerShell
+
+Run from a clean temp directory so you do not overwrite a checkout's existing `.venv`
+`[measured]`.
+
+```powershell
+cd <checkout>
+$VENV = Join-Path $env:TEMP ("consilient-install-" + [guid]::NewGuid().ToString("n").Substring(0,8))
+python --version
+python -m venv $VENV
+& "$VENV\Scripts\Activate.ps1"
+python -m pip install --upgrade pip
+python -m pip install -e .
+(Get-Command consil).Source
+consil --help
+python -c "import consilient; print(consilient.__file__)"
+```
+
+Printed (abridged to the lines that matter):
+
+```
+Python 3.13.11
+Successfully installed consilient-0.1.0
+C:\Users\jpbpr\AppData\Local\Temp\consilient-install-test-ps-e9bd8f08\Scripts\consil.exe
+usage: consil [-h] [--json] [--log LOG] [--db DB]
+              {record,replay,beta,usage,doctor,dashboard} ...
+C:\Users\jpbpr\Repositories\consilience\.claude\worktrees\consilience-cto\src\consilient\__init__.py
+```
+
+`consil` landed on PATH inside the environment — `(Get-Command consil).Source` printed a path
+under `$VENV\Scripts\`, not the system interpreter `[measured]`.
+
+You may also see:
+
+```
+Can't uninstall 'consilient'. No files were found to uninstall.
+```
+
+That is pip noticing an editable install of the **same** tree already registered on the system
+interpreter. It is noisy, not fatal, and the install still completes `[measured]`.
+
+### POSIX shell (Git Bash on Windows)
+
+The same sequence in bash. Git Bash maps `$TEMP` to the Windows temp directory and `source
+…/Scripts/activate` switches the shell correctly `[measured]`.
+
+```bash
+cd <checkout>
+VENV="$TEMP/consilient-install-$(uuidgen | cut -c1-8)"
+python --version
+python -m venv "$VENV"
+source "$VENV/Scripts/activate"
+python -m pip install --upgrade pip
+python -m pip install -e .
+which consil
+consil --help
+python -c "import consilient; print(consilient.__file__)"
+```
+
+Printed:
+
+```
+Python 3.13.11
+/tmp/consilient-install-test-gitbash/Scripts/consil
+usage: consil [-h] [--json] [--log LOG] [--db DB]
+              {record,replay,beta,usage,doctor,dashboard} ...
+C:\Users\jpbpr\Repositories\consilience\.claude\worktrees\consilience-cto\src\consilient\__init__.py
+```
+
+**Pure Linux** (Debian/Ubuntu with a native `python3` and `python3-venv`): the usual pattern is
+`python3 -m venv .venv` then `source .venv/bin/activate` then `pip install -e .`. **Untested**
+on this machine — native `python3 -m venv` failed here because `python3-venv` is not installed,
+and the Windows Python this checkout is developed on does not put `bin/activate` under a WSL
+`/tmp` path.
+
+### Confirm which tree you are measuring
+
+After install, one line tells you whether `import consilient` resolves to the checkout you
+think you are in:
+
+```powershell
+python -c "import consilient; print(consilient.__file__)"
+```
+
+The printed path must sit **inside `<checkout>`**. If it points at another worktree — on this
+machine a stale editable install once silently redirected `python -m consilient.cli` to
+`…\consilient-w-p5\…` while `consil` inside a fresh venv measured the right tree — every
+gate line and exit code from `python -m` is measuring the wrong code. Section 3 is the full
+story; the repair is `pip uninstall consilient` on whichever interpreter is wrong, then
+`pip install -e .` from the checkout you mean.
+
+Inside a correctly built venv, `consil doctor` and `python -m consilient.cli doctor` agreed on
+the `A1` line `[measured]` re-run this evening. They only diverge when the system interpreter
+carries a foreign editable install.
+
+For day-to-day use, create `.venv` in the checkout once and keep using it — section 2 assumes
+that layout. The temp-directory recipe above is for proving install works, not for where to
+keep the environment.
+
+---
+
 ## 1. What you can do with this today
 
 Don't ask ChatGPT. Ask Consilient. It sends harnesses. Consilient is the **Agent Command
@@ -390,7 +506,5 @@ Three things remain broken tonight and are **not** repairable from this page:
 
 ## What is deliberately not on this page
 
-- **Installing from scratch.** The published tree already has a working `.venv`, so nothing here
-  needed the install path, and it was not re-run. **Untested.**
 - **Anything about routing, dispatch or orchestration.** None of it exists, and section 1 is not
   being modest.
