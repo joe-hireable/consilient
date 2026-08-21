@@ -11,7 +11,9 @@
      products or editorial traditions ("think Monocle meets a terminal").
      State what the design is NOT as clearly as what it is. -->
 
-## 2. Colour Palette & Roles
+<!-- American spelling in this heading for interop with Open Design's validator,
+     which string-matches section names. British English in body prose per AGENTS.md. -->
+## 2. Color Palette & Roles
 
 <!-- List every colour as a named role + hex value. At minimum:
      Background, Surface, Foreground (text), Accent (primary),
@@ -46,7 +48,8 @@
 <!-- 3–5 Do's and 3–5 Don'ts. Be concrete: "no gradients", "serif for
      numbers when they matter", "no border-radius above 24 px". -->
 
-## 8. Responsive Behaviour
+<!-- American spelling for interop; see § 2 comment. -->
+## 8. Responsive Behavior
 
 <!-- Breakpoints (px values). Column count per breakpoint. What stacks,
      what hides, what rescales. Padding reduction rules. -->

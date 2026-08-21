@@ -1,6 +1,8 @@
 # 5-Dimension Design Critique — vendored reference
 
 - **Source:** `nexu-io/open-design`, `design-templates/critique/SKILL.md`
+- **Upstream's own credited source:** `alchaincyf/huashu-design` (MIT) — the
+  expert-critique flow that inspired the 5-dimension structure
 - **Licence:** Apache-2.0
 - **Pinned content hash (git blob SHA):** `0e8d6ccfd1769820b10916083ca152d3a250b4a4`
 - **Fetched:** 21 August 2026
@@ -9,9 +11,9 @@
 This file carries the five dimensions and their scoring bands so that a harness
 reading only this repository can run a design critique without fetching from the
 upstream registry at agent runtime (ADR-0016: "never resolve from a registry at
-agent runtime"). The workflow and HTML-report contract below are abbreviated;
-the full upstream skill also specifies radar-chart output and HTML artefact
-shape.
+agent runtime"). The workflow steps and HTML-report contract from the upstream skill are omitted
+here; the full upstream skill also specifies a radar-chart SVG output and an
+HTML artefact shape.
 
 ---
 

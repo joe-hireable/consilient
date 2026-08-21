@@ -9,10 +9,6 @@ description: >
   Trigger on "design system", "DESIGN.md", "visual direction", "design review",
   "critique", "design tokens", "pick a look", "frontend prototype", "UI style",
   or any request to generate a user-facing surface.
-source: >
-  nexu-io/open-design (Apache-2.0). The 9-section DESIGN.md contract and
-  5-dimension critique are adapted, not copied verbatim. The skill is original
-  to this repository; upstream references are in references/.
 ---
 
 # Using Open Design — portable design contracts for agentic harnesses
@@ -21,8 +17,9 @@ Open Design is a local-first, agent-driven design method. The portable contract
 is `DESIGN.md` — a 9-section file that locks visual tokens before any artefact
 is generated. Coding agents (Codex, Cursor, Grok CLI, Claude Code) become the
 design engine; the 400 MB desktop app and Open Design Cloud are optional and are
-**not** required or installed here. `[measured]` negative — no Open Design
-binary, daemon, MCP server, or `od` CLI exists on this machine.
+**not** required by this skill. The desktop app was not found on this machine on
+21 August 2026 `[measured]`; Joe reported installing it later that day
+`[asserted]` — not re-probed.
 
 ## When to use this skill
 
@@ -44,14 +41,14 @@ Copy the template from `references/DESIGN-TEMPLATE.md` and fill every section.
 The nine sections are:
 
 1. **Visual Theme & Atmosphere** — mood, density, what the design is *not*.
-2. **Colour Palette & Roles** — named roles + hex values. No unnamed colours.
+2. **Color Palette & Roles** — named roles + hex values. No unnamed colours.
 3. **Typography Rules** — font stacks, scale, line-height, family count limit.
 4. **Component Stylings** — buttons, cards, inputs, links, with state
    transitions.
 5. **Layout Principles** — grid, max-width, gutters, section spacing.
 6. **Depth & Elevation** — shadow specification per level.
 7. **Do's and Don'ts** — concrete constraints.
-8. **Responsive Behaviour** — breakpoints, column counts, stacking rules.
+8. **Responsive Behavior** — breakpoints, column counts, stacking rules.
 9. **Agent Prompt Guide** — the non-negotiable token rule.
 
 **Tokens are non-negotiable once locked.** Section 9 must state: *do not invent
@@ -149,10 +146,10 @@ it does not gate.
 
 ## What this skill does not do
 
-- **Does not pick a Consilient frontend winner.** Open Bench and Proof Film are
-  a `[simulated]` tie with overlapping CIs. This skill provides the contract
-  format and the review method; it does not collapse that tie into one DESIGN.md
-  "for the product". That decision belongs to the principal.
+- **Does not pick a Consilient frontend winner.** The frontend concept is
+  undecided. This skill provides the contract format and the review method; it
+  does not collapse that into one DESIGN.md "for the product". That decision
+  belongs to the principal.
 - **Does not install the Open Design desktop, daemon, or `od` CLI.** The harness
   uses `DESIGN.md` + critique as files. If the desktop app is installed
   separately, it reads the same `DESIGN.md`; nothing here depends on it.
@@ -193,9 +190,9 @@ dispatching design work to one of those harnesses, paste the following into
 the brief:
 
 > **Design contract:** before generating any UI, lock a DESIGN.md with 9
-> sections (Visual Theme, Colour Palette & Roles, Typography, Component
+> sections (Visual Theme, Color Palette & Roles, Typography, Component
 > Stylings, Layout Principles, Depth & Elevation, Do's and Don'ts, Responsive
-> Behaviour, Agent Prompt Guide). Tokens are non-negotiable once locked. Do not
+> Behavior, Agent Prompt Guide). Tokens are non-negotiable once locked. Do not
 > invent hex values outside the palette. Refuse the AI-SaaS cluster by default:
 > Instrument Serif, IBM Plex, Inter/Geist paired with serif, cyan–violet
 > gradient, chat-column layout, bento KPIs, thinking theatre, confidence rings.
