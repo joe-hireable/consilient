@@ -1,6 +1,10 @@
 # Decision index
 
-39 ADRs, 20 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+51 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
+`python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
+catches a row missing from this table, which is the argument for generating it rather than
+editing it. 0002 and 0027 appear twice by design, in the highlight section and in their own.
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED/DEPRECATED
@@ -49,6 +53,9 @@ Read these before anything else. Everything downstream depends on them.
 | [0046](0046-gate-b3-is-evidenced-by-a-dated-result-not-by-a-schedule-trigger.md) | **Gate B3 is evidenced by a dated result, not a schedule trigger** — no secret may reach a public repository, so the exercise runs locally | ✅ |
 | [0047](0047-promote-the-adapter-contract-and-retire-adapter-count-as-evidence.md) | **Promote the adapter contract; retire adapter count as evidence** — seven backends fit unchanged, but the newest adapter is 3.8× the smallest | ✅ |
 | [0048](0048-open-source-first-and-facilitation-is-prepaid-never-in-arrears.md) | **Open source first; paid facilitation is prepaid, never in arrears** — every capability usable by someone who pays nothing and contacts no server | ✅ |
+| [0049](0049-experiments-inform-they-do-not-gate.md) | **Experiments inform; they do not gate construction** — an unrun experiment justifies a PROVISIONAL assumption with a falsifier, not a stop | ✅ |
+| [0050](0050-gate-on-effect-size-not-on-uncertainty.md) | **Gate on effect size, not on the mere existence of uncertainty** — an entry that does not state its largest plausible effect cannot block a build | ✅ |
+| [0051](0051-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
 
 ## Behaviour and safety
 
