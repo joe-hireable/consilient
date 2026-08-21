@@ -128,17 +128,18 @@ output for us is refused on this ADR's grounds regardless of its capability.
 
 ## Enforcement
 
-- Check: **no tier 1 module may import a third-party package.** `src/consilient/` is already
-  AST-locked against `subprocess` by a shipped test; the same mechanism extends to a third-party
-  import ban on the judgement modules (`beta`, `events`, `projection`, `recall`, `budget`,
-  `work_items`). **Not yet written.**
-- Check: an adopted dependency records its licence in the adopting commit, and BUSL/SSPL are refused.
-  **Not yet written.**
-- Fails CI: not yet.
-- Added in the same commit as the implementation: **no.** The decision is recorded ahead of its
-  checks, deliberately and visibly, because the principal asked for the boundary now. **A decision
-  without a check is the defect this project catalogues under its own name**, and it is stated here
-  rather than hidden. Both checks are owed.
+- Check: **no direct static import in a tier 1 module may name a third-party package.**
+  `tests/test_component_licences.py:111` AST-scans the six judgement modules (`beta`, `events`,
+  `projection`, `recall`, `budget`, `work_items`) and rejects direct imports outside the standard
+  library. `[measured]`
+- Check: every adopted runtime dependency and tracked MCP server appears as a `supplied` entry in
+  `docs/legal/adopted-components.json`. `.github/scripts/check_component_licences.py:42` rejects
+  incomplete records, invalid, future or stale verification dates, denied supplied licences,
+  refused entries without reasons, and adopted names absent from the record. `[measured]`
+- Fails CI: yes. `.github/workflows/invariants.yml:48` self-tests the licence detector and scans the
+  tracked tree; the invariant test suite runs the tier-1 import ban. `[measured]`
+- Added in the same commit as the decision: **no.** The decision was recorded first; both checks now
+  exist and fail CI. `[measured]`
 
 ## What would overturn this
 
@@ -152,7 +153,8 @@ output for us is refused on this ADR's grounds regardless of its capability.
 ## Publication candidate?
 
 **Yes, provisionally.** The test — *a component whose error rate must be measured is native; one whose
-errors are self-evident may be adopted* — is general to any system that orchestrates third-party
-agents, and it is derived from measured failures rather than taste. It should not be published until
-the two enforcement checks exist, because publishing a boundary nothing enforces would be the exact
-thing this project criticises.
+errors are self-evident may be adopted* — is plausibly general to systems that orchestrate third-party
+agents. `[asserted]` Both owed checks are now wired into CI at the scope stated above. `[measured]`
+The licence gate enforces the named denylist rather than proving every unlisted licence permissive,
+and the import gate covers direct static imports rather than dynamic or transitive imports.
+`[measured]` Until those gaps have their own enforcement, publication remains blocked. `[asserted]`

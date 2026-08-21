@@ -45,6 +45,11 @@ jobs:
         # docstring says it cannot run on a runner, and a gate that silently no-ops is worse
         # than no gate. That omission is pinned by a test.
         run: python .github/scripts/check_foreign_identifiers.py --self-test
+      - name: Adopted component licence invariant check
+        # The curated markdown table is not an adoption gate. This self-test proves each
+        # required failure mode detects even while the tracked tree has no MCP config or
+        # runtime dependency, then the same invocation binds adopted names to the record.
+        run: python .github/scripts/check_component_licences.py --self-test
       - name: Replay invariant on a committed fixture trajectory, with a drift control
         # Until 21 Aug 2026 this step ran `beta` first, "so that `replay` has a subject to
         # compare against", then required `compared && identical`. The subject `beta` leaves

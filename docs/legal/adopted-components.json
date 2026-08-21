@@ -1,0 +1,91 @@
+{
+  "components": [
+    {
+      "name": "microsoft/playwright-mcp",
+      "capability": "browser",
+      "source": "https://github.com/microsoft/playwright-mcp",
+      "licence": "Apache-2.0",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "modelcontextprotocol/servers/src/fetch",
+      "capability": "fetch",
+      "source": "https://github.com/modelcontextprotocol/servers",
+      "licence": "MIT→Apache-2.0 transition",
+      "licence_note": "Repository SPDX NOASSERTION; permissive under both licences.",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "modelcontextprotocol/servers/src/filesystem",
+      "capability": "filesystem",
+      "source": "https://github.com/modelcontextprotocol/servers",
+      "licence": "MIT→Apache-2.0 transition",
+      "licence_note": "Repository SPDX NOASSERTION; permissive under both licences.",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "modelcontextprotocol/servers/src/git",
+      "capability": "git",
+      "source": "https://github.com/modelcontextprotocol/servers",
+      "licence": "MIT→Apache-2.0 transition",
+      "licence_note": "Repository SPDX NOASSERTION; permissive under both licences.",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "brave/brave-search-mcp-server",
+      "capability": "web search",
+      "source": "https://github.com/brave/brave-search-mcp-server",
+      "licence": "MIT",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "exa-labs/exa-mcp-server",
+      "capability": "web search",
+      "source": "https://github.com/exa-labs/exa-mcp-server",
+      "licence": "MIT",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "tavily-ai/tavily-mcp",
+      "capability": "web search",
+      "source": "https://github.com/tavily-ai/tavily-mcp",
+      "licence": "MIT",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "anthropics/skills document skills",
+      "capability": "documents",
+      "source": "https://github.com/anthropics/skills",
+      "licence": "All rights reserved",
+      "licence_note": "Proprietary source-available; explicit no-redistribution and no-derivatives clauses in per-directory LICENSE.txt.",
+      "verified": "2026-08-19",
+      "status": "refused",
+      "reason": "Cannot be bundled or redistributed by this MIT project; users may install it from the marketplace."
+    },
+    {
+      "name": "resend/resend-mcp",
+      "capability": "email",
+      "source": "https://github.com/resend/resend-mcp",
+      "licence": "MIT",
+      "verified": "2026-08-19",
+      "status": "supplied"
+    },
+    {
+      "name": "mcp-router/mcp-router",
+      "capability": "context loading",
+      "source": "https://github.com/mcp-router/mcp-router",
+      "licence": "Sustainable Use",
+      "licence_note": "Not open source.",
+      "verified": "2026-08-19",
+      "status": "refused",
+      "reason": "Its non-permissive licence is incompatible with this project's adoption rule."
+    }
+  ]
+}

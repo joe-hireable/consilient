@@ -44,6 +44,8 @@ unchanged rate (43.9% in the reference model). `[algebra]`
 | Email | Resend MCP (MIT, official) | MIT | Modest adoption (562★); optional, API-key-gated |
 | Scheduling / cron | **Nothing to supply** — no standard exists (best candidates are stale sub-100★ personal repos) | — | Use OS cron / the harness's own scheduler; this is the one slot where the harness's own machinery is the right answer |
 
+The binding record for third-party components selected or licence-refused here is `../legal/adopted-components.json`. `[measured]`
+
 ## Genuinely missing — the honest build-or-gap list
 
 1. **Open document-creation skills.** The Anthropic ones are not open source. The open
