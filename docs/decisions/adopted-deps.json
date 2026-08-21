@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "purpose": "ADR-0065's adoption registry. A third-party import in a tier-2 module of src/consilient is legal only when the package is recorded here: upstream, licence, the ADR that adopted it, and the modules permitted to import it. Tier-1 modules (beta, events, projection, recall, budget, work_items, coordination, routing) may import nothing outside stdlib and the package, registered or not. An entry no module imports is stale and fails the check — the registry records what is adopted, not what might be.",
+  "adopted": {}
+}

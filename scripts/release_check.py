@@ -206,6 +206,12 @@ def main(argv: list[str] | None = None) -> int:
         # to read FAILED while the drafts carry unverified sources — that is the gate
         # working, not the checker broken.
         gate("source depth", [sys.executable, ".github/scripts/check_source_depth.py"]),
+        # R36: a third-party import enters the tracked tree only through the ADR-0065
+        # adoption registry — recorded, permissively licensed, module-scoped.
+        gate(
+            "adopted dependencies",
+            [sys.executable, ".github/scripts/check_adopted_deps.py"],
+        ),
         clean_install_gate(),
     ]
 
