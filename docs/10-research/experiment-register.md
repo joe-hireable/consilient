@@ -2648,94 +2648,113 @@ same minute. Taking 65 would have been *following the rule and colliding*. This 
 deliberately distant so a concurrent claim on 65–70 cannot silently alias onto it.
 **65–89 are not reserved by this block and remain free.**
 
-### EXP-90 · Does a browser-observing verifier see a different class of facts than a static one — or the same facts in a different font? `READY`
+### EXP-90 · Is the browser a different class of facts, or only a transport to one? `READY`
 
-**Pre-registered 21 Aug 2026. Not run.** The empirical core of ADR-0054. Everything else in that
-ADR survives this experiment's failure; the different-class-of-facts argument does not.
+**Pre-registered 21 Aug 2026. Not run. Rewritten the same night, before any run**, after
+`qa-automation-and-the-anchor-problem.md` was read properly. The first draft asked "does a
+browser-observing verifier beat a static one", which is the wrong question: this repository has
+already established that different-class credit attaches to the **anchor** — where the expected
+value comes from — and not to the technique or the modality. A browser asserting what the code
+implies is state-anchored and is echo no matter how good the screenshot is. The question worth
+measuring is whether the browser **reaches implicit oracles a source reader cannot reach at any
+level of skill**, and what that is worth.
 
-**Decides:** whether observing a rendered page is a genuinely different class of facts in
-Whewell's sense (`CONSILIENCE.md`, clause 2) or an echo of the static checks — and therefore
-whether `browser_observed` may be registered as an evidence-class-different verifier contract
-in ADR-0054's capability table, or whether browser-capable harnesses are merely *producers*
-that happen to drive a browser.
+**Decides:** whether a composition's ability to drive a real browser earns an `implicit_oracle`
+entry in ADR-0054's `anchor` column — and, separately and more usefully, whether this
+repository's standing refusal of visual-LLM judges (`interface-beta-2026-08-20.md`, item 6)
+costs anything measurable.
 
 **Why it is answerable now, and calibrated rather than free-floating.** EXP-47 already measured
-the dependence between two *same-class* checks on this repository: mutants surviving `pytest`
-survived `mypy` at **87.89%**, against **58.50%** for mutants `pytest` killed, chi-square
-187.28, p < 1e-15. [measured] That is the number a browser verifier has to beat. Two static
-checks reading the same source are strongly dependent — which is what `CONSILIENCE.md` predicts
-of echo, and here it is measured rather than assumed. The claim under test is that a browser
-verifier's dependence on `pytest` is *materially lower* than mypy's already-measured 87.89%.
+the dependence between two *same-class* checks here: mutants surviving `pytest` survived `mypy`
+at **87.89%**, against **58.50%** for mutants `pytest` killed, chi-square 187.28, p < 1e-15.
+[measured] Two static checks reading the same source are strongly dependent, which is what
+`CONSILIENCE.md` predicts of echo — measured, not assumed. That 87.89% is the number a candidate
+verifier has to beat before the word "different" is earned.
 
 **Precondition:** (a) a small self-contained web application fixture — a form, a list view, a
-conditional render, a client-side validation path, a responsive breakpoint — committed under
+conditional render, a client-side validation path, a responsive breakpoint, and at least one
+affordance that can be rendered dead without changing any pure function — committed under
 `experiments/exp90/`, with a `pytest` suite, a type check and a build, all written *before* any
-mutant is generated and never edited afterwards; (b) EXP-47's mutation harness with its operator
-set unchanged; (c) a browser verifier driven through an already-installed MCP browser server
-(Playwright or chrome-devtools) — **no new dependency and no metered call**; (d) a written,
-frozen UI script listing the flows the browser verifier exercises and the assertions it makes.
-Fixture, checks and UI script are all frozen before mutation. Mutating the test suite or the UI
-script is prohibited, exactly as in EXP-47.
+mutant is generated and never edited afterwards. **The static suite must include DOM-level
+component assertions** — the rendered tree read without a browser engine, as a competent suite
+would have them. A static arm that only tests pure functions is a straw man, and beating it
+would establish that *executing the code* is a different class of facts, which `pytest` already
+does. The claim under test is about the **engine and the runtime**, not about execution.
+(b) EXP-47's mutation harness, operator set unchanged. (c) Playwright MCP — already the
+designated browser supply in `capability-layer.md`, Apache-2.0, **no new dependency and no
+metered call**. (d) a frozen UI script naming the flows exercised and the implicit-oracle
+assertions made.
 
-**Arms.** Four verifiers over the same mutant census:
+**Arms.** Four verifiers over one mutant census:
 
-1. `static` — `pytest` + type check + build, composite, as EXP-47 defines composite.
-2. `browser-A` — rendered-page observation, model **different** from the one that authored the
-   fixture and different from `browser-B`.
-3. `browser-B` — rendered-page observation, model of **the same family as** the fixture's author.
-4. `source-reader` — a *control that never renders*: the same model as `browser-A`, handed the
-   mutated source and the UI script as text and asked for the same assertions. This arm is what
-   makes the experiment honest. It separates *modality* from *model diversity*.
+1. `static` — `pytest` (including DOM-level component assertions) + type check + build,
+   composite as EXP-47 defines composite.
+2. `browser-implicit` — real engine, frozen script, **implicit oracles only and no model in the
+   loop**: uncaught exception, console error, hang against a fixed timeout, missing accessible
+   name, computed contrast failure, dead affordance (present, clickable, no state transition),
+   and layout overlap by bounding-box intersection. Deterministic. This arm is the one the ADR's
+   claim rests on, and it is deliberately the *cheapest* arm — the Q32 table calls implicit
+   oracles "cheap, high-precision, narrow" and this tests whether narrow still pays.
+3. `browser-agentic` — a harness driving the same fixture freely and returning a verdict. This
+   is a visual-LLM judge, which this repository has **already refused as an acceptance signal**.
+   It is included here **not as a candidate** but to measure what the refusal costs. Its verdicts
+   are recorded and never credited.
+4. `source-reader` — the same model as arm 3, handed the mutated source and the UI script as
+   text, asked for the same verdict, with no browser at all. Controls arm 3 only. It separates
+   *modality* from *model*.
 
 **Measures:**
 
-- The 2×2 for every verifier pair: killed/survived, with Wilson 95% intervals.
-- r = P(browser kills | static survived) — the multiplicative reduction the browser buys on
-  composite beta. This is the headline.
-- P(survive browser | survive pytest) against P(survive browser | pytest killed), with a
-  chi-square test — directly comparable to EXP-47's 87.89% / 58.50%.
-- **Browser false-failure floor:** the browser verifier run 30× against the *unmutated* fixture.
-  Every r is reported net of this floor, and the floor is reported separately. A flaky browser
-  manufactures apparent consilience; this is the control for it.
-- UI-reachability classification of every static survivor: reachable from the frozen UI script,
-  or not. Mutants unreachable from the UI are **not** browser misses and are excluded from r's
-  denominator; the excluded count is reported.
-- Equivalent-mutant audit using the same three-way classification EXP-47 used.
+- The 2×2 for every verifier pair, with Wilson 95% intervals.
+- **r = P(browser-implicit kills | static survived)** — the multiplicative reduction arm 2 buys
+  on composite beta. The headline.
+- P(survive browser-implicit | survive pytest) against P(survive browser-implicit | pytest
+  killed), chi-square — directly comparable to EXP-47's 87.89% / 58.50%.
+- **False-failure floor, per arm.** Every browser arm run 30× against the *unmutated* fixture.
+  All rates are reported net of the floor and the floor is reported separately. A flaky browser
+  manufactures apparent consilience; a chatty judge manufactures more of it. This control matters
+  more for arm 3 than for anything else in the design.
+- UI-reachability classification of every static survivor. Mutants unreachable from the frozen
+  script are **not** browser misses and are excluded from r's denominator; the excluded count is
+  reported.
+- Equivalent-mutant audit, the same three-way classification EXP-47 used.
+- Per-arm wall-clock and quota, because arm 2 costing 1% of arm 3 is part of the finding.
 
 **Stopping rules (fixed before the run):**
 
 - **Accumulate static-survivors, not mutants.** Generate mutants until **120 UI-reachable,
-  non-equivalent static survivors** exist, capped at 600 mutants total. Fewer than 120 at the cap
-  ⟹ **insufficient evidence**; report the interval and conclude nothing. [asserted]
-- r ≥ 0.20 net of the false-failure floor **and** P(survive browser | survive pytest) ≤ 0.70
-  ⟹ **browser observation is a different class.** Register `browser_observed` as an
-  evidence-class-different verifier contract in ADR-0054. [asserted]
-- r < 0.05 net of the floor **or** P(survive browser | survive pytest) ≥ 0.85 — that is, no
-  better than the measured mypy/pytest dependence — ⟹ **echo.** ADR-0054's
-  different-class-of-facts argument is **refuted for this task class**; browser-capable
-  harnesses are routed as producers only and their verdicts earn no consilience credit.
-  [asserted]
+  non-equivalent static survivors** exist, capped at 600 mutants. Fewer than 120 at the cap ⟹
+  **insufficient evidence**; report the interval and conclude nothing. [asserted]
+- r ≥ 0.20 net of the floor **and** P(survive browser-implicit | survive pytest) ≤ 0.70 ⟹
+  **the browser reaches a different class.** ADR-0054 credits browser-capable compositions with
+  `anchor: implicit_oracle`. [asserted]
+- r < 0.05 net of the floor **or** P(survive browser-implicit | survive pytest) ≥ 0.85 — no
+  better than the measured mypy/pytest dependence — ⟹ **echo.** The browser is a transport to
+  nothing the static suite did not already have; ADR-0054's anchor column loses its browser row
+  and browser-capable harnesses are routed as producers only. [asserted]
 - 0.05 ≤ r < 0.20 ⟹ **too weak to build doctrine on.** Report honestly; do not round up.
-- **The arm that can kill the argument on its own:** if `source-reader` (arm 4, no browser at
-  all) achieves an r within its own 95% interval of `browser-A`'s, then the effect is **model
-  diversity, not modality**, and ADR-0054's stated mechanism is wrong even where its conclusion
-  survives. Rewrite the ADR's argument as *observer diversity* and drop the browser framing.
-  [asserted]
-- If `browser-B` (same model family as the fixture author) shows an r materially below
-  `browser-A`'s, then a verifier must not share a model family with the producer, and that
-  becomes a routing constraint in ADR-0054 rather than a footnote. [asserted]
+- **On the refused judge.** If arm 3 exceeds arm 2's r by ≥ 0.10 on non-overlapping intervals
+  *and* its false-failure floor is below 0.05, then the standing refusal of visual-LLM judges
+  costs something real and `interface-beta-2026-08-20.md` item 6 must be revisited on evidence.
+  If arm 3 does not exceed arm 2, or its floor exceeds 0.05, **the refusal is vindicated by
+  measurement rather than by argument** — which is the more likely outcome and the more useful
+  one. [asserted]
+- **On modality versus model.** If arm 4 (no browser) lands within its own 95% interval of arm
+  3, then whatever arm 3 contributes is **model, not modality**, and no browser framing may be
+  attached to it. [asserted]
 
-**Blocks implementation?** **No.** Its largest possible effect (r = 0) removes one row from a
-capability table and downgrades one paragraph of an ADR from a mechanism to a hypothesis. It
-does not change whether capability is measured rather than declared, whether beta is tracked per
-verifier contract, or what the router is allowed to read. Under ADR-0050 that is not a blocking
-effect, and under ADR-0049 experiments do not gate.
+**Blocks implementation?** **No.** Its largest possible effect (r = 0) removes one value from
+one enumerated column of a capability row. It does not change whether capability is measured
+rather than declared, whether beta is carried per task family, what the router may read, or that
+the anchor taxonomy is the thing evidence-class credit attaches to — that taxonomy predates this
+experiment and does not depend on it. Under ADR-0050 that is not a blocking effect, and under
+ADR-0049 experiments do not gate.
 
-**What it cannot decide:** whether browser observation is different-class for any fixture other
-than this one; the rate on real defects rather than synthetic mutants — that is EXP-50's
-question and it is inherited here in full; anything at all about task classes with no rendered
-artefact. Document drafting, design work and long-horizon batch work are outside this design and
-none of them may borrow its result.
+**What it cannot decide:** whether the result transfers to any fixture but this one; the rate on
+real defects rather than synthetic mutants — that is EXP-50's question, inherited here in full;
+whether specification-anchored or metamorphic anchors would do better, since neither is an arm
+here; and anything whatever about task families with no rendered artefact. Document drafting,
+design work and long-horizon batch work are outside this design and may not borrow its result.
 
 ### EXP-91 · Does a measured capability beat the vendor's label — and by enough to pay for the probe? `BLOCKED: the capability store and a router that reads it`
 
