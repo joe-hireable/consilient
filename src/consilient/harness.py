@@ -205,6 +205,14 @@ class ModelOption:
             raise ValueError("reasoning_provenance must be a non-empty string")
 
 
+def allows_reasoning_scaffold(model: ModelOption) -> bool:
+    """Permit a scaffold only when verified registry data says reasoning is absent.
+
+    Native mandatory, hybrid user-selectable, and unknown capabilities all fail closed.
+    """
+    return model.reasoning_capability == "absent"
+
+
 # `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids. The
 # Cursor Models pool serves the non-vendor families below; claude-*/gpt-*/gemini-* bill
 # to the avoided Other Models pool (CURSOR_OTHER_PREFIXES). Only cursor-composer has a
@@ -291,11 +299,16 @@ def select_model(
         known = ", ".join(item.id for item in harnesses)
         return f"unknown harness {harness_id!r}; known: {known}"
     if requested is not None:
+        for option in models:
+            if option.harness_id == harness_id and option.id == requested:
+                return option
         return ModelOption(
             requested,
             harness_id,
             model_family(requested),
             pool_for_model(harness_id, requested, models=models, harnesses=harnesses),
+            reasoning_capability="unknown",
+            reasoning_provenance=UNMAPPED_REASONING_PROVENANCE,
         )
     registered = list(models_for_harness(harness_id, models))
     if not registered:
@@ -1186,4 +1199,3 @@ def describe_registry(
             }
         )
     return rows
-
