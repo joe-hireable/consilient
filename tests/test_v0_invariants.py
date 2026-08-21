@@ -4777,3 +4777,59 @@ def test_doctor_states_which_code_measured_which_directory(tmp_path, capsys):
         "into a transcript, and the only place the wrong tree stays visible afterwards"
     )
     assert str((tmp_path / "log").resolve()) in rendered[1], rendered[1]
+
+
+# ------------------------------------------ working principle 9, find the bar, 21 Aug 2026
+SUPERLATIVE = re.compile(
+    # Deliberately narrow: a claim about EVERYONE ELSE's work, not a self-limiting statement.
+    # A first draft matched a bare "nothing else" and fired on README:142, "records trajectory
+    # events ... and does nothing else" -- which limits our own scope and claims nothing about
+    # anyone. A check that fires on innocent prose gets suppressed and then protects nothing,
+    # so the pattern names the shapes that actually went wrong.
+    r"\b(nothing (?:on the market|out there|in the (?:field|literature))|"
+    r"no (?:one|body) else|no other (?:system|harness|tool|project|product)|"
+    r"the only (?:system|harness|tool|project|product)|"
+    r"the first (?:system|harness|tool|project|product))\b",
+    re.IGNORECASE,
+)
+# A superlative is a claim about everyone else's work, so it needs a source like any other claim.
+CITATION = re.compile(
+    r"arXiv:|doi\.|https?://|\[cited\]|\(\d{4}\)|et al\.", re.IGNORECASE
+)
+PUBLIC_PROSE = ("README.md", "CONSILIENCE.md")
+
+
+def test_a_superlative_claim_carries_its_citation():
+    """Public-facing prose may not claim to beat everyone without saying who it beat.
+
+    Joe, 21 August 2026: "we should always enforce aiming for better than the best that
+    already exists", and "we need to always be finding where the bar is and raising it."
+    Finding the bar is the work. A superlative is the moment a bar is claimed to be cleared,
+    so it is exactly where the evidence has to be.
+
+    This exists because we breached it. `README.md` claimed "Nothing on the market measures
+    it" while eight published systems measured beta, Reflexion among them since 2023 -- and
+    this repository's own experiment register said so while the README contradicted it.
+    [measured] The claim sat in the public shop window of a project about measurement honesty.
+
+    A citation on the same line or the two lines below satisfies this. The check is
+    deliberately narrow: it catches the specific shape that went wrong rather than policing
+    confident prose, because a check that fires on everything gets suppressed and then
+    protects nothing.
+    """
+    offenders: list[str] = []
+    for name in PUBLIC_PROSE:
+        path = Path(name)
+        if not path.exists():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for number, line in enumerate(lines):
+            if not SUPERLATIVE.search(line):
+                continue
+            window = " ".join(lines[number : number + 3])
+            if not CITATION.search(window):
+                offenders.append(f"{name}:{number + 1}: {line.strip()[:90]}")
+    assert not offenders, (
+        "a superlative claim in public-facing prose carries no citation. Name the incumbent "
+        "and the evidence, or drop the claim:\n  " + "\n  ".join(offenders)
+    )

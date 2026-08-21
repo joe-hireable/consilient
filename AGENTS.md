@@ -102,6 +102,29 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
    locally, run it. Local compute is free, and it is what upgrades a claim from
    `[simulated]` to `[measured]`. See `docs/10-research/local-experimentation.md`.
 
+9. **Find the bar, then beat it.** Joe, 21 August 2026: *"In everything we do, and the harness does,
+   we should always enforce aiming for better than the best that already exists. That is the bar."*
+   And: *"we need to always be finding where the bar is and raising it."*
+
+   **Finding the bar is the work; beating it is the easy half.** Before building a capability, name
+   the best thing that already does it — a product, a paper, a library, a competitor — and say what
+   it achieves. Then state how this will be better, and **what measurement would show it**. If you
+   cannot find an incumbent, say what you searched; "nothing exists" is a claim requiring evidence
+   like any other, and it is the claim this project has already got wrong.
+
+   Once found, the bar is not a one-time check. **Record it so it can be re-checked**, because the
+   incumbent moves. A bar beaten in August and never re-measured is a bar you have stopped clearing.
+
+   This principle exists because we breached it. `README.md` claimed *"Nothing on the market measures
+   it"* while **eight published systems measured β**, including Reflexion in 2023 — and our own
+   experiment register already said so on line 1738 while the README contradicted it. [measured]
+   That claim was in the public shop window of a project whose entire subject is measurement honesty.
+
+   **Enforcement:** a capability claim in public-facing prose names its incumbent and the evidence,
+   or it does not ship. `tests/test_v0_invariants.py` fails a superlative — "nothing", "no one",
+   "first", "only" — appearing in public-facing prose without a citation beside it. Beating a bar you
+   never located is indistinguishable from not knowing where it was.
+
 ## Boundaries
 
 ### Always do
