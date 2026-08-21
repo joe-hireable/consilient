@@ -92,6 +92,7 @@ HUMAN_ONLY = frozenset(
     {
         "approval",
         "consent",
+        "feedback",
         "gate_lift",
         "spend_authorisation",
         "verdict",
@@ -105,6 +106,55 @@ CONSENT_GRANTED = "consent.granted"
 CONSENT_WITHDRAWN = "consent.withdrawn"
 CONSENT_KINDS = frozenset({CONSENT_GRANTED, CONSENT_WITHDRAWN})
 CONSENT_PURPOSES = frozenset({"improve-consilient"})
+
+# feedback-signals.md: the unit of feedback is the task, and the close surface is
+# asked of the user, never the agent. Three durable kinds make a skip never re-asked:
+# the ask and the decline are recorded, so "have we already asked about this task" is
+# a query over the log, not a guess. The asked event carries the goal text verbatim
+# from the pre-committed goal record — the surface renders the goal, nothing the
+# agent wrote (anti-gaming rule 3).
+FEEDBACK_ASKED_KIND = "feedback.asked"
+FEEDBACK_DECLINED_KIND = "feedback.declined"
+FEEDBACK_ANSWERED_KIND = "feedback.answered"
+FEEDBACK_KINDS = frozenset(
+    {FEEDBACK_ASKED_KIND, FEEDBACK_DECLINED_KIND, FEEDBACK_ANSWERED_KIND}
+)
+GOAL_ACHIEVED = frozenset({"fully", "partially", "no"})
+
+# feedback-signals.md rules 1–2: no approval-style signal is ever a training target,
+# and none is collected at all — response rating is not built. The prohibition lives
+# here in the schema, not in prose: validate() rejects these field names on any event.
+RESPONSE_RATING_FIELDS = frozenset(
+    {
+        "rating",
+        "response_rating",
+        "thumbs",
+        "thumbs_up",
+        "thumbs_down",
+        "satisfaction",
+        "helpful",
+        "unhelpful",
+        "stars",
+        "star_rating",
+    }
+)
+
+# feedback-signals.md: achievement (asked) and efficiency (derived) are separate
+# records, permanently. No default composite score exists anywhere, so the answered
+# event refuses the fields that would build one — efficiency stays on
+# dispatch.outcome, where it is measured, and any composite is an explicit user
+# weighting, which is a preferential question the harness must not default.
+FEEDBACK_COMPOSITE_FIELDS = frozenset(
+    {"score", "composite", "overall", "efficiency", "cost", "duration_s"}
+)
+
+# ADR-0035: four levels, milestones by default; the dial changes what is displayed,
+# never what is recorded. The change event exists so β can be stratified by the
+# conditions the verdict was produced under — which is the only measurement that
+# justifies the dial. The floor and its config-load validation are the CLI's half.
+VISIBILITY_LEVELS = ("silent", "milestones", "decisions", "firehose")
+VISIBILITY_DEFAULT = "milestones"
+VISIBILITY_CHANGE_KIND = "visibility.change"
 
 
 class EventError(ValueError):
@@ -201,6 +251,9 @@ def validate(event: object) -> EventPayload:
     _check_attempt_contract(event)
     _check_consent_contract(event)
     _check_decision_contract(event)
+    _check_response_rating_ban(event)
+    _check_feedback_contract(event)
+    _check_visibility_contract(event)
     _check_human_authority(event)
     _check_evidence_class(event)
     _check_dispatch_contract(event)
@@ -619,6 +672,92 @@ def _check_consent_contract(event: EventPayload) -> None:
         )
 
 
+def _check_response_rating_ban(event: EventPayload) -> None:
+    """R22: no response-level rating surface, enforced in the schema.
+
+    Compliance cannot rest on nobody having written the code yet. Any event carrying
+    an approval-style field is rejected before it reaches the log, so a rating widget
+    added tomorrow fails here rather than accreting.
+    """
+    data = event["data"]
+    hits = sorted(RESPONSE_RATING_FIELDS & set(data))
+    if hits:
+        raise EventError(
+            f"{event['event']} carries approval-style field(s) {hits}; the unit of "
+            "feedback is the task, and response-level rating is not built "
+            "(feedback-signals.md rules 1–2)"
+        )
+
+
+def _check_feedback_contract(event: EventPayload) -> None:
+    """R20/R23: task-close feedback — durable, skippable, and never composite."""
+    kind = event["event"]
+    if kind not in FEEDBACK_KINDS:
+        return
+    data = event["data"]
+    task_id = data.get("task_id")
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise EventError(
+            f"{kind} must carry task_id as a non-empty string; the no-re-ask rule is "
+            "a query over the log and task_id is its key"
+        )
+    if kind == FEEDBACK_ASKED_KIND:
+        goal_text = data.get("goal_text")
+        if not isinstance(goal_text, str) or not goal_text.strip():
+            raise EventError(
+                f"{kind} must carry goal_text verbatim from the pre-committed goal "
+                "record; the close surface renders the goal, nothing the agent wrote"
+            )
+    if kind == FEEDBACK_ANSWERED_KIND:
+        achieved = data.get("goal_achieved")
+        if achieved not in GOAL_ACHIEVED:
+            raise EventError(
+                f"{kind} must carry goal_achieved as one of {sorted(GOAL_ACHIEVED)}, "
+                f"got {achieved!r}"
+            )
+        for optional in ("missing", "better_approach"):
+            value = data.get(optional)
+            if value is not None and not isinstance(value, str):
+                raise EventError(f"{kind}.{optional} must be a string when present")
+        composite = sorted(FEEDBACK_COMPOSITE_FIELDS & set(data))
+        if composite:
+            raise EventError(
+                f"{kind} carries composite/efficiency field(s) {composite}; "
+                "achievement and efficiency are separate records permanently, and no "
+                "default composite score exists (feedback-signals.md)"
+            )
+
+
+def _check_visibility_contract(event: EventPayload) -> None:
+    """R31 / ADR-0035: the dial is recorded so β stratifies by display conditions."""
+    data = event["data"]
+    if event["event"] == VISIBILITY_CHANGE_KIND:
+        level = data.get("level")
+        if level not in VISIBILITY_LEVELS:
+            raise EventError(
+                f"{VISIBILITY_CHANGE_KIND} must carry level as one of "
+                f"{VISIBILITY_LEVELS}, got {level!r}"
+            )
+        overrides = data.get("overrides")
+        if overrides is not None:
+            if not isinstance(overrides, dict):
+                raise EventError(f"{VISIBILITY_CHANGE_KIND}.overrides must be an object")
+            for kind_name, override_level in overrides.items():
+                if not isinstance(kind_name, str) or not kind_name.strip():
+                    raise EventError("override keys must be non-empty event kinds")
+                if override_level not in VISIBILITY_LEVELS:
+                    raise EventError(
+                        f"override for {kind_name!r} must be one of "
+                        f"{VISIBILITY_LEVELS}, got {override_level!r}"
+                    )
+    effective = data.get("effective_visibility")
+    if effective is not None and effective not in VISIBILITY_LEVELS:
+        raise EventError(
+            f"effective_visibility must be one of {VISIBILITY_LEVELS}, "
+            f"got {effective!r}"
+        )
+
+
 def _check_decision_contract(event: EventPayload) -> None:
     """V0-22/23/24: autonomous decisions are reversible and outside user-only classes."""
     if event["event"] != DECISION_KIND:
@@ -716,6 +855,21 @@ def _check_human_authority(event: EventPayload) -> None:
                 f"event {event['event']} carries human_decision {decision!r}; "
                 "a consent event is a consent and may not be filed as anything else "
                 "(V0-18)"
+            )
+
+    # And the same shape again for feedback answers: the close questions go to the
+    # user, never the agent — agent self-assessment is never an outcome signal
+    # (feedback-signals.md rule 2; false self-reported completion is the measured
+    # failure). An answered event without the human_decision discipline is an agent
+    # grading its own homework.
+    if event["event"] == FEEDBACK_ANSWERED_KIND:
+        if decision is None:
+            decision = "feedback"
+        elif decision != "feedback":
+            raise EventError(
+                f"{FEEDBACK_ANSWERED_KIND} carries human_decision {decision!r}; "
+                "a feedback answer is the user's and may not be filed as anything "
+                "else (V0-18)"
             )
 
     if decision is None:
