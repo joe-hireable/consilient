@@ -3297,6 +3297,81 @@ population, about assistive technology, or about whether anyone returns a second
 
 ---
 
+### EXP-96 · Two-corpus mutation proxy for verifier β `READY`
+
+**Pre-registered 21 Aug 2026; no verifier outcome inspected.** EXP-94 and EXP-95 were already
+claimed outside this register, so the collision rule in the dispatch brief assigned the next
+unused identifier. [measured]
+
+**Decides:** whether a fixed seeded-fault instrument can produce a decision-grade estimate of
+the automated verifier's false-accept rate on two unrelated Python corpora, while exposing rather
+than absorbing semantically inert or ambiguous mutants. This is mutation-proxy β, a different
+estimand from human-verdict β; it cannot close Gate A1 and no gate reads it. [asserted]
+
+**Precondition:** both pinned baselines pass their native local composites before mutation:
+
+- Consilient at `e7a9940`, `src/consilient/*.py`, checked by `pytest tests -q`, strict `mypy`
+  over `src/consilient`, and `ruff check .`. [measured: revision and declared checks]
+- Pallets `itsdangerous` 2.2.0 at `096c8d42545d3b68ea21a4f890fb2b2d8979c0bd`,
+  `src/itsdangerous/*.py`, checked by its pytest suite, strict mypy configuration, and Ruff.
+  It was named before the run because it is a public, production Python library with a real
+  behaviour-oriented suite, multi-version CI, no relationship to Consilient, and a verification
+  history independent of this project's invariant-heavy suite. The shared check families keep
+  the composite comparable; the independently authored corpus and tests provide the different
+  verification regime ADR-0013 requires. [measured: repository metadata; asserted: selection]
+
+`mutmut==3.7.0` with LibCST generates a complete first-order census using the six operator
+families fixed by EXP-47: comparison, boolean/logical, binary/arithmetic, unary,
+constant/literal, and statement mutation. No test file is mutated. [cited: EXP-47]
+
+**Procedure:**
+
+1. Record each corpus revision, source/test manifest, engine version, baseline outputs, generated
+   mutant receipt, and every per-mutant verifier outcome. Refuse input drift, a failed baseline,
+   an execution error, a timeout, or an incomplete census; none is counted as a killed mutant.
+   Subprocess timeouts kill the process tree. [asserted]
+2. Generate each mutant once with mutmut/LibCST, then run the three checks independently in an
+   isolated copy. Composite acceptance means all three checks accept. [asserted]
+3. Freeze EXP-47's four equivalent classes exactly:
+   `docstring_mutation`, `sql_case_insensitive_mutation`, `cli_help_metadata_string`, and
+   `dataclass_default_caveat_string`. No fifth class may be added after outcomes are visible.
+   [cited: EXP-47]
+4. Classify composite survivors three ways. A survivor matching a frozen class is `equivalent`.
+   A pure string/presentation or annotation/default-metadata mutation outside those classes is
+   `unclassifiable`, never silently equivalent. Other non-equivalent operator mutations are
+   `true_defect` under the seeded-fault proxy. Report all three counts per corpus before pooled
+   counts. [asserted]
+5. Let `K` be non-equivalent mutants rejected by the composite, `D` classified true-defect
+   survivors, `E` frozen equivalent survivors, and `U` unclassifiable survivors. Assert the
+   census identity `N = K + D + E + U`. Report classifiable proxy β as `D / (K + D)` with a
+   Wilson 95% interval; never fold `U` into either side. Also report the partial-identification
+   range `D / (K + D)` (all `U` inert) to `(D + U) / (K + D + U)` (all `U` bad). [algebra]
+6. Report known-inert contamination `E/N`, unresolved contamination `U/N`, the possible inertness
+   range `[E/N, (E+U)/N]`, and the corresponding survivor shares. EXP-48's 75.41% is only
+   P2-unmatched spatial clusters (46/61), not this contamination measure. [cited: EXP-48]
+
+**Measures:** per-corpus and pooled classifiable mutation-proxy β with Wilson 95% intervals and
+sample counts; partial-identification ranges; `E`, `U`, and contamination rates; per-check and
+composite outcomes; census completeness; wall-clock cost. No result is human-verdict β. [asserted]
+
+**Stopping rule:** the measurement completes only if both baselines pass, both censuses complete,
+each corpus has at least 50 classifiable non-equivalent mutants, and every per-corpus Wilson 95%
+interval for classifiable composite β has half-width at most 0.05. Otherwise record
+`insufficient_evidence` and no pooled point estimate. If `U/N > 0.10` in either corpus or that
+corpus's partial-identification range is wider than 0.10, the contamination rule fires: retain the
+measurement but mark it non-decision-grade. Either outcome leaves A1 and
+`routing_orchestration_enabled` unchanged. [asserted]
+
+**Largest plausible effect:** the proxy could range from 0 to 1 and could establish or retire this
+mutation instrument for verifier hardening. It cannot validate human labels, identify the natural
+distribution of developer faults, close Gate A1, or authorise routing. [asserted]
+
+**What it cannot decide:** generalisation beyond Python; higher-order or multi-file defects;
+whether mutmut's operator distribution resembles real bad artefacts; whether an unclassifiable
+survivor is actually inert; human-verdict β; or any gate condition. [asserted]
+
+---
+
 ## Not experiments
 
 **Q4** (what v0 optimises for), **Q14** (does the Inquiry tier belong in v0), **Q15/Q23**
