@@ -131,6 +131,10 @@ negative or underpowered results ship as research notes rather than waiting for 
 
 ## Start here
 
+**If you just want to use it:**
+[`docs/00-context/getting-started.md`](docs/00-context/getting-started.md) — what the tool does
+today, the first command to type, how to get β off zero, and what will go wrong first.
+
 **Read, in order:**
 
 1. [`CONSILIENCE.md`](CONSILIENCE.md) — the definition everything derives from
