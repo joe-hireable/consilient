@@ -706,7 +706,13 @@ def cmd_doctor(args: argparse.Namespace) -> CommandResult:
     # first would recreate the tautological A2 check repaired on 20 August 2026. The beta
     # read that used to follow here fed Gate B2's throughput threshold, withdrawn by
     # ADR-0045.
-    replay = cmd_replay(args)
+    try:
+        replay = cmd_replay(args)
+    except PermissionError as exc:
+        raise EventError(
+            f"state database is locked or busy at {db}; close any process using it, "
+            "then run consil doctor again"
+        ) from exc
     a1, b1, b2 = _experiment_conditions()
     gates = {
         "A": _gate([a1, _replay_condition(replay, log, db), _capture_condition(log)]),

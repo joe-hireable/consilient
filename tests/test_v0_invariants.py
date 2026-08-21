@@ -3064,6 +3064,31 @@ def test_doctor_exits_nonzero_while_the_gates_are_shut(tmp_path, capsys):
     assert code == 1, "doctor reported shut gates and told its caller they were open"
 
 
+def test_doctor_refuses_when_state_database_is_busy(tmp_path, monkeypatch, capsys):
+    """Removing the PermissionError handler must expose the raw lock failure again."""
+    from consilient import cli as cli_mod
+
+    log = tmp_path / "log"
+    log.mkdir()
+    db = tmp_path / "state.db"
+    db.touch()
+
+    def locked(_path):
+        raise PermissionError("locked by another process")
+
+    monkeypatch.setattr(cli_mod.sqlite3, "connect", locked)
+
+    code = main(["--log", str(log), "--db", str(db), "doctor"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert captured.out == ""
+    assert len(captured.err.splitlines()) == 1
+    message = captured.err.lower()
+    assert "state.db" in message
+    assert "locked" in message or "busy" in message
+
+
 def test_doctor_exits_zero_when_every_gate_passes(tmp_path, capsys, monkeypatch):
     """The other direction, so the exit code is a report and not a constant.
 
