@@ -171,9 +171,11 @@ Three consequences are already decided:
   learning, self-efficacy and stress are reported **separately and never composited** —
   because satisfaction and quality are anti-correlated through a measured mechanism.
   [`docs/40-spec/v0-draft.md` §1.1]
-- **Capacity-aware admission.** Subscription headroom, metered budget and local hardware are
-  structural vetoes before any routing decision: an unknown limit means no unattended work,
-  and a model that will not fit is never downloaded. [ADR-0026, ADR-0028]
+- **Capacity-aware admission.** Subscription headroom and metered budget are structural
+  vetoes before routing (ADR-0026). Local hardware fit is gated in policy
+  (`local_fit.acquire_local_model`) against a probed profile: infeasible or unknown refuses
+  before any downloader runs, but no product download path calls that chokepoint yet.
+  [ADR-0026, ADR-0028]
 
 Research is a first-class output. Every completed experiment gets a public disposition, and
 negative or underpowered results ship as research notes rather than waiting for a paper.
