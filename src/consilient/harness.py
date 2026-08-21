@@ -37,6 +37,14 @@ Status = Literal["ok", "silent", "failed", "timeout", "refused"]
 DecisionKind = Literal["run", "refuse"]
 VerdictKind = Literal["agree", "disagree", "incomparable"]
 PermissionMode = Literal["bypass", "prompt"]
+ReasoningCapability = Literal["native", "hybrid", "absent", "unknown"]
+
+REASONING_CAPABILITIES: frozenset[str] = frozenset(
+    {"native", "hybrid", "absent", "unknown"}
+)
+UNMAPPED_REASONING_PROVENANCE = (
+    "unmapped model id; no verified reasoning-capability source"
+)
 
 # Default is bypass: the principal asked that dispatched harnesses run like this Grok
 # session, without per-tool prompts. `prompt` is the attended alternative. Flags were
@@ -168,12 +176,33 @@ CURSOR_OTHER_PREFIXES: tuple[str, ...] = ("claude-", "gpt-", "gemini-")
 
 @dataclass(frozen=True)
 class ModelOption:
-    """One selectable model on one harness, and the quota pool it draws on."""
+    """One selectable model, its quota pool, and its verified reasoning posture.
+
+    `native` means mandatory reasoning and `hybrid` means a user-selectable native
+    mode. Legacy callers default to fail-closed `unknown`; a model name never supplies
+    evidence about reasoning capability.
+    """
 
     id: str
     harness_id: str
     family: str
     pool: str
+    reasoning_capability: ReasoningCapability = "unknown"
+    reasoning_provenance: str = UNMAPPED_REASONING_PROVENANCE
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.reasoning_capability, str)
+            or self.reasoning_capability not in REASONING_CAPABILITIES
+        ):
+            raise ValueError(
+                "reasoning_capability must be native, hybrid, absent, or unknown"
+            )
+        if (
+            not isinstance(self.reasoning_provenance, str)
+            or not self.reasoning_provenance.strip()
+        ):
+            raise ValueError("reasoning_provenance must be a non-empty string")
 
 
 # `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids. The
@@ -374,6 +403,58 @@ def cursor_pool_for_model(model: str) -> str:
         if lowered.startswith(prefix):
             return "cursor-other"
     return "cursor-models"
+
+
+def parse_list_models(output: str) -> tuple[str, ...]:
+    """Model ids from `cursor-agent --list-models` output, in output order.
+
+    Lines are `id - Display Name`; the header and blank lines carry no ` - `
+    separator and drop out. Ids contain no spaces, so anything before the first
+    separator that does is not an id line. Parsing is pure: the subprocess that
+    produces `output` lives in scripts/refresh_models.py, not here (AST lock).
+    """
+    ids: list[str] = []
+    for raw in output.splitlines():
+        line = raw.strip()
+        if " - " not in line:
+            continue
+        candidate = line.split(" - ", 1)[0].strip()
+        if candidate and " " not in candidate:
+            ids.append(candidate)
+    return tuple(ids)
+
+
+def cursor_models_pool_ids(live_ids: Sequence[str]) -> tuple[str, ...]:
+    """The live ids that bill to the Cursor Models pool: no vendor aliases, no `auto`.
+
+    `auto` is excluded because the registry omits it deliberately — selection must
+    name what it spends — so its absence from MODELS is policy, not drift.
+    """
+    return tuple(
+        sorted(
+            {
+                item.strip()
+                for item in live_ids
+                if item.strip() and item.strip() != "auto" and cursor_pool_for_model(item) == "cursor-models"
+            }
+        )
+    )
+
+
+def registry_drift(
+    live_ids: Sequence[str],
+    registered: tuple[ModelOption, ...] = MODELS,
+    *,
+    harness_id: str = "cursor-composer",
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(unregistered live ids, stale registered ids) on the Cursor Models surface.
+
+    Vendor-pool ids are out of scope: the registry never lists them, so their
+    absence is the avoid-pool rule working, not the snapshot going stale.
+    """
+    live = set(cursor_models_pool_ids(live_ids))
+    known = {item.id for item in registered if item.harness_id == harness_id}
+    return tuple(sorted(live - known)), tuple(sorted(known - live))
 
 
 def _is_exhausted(pool: PoolState) -> bool:
@@ -1105,5 +1186,4 @@ def describe_registry(
             }
         )
     return rows
-
 
