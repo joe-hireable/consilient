@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from . import beta as beta_mod
+from . import dashboard as dashboard_mod
 from . import events as events_mod
 from . import projection
 from .events import EventError, append, read_all
@@ -31,13 +32,12 @@ CommandResult = dict[str, Any]
 
 DEFAULT_LOG = Path(".harness/log")
 DEFAULT_DB = Path(".harness/state.db")
+DEFAULT_DASHBOARD = Path(".harness/dashboard.html")
 EXPERIMENT_REGISTER = Path("docs/10-research/experiment-register.md")
 GATE_B2_ADR = Path(
     "docs/decisions/0045-give-gate-b2-and-b3-success-criteria-they-never-had.md"
 )
-GATE_B_CIRCULARITY = Path(
-    "docs/00-context/gate-b-cannot-be-passed-2026-08-20.md"
-)
+GATE_B_CIRCULARITY = Path("docs/00-context/gate-b-cannot-be-passed-2026-08-20.md")
 # Refused lines already in the trajectory when ADR-0043 was accepted on 20 August 2026:
 # three V0-18 violations appended between 09:41 and 09:56 that day, permanent because the
 # log is append-only. ADR-0043 tolerates these exact three lines by their content digests.
@@ -216,7 +216,11 @@ def _experiment_entry(identifier: str) -> tuple[str | None, str]:
     marker = re.search(
         r"`((?:DONE|IN PROGRESS|BLOCKED)[^`]*)`\s*$", entry.partition("\n")[0]
     )
-    status = marker.group(1).partition(" see ")[0].rstrip(" -\N{EM DASH}") if marker else None
+    status = (
+        marker.group(1).partition(" see ")[0].rstrip(" -\N{EM DASH}")
+        if marker
+        else None
+    )
     return status, entry
 
 
@@ -282,16 +286,19 @@ def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResul
 
     b1_status, b1_entry = _experiment_entry("EXP-05")
     b1_result = b1_entry.partition("**Result:**")[2].partition("\n\n")[0]
-    no_redesign = (
-        "Adapter #2 (Codex) did not force an interface redesign"
-        in " ".join(b1_result.split())
+    no_redesign = "Adapter #2 (Codex) did not force an interface redesign" in " ".join(
+        b1_result.split()
     )
     if b1_status is None:
         b1 = _condition("B1", "unknown", "No EXP-05 result is recorded.")
     elif b1_status.startswith("DONE") and no_redesign:
-        b1 = _condition("B1", "pass", "EXP-05 is DONE; adapter two forced no redesign.", register)
+        b1 = _condition(
+            "B1", "pass", "EXP-05 is DONE; adapter two forced no redesign.", register
+        )
     elif b1_status.startswith("DONE"):
-        b1 = _condition("B1", "unknown", "Adapter-two outcome is not recorded.", register)
+        b1 = _condition(
+            "B1", "unknown", "Adapter-two outcome is not recorded.", register
+        )
     else:
         b1 = _condition("B1", "fail", f"EXP-05 is recorded as {b1_status}.", register)
 
@@ -413,7 +420,9 @@ def _capture_condition(log: Path) -> CommandResult:
             if day <= datetime.now(timezone.utc).date() and matching:
                 days.append(day)
                 hist_count = sum(
-                    1 for r in rejected if r.content_digest in HISTORICAL_REFUSAL_DIGESTS
+                    1
+                    for r in rejected
+                    if r.content_digest in HISTORICAL_REFUSAL_DIGESTS
                 )
                 new_count = len(rejected) - hist_count
                 historical_refusals_by_day[day] = hist_count
@@ -610,14 +619,16 @@ def _foreign_tickets(log: Path) -> int:
                 attempt_id = str(data.get("attempt_id", ""))
                 task = str(data.get("task", "")) or identifier
                 if identifier:
-                    ticket_completions.append((repository, identifier, attempt_id or task))
+                    ticket_completions.append(
+                        (repository, identifier, attempt_id or task)
+                    )
 
     seen: set[str] = set()
     for repo, ticket_id, attempt_or_task in ticket_completions:
-        if (
-            (repo, attempt_or_task) in verified_attempts
-            or (repo, ticket_id) in verified_attempts
-        ):
+        if (repo, attempt_or_task) in verified_attempts or (
+            repo,
+            ticket_id,
+        ) in verified_attempts:
             seen.add(f"{repo}#{ticket_id}")
 
     return len(seen)
@@ -654,12 +665,43 @@ def cmd_doctor(args: argparse.Namespace) -> CommandResult:
     enabled = all(
         {condition["id"] for condition in gates[name]["conditions"]} == identifiers
         and all(
-            condition["status"] == "pass"
-            for condition in gates[name]["conditions"]
+            condition["status"] == "pass" for condition in gates[name]["conditions"]
         )
         for name, identifiers in expected.items()
     )
     return {"gates": gates, "routing_orchestration_enabled": enabled}
+
+
+def cmd_dashboard(args: argparse.Namespace) -> CommandResult:
+    """Render the observability surface to one self-contained file (ADR-0053).
+
+    Every authoritative figure is taken from the command that already owns it — `cmd_doctor`
+    for the gates, `cmd_beta` for beta, `render` for beta's own sentence — and copied through
+    untouched. This function performs no arithmetic on any of them. That is what makes it
+    impossible for the page and the CLI to disagree, rather than merely unlikely (V0-30).
+    """
+    log = Path(args.log)
+    # Order matters: doctor runs replay, which must inspect the state already on disk before
+    # anything rebuilds it. Computing beta first would rebuild the projection and destroy the
+    # subject of the A2 comparison — the exact defect repaired in `cmd_replay` on 20 Aug 2026.
+    doctor = cmd_doctor(args)
+    beta_result = cmd_beta(args)
+    events, rejections = read_all(log)
+    windows, note = dashboard_mod.read_usage(events)
+    payload = dashboard_mod.build_payload(
+        events,
+        rejections,
+        doctor,
+        beta_result,
+        render("beta", beta_result),
+        len(events_mod.bypassed(log)),
+        windows,
+        note,
+    )
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(dashboard_mod.render_html(payload), encoding="utf-8", newline="\n")
+    return {**payload, "written": str(out)}
 
 
 def render(command: str, result: CommandResult) -> str:
@@ -700,15 +742,26 @@ def render(command: str, result: CommandResult) -> str:
             interval=tuple(result["interval"]) if result["interval"] else None,
             window=tuple(result["window"]) if result["window"] else None,
         ).render()
+    if command == "dashboard":
+        traj = result["trajectory"]
+        unanswerable = sum(1 for g in result["schema_gaps"] if not g["answerable"])
+        enabled = "yes" if result["routing_orchestration_enabled"] else "no"
+        return (
+            f"wrote {result['written']}\n"
+            f"  {traj['events']} events, {traj['distinct_agents']} agents, "
+            f"{traj['distinct_artefacts']} files written\n"
+            f"  routing/orchestration enabled: {enabled}\n"
+            f"  {result['beta_line']}\n"
+            f"  RACI derivable: {'yes' if result['raci']['derivable'] else 'no'}; "
+            f"{unanswerable} question(s) the record cannot answer"
+        )
     if command == "doctor":
         lines = []
         for name, gate in result["gates"].items():
             lines.append(f"Gate {name}: {gate['status'].replace('_', '-').upper()}")
             for condition in gate["conditions"]:
                 mark = condition["status"].replace("_", "-").upper()
-                lines.append(
-                    f"  {condition['id']} {mark}: {condition['requirement']}"
-                )
+                lines.append(f"  {condition['id']} {mark}: {condition['requirement']}")
                 lines.append(f"    {condition['reason']}")
                 evidence = ", ".join(condition["evidence"]) or "none"
                 lines.append(f"    evidence: {evidence}")
@@ -766,10 +819,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="report measured Gate A and Gate B status",
     )
     doctor.set_defaults(handler=cmd_doctor)
+
+    dash = sub.add_parser(
+        "dashboard",
+        parents=[common],
+        help="render the local observability surface to one self-contained HTML file",
+    )
+    dash.add_argument("--out", default=argparse.SUPPRESS)
+    dash.set_defaults(handler=cmd_dashboard)
     return parser
 
 
-DEFAULTS = {"json": False, "log": str(DEFAULT_LOG), "db": str(DEFAULT_DB)}
+DEFAULTS: dict[str, object] = {
+    "json": False,
+    "log": str(DEFAULT_LOG),
+    "db": str(DEFAULT_DB),
+    "out": str(DEFAULT_DASHBOARD),
+    # `dashboard` reuses `cmd_beta`, which reads these. They are defaulted rather than
+    # exposed as dashboard flags: the surface reports beta over the whole trajectory, and a
+    # filtered beta rendered under an unfiltered heading is exactly the kind of quietly
+    # narrowed denominator `cmd_beta` already refuses to let the quarantine count hide.
+    "task_family": None,
+    "verifier_version": None,
+}
 
 
 def main(argv: list[str] | None = None) -> int:
