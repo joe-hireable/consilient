@@ -1195,6 +1195,111 @@ def test_write_brief_without_a_log_is_the_task_alone(tmp_path):
     assert brief.read_text(encoding="utf-8") == "pong\n"
 
 
+def test_main_injects_one_fail_closed_task_capability_context(
+    monkeypatch, tmp_path, capsys
+):
+    script = _load_script()
+    now = datetime.now(timezone.utc).isoformat()
+    headroom = tmp_path / "headroom.json"
+    headroom.write_text(
+        json.dumps(
+            {
+                "observed_at": now,
+                "source": "test",
+                "pools": {
+                    pool.name: {
+                        "used_percent": 10,
+                        "exhausted": False,
+                        "note": "test",
+                    }
+                    for pool in DEFAULT_POOLS
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    inventory = tmp_path / "inventory.json"
+    inventory.write_text(
+        json.dumps(
+            {
+                "allowlist": [
+                    {
+                        "kind": "tool",
+                        "name": "pytest",
+                        "available": True,
+                        "provenance": ["probe:pytest"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    request = tmp_path / "request.json"
+    request.write_text(
+        json.dumps(
+            {
+                "capabilities": [
+                    {"kind": "tool", "name": "pytest", "reason": "verify task"}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    captured = {}
+    monkeypatch.setattr(script, "probe_all", lambda: INSTALLED)
+
+    def fake_dispatch_one(**kwargs):
+        captured["task"] = kwargs["task"]
+        return {"status": "ok"}, 0
+
+    monkeypatch.setattr(script, "dispatch_one", fake_dispatch_one)
+
+    code = script.main(
+        [
+            "pong",
+            "--cwd",
+            str(Path.cwd()),
+            "--headroom",
+            str(headroom),
+            "--harness",
+            "grok",
+            "--capability-inventory",
+            str(inventory),
+            "--capability-request",
+            str(request),
+            "--json",
+        ]
+    )
+
+    assert code == 0, capsys.readouterr().out
+    task = captured["task"]
+    assert "Selected capability context" in task
+    assert '\"name\":\"pytest\"' in task
+    assert '\"reason\":\"verify task\"' in task
+
+
+def test_capability_context_refuses_unpaired_or_unknown_inputs(tmp_path):
+    script = _load_script()
+    with pytest.raises(ValueError, match="must be passed together"):
+        script.task_with_capabilities("pong", str(tmp_path / "one.json"), None)
+
+    inventory = tmp_path / "inventory.json"
+    request = tmp_path / "request.json"
+    inventory.write_text(json.dumps({"allowlist": []}), encoding="utf-8")
+    request.write_text(
+        json.dumps(
+            {
+                "capabilities": [
+                    {"kind": "tool", "name": "missing", "reason": "needed"}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unknown capability"):
+        script.task_with_capabilities("pong", str(inventory), str(request))
+
+
 def test_write_brief_includes_a_recall_pack_from_the_log(tmp_path):
     from datetime import datetime, timezone
 

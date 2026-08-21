@@ -41,6 +41,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from consilient import coordination  # noqa: E402
+from consilient.capabilities import CapabilityError, select_capabilities  # noqa: E402
 from consilient.error_tracking import (  # noqa: E402
     ErrorRecordError,
     append_record,
@@ -1244,6 +1245,33 @@ def load_task(positional: str | None, task_file: str | None) -> str:
     raise ValueError("a task is required (positional or --task-file)")
 
 
+def task_with_capabilities(
+    task: str,
+    inventory_path: str | None,
+    request_path: str | None,
+) -> str:
+    """Select and inject one vendor-neutral per-task capability context."""
+    if bool(inventory_path) != bool(request_path):
+        raise ValueError(
+            "--capability-inventory and --capability-request must be passed together"
+        )
+    if inventory_path is None or request_path is None:
+        return task
+    try:
+        inventory = json.loads(Path(inventory_path).resolve().read_text(encoding="utf-8"))
+        request = json.loads(Path(request_path).resolve().read_text(encoding="utf-8"))
+        context = select_capabilities(inventory, request)
+    except (CapabilityError, json.JSONDecodeError, OSError, UnicodeError) as exc:
+        raise ValueError(f"capability context refused: {exc}") from exc
+    encoded = json.dumps(
+        context, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    )
+    return (
+        f"{task.rstrip()}\n\n---\n\n## Selected capability context\n\n"
+        f"```json\n{encoded}\n```\n"
+    )
+
+
 def _exit_for(status: str) -> int:
     if status in {"ok", "agree", "disagree", "incomparable"}:
         return 0
@@ -1682,6 +1710,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--task-file", help="read the task from this file (preferred for long briefs)"
     )
     parser.add_argument(
+        "--capability-inventory",
+        help="JSON allowlist of available tools, MCPs, skills, plugins and connections",
+    )
+    parser.add_argument(
+        "--capability-request",
+        help="JSON capabilities requested for this task; requires --capability-inventory",
+    )
+    parser.add_argument(
         "--cwd",
         help="working directory; this repository, a worktree of it, or an instance-allowlisted root",
     )
@@ -1790,6 +1826,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         task = load_task(args.task, args.task_file)
+        task = task_with_capabilities(
+            task, args.capability_inventory, args.capability_request
+        )
     except ValueError as exc:
         emit({"status": "refused", "reason": str(exc)}, args.json)
         return 2
