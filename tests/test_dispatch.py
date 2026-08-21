@@ -604,6 +604,28 @@ def test_unknown_explicit_model_refuses_before_brief_or_launch(monkeypatch, tmp_
     assert not (run_dir / "brief.md").exists()
 
 
+def test_default_headroom_refresh_is_bounded_and_uses_the_local_probe(
+    monkeypatch, tmp_path
+):
+    script = _load_script()
+    output = (tmp_path / "headroom.json").resolve()
+    monkeypatch.setattr(script, "DEFAULT_HEADROOM", output)
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured["argv"] = argv
+        captured["kwargs"] = kwargs
+        return 0, False, 0.1
+
+    monkeypatch.setattr(script, "run_process", fake_run)
+
+    assert script.refresh_default_headroom(output) is None
+    assert captured["argv"][0] == sys.executable
+    assert captured["argv"][1].endswith("scripts\\headroom.py")
+    assert captured["argv"][-2:] == ["--timeout", "5"]
+    assert captured["kwargs"]["timeout_s"] == 45
+
+
 @pytest.mark.parametrize("harness_id", ("claude", "grok", "codex"))
 def test_brief_is_delivered_by_reference(monkeypatch, tmp_path, harness_id):
     script = _load_script()

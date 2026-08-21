@@ -14,7 +14,7 @@ import hashlib
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -28,6 +28,7 @@ from .events import (
 # Operator observation, 21 August 2026. Claude weekly is "nearly exhausted"; no precise
 # counter was supplied, so it is flagged exhausted rather than given an invented percent.
 EXHAUSTED_USED_PERCENT = 90.0
+HEADROOM_MAX_AGE = timedelta(minutes=15)
 DISPATCH_ACTOR = "consilient.dispatch"
 REFUSED_KIND = "dispatch.refused"
 DISPATCH_OUTCOME_KIND = "dispatch.outcome"
@@ -505,6 +506,30 @@ def remaining_percent(pool: PoolState) -> float | None:
     if pool.used_percent is None:
         return None
     return 100.0 - pool.used_percent
+
+
+def headroom_freshness_refusal(
+    pools: Sequence[PoolState], *, now: datetime
+) -> str | None:
+    """Refuse routing on missing, future, malformed, or stale observations."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("headroom check time must be timezone-aware")
+    if not pools:
+        return "headroom snapshot has no pools"
+    current = now.astimezone(timezone.utc)
+    for pool in pools:
+        try:
+            observed = datetime.fromisoformat(pool.observed_at)
+        except ValueError:
+            return f"{pool.name} headroom observation timestamp is malformed"
+        if observed.tzinfo is None or observed.utcoffset() is None:
+            return f"{pool.name} headroom observation timestamp has no timezone"
+        age = current - observed.astimezone(timezone.utc)
+        if age < timedelta(0):
+            return f"{pool.name} headroom observation is in the future"
+        if age > HEADROOM_MAX_AGE:
+            return f"{pool.name} headroom observation is stale"
+    return None
 
 
 def _ineligible(

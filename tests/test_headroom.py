@@ -11,7 +11,12 @@ from typing import cast
 
 import pytest
 
-from consilient.harness import DEFAULT_POOLS, load_pools
+from consilient.harness import (
+    DEFAULT_POOLS,
+    PoolState,
+    headroom_freshness_refusal,
+    load_pools,
+)
 from consilient.usage import Provenance, ProviderUsage, Quota
 
 
@@ -337,3 +342,37 @@ def test_atomic_replace_failure_preserves_previous_snapshot(tmp_path, monkeypatc
 
     assert output.read_text(encoding="utf-8") == "old"
     assert list(tmp_path.iterdir()) == [output]
+
+
+def test_routing_refuses_stale_future_or_partial_headroom() -> None:
+    def pools(observed_at: datetime) -> tuple[PoolState, ...]:
+        return tuple(
+            PoolState(
+                pool.name,
+                pool.used_percent,
+                pool.exhausted,
+                pool.note,
+                observed_at.isoformat(),
+                "test",
+            )
+            for pool in DEFAULT_POOLS
+        )
+
+    assert headroom_freshness_refusal(pools(NOW), now=NOW) is None
+    assert "stale" in headroom_freshness_refusal(
+        pools(NOW - timedelta(minutes=15, microseconds=1)), now=NOW
+    )
+    assert "future" in headroom_freshness_refusal(
+        pools(NOW + timedelta(microseconds=1)), now=NOW
+    )
+
+    partial = list(pools(NOW))
+    partial[-1] = PoolState(
+        partial[-1].name,
+        partial[-1].used_percent,
+        partial[-1].exhausted,
+        partial[-1].note,
+        (NOW - timedelta(days=1)).isoformat(),
+        "default fallback",
+    )
+    assert "stale" in headroom_freshness_refusal(tuple(partial), now=NOW)

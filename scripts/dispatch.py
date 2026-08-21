@@ -30,6 +30,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -56,6 +57,7 @@ from consilient.harness import (  # noqa: E402
     cursor_pool_for_model,
     describe_registry,
     harness_by_id,
+    headroom_freshness_refusal,
     judge_fanout,
     load_permission_mode,
     load_pools,
@@ -548,6 +550,33 @@ def run_process(
             except subprocess.TimeoutExpired:
                 pass
     return process.returncode, timed_out, time.perf_counter() - started
+
+
+def refresh_default_headroom(path: Path) -> str | None:
+    """Refresh the default snapshot through the bounded, non-inference probe."""
+    if path != DEFAULT_HEADROOM.resolve():
+        return None
+    with tempfile.TemporaryDirectory(prefix="consilient-headroom-") as directory:
+        temporary = Path(directory)
+        code, timed_out, _duration = run_process(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "headroom.py"),
+                "--output",
+                str(path),
+                "--timeout",
+                "5",
+            ],
+            cwd=ROOT,
+            stdout_path=temporary / "stdout.txt",
+            stderr_path=temporary / "stderr.txt",
+            timeout_s=45,
+        )
+    if timed_out:
+        return "headroom refresh timed out; process tree killed"
+    if code != 0:
+        return f"headroom refresh failed (exit {code})"
+    return None
 
 
 def _harvest_quietly(log_dir: Path, runs_dir: Path) -> None:
@@ -1686,6 +1715,10 @@ def main(argv: list[str] | None = None) -> int:
     log_dir = Path(args.log).resolve()
     runs_dir = Path(args.runs).resolve()
     headroom_path = Path(args.headroom).resolve()
+    refresh_refusal = refresh_default_headroom(headroom_path)
+    if refresh_refusal is not None:
+        emit({"status": "refused", "reason": refresh_refusal}, args.json)
+        return 2
     ensure_default_headroom(headroom_path)
     permissions: PermissionMode = (
         args.permissions
@@ -1697,6 +1730,12 @@ def main(argv: list[str] | None = None) -> int:
         pools: tuple[PoolState, ...] = load_pools(headroom_path)
     except ValueError as exc:
         emit({"status": "refused", "reason": str(exc)}, args.json)
+        return 2
+    freshness_refusal = headroom_freshness_refusal(
+        pools, now=datetime.now(timezone.utc)
+    )
+    if freshness_refusal is not None:
+        emit({"status": "refused", "reason": freshness_refusal}, args.json)
         return 2
 
     probes = probe_all()
