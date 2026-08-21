@@ -99,13 +99,14 @@ HUMAN_ONLY = frozenset(
     }
 )
 
-# ADR-0057: sharing is opt-in, one purpose, private, used to improve Consilient only.
-# Pinning the set makes bundling a failing test rather than a comment. Expanding it is
-# an explicit decision; an existing grant does not become authority for a new purpose.
+# ADR-0057: sharing is opt-in and purpose-specific. An existing grant never becomes
+# authority for another purpose; commercial training is authorised one use at a time.
 CONSENT_GRANTED = "consent.granted"
 CONSENT_WITHDRAWN = "consent.withdrawn"
 CONSENT_KINDS = frozenset({CONSENT_GRANTED, CONSENT_WITHDRAWN})
-CONSENT_PURPOSES = frozenset({"improve-consilient"})
+CONSENT_PURPOSES = frozenset(
+    {"improve-consilient", "train-consilient", "commercial-training"}
+)
 
 # feedback-signals.md: the unit of feedback is the task, and the close surface is
 # asked of the user, never the agent. Three durable kinds make a skip never re-asked:
@@ -643,7 +644,7 @@ def _check_attempt_contract(event: EventPayload) -> None:
 
 
 def _check_consent_contract(event: EventPayload) -> None:
-    """A consent event names a permitted purpose; a grant states a retention period.
+    """Consent is purpose-specific; commercial grants authorise one named use.
 
     ADR-0057 forbids shipping sharing until consent, retention and a checkable use
     limit exist. The exporter is not in this commit. These two fields are the part
@@ -656,19 +657,44 @@ def _check_consent_contract(event: EventPayload) -> None:
         return
     data = event["data"]
     purpose = data.get("purpose")
-    if purpose not in CONSENT_PURPOSES:
+    if not isinstance(purpose, str) or purpose not in CONSENT_PURPOSES:
         raise EventError(
             f"{kind} must declare purpose as one of {sorted(CONSENT_PURPOSES)}; "
-            "ADR-0057 permits sharing only to improve Consilient, and purposes "
-            "are not bundled"
+            "purposes are not bundled"
         )
     if kind != CONSENT_GRANTED:
+        grant_fields = sorted({"per_use", "use_ref"} & set(data))
+        if grant_fields:
+            raise EventError(
+                f"{kind} is a withdrawal and must not carry commercial grant "
+                f"field(s) {grant_fields}"
+            )
         return
     retention = data.get("retention_days")
     if not isinstance(retention, int) or isinstance(retention, bool) or retention <= 0:
         raise EventError(
             f"{kind} must carry retention_days as a positive integer; "
             "a grant with no stated retention is the gap ADR-0057 forbids shipping"
+        )
+    try:
+        datetime.fromisoformat(event["ts"]) + timedelta(days=retention)
+    except OverflowError as exc:
+        raise EventError(
+            f"{kind} retention_days must produce a representable granted-until "
+            "timestamp"
+        ) from exc
+    if purpose != "commercial-training":
+        return
+    if data.get("per_use") is not True:
+        raise EventError(
+            f"{kind} for commercial-training must carry per_use: true; commercial "
+            "gain requires fresh consent for each use"
+        )
+    use_ref = data.get("use_ref")
+    if not isinstance(use_ref, str) or not use_ref.strip():
+        raise EventError(
+            f"{kind} for commercial-training must carry use_ref as a non-empty "
+            "string naming the single authorised use"
         )
 
 

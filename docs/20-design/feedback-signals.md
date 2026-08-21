@@ -133,6 +133,11 @@ learns to burn unlimited budget. So:
 The user action is identical — answering three questions — but the *purposes* are not,
 and they are never bundled (§3):
 
+`[measured]` `scripts/consent.py` obtains `improve-consilient` and `train-consilient`
+consent through separate invocations and renders each purpose in its own visible status
+section; no gesture can grant both. A `commercial-training` grant is per-use and names
+the single authorised use.
+
 - **Local only** (default): outcomes feed the user's own trajectory log and β
   instrument. Nothing leaves the machine. No consent surface appears.
 - **Product improvement** (opt-in, separate): derived, aggregated outcome metrics.
