@@ -43,6 +43,9 @@ INDEX = DECISIONS / "index.md"
 
 # The ratchet pin: violations in history at or before this commit are reported, not failed.
 # Pinned 21 Aug 2026 when this check landed; the nine known candidates are at or before it.
+# GIT_DIR overrides cwd. A git subprocess that inherits it from a hook reads the wrong repo.
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
 HISTORY_PIN = "1db009b"
 
 ADR_FILE = re.compile(r"^(\d{4})-.+\.md$")
@@ -120,11 +123,11 @@ def classify_edit(parent_status: str, added: list[str], removed: list[str]) -> s
     return "ok-settled-with-marker" if marker_added else "violation"
 
 
-def _git(args: list[str], *, scrubbed_env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def _git(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
         cwd=ROOT,
-        env=scrubbed_env,
+        env=GIT_ENV,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -136,14 +139,10 @@ def _git(args: list[str], *, scrubbed_env: dict[str, str]) -> subprocess.Complet
 
 def check_history() -> tuple[list[str], list[str]]:
     """(reported, failed). Post-pin silent edits of settled ADRs fail; the rest report."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    log = _git(
-        ["log", "--format=%H", "--name-only", "--", "docs/decisions/"],
-        scrubbed_env=env,
-    )
+    log = _git(["log", "--format=%H", "--name-only", "--", "docs/decisions/"])
     if log.returncode != 0:
         return [], [f"git log failed: {log.stderr.strip()[:200]}"]
-    pinned = _git(["merge-base", "--is-ancestor", HISTORY_PIN, "HEAD"], scrubbed_env=env)
+    pinned = _git(["merge-base", "--is-ancestor", HISTORY_PIN, "HEAD"])
     pin_known = pinned.returncode == 0
 
     reported: list[str] = []
@@ -162,21 +161,18 @@ def check_history() -> tuple[list[str], list[str]]:
         if not adr_paths:
             continue
         for rel in adr_paths:
-            parent = _git(["show", f"{sha}^:{rel}"], scrubbed_env=env)
-            child = _git(["show", f"{sha}:{rel}"], scrubbed_env=env)
+            parent = _git(["show", f"{sha}^:{rel}"])
+            child = _git(["show", f"{sha}:{rel}"])
             if parent.returncode != 0 or child.returncode != 0:
                 continue  # added or deleted in this commit; not an edit
-            diff = _git(
-                ["diff", "--ignore-all-space", f"{sha}^", sha, "--", rel],
-                scrubbed_env=env,
-            )
+            diff = _git(["diff", "--ignore-all-space", f"{sha}^", sha, "--", rel])
             added = [l[1:] for l in diff.stdout.splitlines() if l.startswith("+") and not l.startswith("+++")]
             removed = [l[1:] for l in diff.stdout.splitlines() if l.startswith("-") and not l.startswith("---")]
             verdict = classify_edit(_status_of(parent.stdout), added, removed)
             if verdict != "violation":
                 continue
             message = f"{sha[:9]} silently edits settled ADR {rel}"
-            ancestor = _git(["merge-base", "--is-ancestor", sha, HISTORY_PIN], scrubbed_env=env)
+            ancestor = _git(["merge-base", "--is-ancestor", sha, HISTORY_PIN])
             if pin_known and ancestor.returncode == 0:
                 reported.append(message + " (at/before pin — reported)")
             else:
