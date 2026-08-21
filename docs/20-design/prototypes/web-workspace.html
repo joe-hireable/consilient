@@ -21,7 +21,7 @@
       --fg-primary: #F0F2F5;
       --fg-secondary: #C4C9D4;
       --fg-muted: #8B93A5;
-      --fg-tertiary: #757E91;
+      --fg-tertiary: #8B93A5;
 
       /* Semantic Signals */
       --action: #E2B340;
@@ -33,10 +33,10 @@
       --fault: #E05349;
       --fault-tint: #2D1617;
 
-      /* Typography Stacks */
-      --font-display: "Syne", -apple-system, system-ui, sans-serif;
-      --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
-      --font-mono: "Space Mono", ui-monospace, SFMono-Regular, monospace;
+      /* Typography Stacks matching DESIGN.md and dashboard.py verbatim */
+      --font-display: "Syne", "Cabinet Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --font-mono: "Space Mono", "Fragment Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
     body {
@@ -140,7 +140,9 @@
       flex: 1;
     }
 
-    /* Functional Bands */
+    /* Functional Bands over Bento Grid:
+       A single row of equal-height, uniform structural telemetry cards is
+       a functional horizontal band, not a decorative bento mosaic. */
     section.band {
       display: flex;
       flex-direction: column;
@@ -155,7 +157,7 @@
       color: var(--fg-muted);
     }
 
-    /* Band 1: Integrity & Telemetry (Grid of Structural Cards) */
+    /* Band 1: Integrity & Telemetry */
     .telemetry-grid {
       display: grid;
       grid-template-columns: 1.4fr 1fr 1fr;
@@ -216,11 +218,11 @@
       background: var(--attention-tint);
     }
 
-    /* Band 2: Active Ask (Unavoidable Decision Container) */
+    /* Band 2: Active Ask (Unavoidable Decision Container per ADR-0033 §3 / ADR-0053) */
     .ask-box {
       background: var(--surface-0);
       border: 1px solid var(--border);
-      border-top: 3px solid var(--action);
+      border-top: 2px solid var(--action);
       border-radius: 8px;
       padding: 24px;
       display: flex;
@@ -247,10 +249,11 @@
       color: var(--fg-secondary);
     }
 
+    /* 4-Column Affordability Grid satisfying ADR-0033 §3 */
     .ask-body-grid {
       display: grid;
-      grid-template-columns: 1.2fr 1fr 1fr;
-      gap: 16px;
+      grid-template-columns: 1.1fr 1.1fr 1fr 1.2fr;
+      gap: 14px;
       background: var(--surface-1);
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -369,7 +372,7 @@
     }
 
     table.work-table tr:hover td {
-      background: rgba(255, 255, 255, 0.015);
+      background: var(--surface-1);
     }
 
     .task-id {
@@ -400,6 +403,12 @@
       background: var(--surface-0);
     }
 
+    @media (max-width: 1024px) {
+      .ask-body-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
     @media (max-width: 900px) {
       .telemetry-grid, .ask-body-grid {
         grid-template-columns: 1fr;
@@ -425,7 +434,7 @@
     </div>
     <div class="system-status">
       <div class="status-indicator">Trajectory Integrity: Replay Identical</div>
-      <div class="status-indicator amber">Gate A: 2/3 &middot; Gate B: 1/4</div>
+      <div class="status-indicator amber">Gate A: 0/3 &middot; Gate B: 2/4 (Doctor Report)</div>
     </div>
   </header>
 
@@ -443,10 +452,10 @@
           </div>
           <div>
             <div class="big-metric num">0.3132</div>
-            <div class="metric-sub">95% CI [0.2926, 0.3346] &middot; n = 1,931 seeded mutants</div>
+            <div class="metric-sub">95% CI [0.2926, 0.3346] &middot; n = 1,871 non-equivalent (of 1,931 seeded)</div>
           </div>
-          <div class="metric-sub mono" style="color: var(--fg-tertiary);">
-            oracle: pytest + mypy + ruff + token-linter
+          <div class="metric-sub mono" style="color: var(--fg-muted);">
+            oracle: pytest (96) + mypy + ruff
           </div>
         </div>
 
@@ -459,7 +468,7 @@
             <div class="big-metric num">3.1 <span style="font-size: 16px; font-weight: 400; color: var(--fg-muted);">slots</span></div>
             <div class="metric-sub">T_cycle (25m) &divide; T_review (8m) &middot; 2 active, 1 idle</div>
           </div>
-          <div class="metric-sub mono" style="color: var(--fg-tertiary);">
+          <div class="metric-sub mono" style="color: var(--fg-muted);">
             governs: dispatch concurrency ceiling
           </div>
         </div>
@@ -473,8 +482,8 @@
             <div class="big-metric num" style="font-size: 20px; line-height: 1.4;">108 events</div>
             <div class="metric-sub">0 quarantined &middot; zero unverified state bypasses</div>
           </div>
-          <div class="metric-sub mono" style="color: var(--fg-tertiary);">
-            storage: append-only JSONL + SQLite
+          <div class="metric-sub mono" style="color: var(--fg-muted);">
+            storage: append-only JSONL + SQLite projection
           </div>
         </div>
       </div>
@@ -492,7 +501,7 @@
           <span class="tag-chip attention">Awaiting Verdict</span>
         </div>
 
-        <!-- 3 Mandatory Affordability Fields from ADR-0033 §3 -->
+        <!-- 4 Mandatory Affordability & Context Fields from ADR-0033 §3 / DESIGN.md §4 -->
         <div class="ask-body-grid">
           <div class="ask-col">
             <span class="col-label">01 &middot; Artefact & Checks</span>
@@ -516,16 +525,23 @@
               Task waits. Zero changes merged to main. No budget consumed. Reversal path: <span class="mono">git branch -D</span>.
             </div>
           </div>
+
+          <div class="ask-col">
+            <span class="col-label">04 &middot; Cost To Resolve Without You</span>
+            <div class="col-content">
+              No automated path. Human verdict is the ground truth &beta; is measured against (ADR-0033 &sect;3).
+            </div>
+          </div>
         </div>
 
         <div class="ask-actions">
-          <button class="btn btn-secondary mono" onclick="alert('Opening local worktree in VSCode / Editor...');">
+          <button class="btn btn-secondary" onclick="alert('Opening local worktree in VSCode / Editor...');">
             Open in Editor
           </button>
-          <button class="btn btn-destructive mono" onclick="alert('Verdict REJECTED recorded to trajectory log.');">
+          <button class="btn btn-destructive" onclick="alert('Verdict REJECTED recorded to trajectory log.');">
             Reject &middot; Provide Defect Reason
           </button>
-          <button class="btn btn-primary mono" onclick="alert('Verdict ACCEPTED recorded to trajectory log.');">
+          <button class="btn btn-primary" onclick="alert('Verdict ACCEPTED recorded to trajectory log.');">
             Accept Verdict as-is
           </button>
         </div>
@@ -578,7 +594,7 @@
   <!-- System Footer -->
   <footer class="system-footer mono">
     <div>CONSILIENT PROTOCOL &middot; META-HARNESS OBSERVE-ONLY INCREMENT</div>
-    <div>LOG: <span style="color: var(--valid);">.harness/log (108 events valid)</span> &middot; ZERO ADJECTIVES &middot; STATE OVER NARRATIVE</div>
+    <div>LOG: <span style="color: var(--valid);">.harness/log (trajectory projection)</span> &middot; ZERO ADJECTIVES &middot; STATE OVER NARRATIVE</div>
   </footer>
 
 </body>

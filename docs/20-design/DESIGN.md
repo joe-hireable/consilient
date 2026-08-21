@@ -37,7 +37,7 @@
 - **Foreground Primary (Ink):** `#F0F2F5` (High-contrast pure neutral off-white; 17.2:1 contrast)
 - **Foreground Secondary (Ink 2):** `#C4C9D4` (Clear secondary readable text; 11.8:1 contrast)
 - **Foreground Muted:** `#8B93A5` (Labels, metadata, units; 6.3:1 contrast)
-- **Foreground Tertiary:** `#757E91` (Timestamps, hashes, secondary annotations; 4.8:1 contrast, passes WCAG AA)
+- **Foreground Tertiary:** `#8B93A5` (Timestamps, hashes, secondary annotations; passes WCAG AA on both Canvas and Surface 0 containers)
 
 ### Semantic Signal Colours (Used surgically; max 1 signal role per screen region)
 
@@ -118,7 +118,7 @@
   3. *Autonomous Work Registry* (active runs, ceiling derivation, artefact timestamps)
   4. *Unavoidable Asks* (zero or one active action card)
 - **Section Spacing:** 28px–32px between primary bands; 14px–16px between interior cards.
-- **Rule of Restraint:** A screen region may contain at most ONE attention colour (`#E2B340` or `#E05349`). All other elements must sit in the monochrome/slate hierarchy.
+- **Rule of Restraint:** A screen region may contain at most ONE attention colour (`#E2B340` or `#E05349`), excluding explicit human decision affordances within an active ask container. All other elements must sit in the monochrome/slate hierarchy.
 
 ## 6. Depth & Elevation
 

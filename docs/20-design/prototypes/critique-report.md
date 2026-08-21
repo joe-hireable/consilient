@@ -1,7 +1,9 @@
 # 5-Dimension Design Critique: Consilient Web Workspace & Mobile Verdict Client
 
-> Reviewer: Claude (Consilient Agent & Open Design Skill Protocol)
-> Governed by: `docs/20-design/DESIGN.md`, ADR-0060, and `.agents/skills/using-open-design/references/critique-upstream.md`
+> Status: `[asserted]` — preliminary single-family self-review under Open Design Skill Protocol.
+> Reviewer: Claude (Consilient Agent & Open Design Skill Protocol).
+> Method note: This is a single-family review. Under the Nielsen & Molich (1990) heuristic evaluation prior, individual evaluators capture ~35% of usability issues; aggregating across 3–5 independent model families (EXP-95) is required to upgrade this review to a consilience test.
+> Governed by: `docs/20-design/DESIGN.md`, ADR-0060, and `.agents/skills/using-open-design/references/critique-upstream.md`.
 > Artefacts under review:
 > 1. `docs/20-design/prototypes/web-workspace.html` (Web Telemetry & Asks Workspace)
 > 2. `docs/20-design/prototypes/mobile-verdict.html` (Hardware-Attested Verdict Client)
@@ -22,7 +24,7 @@ Both the web workspace (`web-workspace.html`) and the mobile client (`mobile-ver
 **Score: 9 / 10 (Exceptional)**
 
 **Evidence:**
-The eye navigates with zero friction. On the desktop workspace, the 3 horizontal functional bands create a deterministic reading path: (1) System Reliability & Composite β headline, (2) Active Human Asks (elevated with 3px solid Electric Ochre top border), (3) Workstream Fleet Registry. Display typography (`Syne`) handles brand headers, `Plus Jakarta Sans` handles explanatory copy, and `Space Mono` is used exclusively for tabular numbers, task IDs (`#142`), and telemetry digests.
+The eye navigates with zero friction. On the desktop workspace, the 3 horizontal functional bands create a deterministic reading path: (1) System Reliability & Composite β headline, (2) Active Human Asks (elevated with 2px solid Electric Ochre top border), (3) Workstream Fleet Registry. Display typography (`Syne` / `Cabinet Grotesk`) handles brand headers, `Plus Jakarta Sans` handles explanatory copy, and `Space Mono` handles tabular numbers, task IDs (`#142`), and telemetry digests.
 
 ---
 
@@ -31,7 +33,7 @@ The eye navigates with zero friction. On the desktop workspace, the 3 horizontal
 **Score: 8 / 10 (Strong)**
 
 **Evidence:**
-100% token lockdown verified by `.github/scripts/check_design_tokens.py` (0 undeclared hex violations). Every tabular numeral explicitly declares `font-variant-numeric: tabular-nums`. Sharp 6px–8px radius used across cards and buttons; no bubbly pill cards. Contrast ratios meet WCAG AA comfortably (Foreground Primary 17.2:1, Ochre 9.9:1, Muted Foreground 6.3:1). Minor opportunity: Mobile notch top padding could use dynamic `env(safe-area-inset-top)` for native iOS/Android embedding.
+100% token lockdown verified by `.github/scripts/check_design_tokens.py` (0 undeclared hex violations across styling and SVG presentation attributes). Tabular numerals explicitly declare `font-variant-numeric: tabular-nums` in both prototypes. Sharp 6px–8px radius used across cards and action buttons. Contrast ratios meet WCAG AA comfortably (Foreground Primary 17.2:1, Ochre 9.9:1, Muted Foreground 6.3:1). Minor opportunity: Mobile notch top padding could use dynamic `env(safe-area-inset-top)` for native edge-to-edge embedding.
 
 ---
 
@@ -40,7 +42,7 @@ The eye navigates with zero friction. On the desktop workspace, the 3 horizontal
 **Score: 9 / 10 (Exceptional)**
 
 **Evidence:**
-Implements the exact ADR-0033 §3 / ADR-0053 affordability contract: (1) Artefact pointer & checks breakdown, (2) What was tried, (3) Default consequence on expiry. On mobile (`mobile-verdict.html`), tap targets are explicitly sized at 50px height (exceeding the 48px touch minimum), specifically tailored for one-thumb hardware key attestation without cognitive overload.
+Implements the full 4-part ask layout satisfying ADR-0033 §3 affordability requirements: (1) Artefact pointer & checks breakdown, (2) What was tried, (3) Default consequence on expiry, (4) Cost to resolve without you. On mobile (`mobile-verdict.html`), tap targets are explicitly sized at 50px height (exceeding the 48px touch minimum) with a dedicated "Open diff on this device" inspection path preceding the Ed25519 hardware key signing affordance.
 
 ---
 
@@ -58,12 +60,14 @@ Emphatically breaks out of the AI-SaaS median. Zero purple/cyan gradients, zero 
 ### Keep (Working, do not break)
 - **Electric Ochre focal reservation:** Keep `#E2B340` strictly reserved for pending human decision/verdict affordances.
 - **Horizontal functional bands:** Preserve the 3-band structure (System Reliability → Unavoidable Ask → Workstream Registry) rather than collapsing into a generic bento grid.
-- **Mandatory affordability grid:** Maintain the 3-column breakdown (Artefact & Checks / What Was Tried / Default If Expired) in all ask cards.
+- **Mandatory affordability grid:** Maintain the 4-part breakdown (Artefact & Checks / What Was Tried / Default If Expired / Cost To Resolve) in all ask cards.
 
 ### Fix (P0 / P1 Improvements)
 - Add native CSS `safe-area-inset` support to `mobile-verdict.html` for edge-to-edge mobile screens.
 - Add keyboard shortcuts (e.g. `[A]` for Accept, `[R]` for Reject) in `web-workspace.html` for power-user CLI parity.
+- Bundle self-hosted WOFF2 font assets for `Syne`, `Plus Jakarta Sans`, and `Space Mono` to decouple production builds from Google Fonts CDN.
 
 ### Quick Wins (5–15 min tweaks)
 - Include subtle monospace checksum indicator next to trajectory event counter (`.harness/log#a7d005a`).
 - Add active workstream counter badge in header for rapid multi-agent fleet overview.
+- Add local storage persistence to theme switcher when light/dark toggle is exercised.

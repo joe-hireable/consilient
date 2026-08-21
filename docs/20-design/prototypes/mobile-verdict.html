@@ -19,7 +19,7 @@
       --fg-primary: #F0F2F5;
       --fg-secondary: #C4C9D4;
       --fg-muted: #8B93A5;
-      --fg-tertiary: #757E91;
+      --fg-tertiary: #8B93A5;
 
       --action: #E2B340;
       --action-tint: #2A2412;
@@ -30,9 +30,10 @@
       --fault: #E05349;
       --fault-tint: #2D1617;
 
-      --font-display: "Syne", -apple-system, system-ui, sans-serif;
-      --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
-      --font-mono: "Space Mono", ui-monospace, SFMono-Regular, monospace;
+      /* Typography Stacks matching DESIGN.md and dashboard.py verbatim */
+      --font-display: "Syne", "Cabinet Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --font-mono: "Space Mono", "Fragment Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
     body {
@@ -47,7 +48,13 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Mobile Frame Mockup */
+    /* Tabular Numeral Enforcement */
+    .mono, code, .num {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Mobile Frame Mockup (Outer 40px radius is physical hardware bezel mockup only) */
     .mobile-frame {
       width: 100%;
       max-width: 412px;
@@ -123,7 +130,7 @@
     .summary-card {
       background: var(--surface-0);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       padding: 14px 16px;
       display: flex;
       justify-content: space-between;
@@ -139,17 +146,18 @@
 
     .summary-card .value {
       font-family: var(--font-mono);
-      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+      font-size: 14px;
       font-weight: 700;
       color: var(--fg-primary);
     }
 
-    /* Active Ask Verdict Container */
+    /* Active Ask Verdict Container (8-10px radius per DESIGN.md §4) */
     .verdict-card {
       background: var(--surface-0);
       border: 1px solid var(--border);
-      border-top: 3px solid var(--action);
-      border-radius: 12px;
+      border-top: 2px solid var(--action);
+      border-radius: 10px;
       padding: 18px;
       display: flex;
       flex-direction: column;
@@ -185,7 +193,7 @@
     .meta-box {
       background: var(--surface-1);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 12px;
       display: flex;
       flex-direction: column;
@@ -216,6 +224,7 @@
 
     .meta-v {
       font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
       text-align: right;
     }
 
@@ -231,7 +240,7 @@
       padding: 4px 2px;
     }
 
-    /* Attested Touch Action Targets (Min 48px Touch Height) */
+    /* Attested Touch Action Targets (Min 48px Touch Height; 6px radius) */
     .touch-actions {
       display: flex;
       flex-direction: column;
@@ -242,7 +251,7 @@
     button.touch-btn {
       width: 100%;
       height: 50px;
-      border-radius: 8px;
+      border-radius: 6px;
       font-family: var(--font-body);
       font-size: 14px;
       font-weight: 600;
@@ -260,6 +269,12 @@
       opacity: 0.9;
     }
 
+    button.btn-inspect {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--fg-primary);
+    }
+
     button.btn-sign-accept {
       background: var(--action);
       color: var(--bg);
@@ -275,8 +290,8 @@
     .enclave-notice {
       text-align: center;
       font-family: var(--font-mono);
-      font-size: 9px;
-      color: var(--fg-tertiary);
+      font-size: 10px;
+      color: var(--fg-muted);
       margin-top: 4px;
     }
   </style>
@@ -304,8 +319,8 @@
       <!-- Quick Telemetry Summary -->
       <div class="summary-card">
         <div>
-          <div class="label">System &beta; (mutation)</div>
-          <div class="value">0.3132</div>
+          <div class="label">System &beta; (EXP-47)</div>
+          <div class="value">0.3132 <span style="font-size: 11px; font-weight: normal; color: var(--fg-muted);">[0.29, 0.33] n=1,871</span></div>
         </div>
         <div style="text-align: right;">
           <div class="label">Fleet Activity</div>
@@ -313,7 +328,7 @@
         </div>
       </div>
 
-      <!-- Single Urgent Verdict Card (Concept C3) -->
+      <!-- Single Urgent Verdict Card (Concept C3 per frontend-concepts-kimi §7) -->
       <div class="verdict-card">
         <div class="verdict-tag">
           <span class="chip-ask">Mandatory Verdict</span>
@@ -324,11 +339,11 @@
           Verify Verification Boundary Modification
         </div>
 
-        <!-- 3 Affordability Fields Encoded for Mobile Review -->
+        <!-- 4 Affordability & Context Fields (ADR-0033 §3 / DESIGN.md §4) -->
         <div class="meta-box">
           <div class="meta-row">
             <span class="meta-k">Artefact</span>
-            <span class="meta-v">src/consilient/dashboard.py (+124 -18)</span>
+            <span class="meta-v">src/consilient/dashboard.py (+124 &minus;18)</span>
           </div>
           <div class="meta-row">
             <span class="meta-k">Checks</span>
@@ -350,6 +365,10 @@
 
         <!-- Mobile Touch Action Buttons (48px+ touch targets) -->
         <div class="touch-actions">
+          <button class="touch-btn btn-inspect" onclick="alert('Opening diff inspection view on device...');">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            Open Diff on this Device
+          </button>
           <button class="touch-btn btn-sign-accept" onclick="alert('Hardware Key Enclave Signing: ACCEPTED verdict logged via Ed25519.');">
             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
             Sign &amp; Accept Verdict

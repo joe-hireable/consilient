@@ -20,6 +20,12 @@ from pathlib import Path
 
 HEX_RE = re.compile(r"#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b")
 
+# SVG/CSS presentation attributes in HTML that can carry color hexes
+STYLE_ATTRS_RE = re.compile(
+    r'(?:style|fill|stroke|stop-color|flood-color|lighting-color|color)=["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+
 # Files governed by the official DESIGN.md
 GOVERNED_FILES = [
     Path("src/consilient/dashboard.py"),
@@ -39,17 +45,21 @@ def extract_declared_hexes(design_md_path: Path) -> set[str]:
 
 
 def extract_governed_hexes(file_path: Path) -> set[str]:
-    """Extract all hex color codes used in CSS / styling of a governed code/template file."""
+    """Extract all hex color codes used in CSS / SVG / styling of a governed file."""
     if not file_path.exists():
         return set()
     text = file_path.read_text(encoding="utf-8")
-    
-    # In HTML files, inspect only <style> blocks and style="" attributes to avoid matching #142 task IDs
+
     if file_path.suffix == ".html":
+        # Extract <style> blocks
         style_blocks = re.findall(r"<style[^>]*>(.*?)</style>", text, re.DOTALL | re.IGNORECASE)
-        style_attrs = re.findall(r'style=["\'](.*?)["\']', text, re.DOTALL | re.IGNORECASE)
-        css_text = " ".join(style_blocks + style_attrs)
-        return {h.upper() for h in HEX_RE.findall(css_text)}
+        # Extract <script> blocks
+        script_blocks = re.findall(r"<script[^>]*>(.*?)</script>", text, re.DOTALL | re.IGNORECASE)
+        # Extract style and SVG presentation attributes (fill, stroke, stop-color, etc.)
+        attr_values = STYLE_ATTRS_RE.findall(text)
+
+        combined_styling = " ".join(style_blocks + script_blocks + attr_values)
+        return {h.upper() for h in HEX_RE.findall(combined_styling)}
 
     return {h.upper() for h in HEX_RE.findall(text)}
 
