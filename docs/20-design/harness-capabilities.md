@@ -277,8 +277,13 @@ structural reference". It reports Connected under Claude Code on 21 August. That
 change, and under ADR-0029 it invalidates the old row rather than being inferred from it — the
 capability must be re-probed, not upgraded by reading this sentence.
 
-**OpenDesign** was named in the instruction. No OpenDesign integration, plugin, MCP server or
-binary was found anywhere on this machine. `[measured]` negative.
+**Open Design** was named in the instruction. No Open Design integration, plugin, MCP server or
+binary was found anywhere on this machine. `[measured]` negative. A **portable skill**
+(`.agents/skills/using-open-design/`) now exists, carrying the 9-section `DESIGN.md` contract
+format and a vendored 5-dimension critique with provenance (`references/critique-upstream.md`,
+pinned to upstream blob `0e8d6cc`). The skill requires no desktop app, daemon, or runtime
+dependency. `[measured]` — the skill file is committed and readable by any harness that reads
+`.agents/skills/` or receives the portable core in a brief.
 
 ### Document drafting
 
