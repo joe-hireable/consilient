@@ -49,7 +49,16 @@ harness routes work and runs agents in parallel, and every one assumes its verif
 is sound. Define **β** = the rate at which automated checks *accept a bad artifact*.
 Executed simulation shows β determines (a) whether cheap-first routing helps or silently
 degrades quality, (b) how many agents you can run before human review saturates, and (c) how
-much of your day you spend reviewing. **Nothing on the market measures it.**
+much of your day you spend reviewing.
+
+β has been measured before, and we should say so plainly: Reflexion reported its own
+self-generated oracle's false-accept rate in 2023 (1.4% on HumanEval-PY, 16.3% on MBPP-PY);
+Wang, Pradel & Liu (ICSE 2026, arXiv:2503.15223) found **7.8%** of accepted patches fail the
+developer-written test suite (n=877, SWE-bench Verified); METR measured a **24.2pp** gap
+between maintainer judgement and the grader (n=296). **What none of them does is act on it.**
+Every one measures β, reports it, and recommends a human. **Nothing conditions its own routing,
+its parallelism or its acceptance threshold on a measured β.** That is the gap this project is
+built in.
 
 A related gap exists one level up. Self-improving agent systems — Darwin Gödel Machine, SICA,
 Huxley-Gödel, HyperAgents, Voyager, ADAS, Meta-Harness, Live-SWE-agent — accept a

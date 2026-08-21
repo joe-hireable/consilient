@@ -100,14 +100,27 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
 ### Never do
 - **Publish anything from `../hireable-3.0` or `../jobboard-v2`.** They are strictly
   private commercial repos, usable as inspiration and as measurement corpora only
-  (EXP-01 runs on their histories). Their names and *aggregate measured metrics* may
-  appear in docs; their code, file contents, excerpts and detailed file paths may
-  never be committed here or included in anything published from here. (Joe,
-  19 Aug 2026.)
+  (EXP-01 runs on their histories). Their code, file contents, excerpts, detailed file paths
+  and **commit identifiers** may never be committed here or included in anything published
+  from here.
+
+  What Joe actually said, 19 Aug 2026, was that they **"must not be published as part of this
+  repo"** — flat, with no carve-out. The narrower reading that their *names and aggregate
+  measured metrics* may appear is **the orchestrator's inference, not the principal's words**,
+  and was found signed in his name by an audit on 21 Aug 2026. It is recorded here as inference
+  because a loosening filed under the principal's signature is worse than an invented
+  tightening, and because this specific carve-out is what let 71 private commit identifiers
+  reach a results file. It stands provisionally until Joe adopts or rejects it. **Where the two
+  readings disagree, take his.**
 - Commit secrets or `.env`. `.github/workflows/secret-scan.yml` enforces this against the
   tracked tree and repository history without printing a detected credential.
-- **Put a secret into a public repository, under any circumstances.** (Joe, 20 Aug 2026.)
-  This is stronger than the line above: not merely "do not commit one", but do not place one
+- **Put a secret into a public repository, under any circumstances.** Joe's words, 20 Aug 2026,
+  were **"no secrets in public repo"**. Everything after this sentence is **the orchestrator's
+  reading of that instruction, not his words** — recorded as inference on 21 Aug 2026 after an
+  audit found the expansion signed in his name. It is almost certainly what he meant, and it is
+  kept because it is the safe direction; but it deleted a gate condition (B3), so he is owed the
+  chance to confirm or narrow it.
+  The reading: not merely "do not commit one", but do not place one
   in repository settings, Actions secrets, or anywhere the public repository can reach. A
   capability that needs a credential there is not built — **it runs locally or it does not
   run.** Gate B3 is the first thing this rule cost.
