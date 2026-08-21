@@ -67,42 +67,34 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 # Removing an entry is always permitted. Adding one means a human re-ran that test and wrote
 # down the answer.
 ALLOWLIST = {
-    "6183c59c0dbd5b519c06f17710365b66bedde9455398c7db3be6e01ed7d4ec81":
-        "exp05/backend-comparison.json:126 - an OpenCode session snapshot digest inside a "
-        "captured raw transcript tail, not a git commit at all.",
-    "a835ca7063a2cde8547e189f9f2bfffbb95f2366898a8cfc547c52b42986d9bb":
-        "exp49 results x2 and run_exp49.py - EXP-49's own pre-registration commit, orphaned "
-        "by this repository's history rewrite.",
-    "70b0ce5be10eb485e98b2e39e4cd3a1ca5d29cf701abf750366644b54ae76fae":
-        "orchestration-dependencies-2026-08-20.md:72 - public permalink into "
-        "github.com/julep-ai/julep. [cited]",
-    "f6aaacce682ae394128c72423412cb89f018ae8a8d43020750a6d6cf8b6c8687":
-        "orchestration-dependencies-2026-08-20.md:74 - public permalink into "
-        "github.com/mlflow/mlflow. [cited]",
-    "cb91183a60800eedca949eaeaa355811a46e7c0770ab054c6dc667c0f0403cc6":
-        "orchestration-dependencies-2026-08-20.md:75 - public permalink into "
-        "github.com/gptme/gptme. [cited]",
-    "f272fc7d6bfeca2f17765d37ec1489c662e95837ab3a8d1f1b7582f4589d9ed3":
-        "orchestration-dependencies-2026-08-20.md:79 - public permalink into "
-        "github.com/tavily-ai/tavily-chat. [cited]",
-    "b8bd517a78280c6e34b2f84d9548dd151686c52150504b0d1a9565724dc2f4ed":
-        "orchestration-dependencies-2026-08-20.md:80 - public permalink into "
-        "github.com/dataforgoodfr/13_odis. [cited]",
-    "615ea7a905bcb09be96187ff87d3a8ad1324400e6cc77a4cb04be3d9c5339141":
-        "orchestration-dependencies-2026-08-20.md:81 - public permalink into "
-        "github.com/coleam00/MongoDB-RAG-Agent. [cited]",
-    "7dceea271dafc608ef71740b09b1828949fe7bb1d37ea8597dc363cc03651a35":
-        "orchestration-dependencies-2026-08-20.md:85 - public permalink into "
-        "github.com/Zen7-Labs/Zen7-Payment-Agent. [cited]",
-    "b43ec99390cfed6070c28517df5719b3aa5955fd12044adf6b7c490b320c9292":
-        "orchestration-dependencies-2026-08-20.md:86 - public permalink into "
-        "github.com/heaversm/crew-llamafile. [cited]",
-    "fbeeb8070d3d6e5b76c64b724ca192bc31128dd5dab9ce69fa74d1ed3378959f":
-        "orchestration-dependencies-2026-08-20.md:87 - public permalink into "
-        "github.com/chrisammon3000/dspy-neo4j-knowledge-graph. [cited]",
-    "71335227b801d5ce6c47d50529803a2b8ed5ecefbd998d173d89fcdf734a8bc0":
-        "orchestration-dependencies-2026-08-20.md:90 - public permalink into "
-        "github.com/traceloop/opentelemetry-mcp-server. [cited]",
+    "8dd61cadb9e983d128ad8bc9d8da9a7aa51fb3142d191f74532e14124f22bcb2": ".agents/skills/using-open-design/references/critique-upstream.md - a public GitHub "
+    "permalink pinning a blob in nexu-io/open-design for provenance, the same class as the "
+    "julep-ai and mlflow permalinks below. Tested 21 Aug 2026 with a scrubbed environment "
+    "against both private corpora: resolves in neither.",
+    "6183c59c0dbd5b519c06f17710365b66bedde9455398c7db3be6e01ed7d4ec81": "exp05/backend-comparison.json:126 - an OpenCode session snapshot digest inside a "
+    "captured raw transcript tail, not a git commit at all.",
+    "a835ca7063a2cde8547e189f9f2bfffbb95f2366898a8cfc547c52b42986d9bb": "exp49 results x2 and run_exp49.py - EXP-49's own pre-registration commit, orphaned "
+    "by this repository's history rewrite.",
+    "70b0ce5be10eb485e98b2e39e4cd3a1ca5d29cf701abf750366644b54ae76fae": "orchestration-dependencies-2026-08-20.md:72 - public permalink into "
+    "github.com/julep-ai/julep. [cited]",
+    "f6aaacce682ae394128c72423412cb89f018ae8a8d43020750a6d6cf8b6c8687": "orchestration-dependencies-2026-08-20.md:74 - public permalink into "
+    "github.com/mlflow/mlflow. [cited]",
+    "cb91183a60800eedca949eaeaa355811a46e7c0770ab054c6dc667c0f0403cc6": "orchestration-dependencies-2026-08-20.md:75 - public permalink into "
+    "github.com/gptme/gptme. [cited]",
+    "f272fc7d6bfeca2f17765d37ec1489c662e95837ab3a8d1f1b7582f4589d9ed3": "orchestration-dependencies-2026-08-20.md:79 - public permalink into "
+    "github.com/tavily-ai/tavily-chat. [cited]",
+    "b8bd517a78280c6e34b2f84d9548dd151686c52150504b0d1a9565724dc2f4ed": "orchestration-dependencies-2026-08-20.md:80 - public permalink into "
+    "github.com/dataforgoodfr/13_odis. [cited]",
+    "615ea7a905bcb09be96187ff87d3a8ad1324400e6cc77a4cb04be3d9c5339141": "orchestration-dependencies-2026-08-20.md:81 - public permalink into "
+    "github.com/coleam00/MongoDB-RAG-Agent. [cited]",
+    "7dceea271dafc608ef71740b09b1828949fe7bb1d37ea8597dc363cc03651a35": "orchestration-dependencies-2026-08-20.md:85 - public permalink into "
+    "github.com/Zen7-Labs/Zen7-Payment-Agent. [cited]",
+    "b43ec99390cfed6070c28517df5719b3aa5955fd12044adf6b7c490b320c9292": "orchestration-dependencies-2026-08-20.md:86 - public permalink into "
+    "github.com/heaversm/crew-llamafile. [cited]",
+    "fbeeb8070d3d6e5b76c64b724ca192bc31128dd5dab9ce69fa74d1ed3378959f": "orchestration-dependencies-2026-08-20.md:87 - public permalink into "
+    "github.com/chrisammon3000/dspy-neo4j-knowledge-graph. [cited]",
+    "71335227b801d5ce6c47d50529803a2b8ed5ecefbd998d173d89fcdf734a8bc0": "orchestration-dependencies-2026-08-20.md:90 - public permalink into "
+    "github.com/traceloop/opentelemetry-mcp-server. [cited]",
 }
 
 
@@ -180,7 +172,9 @@ def self_test() -> None:
     # The allowlist stores digests precisely so this file cannot trip its own detector.
     for digest in ALLOWLIST:
         assert not SHA_RE.search(digest), "a stored digest must not read as a commit id"
-        assert ALLOWLIST[digest].strip(), "every allowlist entry carries a justification"
+        assert ALLOWLIST[digest].strip(), (
+            "every allowlist entry carries a justification"
+        )
 
 
 def main() -> int:

@@ -1,0 +1,4 @@
+{
+  "_": "PRODUCT ships this shape. Copy to .harness/allowed-cwds.json and list directory roots the principal has authorised for supervised dispatch. That path is gitignored and must never be committed. Empty roots means refuse every cwd outside this repository and its worktrees. This does not pass Gate B (ADR-0063). A filesystem root is refused. No credential belongs in this file.",
+  "roots": []
+}
