@@ -18,6 +18,13 @@ was the same path written bare, with no prefix to search for. That angle could n
 found it however carefully it was run. This script encodes the angle that worked: take the
 paths that actually exist in the private repositories and look for them here.
 
+CONTENT FINGERPRINTS close the remaining excerpt gap. Each UTF-8 line is normalised to
+case-folded words; lines with at least 12 words and 80 characters become whole-line
+shingles, represented only by their SHA-256 digest. To keep the local gate bounded, it
+retains the deterministic lowest 25,000 digests per corpus: at most 50,000 content needles,
+not millions. A copied multi-line passage survives a one-line edit through its neighbouring
+shingles; an edited isolated line is below this detector's guarantee.
+
 It also caught itself on first run: the docstring below originally used a real private path
 as its example of a distinctive one. That is the correct behaviour and it is left recorded
 rather than tidied away.
@@ -28,6 +35,7 @@ pre-publication gate. `--require-corpora` makes a missing corpus a failure rathe
 skip, which is what a release step should pass.
 
     python .github/scripts/check_private_corpus.py --require-corpora
+    python .github/scripts/check_private_corpus.py --self-test
 
 Exit 0 clean, 1 on any finding. Never prints the matched private path in full -- it prints
 where the leak is in THIS repository and enough of the needle to find it, because a script
@@ -56,10 +64,13 @@ corpora" rather than "those directories exist".
 from __future__ import annotations
 
 import argparse
+import hashlib
+import heapq
 import os
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 CORPORA = [
@@ -75,6 +86,13 @@ MIN_LEN = 12
 GENERIC = re.compile(
     r"^(src/index|src/main|docs?/|test/|tests/|\.github/|node_modules/|dist/)", re.I
 )
+
+# Whole-line shingles make line-number reporting exact. Bottom-hash sampling is stable across
+# file order and bounds each private corpus to tens of thousands of hash-only needles.
+MIN_CONTENT_WORDS = 12
+MIN_CONTENT_CHARS = 80
+MAX_CONTENT_NEEDLES = 25_000
+WORD_RE = re.compile(r"\w+", re.UNICODE)
 
 # Files that are allowed to discuss the corpora, because their entire purpose is to record
 # what was learned from them. They are still checked; they are simply where a finding is
@@ -156,11 +174,99 @@ def needles(paths: set[str]) -> set[str]:
     return found
 
 
+def content_digest(line: str) -> str | None:
+    """Hash one distinctive normalised line, or ignore short/generic text."""
+    words = WORD_RE.findall(unicodedata.normalize("NFKC", line).casefold())
+    normalised = " ".join(words)
+    if len(words) < MIN_CONTENT_WORDS or len(normalised) < MIN_CONTENT_CHARS:
+        return None
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+
+
+def content_needles(root: Path, paths: set[str] | list[str]) -> set[str]:
+    """Return a bounded deterministic sample of hash-only content shingles."""
+    selected: set[str] = set()
+    heap: list[tuple[int, str]] = []
+    for rel in paths:
+        path = root / rel
+        if not path.exists():
+            raise BindingError(
+                f"tracked content is missing from '{root.name}'; refusing a partial scan"
+            )
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        except OSError as error:
+            raise BindingError(
+                f"tracked content in '{root.name}' could not be read; refusing a partial scan"
+            ) from error
+        for line in lines:
+            digest = content_digest(line)
+            if digest is None or digest in selected:
+                continue
+            item = (-int(digest, 16), digest)
+            if len(heap) < MAX_CONTENT_NEEDLES:
+                heapq.heappush(heap, item)
+                selected.add(digest)
+            elif item > heap[0]:
+                _, removed = heapq.heapreplace(heap, item)
+                selected.remove(removed)
+                selected.add(digest)
+    if not selected:
+        raise BindingError(
+            f"'{root.name}' produced zero distinctive content fingerprints"
+        )
+    return selected
+
+
+def scan_content(
+    root: Path, paths: list[str], needle_hashes: set[str]
+) -> list[tuple[str, int, str]]:
+    """Find public lines matching corpus hashes without retaining or returning their text."""
+    findings: list[tuple[str, int, str]] = []
+    for rel in paths:
+        try:
+            lines = (root / rel).read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for number, line in enumerate(lines, start=1):
+            digest = content_digest(line)
+            if digest is not None and digest in needle_hashes:
+                findings.append((rel, number, digest))
+    return findings
+
+
+def self_test() -> None:
+    """The content detector must normalise harmless formatting and reject an edit."""
+    line = (
+        "A synthetic private passage contains enough deliberately unusual words to prove "
+        "that the content fingerprint recognises copied material without storing its text."
+    )
+    digest = content_digest(line)
+    assert digest is not None, "a long distinctive line must produce a fingerprint"
+    assert digest == content_digest(f"  {line.upper()}  "), (
+        "case and surrounding whitespace must be normalised"
+    )
+    assert digest != content_digest(line.replace("unusual", "specific")), (
+        "an edited line must not retain the verbatim fingerprint"
+    )
+    assert content_digest("too short") is None, "short boilerplate is not distinctive"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--require-corpora", action="store_true")
     parser.add_argument("--root", default=".")
+    parser.add_argument(
+        "--self-test", action="store_true", help="prove the detector still detects"
+    )
     args = parser.parse_args()
+
+    if args.self_test:
+        self_test()
 
     root = Path(args.root).resolve()
     # The corpus locations above are absolute paths on the principal's Windows machine, so
@@ -189,9 +295,12 @@ def main() -> int:
         return 0
 
     all_needles: set[str] = set()
+    all_content_needles: set[str] = set()
     try:
         for repo in present:
-            all_needles |= needles(corpus_paths(repo))
+            paths = corpus_paths(repo)
+            all_needles |= needles(paths)
+            all_content_needles |= content_needles(repo, paths)
         checked = tracked_files(root)
     except BindingError as error:
         print(f"FAIL {error}")
@@ -199,8 +308,12 @@ def main() -> int:
     print(
         f"checking against {len(all_needles)} distinctive paths from {len(present)} corpora"
     )
+    print(
+        f"checking against {len(all_content_needles)} hashed content shingles from "
+        f"{len(present)} corpora"
+    )
 
-    findings: list[tuple[str, int, str]] = []
+    path_findings: list[tuple[str, int, str]] = []
     for rel in checked:
         path = root / rel
         try:
@@ -210,26 +323,42 @@ def main() -> int:
         for number, line in enumerate(text.splitlines(), start=1):
             for needle in all_needles:
                 if needle in line:
-                    findings.append((rel, number, needle))
+                    path_findings.append((rel, number, needle))
 
-    if not findings:
+    content_findings = scan_content(root, checked, all_content_needles)
+
+    if not path_findings and not content_findings:
         print(
-            "private-corpus invariant passes: no corpus path appears in tracked content"
+            "private-corpus invariant passes: no corpus path or content excerpt appears "
+            "in tracked content"
         )
         return 0
 
-    print(
-        f"\nFAIL {len(findings)} private-corpus path reference(s) in tracked content:\n"
-    )
-    for rel, number, needle in sorted(findings):
-        tail = needle.rsplit("/", 1)[-1]
-        expected = "  (expected location)" if rel in EXPECTED else ""
+    if path_findings:
         print(
-            f"  {rel}:{number}  references a private path ending '.../{tail}'{expected}"
+            f"\nFAIL {len(path_findings)} private-corpus path reference(s) in tracked "
+            "content:\n"
         )
+        for rel, number, needle in sorted(path_findings):
+            tail = needle.rsplit("/", 1)[-1]
+            expected = "  (expected location)" if rel in EXPECTED else ""
+            print(
+                f"  {rel}:{number}  references a private path ending "
+                f"'.../{tail}'{expected}"
+            )
+
+    if content_findings:
+        print(
+            f"\nFAIL {len(content_findings)} private-corpus content fingerprint(s) in "
+            "tracked content:\n"
+        )
+        for rel, number, digest in sorted(content_findings):
+            print(f"  {rel}:{number}  matches private content hash {digest[:12]}")
+
     print(
-        "\nAGENTS.md: detailed file paths from the private corpora may never be committed.\n"
-        "Aggregate measured metrics and the repository names are permitted; paths are not."
+        "\nAGENTS.md: detailed paths and content excerpts from the private corpora may never "
+        "be committed.\nAggregate measured metrics and the repository names are permitted; "
+        "paths and excerpts are not."
     )
     return 1
 
