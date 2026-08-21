@@ -7,7 +7,12 @@ surface stays {record, replay, beta, doctor} until the principal settles it.
     python scripts/dispatch.py --probe
     python scripts/dispatch.py "reply with the single word pong"
     python scripts/dispatch.py "reply with the single word pong" --fan-out
-    python scripts/dispatch.py --task-file brief.md --cwd C:/path/to/repo
+    python scripts/dispatch.py --task-file brief.md --cwd <this repository, or a subdirectory>
+
+`--cwd` accepts this repository only — its root, a git worktree of the same repository,
+or a directory inside one of those. Any other path is refused, including on `--dry-run`,
+and there is no override flag: Gate B, which governs depending on this harness for work
+on another repository, is not passed.
 
 Never silently spends the exhausted pool. A harness that exits 0 having done nothing
 is recorded `silent` and is not retried on another pool.
@@ -59,6 +64,7 @@ from consilient.harness import (  # noqa: E402
     select_fanout,
     snapshot_mapping,
 )
+from consilient.recall import pack as pack_recall  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -376,10 +382,32 @@ def git_diff_bytes(cwd: Path) -> int:
     return len((completed.stdout or "").encode("utf-8"))
 
 
-def write_brief(run_dir: Path, task: str) -> Path:
+RECALL_LIMIT_CHARS = 8000
+
+
+def write_brief(
+    run_dir: Path, task: str, *, log_dir: Path | None = None
+) -> Path:
+    """Write the task, plus a verbatim recall pack so the child is not amnesiac.
+
+    Cross-harness memory is the trajectory. Until 21 August 2026 this function
+    wrote the task alone, so Cursor could not see what Codex had just done.
+    """
     path = (run_dir / "brief.md").resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(task, encoding="utf-8", newline="\n")
+    body = task if task.endswith("\n") else task + "\n"
+    if log_dir is not None:
+        try:
+            recall = pack_recall(
+                Path(log_dir), query=task[:240], limit_chars=RECALL_LIMIT_CHARS
+            )
+        except (OSError, ValueError):
+            recall = ""
+        if recall.strip() and "No events in log" not in recall:
+            body = body + "\n---\n\n" + recall
+            if not body.endswith("\n"):
+                body += "\n"
+    path.write_text(body, encoding="utf-8", newline="\n")
     return path
 
 
@@ -403,11 +431,15 @@ def build_command(
     cwd = cwd.resolve()
     brief = brief.resolve()
     bypass = list(permission_flags(harness.id, permissions))
+    instruction = (
+        f"Read the file {brief.as_posix()} and do exactly that task. "
+        "Do not wait for confirmation."
+    )
     if harness.id == "claude":
         binary = find_claude()
         if binary is None:
             return "claude is not on PATH"
-        return [binary, *bypass, "-p", task]
+        return [binary, *bypass, "-p", instruction]
     if harness.id == "grok":
         metered = metered_grok_reason()
         if metered is not None:
@@ -419,7 +451,7 @@ def build_command(
         for flag in bypass:
             if flag not in extra:
                 extra.append(flag)
-        return [binary, "-p", task, "--cwd", str(cwd), *extra]
+        return [binary, "-p", instruction, "--cwd", str(cwd), *extra]
     if harness.id == "codex":
         binary = find_codex()
         if binary is None:
@@ -429,19 +461,16 @@ def build_command(
             if flag not in extra:
                 extra.append(flag)
         # Insert extra flags before the prompt so they are not eaten as the task.
-        return [binary, "exec", "-C", str(cwd), *extra, task]
+        return [binary, "exec", "-C", str(cwd), *extra, instruction]
     if harness.id == "cursor-composer":
         chosen = model or DEFAULT_CURSOR_MODEL
-        if cursor_pool_for_model(chosen) == "cursor-other":
+        if cursor_pool_for_model(chosen) == "cursor-other" and model is None:
             return (
-                f"refusing cursor model {chosen!r}: it draws on the Cursor Other Models "
-                "pool (claude-*/gpt-*/gemini-*), which the operator asked to avoid"
+                f"refusing default cursor model {chosen!r}: it draws on the Cursor Other "
+                "Models pool (claude-*/gpt-*/gemini-*). Automatic selection avoids that "
+                "pool; pass --model explicitly if you mean to spend it."
             )
         native = cursor_native()
-        instruction = (
-            f"Read the file {brief.as_posix()} and do exactly that task. "
-            "Do not wait for confirmation."
-        )
         extra: list[str] = []
         if native is not None:
             extra = optional_flags(help_text([native]), "--force", "--trust")
@@ -495,10 +524,11 @@ def run_harness(
     model: str | None,
     run_id: str,
     permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
+    log_dir: Path | None = None,
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
-    brief = write_brief(run_dir, task)
+    brief = write_brief(run_dir, task, log_dir=log_dir)
     stdout_path = (run_dir / "stdout.txt").resolve()
     stderr_path = (run_dir / "stderr.txt").resolve()
     built = build_command(
@@ -527,7 +557,7 @@ def run_harness(
             stderr_path=str(stderr_path),
         )
     argv = built
-    env = dict(os.environ)
+    env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     code, timed_out, duration = run_process(
         argv,
@@ -663,9 +693,60 @@ def ensure_default_headroom(path: Path) -> None:
     )
 
 
+def repo_roots() -> tuple[Path, ...]:
+    """This repository's root, plus every git worktree checked out from the same repository.
+
+    `git worktree list` is the only enumeration that stays true when a worktree is added or
+    removed; a hard-coded list would drift. If git cannot answer, the answer is ROOT alone,
+    which refuses more rather than less.
+    """
+    roots = [ROOT]
+    git = which_binary("git")
+    if git is not None:
+        try:
+            completed = subprocess.run(
+                [git, "-C", str(ROOT), "worktree", "list", "--porcelain"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                env=GIT_ENV,
+            )
+            listing = completed.stdout if completed.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            listing = ""
+        for line in (listing or "").splitlines():
+            if not line.startswith("worktree "):
+                continue
+            candidate = Path(line[len("worktree ") :].strip())
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                continue
+            if resolved.is_dir():
+                roots.append(resolved)
+    return tuple(dict.fromkeys(roots))
+
+
 def resolve_cwd(value: str | None) -> Path:
-    path = Path(value) if value else Path.cwd()
-    return path.resolve()
+    """Resolve the working directory, refusing anything outside this repository.
+
+    AGENTS.md: nothing here may be pointed at another repository. That boundary had no
+    check, and a boundary without a check is not a boundary (working principle 3). There is
+    deliberately no override flag — a second path to the same state is the same hole.
+    """
+    path = (Path(value) if value else Path.cwd()).resolve()
+    roots = repo_roots()
+    for root in roots:
+        if path == root or root in path.parents:
+            return path
+    raise ValueError(
+        f"refusing to dispatch with cwd {path}: this harness runs only inside its own "
+        f"repository ({ROOT}), a git worktree of the same repository, or a directory "
+        "within one of those. Gate B — depending on this harness for work on another "
+        "repository — is not passed, and there is no flag that reopens it."
+    )
 
 
 def load_task(positional: str | None, task_file: str | None) -> str:
@@ -732,7 +813,7 @@ def dispatch_one(
 
     harness = decision.harness
     if dry_run:
-        brief = write_brief((runs_dir / run_id).resolve(), task)
+        brief = write_brief((runs_dir / run_id).resolve(), task, log_dir=log_dir)
         built = build_command(
             harness,
             task=task,
@@ -766,6 +847,7 @@ def dispatch_one(
         model=model,
         run_id=run_id,
         permissions=permissions,
+        log_dir=log_dir,
     )
     recorded = record_outcome(
         log_dir,
@@ -854,6 +936,7 @@ def dispatch_fanout(
             model=model if harness.id == "cursor-composer" else None,
             run_id=child_id,
             permissions=permissions,
+            log_dir=log_dir,
         )
         record_outcome(
             log_dir,
@@ -916,7 +999,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("task", nargs="?", help="the task to run")
     parser.add_argument("--task-file", help="read the task from this file (preferred for long briefs)")
-    parser.add_argument("--cwd", help="working directory (resolved to an absolute path)")
+    parser.add_argument(
+        "--cwd",
+        help="working directory; this repository or a worktree of it only, else refused",
+    )
     parser.add_argument(
         "--harness",
         help="run this harness; still refuses an exhausted pool without --allow-exhausted",
@@ -951,7 +1037,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    cwd = resolve_cwd(args.cwd)
+    try:
+        cwd = resolve_cwd(args.cwd)
+    except ValueError as exc:
+        # Before anything else, and before --dry-run can print a command that names
+        # another repository. A refused boundary must not leave a runnable artefact.
+        emit({"status": "refused", "reason": str(exc)}, args.json)
+        return 2
     log_dir = Path(args.log).resolve()
     runs_dir = Path(args.runs).resolve()
     headroom_path = Path(args.headroom).resolve()

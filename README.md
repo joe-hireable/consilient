@@ -17,13 +17,14 @@ convergence is a **test**, so its error rate must be measured.
 
 ## What this is
 
-An open-source **meta-harness** — an orchestrator above existing agents (Claude Code,
-Codex, opencode, Antigravity CLI, and any other the user favours) rather than a
-replacement for them, with a native execution path for open models (OpenRouter or local)
-when no delegated agent fits. It orchestrates **agentic work in general** — chats,
-projects, tasks, scheduled and background runs, parallel workflows — not coding
-specifically. The harness is identical regardless of domain: one loader supplies tools,
-skills, MCPs and connections dynamically per task. There is no "code mode".
+An open-source **Agent Command Post** (ADR-0061). Don't ask ChatGPT. Ask Consilient. It
+sends **harnesses** — Claude Code, Codex, Cursor, Grok, opencode, Antigravity CLI, or any
+other you favour — rather than replacing them, with a native path for open models
+(OpenRouter or local) when no delegated harness fits. It is for **work in general** —
+chats, projects, tasks, scheduled and background runs, parallel workflows — not coding
+specifically. The command post is identical regardless of domain: one loader supplies
+tools, skills, MCPs and connections dynamically per task. There is no "code mode". Child
+runtimes are harnesses. Consilient is not.
 
 Its distinguishing feature: it **measures whether your automated checks can be trusted**
 before routing work to cheaper models or running agents in parallel.

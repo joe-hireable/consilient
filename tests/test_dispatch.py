@@ -215,6 +215,22 @@ def test_workspace_trust_message_is_silent_even_when_exit_is_zero():
     assert "workspace trust required" in reason
 
 
+def test_trust_marker_in_a_large_transcript_is_not_silent():
+    """Codex twice wrote the artefact and was recorded silent because the marker
+    appeared in a dumped agents.md. A banner with no work is silent; a 5 kB
+    transcript is not."""
+    status, reason = classify_artefact(
+        exit_code=0,
+        stdout="Completed naming-repo.md\n",
+        stderr="workspace trust required appears inside a dump\n" + ("x" * 3000),
+        output_bytes=5000,
+        diff_bytes=0,
+        timed_out=False,
+    )
+    assert status == "ok"
+    assert "artefact" in reason
+
+
 def test_empty_exit_zero_is_silent():
     status, reason = classify_artefact(
         exit_code=0,
@@ -420,6 +436,63 @@ def test_run_process_kills_a_sleeping_child(tmp_path):
     assert code != 0 or timed_out
 
 
+@pytest.mark.parametrize("harness_id", ("claude", "grok", "codex"))
+def test_brief_is_delivered_by_reference(monkeypatch, tmp_path, harness_id):
+    script = _load_script()
+    monkeypatch.setattr(script, "find_claude", lambda: "claude")
+    monkeypatch.setattr(script, "find_grok", lambda: "grok")
+    monkeypatch.setattr(script, "find_codex", lambda: "codex")
+    monkeypatch.setattr(script, "help_text", lambda _argv: "")
+    monkeypatch.setattr(script, "metered_grok_reason", lambda: None)
+    harness = harness_by_id(harness_id)
+    assert harness is not None
+    brief = (tmp_path / "brief.md").resolve()
+    task = "INLINE_TASK_SENTINEL $(touch escaped) `also escaped`"
+
+    built = script.build_command(
+        harness,
+        task=task,
+        cwd=tmp_path,
+        brief=brief,
+        model=None,
+    )
+
+    assert isinstance(built, list)
+    command = " ".join(str(part) for part in built)
+    assert "INLINE_TASK_SENTINEL" not in command
+    assert brief.as_posix() in command
+
+
+def test_run_harness_scrubs_git_environment(monkeypatch, tmp_path):
+    script = _load_script()
+    monkeypatch.setenv("GIT_DIR", "C:/wrong/repository/.git")
+    monkeypatch.setenv("GIT_WORK_TREE", "C:/wrong/repository")
+    monkeypatch.setenv("GIT_INDEX_FILE", "C:/wrong/repository/index")
+    monkeypatch.setattr(script, "build_command", lambda *_args, **_kwargs: ["agent"])
+    captured: dict[str, str] = {}
+
+    def fake_run_process(_argv, *, env, **_kwargs):
+        captured.update(env)
+        return 0, False, 0.1
+
+    monkeypatch.setattr(script, "run_process", fake_run_process)
+    harness = harness_by_id("codex")
+    assert harness is not None
+
+    script.run_harness(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        run_dir=tmp_path / "run",
+        timeout_s=5,
+        model=None,
+        run_id="run-1",
+    )
+
+    assert not any(key.startswith("GIT_") for key in captured)
+    assert captured["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
 def test_bypass_flags_are_known_for_every_registered_harness():
     for item in HARNESSES:
         flags = permission_flags(item.id, "bypass")
@@ -454,7 +527,8 @@ def test_claude_bypass_always_skips_permissions(monkeypatch, tmp_path):
     assert "--dangerously-skip-permissions" not in prompted
 
 
-def test_cursor_other_models_are_refused_by_the_runner(tmp_path):
+def test_explicit_cursor_other_model_is_attended(tmp_path):
+    """Automatic selection avoids the Other pool; an explicit --model is the operator naming it."""
     script = _load_script()
     harness = harness_by_id("cursor-composer")
     assert harness is not None
@@ -465,8 +539,8 @@ def test_cursor_other_models_are_refused_by_the_runner(tmp_path):
         brief=tmp_path / "brief.md",
         model="gpt-5",
     )
-    assert isinstance(built, str)
-    assert "Other Models" in built
+    assert isinstance(built, list)
+    assert any("gpt-5" in str(part) for part in built)
 
 
 def test_silent_run_is_not_retried_on_another_pool(tmp_path, monkeypatch):
@@ -511,6 +585,89 @@ def test_silent_run_is_not_retried_on_another_pool(tmp_path, monkeypatch):
     events, rejected = read(tmp_path / "log" / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl")
     assert not rejected
     assert events[-1].data["status"] == "silent"
+
+
+def test_resolve_cwd_allows_this_repository_root():
+    script = _load_script()
+    assert script.resolve_cwd(str(script.ROOT)) == script.ROOT
+
+
+def test_resolve_cwd_allows_a_directory_inside_this_repository():
+    script = _load_script()
+    inside = script.ROOT / "scripts"
+    assert inside.is_dir()
+    assert script.resolve_cwd(str(inside)) == inside.resolve()
+
+
+def test_resolve_cwd_refuses_a_path_outside_this_repository(tmp_path):
+    """Gate B has a check now. AGENTS.md forbade pointing this at another repository and
+    nothing enforced it; `Path(value).resolve()` accepted every path on the machine.
+
+    The outside path is constructed under tmp_path deliberately: proving the boundary must
+    not require reading, resolving or naming a private corpus.
+    """
+    script = _load_script()
+    outside = tmp_path / "some-other-repo"
+    outside.mkdir()
+    with pytest.raises(ValueError, match="only inside its own repository"):
+        script.resolve_cwd(str(outside))
+
+
+def test_resolve_cwd_has_no_override_flag():
+    """A second path to the same state is the same hole. There is no --gate-b-approved."""
+    source = DISPATCH_PATH.read_text(encoding="utf-8")
+    assert "gate-b-approved" not in source
+    assert "--allow-foreign" not in source
+
+
+def test_dry_run_outside_this_repository_is_refused_and_prints_no_command(tmp_path, capsys):
+    script = _load_script()
+    outside = tmp_path / "some-other-repo"
+    outside.mkdir()
+    code = script.main(["--dry-run", "--json", "--cwd", str(outside), "noop"])
+    assert code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "refused"
+    assert "repository" in payload["reason"]
+    assert str(outside.resolve()) in payload["reason"]
+    assert "command" not in payload
+
+
+def test_write_brief_without_a_log_is_the_task_alone(tmp_path):
+    script = _load_script()
+    brief = script.write_brief(tmp_path / "run", "pong")
+    assert brief.read_text(encoding="utf-8") == "pong\n"
+
+
+def test_write_brief_includes_a_recall_pack_from_the_log(tmp_path):
+    from datetime import datetime, timezone
+
+    from consilient.events import SCHEMA_VERSION, append
+
+    script = _load_script()
+    log = tmp_path / "log"
+    log.mkdir()
+    ts = datetime.now(timezone.utc).isoformat()
+    append(
+        log / f"{ts[:10]}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": ts,
+            "event": "dispatch.outcome",
+            "actor": "consilient.dispatch",
+            "data": {
+                "status": "ok",
+                "harness": "grok",
+                "task": "pong",
+                "supervised": True,
+            },
+        },
+    )
+    brief = script.write_brief(tmp_path / "run", "continue the work", log_dir=log)
+    text = brief.read_text(encoding="utf-8")
+    assert text.startswith("continue the work")
+    assert "Recall pack" in text
+    assert "dispatch.outcome" in text
 
 
 def test_make_run_id_is_stable_for_the_same_inputs():

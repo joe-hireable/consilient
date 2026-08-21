@@ -12,13 +12,14 @@ the source every rule below is derived from.
 > Consilience is a **test of the truth** of the Theory in which it occurs."
 > — Whewell, 1840
 
-An open-source **meta-harness**: an orchestrator for agentic work in general — above
-existing agents (Claude Code, Codex, opencode, Antigravity CLI, or any other the user
-favours), with a native execution path for open models — organised around measuring
-**β**, the rate at which automated checks accept a bad artifact. Coding is v0 because it
-is the only domain with a cheap automated oracle, so it is where β can be measured; the
-architecture itself is domain-blind (see `docs/20-design/architecture-sketch.md`,
-"Domain posture", and Q24).
+An open-source **Agent Command Post** (ADR-0061): you do not ask a model; you ask
+Consilient, and it sends **harnesses** (Claude Code, Codex, Cursor, Grok, opencode, or any
+other the user favours), with a native execution path for open models when no delegated
+harness fits. Organised around measuring **β**, the rate at which automated checks accept
+a bad artifact. Coding is v0 because it is the only domain with a cheap automated oracle,
+so it is where β can be measured; the architecture itself is domain-blind (see
+`docs/20-design/architecture-sketch.md`, "Domain posture", and Q24). Child runtimes stay
+*harnesses*. Consilient is not one.
 
 β exists because of Whewell's third clause: convergence is a *test*, and tests have error
 rates. The multi-agent constraints exist because of his second clause: **different** class.

@@ -10,9 +10,9 @@ THE INTERFACE IS THE COMMANDS. A CHAT WINDOW THAT DISPATCHES FOR YOU IS A DETOUR
 ```
 
 Joe's words, 21 August 2026: he is orchestrating via chat and wants the interface
-to move to the harness itself. This file is that move. Use it when someone asks
-to "run consil", "dispatch", "feed the meter", or "stop talking to the agent and
-just use the tool".
+to move to Consilient itself. This file is that move. Don't ask a model. Ask the
+Agent Command Post (ADR-0061). Use it when someone asks to "run consil", "dispatch",
+"feed the meter", or "stop talking to the agent and just use the tool".
 
 ## What to type
 
@@ -28,6 +28,8 @@ python -m consilient.cli dashboard
 python scripts/dispatch.py --probe
 python scripts/dispatch.py "the task"
 python scripts/dispatch.py --permissions prompt "ask me before tools"
+python scripts/work.py open --ticket PM-1 --accountable joe-brown "the task"
+python scripts/recall.py --log .harness/log --query dispatch
 python scripts/verdict.py reject "what was wrong" --checks pass
 ```
 
@@ -48,7 +50,7 @@ Cursor and Grok have not. [measured]
 Dispatched children default to **bypass** permissions (`claude --dangerously-skip-permissions`,
 `codex --dangerously-bypass-approvals-and-sandbox`, `grok --always-approve`,
 `cursor-agent --force --trust`). Override with `--permissions prompt` or
-`.harness/permissions.json`. The meta-harness owns that flag, not the child.
+`.harness/permissions.json`. The Agent Command Post owns that flag, not the child harness.
 
 Do not open a Claude Code chat to work around a refused pool. That is the
 behaviour this skill exists to stop.

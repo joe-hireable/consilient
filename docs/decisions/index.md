@@ -1,6 +1,6 @@
 # Decision index
 
-51 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+60 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
 `python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
 catches a row missing from this table, which is the argument for generating it rather than
@@ -25,7 +25,9 @@ Read these before anything else. Everything downstream depends on them.
 | # | Decision | Status |
 |---|---|---|
 | [0003](0003-no-learned-routing-policy-in-v0.md) | No learned routing policy in v0 | ✅ |
-| [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary) | ⛔ |
+| [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary; category word retired by [0060](0060-call-consilient-a-command-post-not-a-meta-harness.md)) | ⛔ |
+| [0060](0060-call-consilient-a-command-post-not-a-meta-harness.md) | Consilient is a command post; child runtimes stay harnesses — descriptor superseded by [0061](0061-the-descriptor-is-agent-command-post.md) | ⛔ |
+| [0061](0061-the-descriptor-is-agent-command-post.md) | **The descriptor is Agent Command Post** — product Consilient; children are harnesses | ✅ |
 | [0005](0005-local-model-library-with-hardware-gating.md) | Local model library with hardware gating (superseded by 0026) | ⛔ |
 | [0006](0006-ticket-store-sqlite-plus-git-log.md) | Ticket store: SQLite for coordination, append-only JSONL in git for the record | ✅ |
 | [0007](0007-cli-only-no-review-surface.md) | CLI only, and build no review surface (the diff-review half stands; the no-visibility half superseded by 0053) | ⛔ |

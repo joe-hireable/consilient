@@ -15,6 +15,9 @@ You do not need to have read anything else. Links at the bottom are for when you
 
 ## 1. What you can do with this today
 
+Don't ask ChatGPT. Ask Consilient. It sends harnesses. Consilient is the **Agent Command
+Post** (ADR-0061); Claude Code, Cursor, Codex and Grok are the harnesses.
+
 Four commands, and not one of them stands between you and your work.
 
 | | |

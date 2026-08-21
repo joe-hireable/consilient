@@ -2908,6 +2908,18 @@ def test_gate_a2_still_passes_on_a_non_empty_identical_replay(tmp_path, capsys):
     assert "Compared 1 events" in condition["reason"]
 
 
+def without_comments(yaml_text: str) -> str:
+    """What the runner would execute, with the prose stripped out.
+
+    A workflow comment may legitimately name the thing the step must not do — that is how a
+    repair explains itself. A test that greps the comments is testing prose, and it fails on
+    the sentence that documents the fix.
+    """
+    return "\n".join(
+        line for line in yaml_text.splitlines() if not line.strip().startswith("#")
+    )
+
+
 def test_ci_replay_step_carries_a_control_that_can_fail():
     """The CI replay step must not manufacture the subject it then compares against.
 
@@ -2917,6 +2929,11 @@ def test_ci_replay_step_carries_a_control_that_can_fail():
     A fresh checkout carries no `.harness/state.db` at all; it is gitignored. Measured:
     with that sequence, deliberate out-of-band drift produced `identical: true` and the
     gate exited 0.
+
+    It then read `.harness/log`, which ADR-0057 gitignored on the same day, so on a fresh
+    checkout the first assertion aborted the step before the detector was exercised at all.
+    The subject is now a committed synthetic fixture: the step must read that, and must not
+    read a user's trajectory.
     """
     workflow = Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
     step = workflow.partition("- name: Replay invariant")[2]
@@ -2927,6 +2944,66 @@ def test_ci_replay_step_carries_a_control_that_can_fail():
     )
     assert "identical'] is False" in step or 'identical"] is False' in step, (
         "the replay step lost the drift control that proves it can fail"
+    )
+    commands = without_comments(step)
+    assert "tests/fixtures/replay-ci" in commands, (
+        "the replay step must read the committed fixture trajectory; anything gitignored is "
+        "empty on a fresh checkout and the step aborts before it proves anything"
+    )
+    assert ".harness/log" not in commands, (
+        "the replay step reads a user's trajectory again; it is gitignored (ADR-0057), so in "
+        "CI it is empty, and where it is not empty it is not CI's to read"
+    )
+
+
+def test_the_ci_replay_fixture_is_a_non_empty_trajectory(tmp_path):
+    """The fixture is the subject of the drift control. If it were empty or unreadable, the
+    step's first assertion would abort and the detector would go unexercised — which is the
+    exact failure this repair exists to remove."""
+    from consilient.cli import cmd_replay
+
+    fixture = Path("tests/fixtures/replay-ci")
+    assert fixture.is_dir(), "the committed fixture trajectory is gone"
+    result = cmd_replay(argparse.Namespace(log=str(fixture), db=str(tmp_path / "replay.db")))
+    assert result["events"] == 1
+
+
+def test_foreign_identifier_check_is_wired_into_ci_and_cannot_be_silently_unwired():
+    """A leak class with a checker and no CI step is a checker nobody runs.
+
+    `check_foreign_identifiers.py` was written on 21 August 2026 after an audit found 71
+    commit identifiers from a private commercial repository in a tracked results file, and
+    it shipped with no CI step: the tracked tree was scanned only when someone remembered.
+    """
+    workflow = Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
+    step = workflow.partition("- name: Foreign identifier invariant check")[2].partition(
+        "- name:"
+    )[0]
+
+    assert "run: python .github/scripts/check_foreign_identifiers.py" in step
+    assert Path(".github/scripts/check_foreign_identifiers.py").is_file()
+    checkout = workflow.partition("- uses: actions/checkout@v4")[2].partition("- uses:")[0]
+    assert "fetch-depth: 0" in checkout, (
+        "a shallow clone cannot tell this repository's own commits from foreign ones; "
+        "the foreign-identifier step would fail red on history it cannot see"
+    )
+
+
+def test_the_private_corpus_check_is_deliberately_not_in_ci():
+    """The declined half of the same repair, pinned so nobody "helpfully" adds it later.
+
+    `check_private_corpus.py` matches paths inside `../hireable-3.0` and `../jobboard-v2`,
+    which do not exist on a GitHub runner; its own docstring says so. Wired into CI it would
+    scan nothing and report green, which is worse than no gate — a green tick is read as
+    evidence. It runs locally, in the pre-push hook, or not at all.
+    """
+    workflow = without_comments(
+        Path(".github/workflows/invariants.yml").read_text(encoding="utf-8")
+    )
+
+    assert "check_private_corpus" not in workflow, (
+        "a check that cannot see its subject on a runner must not report green there; "
+        "check_private_corpus runs locally and in .githooks, not in GitHub Actions"
     )
 
 

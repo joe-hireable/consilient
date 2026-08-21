@@ -491,8 +491,13 @@ def classify_artefact(
     """Verify by artefact, never by exit code. Empty exit-0 is `silent`."""
     combined = f"{stdout}\n{stderr}"
     lowered = combined.casefold()
+    # A trust banner with nothing else is silent (Cursor, measured). The same
+    # banner buried in a 700 kB Codex transcript is not: twice on 21 Aug 2026
+    # Codex wrote the named artefact and was recorded silent because agents.md
+    # in the dump contained the marker. Marker wins only when there is no work.
+    trust_only = output_bytes <= 200 and diff_bytes == 0
     for marker in SILENT_MARKERS:
-        if marker in lowered:
+        if marker in lowered and trust_only:
             return (
                 "silent",
                 f"harness produced no work: {marker!r} (exit {exit_code})",
