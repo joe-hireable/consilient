@@ -2922,3 +2922,40 @@ def test_ci_replay_step_carries_a_control_that_can_fail():
     assert "identical'] is False" in step or 'identical"] is False' in step, (
         "the replay step lost the drift control that proves it can fail"
     )
+
+
+# ------------------------------------------------ V0-33, privacy of the trajectory, 21 Aug 2026
+def test_no_user_trajectory_is_tracked():
+    """A user's trajectory is their data and is never tracked, so it cannot be published.
+
+    Joe Brown, 21 August 2026: "Obviously we shouldn't be shipping anyones personal logs to
+    the public repo ... my usage of consilient should remain private just like anyone elses
+    unless they agree to share data in which case that is private and used to improve
+    consilient only."
+
+    Two days of trajectory -- `.harness/log/2026-08-19.jsonl` and `2026-08-20.jsonl` -- were
+    tracked and reached the public repository before this check existed. Only `state.db` and
+    `dispatch/` had ever been ignored. [measured] Publishing is one-way, so those two are not
+    retractable; this stops the third.
+
+    The project's own provenance -- which ADRs were accepted, what the gates measured -- is a
+    DIFFERENT artefact and may be published deliberately. What must never happen is a user's
+    log being published as a side effect of living in a tracked path. Today they are the same
+    file only because this project is its own only user; that stops being true the moment
+    anyone else runs it, and the fix belongs here rather than after it has a victim.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    tracked = subprocess.run(
+        ["git", "ls-files", ".harness/log/"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=True,
+    ).stdout.split()
+    assert tracked == [], (
+        "a user trajectory file is tracked and would be published on the next release: "
+        f"{tracked}. The trajectory is private by default; publish a curated provenance "
+        "record instead."
+    )

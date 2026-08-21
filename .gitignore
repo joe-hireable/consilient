@@ -29,6 +29,16 @@ entities.json
 
 # derived: the SQLite projection is rebuildable from the trajectory (V0-02)
 .harness/state.db
+
+# A user's trajectory is THEIR data and is private by default. Joe Brown, 21 August 2026:
+# "Obviously we shouldn't be shipping anyones personal logs to the public repo ... my usage of
+# consilient should remain private just like anyone elses unless they agree to share data in
+# which case that is private and used to improve consilient only."
+# Two days of trajectory were tracked and published before this line existed. The project's own
+# provenance (which ADRs were accepted, what the gates measured) is a DIFFERENT artefact and may
+# be published deliberately; it must never be published as a side effect of a user's log living
+# in a tracked path. Enforced by test_no_user_trajectory_is_tracked.
+.harness/log/
 .harness/state.db-wal
 .harness/state.db-shm
 # `replay` sets aside a stale projection before rebuilding; it is a local artefact,
