@@ -18,7 +18,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from consilient.local_fit import hardware_profile_from_mapping, profile_to_mapping, unknown_profile
+from consilient.local_fit import (  # noqa: E402
+    hardware_profile_from_mapping,
+    profile_to_mapping,
+    unknown_profile,
+)
 
 PROVENANCE = "scripts/hardware_probe.py"
 _SUBPROCESS_KW = {"encoding": "utf-8", "errors": "replace", "timeout": 30}

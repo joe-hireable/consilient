@@ -11,7 +11,6 @@ from consilient.local_fit import (
     FRAMEWORK_FLOOR_BYTES,
     GRAPH_ALLOWANCE_BYTES,
     LOCAL_DOWNLOAD_CHOKEPOINT,
-    VRAM_SAFETY_FACTOR,
     AcquireResult,
     HardwareProfile,
     LocalModelRequest,

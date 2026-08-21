@@ -150,7 +150,7 @@ def hardware_profile_from_mapping(data: Mapping[str, object]) -> HardwareProfile
             return None
         if value not in {"cuda", "rocm", "metal", "cpu", "unknown"}:
             return None
-        return value  # type: ignore[return-value]
+        return value
 
     def optional_bool(key: str) -> bool | None:
         value = data.get(key)
