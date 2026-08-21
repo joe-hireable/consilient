@@ -46,8 +46,15 @@ built and run.
    and the gates are not open.** Entering the stage permits the work; it does not pass the
    gates.
 
-Product code in `src/consilient/` remains observe-only *today* because nothing else has
-been built yet, not because it is forbidden.
+**The operator surface is this repository's commands, not a chat window.** `consil` observes
+(`record`, `replay`, `beta`, `usage`, `doctor`, `dashboard`). Orchestration is
+`python scripts/dispatch.py`. Open a Claude/Codex/Cursor/Grok session to *build* the
+harness; to *run* it, type those commands. The skill is
+`.agents/skills/operating-the-harness/SKILL.md`.
+
+Product code in `src/consilient/` remains observe-only *today* because routing is not a
+`consil` subcommand, not because orchestration cannot be built. Dispatch is a script
+(ADR-0058). Gate B still forbids pointing it at another repository.
 
 ## Working principles for this repo
 

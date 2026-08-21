@@ -79,6 +79,7 @@ been the right answer three times on this project.
 | `adversarial-audit` | The auditor is a different family from the author, and is asked about second paths |
 | `pre-publication-gate` | "All the checks passed" stops being an argument for publishing |
 | `dispatching-workers` | A fan-out that cannot name its different class of facts does not happen |
+| `operating-the-harness` | Orchestration is `python scripts/dispatch.py`, not a chat window |
 
 Written 21 August 2026: the five after `citing-sources`, adapted from proven public collections
 rather than invented — see each skill's *Adapted from* section for source and licence.

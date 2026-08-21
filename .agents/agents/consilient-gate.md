@@ -25,10 +25,10 @@ python .github/scripts/check_foreign_identifiers.py
 python .github/scripts/check_record_numbers.py
 ```
 
-`check_foreign_identifiers.py` and `check_record_numbers.py` both exit 1 today on known,
-accounted-for content. The invariant for the first is the ratchet test in
-`tests/test_v0_invariants.py`, which asserts the total may only fall. Never raise a ratchet to
-turn a check green.
+`check_record_numbers.py` currently exits 1 on the remaining EXP-58 heading collision (R15).
+`check_foreign_identifiers.py` passes with twelve allowlisted identifiers and a ratchet that
+may only fall. Never raise a ratchet to turn a check green. Read the finding, not the exit
+code.
 
 ## Then do the part no script does
 

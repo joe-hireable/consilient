@@ -24,8 +24,22 @@ Four commands, and not one of them stands between you and your work.
 | `consil beta` | report how often the checks were wrong |
 | `consil doctor` | report which gates are open |
 
-`[measured]` — that is the whole command set, from `consil --help`, whose own one-line description
-of itself is `Observe-only.`
+`[measured]` 21 August 2026, against this tree with `PYTHONPATH=src`: `consil --help` lists
+`record`, `replay`, `beta`, `usage`, `doctor`, `dashboard`. An interpreter-global install of
+another worktree still prints only the first four — that is the identity bug `consil` now
+refuses. Run it as `python -m consilient.cli` from this checkout, or `pip install -e .`.
+
+**To actually dispatch work**, do not open another chat. From this checkout:
+
+```
+python scripts/dispatch.py --probe
+python scripts/dispatch.py "the task"
+```
+
+`[measured]` — `--help` describes it as `Dispatch a task to a subscription harness. Not a consil
+subcommand.` `--probe` on this machine listed claude (nearly exhausted), cursor-composer (1%),
+grok (2%), and codex (unknown). The selector refuses an exhausted pool unless you pass
+`--allow-exhausted`.
 
 **It cannot route a task, pick an agent, block a change, hold a gate shut against you, or run
 anything unattended.** There is no flag that makes it do any of those. The last line `consil
