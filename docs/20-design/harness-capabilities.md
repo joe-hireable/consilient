@@ -258,6 +258,26 @@ being `[measured]`, and none of them should be argued about in the meantime.
    `reach` column. That is by design — it is the free one — but it is one third of a capability
    row and it decides nothing on its own.
 
+## On the absence of `[cited]` rows, which is itself the finding
+
+**There is not one `[cited]` row in this survey**, and that was not an oversight. A parallel
+attempt to fetch official vendor documentation for these capabilities was made and had returned
+nothing usable when this file was committed. Every capability fact above is `[measured]` from the
+machine or `[asserted]`.
+
+That is the correct ratio, and it is the argument for ADR-0054 in miniature. The `reach` column
+is **free to measure and expensive to cite**: `--help`, a config file and `mcp list` gave
+verifiable, dated, machine-specific answers in minutes, whereas a vendor page would have given a
+product-wide claim that is not true of this machine, cannot be dated to this install, and would
+have been the weakest evidence class available for the strongest-sounding sentence. **Where a
+capability can be measured locally for nothing, citing it is a downgrade.**
+
+The place a `[cited]` row would genuinely help is the one place none was needed: nothing here
+turns on a vendor's roadmap or a feature that is not installed. If a future revision needs to
+reason about a capability that is *not* on the machine, that is when a citation earns its tag —
+and it must carry a URL and a fetch date, per `../../CONTRIBUTING.md` and the citing-sources
+skill.
+
 ## Housekeeping noticed in passing, not acted on
 
 - Codex's `config.toml` has accumulated roughly 300 `[projects.…] trust_level` entries, nearly all
