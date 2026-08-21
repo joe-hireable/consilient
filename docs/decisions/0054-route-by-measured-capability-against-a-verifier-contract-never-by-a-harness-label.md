@@ -164,7 +164,16 @@ capability_row := {
 ```
 
 `composition` includes the attached servers and their versions, because of the measurement above:
-the harness name does not determine capability. `provenance` is what makes the row a measurement
+the harness name does not determine capability.
+
+**Where a capability is supplied by a tool server, the row attributes it to the server, not to the
+harness.** Browser control is the worked example: it is supplied by Playwright or chrome-devtools
+over MCP, so any harness that speaks MCP inherits it and any harness without a server lacks it,
+whatever its marketing says. Attributing to the server generalises across vendors; attributing to
+the harness produces a list that must be re-enumerated every time a product ships. Native
+capability still attaches to the harness — Claude Code's `--chrome` is the only measured instance
+here — and the row distinguishes the two, because a native tool and a server-supplied one fail in
+different ways and are invalidated by different events. `provenance` is what makes the row a measurement
 rather than an assertion, and the *Enforcement* section is entirely about keeping it honest.
 
 **`reach` and `strength` are not new.** They restate ADR-0042 and ADR-0025 in a shape a router
@@ -273,6 +282,20 @@ composition up. The row shows it.
 
 ## Evidence
 
+- `[measured]` **The founding example of this ADR was a label, and probing it took one command.**
+  Joe's instruction names Cursor as the browser and visual-analysis specialist. Probed 21 Aug 2026:
+  `cursor-agent` serves 22 tools on `composer-2.5` and 21 on `sonnet-4.5`, and **neither set
+  contains a browser, a screenshot or any computer-control tool.** Corroborated by a second and
+  different class of fact — static inspection of the bundle shows `browser_use_enabled` is a
+  scalar in a *settings* protobuf that the vendor's backend sets per account, and `browser_use` is
+  a value in a *background-agent job-kind* enum, not a local tool registration. The premise is
+  true of Cursor the IDE and false of Cursor the CLI, and **a meta-harness drives the CLI**. Had
+  this ADR shipped without the probe it would have committed, in its own founding example, exactly
+  the error it exists to prevent. `../20-design/harness-capabilities.md`.
+- `[measured]` **Capability is server-gated, so it is a property of the composition at dispatch,
+  not at install.** `browser_use_enabled` is set by Cursor's backend: same binary, same version,
+  same machine, different account or different day, different capability. This is why §4 probes at
+  dispatch and why ADR-0029's rule — change intelligence invalidates, never admits — binds here.
 - `[measured]` **Two same-class checks are strongly dependent on this repository.** EXP-47, 1,931
   mutants: mutants surviving `pytest` survived `mypy` at 87.89% against 58.50% for those `pytest`
   killed; χ² = 187.28, p < 10⁻¹⁵; ADR-0012's independent-product prior refuted. This is the
@@ -300,6 +323,20 @@ composition up. The row shows it.
   `[cited]` at abstract depth for the literature and `[asserted]` for the taxonomy, and that note
   is explicit that its sources *"may not be promoted to a `[cited]` line in an ADR until fetched
   and read"*. They have not been. This ADR therefore carries the taxonomy as `[asserted]`.
+- `[measured]` + `[cited]` **The label, the vendor's documentation and the machine give three
+  different answers about the same capability, and only a probe settles it.** Codex ships
+  `computer-use@openai-bundled` installed and **enabled** on this machine, with a bundled Windows
+  window API including screenshot capture `[measured]`; OpenAI's own documentation states Computer
+  Use has **no CLI surface** `[cited]`, and separately denies Codex CLI a browser outright —
+  *"Browser isn't available in Codex CLI or the Codex IDE extension"*. The conflict is unresolved.
+  This is §4's cold-start rule reduced to one row: the correct status is `unprobed`, and `unprobed`
+  routes to a probe rather than to whichever source is most quotable.
+  `../20-design/harness-capabilities.md`.
+- `[cited]` **A "coding harness" ships non-coding capability natively, and it is not the one the
+  instruction named.** Codex CLI has documented native image input (`--image, -i`, *"Attach one or
+  more image files to the initial prompt"*) and native image generation (`$imagegen`, `gpt-image-2`).
+  Cursor, named in the instruction as the visual specialist, has zero MCP servers configured here
+  and no official page establishing CLI browser availability either way.
 - `[cited]` **A delegated network without new exogenous signals is dominated by a single
   decision-maker with the same information.** Ao, Gao & Simchi-Levi (2026), arXiv:2603.26993.
   Why §3 exists: adding a harness that reaches no new anchor adds cost and relay loss, not
@@ -362,6 +399,12 @@ Seven, and the third and seventh are the ones that would actually cost us.
   names "design with Figma plugins or OpenDesign" as a capability to route to. It is one — as a
   *producer*, under an unverified label. It is not an evidence class, and the `anchor` column
   must not be used to smuggle one in.
+- `[cited]` **At least one vendor actively steers non-coding work away from its own CLI.**
+  OpenAI: *"If you have used Codex for non-coding work, you can stay in Codex or use ChatGPT Work
+  instead"*, and Codex CLI is documented as lacking a visual file preview and the scheduled-task
+  interface. A product-positioning preference is not a capability measurement, but it is honest to
+  record that the label and the vendor point the same way here while the machine points the other
+  way — and a vendor sometimes knows its own product is weak at something.
 - `[asserted]` **The `random-admitted` result is the one to fear.** If EXP-91's floor arm lands
   inside both other arms' intervals, routing is not the lever at this scale and neither labels
   nor measurements matter; the finding would belong to ADR-0003 and ADR-0009, and this ADR would
@@ -458,6 +501,12 @@ from a manifest.
   the subject widened from model to composition. `ruff check .` already runs repository-wide in
   CI, and the single-construction rule is an AST check of the same kind as
   `.github/scripts/check_rename_safety.py`, which already exists and already fails CI. [measured]
+
+**The rule the checks encode, stated plainly because it is the portable part:** *a capability
+claim that was never probed is `[asserted]`, however confident the vendor's documentation sounds
+— and the probe must read the **served** surface, not the binary, not the documentation, and not
+the model's opinion of itself.* All three of those alternatives were tried during this ADR's
+survey and all three gave a wrong or unresolvable answer; the served surface took one command.
 
 - **Where the test lives:** `tests/test_v0_invariants.py`, the established pattern — that file
   already contains meta-tests asserting the CI configuration itself and the no-bypass rule — plus
