@@ -95,6 +95,35 @@ and the pretraining median is the mechanism.
 An artefact that uses a banned element must carry a comment stating why the
 context makes it appropriate. Silence is not consent; it is the median.
 
+## The brand direction — outlier, not median
+
+ADR-0060 records the brand thesis. The short version:
+
+In the age of AI agents making everything look "great" but identical,
+**distinction is the scarce resource, not quality.** The pretraining median is
+the visible floor, and the floor is crowded. Consilient's brand is pushing the
+boundaries of what the best looks like — not relying on pretraining to produce
+the "current right thing" but questioning the idiom itself.
+
+Five constraints on any `DESIGN.md` authored for this project:
+
+1. **Anti-Median Rule.** The result must not be producible by a zero-shot
+   frontier prompt. If asking Claude or GPT "design me an AI product" would
+   get you there, it is echo.
+2. **Outlier Principle.** Distinction is the goal, not polish. Polish is table
+   stakes.
+3. **Honesty Principle.** The design reflects the architecture: autonomous,
+   quiet, evidence-over-narrative. No reassuring fictions.
+4. **Minimalism Constraint.** Less, not more. Overwhelm is the failure mode.
+   Distinction comes from what is *absent* and what *remains*, not from
+   spectacle.
+5. **Ridiculous Test.** If the result looks contrarian rather than considered,
+   it has failed. Anti-median is a direction, not a licence to ignore craft.
+
+These are `[asserted]` — brand direction from the principal, not measured. The
+critique's Functionality and Hierarchy dimensions are the checks against
+novelty-for-its-own-sake.
+
 ## Why critique is a different class of facts
 
 Under `CONSILIENCE.md` clause 2, structures that touch the world are
@@ -170,6 +199,10 @@ the brief:
 > invent hex values outside the palette. Refuse the AI-SaaS cluster by default:
 > Instrument Serif, IBM Plex, Inter/Geist paired with serif, cyan–violet
 > gradient, chat-column layout, bento KPIs, thinking theatre, confidence rings.
+> Brand constraints: the result must not be producible by a zero-shot frontier
+> prompt (anti-median rule); distinction over polish; design reflects the
+> architecture (autonomous, quiet, honest); minimalism — less, not more;
+> anti-median is not anti-usable.
 > After generating, score the artefact on 5 dimensions (Philosophy consistency,
 > Visual hierarchy, Detail execution, Functionality, Innovation) each 0–10 with
 > cited evidence. Produce Keep / Fix / Quick-wins lists.
