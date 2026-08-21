@@ -2738,7 +2738,7 @@ documentation is the barrier the ADR claims it is.
 
 | Arm | Material given |
 |---|---|
-| A | the proposed one-page guide (five concepts) and `consil --help` |
+| A | the one-page guide at `../20-design/minimum-user-guide-draft-2026-08-21.md` (five concepts) and `consil --help` |
 | B | the current `README.md`, `AGENTS.md` and `CONSILIENCE.md` |
 | C | `consil --help` alone — the floor |
 
