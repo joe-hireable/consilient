@@ -2638,7 +2638,7 @@ resource access, or v2's eventual stable surface.
 ## Capability routing — registered 21 Aug 2026 (ADR-0054)
 
 **ID block EXP-90 … EXP-93, and why it skips.** At 02:15 on 21 Aug 2026 the highest number
-anywhere under `docs/` was EXP-64, and **nine concurrent worktrees were sitting on that same
+anywhere under `docs/` was EXP-64, and **ten concurrent worktrees were sitting on that same
 maximum** — `consilient-w-capability`, `-loops-impl`, `-loops-theory`, `-observability`,
 `-personas`, `-qa`, `-skills`, `-usage`, plus `consilient-clone-math2` and
 `consilient-clone-strict`. [measured] The register's own allocation rule — take the highest,
