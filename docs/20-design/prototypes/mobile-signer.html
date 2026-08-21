@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consilient Mobile Signer &middot; Concept C3 Clear-Signing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0C0E12;
+      --surface-0: #14171E;
+      --surface-1: #1C202A;
+      --border: #2A2F3D;
+      --fg-primary: #F0F2F5;
+      --fg-secondary: #C4C9D4;
+      --fg-muted: #8B93A5;
+      --fg-tertiary: #8B93A5;
+
+      --action: #E2B340;
+      --action-tint: #2A2412;
+      --valid: #2E9E66;
+      --valid-tint: #11261C;
+      --attention: #DDA136;
+      --attention-tint: #2B2012;
+      --fault: #E05349;
+      --fault-tint: #2D1617;
+
+      --font-display: "Syne", "Cabinet Grotesk", ui-sans-serif, system-ui, sans-serif;
+      --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+      --font-mono: "Space Mono", "Fragment Mono", ui-monospace, SFMono-Regular, monospace;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg-primary);
+      font-family: var(--font-body);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 12px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono, code, .num {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Mobile Frame Mockup (Outer 40px radius is physical hardware mockup container) */
+    .mobile-frame {
+      width: 100%;
+      max-width: 412px;
+      min-height: 840px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 8px var(--surface-1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Notch */
+    .notch {
+      padding: 14px 24px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-muted);
+      border-bottom: 1px solid rgba(42, 47, 61, 0.4);
+    }
+
+    .enclave-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--valid);
+      font-size: 10px;
+    }
+
+    .enclave-badge::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--valid);
+    }
+
+    .content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .head h1 {
+      font-family: var(--font-display);
+      font-size: 19px;
+      font-weight: 700;
+    }
+
+    .verdict-card {
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--action);
+      border-radius: 10px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .meta-box {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--fg-secondary);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(42, 47, 61, 0.5);
+      padding-bottom: 6px;
+    }
+
+    .meta-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .meta-k {
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    /* WYSIWYS Clear-Signing Diff Inspection Box */
+    .diff-inspect-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .diff-line.add { color: var(--valid); }
+    .diff-line.del { color: var(--fault); }
+
+    .touch-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    button.touch-btn {
+      width: 100%;
+      height: 50px;
+      border-radius: 6px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.05s, opacity 0.15s;
+    }
+
+    button.touch-btn:active { transform: scale(0.98); opacity: 0.9; }
+    button.btn-sign-accept { background: var(--action); color: var(--bg); font-weight: 700; }
+    button.btn-sign-reject { background: transparent; border: 1px solid var(--fault); color: var(--fault); }
+
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--action);
+      background: var(--action-tint);
+      color: var(--action);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-frame">
+    <div class="notch">
+      <span>19:42</span>
+      <div class="enclave-badge">Hardware Key Enrolled</div>
+      <span>5G</span>
+    </div>
+
+    <div class="content">
+      <div class="head">
+        <h1>CONSILIENT MOBILE</h1>
+        <span class="mono" style="font-size: 11px; color: var(--fg-muted);">rev a539081</span>
+      </div>
+
+      <div class="verdict-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="tag">CLEAR-SIGNING VERDICT</span>
+          <span class="mono" style="font-size: 11px; color: var(--fg-muted);">Task #143</span>
+        </div>
+
+        <div style="font-family: var(--font-display); font-size: 17px; font-weight: 600;">
+          Verify Verification Boundary Modification
+        </div>
+
+        <!-- 4-Part Affordability Contract (ADR-0033 §3) -->
+        <div class="meta-box">
+          <div class="meta-row">
+            <span class="meta-k">01 &middot; Artefact</span>
+            <span class="mono" style="font-size: 11px;">src/consilient/dashboard.py (+184 &minus;22)</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-k">Checks</span>
+            <span class="mono" style="color: var(--valid);">pytest &middot; token-linter PASS</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-k">02 &middot; Tried</span>
+            <span class="mono" style="font-size: 11px;">100% token lockdown verified</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-k">03 &middot; On Expiry</span>
+            <span class="mono" style="color: var(--attention);">Hold branch; &pound;0 spend</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-k">04 &middot; Cost To Resolve</span>
+            <span style="font-size: 11px;">Ground truth requires human signature</span>
+          </div>
+        </div>
+
+        <!-- Clear Signing / WYSIWYS Inline Diff Inspection (Anti-Blind-Signing) -->
+        <div style="font-size: 10.5px; font-family: var(--font-mono); color: var(--fg-muted); text-transform: uppercase;">
+          WYSIWYS Diff Inspection (ERC-7730 Pattern)
+        </div>
+        <div class="diff-inspect-box">
+          <div class="diff-line del">&minus; --ground: #faf9f7; --surface: #fff;</div>
+          <div class="diff-line add">+ --ground: #0C0E12; --surface: #14171E;</div>
+          <div class="diff-line add">+ --accent: #E2B340; --pass: #2E9E66;</div>
+          <div class="diff-line">&nbsp;&nbsp;body { font-family: var(--sans); }</div>
+        </div>
+
+        <div style="font-size: 11px; color: var(--fg-muted); line-height: 1.4;">
+          Affordability latency floor: approvals submitted faster than inspection time are logged as unread (ADR-0033 &sect;4).
+        </div>
+
+        <div class="touch-actions">
+          <button class="touch-btn btn-sign-accept" onclick="alert('Hardware Enclave Key: Signed ACCEPTED.');">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+            Sign &amp; Accept Verdict
+          </button>
+          <button class="touch-btn btn-sign-reject" onclick="alert('Hardware Enclave Key: Signed REJECTED.');">
+            Sign &amp; Reject
+          </button>
+        </div>
+
+        <div class="mono" style="text-align: center; font-size: 9px; color: var(--fg-muted);">
+          ED25519 SECURE ENCLAVE SIGNATURE ATTACHED
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
