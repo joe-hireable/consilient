@@ -1,11 +1,23 @@
-# Requirements — derived from the principal's own words
+# Requirements — audit-extracted, attribution not attested
 
-> **Source of truth: what Joe Brown typed.** Every requirement below carries his verbatim
-> quote. Nothing here is inferred from a document, a commit message or an orchestrator's
-> summary. That constraint exists because on 21 August 2026 an audit found two rules filed
-> under his signature that he never wrote — one of them a loosening that let 71 private
-> commit identifiers reach a results file. **A requirement without his words is not a
-> requirement.**
+> **Provenance warning, 21 August 2026. Read this before citing anything below.**
+>
+> These requirements were extracted by an automated audit of the principal's messages.
+> **At least one quote was fabricated.** Shown R11 — *"Do not let any arm run unbounded.
+> Hard turn and token caps."* — he stated plainly that those are not his words. Its
+> attribution is withdrawn below, and two further quotes could not be located in his
+> transcripts at all.
+>
+> **The remaining quotes have NOT been independently re-verified.** Two mechanical
+> attempts failed: the transcripts interleave his typed messages with tool results,
+> injected file contents and assistant replies, so a naive search matches this document
+> quoting itself. The first attempt reported 33 of 36 verified and was wrong. Treat every
+> quote here as **audit-extracted, not attested**.
+>
+> **An obligation can be right while its attribution is wrong.** Where that holds the
+> requirement is kept on engineering merit and says so — but it carries no claim on the
+> principal's authority. Invariant V0-18 means only he can supply that, and a requirement
+> he did not write must never be quoted back to him as though he had.
 
 **Generated** from a 72-hour audit of his messages, 18–21 August 2026, assessed against the
 code as built. Regenerate with `python scripts/build_requirements.py`; verify with
@@ -49,7 +61,7 @@ These unblock other work, so they come first. **19 of 36.**
 
 ### R11 — PARTIAL
 
-> Do not let any arm run unbounded. Hard turn and token caps.
+> [ATTRIBUTION WITHDRAWN] Do not let any arm run unbounded. Hard turn and token caps.
 
 **Obligation.** Every dispatched run carries an enforced turn cap and token cap; unbounded runs are prohibited.
 
@@ -231,7 +243,7 @@ THE ONE MECHANICAL PART T
 
 ### R18 — PARTIAL
 
-> NEVER a training target: "was this helpful?" style approval signals.
+> [ATTRIBUTION WITHDRAWN] NEVER a training target: "was this helpful?" style approval signals.
 
 **Obligation.** Stated-approval signals are prohibited as a training or optimisation target anywhere in the system.
 
@@ -410,7 +422,7 @@ effort: medium
 
 ### R24 — PARTIAL
 
-> ADR-0024 requires no telemetry by default, so a central "model registry" that phones home is out. Design it local-first.
+> [ATTRIBUTION WITHDRAWN] ADR-0024 requires no telemetry by default, so a central "model registry" that phones home is out. Design it local-first.
 
 **Obligation.** Model discovery and capability probing run locally on demand with no default telemetry and no phone-home registry.
 

@@ -9,7 +9,8 @@
   "gap": "Everything on the positive half. There is no loader object, no per-task capability selection record, and no injection of a selected tool/MCP/skill/plugin/connection set into any child invocation — build_command (scripts/dispatch.py:443) passes none and would need a per-vendor injection leg for each of claude/grok/codex/cursor, whose flags already diverge there. No fail-closed validator gates what a task may load (exp27's validate_capability_record covers CLI flags, not capabilities, and is unwired). The negative half (\"no domain-keyed modes\") is currently true only by absence: nothing keys behaviour on domain, but no test would fail if a code-mode/document-mode branch were added to scripts/d",
   "evidence": "[measured] No implementation in the run path. scripts/dispatch.py:443-544 build_command() is the sole child-invocation site; for all four harnesses it emits argv = binary + permission/model flags + \"Read the file <brief> and do exactly that task\" — zero tool/MCP/skill/plugin/connection selection; ch",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R28",
@@ -21,7 +22,8 @@
   "gap": "Everything. Missing: (1) hardware autodetection — GPU/VRAM, system RAM, free disk, backend (CUDA/ROCm/Metal/CPU), unified-vs-discrete — nothing in src/ or scripts/ reads machine spec; (2) a fit decision per docs/10-research/local-model-fit-arithmetic.md (W + KV + G + F <= 0.9 * VRAM_total), whether built or wrapped via the llmfit candidate ADR-0026 defers to a separate dependency-approval decision; (3) any model-download or local-execution path at all, so there is no byte-transfer boundary at which to refuse — ADR-0005 §Enforcement requires the refusal be at the engine boundary, \"a UI-only gate is not a gate\"; (4) fail-closed on *unknown* as well as infeasible, which docs/40-spec/v0-draft.md",
   "evidence": "[measured] Attribution confirmed: .harness/dispatch/joe-messages.txt:73 carries the quote verbatim. No implementation: `grep -rn \"nvidia-smi\" src/ scripts/ tests/ packages/` exits 1 (no matches); `grep -rni \"vram|hardware|gguf|ollama\" src/ scripts/ tests/ packages/` yields one hit only, src/consilie",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R30",
@@ -33,7 +35,8 @@
   "gap": "Everything except the prose. Three things are missing and each is load-bearing. (1) There is no autonomous-decision event kind — src/consilient/events.py declares six kinds and none of them represents \"the harness decided X\", so there is no record for a reversal path to live on. (2) There is consequently no required `reversal` field and no schema test rejecting a decision that lacks one (V0-22); the sole decision-shaped event, `spend.reserved`, is actively pinned by tests/test_budget.py:229-236 to a five-key dict that excludes it, so the current test suite would reject the fix. (3) There is no ask surface at all, so the second half of the obligation — \"deferring a reversible decision to the ",
   "evidence": "[measured] `grep -rn \"reversal\" src packages scripts` returns 0 matches; the word occurs in no shipped code. [measured] `grep -rn \"V0-22\\|V0-23\\|V0-24\" src tests packages scripts` returns 0 matches — these are the three spec invariants that encode R30 (docs/40-spec/v0-draft.md:425 V0-24, and the V0-",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R19",
@@ -45,7 +48,8 @@
   "gap": "All three limbs of the obligation are missing; only the negative prohibition is enforced, and only on an event no user can produce.\n\n1. **Separately obtained** — absent. There is no training-consent path to separate *from*: `CONSENT_PURPOSES` holds one value, and `commercial-training` is refused outright. Nor is there a product-improvement consent *flow* — only a schema check on an event a human would have to hand-write into the JSONL. Neither purpose can be granted through any product surface, so nothing is \"obtained\" at all.\n2. **Visibly separate in the UI** — absent. No consent UI of any kind: no CLI subcommand (surface pinned at `tests/test_v0_invariants.py:1011`), nothing in `dashboard.",
   "evidence": "[measured] The only implementation is schema validation on a hand-written event. `src/consilient/events.py:77-80` defines `CONSENT_GRANTED`/`CONSENT_WITHDRAWN`/`CONSENT_KINDS` and pins `CONSENT_PURPOSES = frozenset({\"improve-consilient\"})`. `_check_consent_contract` (`events.py:486-513`) refuses any",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R08",
@@ -57,19 +61,21 @@
   "gap": "Three distinct gaps. (1) The mirror does not exist right now: .claude/skills is a plain 17-byte file in HEAD, on main, and on disk, so it resolves to nothing and Claude Code loads no project skill — the requirement's whole operational point fails, and the repo's own docs still describe the pre-c725874 state. (2) The \"otherwise copy\" half of the instruction was never built: there is no copy path, no bootstrap/repair script, and no content-equality drift check — skills-mirror.yml only compares the symlink target string, so a byte-identical copy (the sanctioned Windows fallback) would be rejected by CI rather than validated. Closing (1) by restoring the symlink leaves every non-developer-mode W",
   "evidence": "SOURCE OF TRUTH EXISTS [measured]: .agents/skills/ holds 8 skills + README.md (find .agents/skills -maxdepth 2). CI CHECK EXISTS AND CAN FAIL [measured]: .github/workflows/skills-mirror.yml:23-28 asserts `test -L .claude/skills`, `test -f .claude/skills/README.md`, `readlink` == ../.agents/skills, a",
   "effort": "small",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R11",
   "area": "budget",
   "repeated": false,
-  "quote": "Do not let any arm run unbounded. Hard turn and token caps.",
+  "quote": "[ATTRIBUTION WITHDRAWN] Do not let any arm run unbounded. Hard turn and token caps.",
   "requirement": "Every dispatched run carries an enforced turn cap and token cap; unbounded runs are prohibited.",
   "status": "partial",
   "gap": "Neither cap Joe named exists. (1) Turn cap: build_command (scripts/dispatch.py:443-543) passes no turn limit to claude, grok, codex or cursor-composer, so an arm may take unlimited turns inside its 600s window; the existing optional_flags(help_text(...)) probe already used at :471, :482 and :496 is the mechanism a cap would ride on, and nothing uses it for this. (2) Token cap: no token counter and no token ceiling exists at all — dispatch does not even request structured output from claude or codex (only cursor-composer gets --output-format, and it is `text`, :512-513), so no token figure is available to cap against. (3) Defaults are unbounded where machinery does exist: loop.max_ticks defau",
   "evidence": "[measured] ENFORCED: an unconditional wall-clock deadline on every dispatched arm — scripts/dispatch.py:92 (DEFAULT_TIMEOUT_S=600), :1276 (--timeout), plumbed to the single-run path :1371 and the fan-out path :1394, killed by tree at :361-368 (process.wait -> kill_process_tree). Test that can fail: ",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "DISPUTED 21 Aug 2026: the principal states these are not his words. The obligation is retained on engineering merit (see ADR trail / dispatch.py), NOT on his authority."
  },
  {
   "id": "R07",
@@ -81,7 +87,8 @@
   "gap": "The declaration is opt-in, so the \"or it does not ship\" half of the rule does not exist. Three things are missing. (1) No admission check that a multi-agent structure carries `contributors` at all: `events.py:398` returns early when the field is absent, so any structure can escape V0-26 by staying silent — proven by validate() accepting a three-agent `fleet.dispatched` with no contributors and a `dispatch.fanout` naming `grok` twice. Fix: name the multi-agent event kinds (`dispatch.fanout`, `fleet.*`, any future merge kind) and require a `contributors` list of length ≥ 2 on them, converting the opt-in invariant into a closed one. (2) No configuration-load check on agent role definitions, whi",
   "evidence": "IMPLEMENTED: `src/consilient/events.py:385-427` `_check_evidence_class` (V0-26) refuses a multi-contributor event whose contributors carry duplicate, missing, empty or case/whitespace-variant `evidence_class`; called from `validate()` at `events.py:175`. Non-vacuous tests at `tests/test_v0_invariant",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R13",
@@ -93,7 +100,8 @@
   "gap": "The search-and-licence record exists as prose; nothing makes it binding, and no curated component is actually supplied.\n\nMissing, precisely:\n1. A machine-readable component record. `capability-layer.md:37-45` is a markdown table only — no field a test can read. Needs name, source URL, SPDX licence, verification date per component, covering non-Python components (MCP servers, shelled-out binaries), which the two existing stdlib tests cannot see at all.\n2. The check ADR-0065:135-136 owes itself: an entry with a missing licence, or one on a denylist (BUSL, SSPL, AGPL, proprietary/source-available), fails CI. Also owed is the sibling tier-1 third-party-import ban at :131-134, likewise \"Not yet w",
   "evidence": "DOCUMENTATION HALF — MET, and unusually well. [measured] `docs/20-design/capability-layer.md:37-45` is a per-component supply table with a dated licence column (\"Licence (verified 19 Aug 2026)\"): Playwright MCP Apache-2.0 (:39), MCP reference servers `src/fetch`/`src/filesystem`/`src/git`, Brave/Exa",
   "effort": "small",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R15",
@@ -105,7 +113,8 @@
   "gap": "The entire native execution path is missing. Concretely, none of the following exists anywhere in src/ or scripts/: (1) an HTTP transport to https://openrouter.ai/api/v1/chat/completions or to a local endpoint (Ollama at localhost:11434, llama.cpp, vLLM); (2) an OpenRouter provider adapter or a local provider adapter, plus the model catalogue read that would let one be selected; (3) credential acquisition and injection for OPENROUTER_API_KEY -- the friction log (docs/00-context/friction-log.md:114) already calls for a broker holding it, and today src/ may not even read os.environ (FORBIDDEN_CALLS at tests/test_budget.py:39-49 blocks os.getenv/os.environ.get); (4) a native agent loop -- tool-",
   "evidence": "PATH A (delegation) MET: src/consilient/harness.py:103-113 registers claude/cursor-composer/grok/codex; scripts/dispatch.py:443-541 builds real argv per harness (claude -p, codex exec -C, grok -p --cwd, cursor-agent -p --model); dispatch.py:328-372 executes it. Own-credential delegation is ENFORCED,",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R12",
@@ -117,7 +126,8 @@
   "gap": "Three of the six modes have no implementation and one has no enforcement. (1) Chat: no session continuity — dispatch builds a fresh one-shot `-p` invocation per run, so a multi-turn interactive mode needs a per-harness resume/session mechanism (each vendor CLI differs) plus a session id on the trajectory record. (2) Project: no durable cross-session context object; recall.py's trajectory pack is the only thing spanning sessions, and it is not keyed to anything. (3) Scheduled: ADR-0051's own schedule invariants are unimplemented — no schedule registry, no mandatory `expires_at`, no per-schedule budget principal wired into budget.py's ceilings, no disarm-and-escalate-once on exhaustion. A cron",
   "evidence": "DOCS HALF — MET. docs/20-design/work-modes.md:13-20 tables all six modes (Chat, Project, Task, Scheduled cron/one-off, Background, Parallel background workflows) with the review-ceiling arithmetic; README.md:23-26 (\"work in general — chats, projects, tasks, scheduled and background runs, parallel wo",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R10",
@@ -129,19 +139,21 @@
   "gap": "The format, the single writer, and replay are done to a high standard. What is missing is *completeness* — the half of R10 that says unlogged work does not count. Concretely: (1) no start-of-run event in committed code, so a dispatch killed between launch and return leaves no trace — measured twice in today's log; (2) no check anywhere reconciles `.harness/dispatch/` run directories against run_ids in the trajectory, so the 18-of-36 gap is invisible to every command the repo ships (`doctor`, `replay`, `dashboard`); (3) `coordination.py`, which contains the pre-run claim event, is untracked and unexercised on the real record; (4) the bypass ratchet — the only check enforcing \"append() is the ",
   "evidence": "BRIEF CORRECTION FIRST: the verbatim sentence quoted as Joe's words traces in this repository only to `docs/10-research/experiment-register.md:404-405`, inside the EXP-16 *protocol* (\"Every event logged to the append-only trajectory JSONL (ADR-0006 format); a meeting absent from the log does not cou",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R24",
   "area": "privacy",
   "repeated": false,
-  "quote": "ADR-0024 requires no telemetry by default, so a central \"model registry\" that phones home is out. Design it local-first.",
+  "quote": "[ATTRIBUTION WITHDRAWN] ADR-0024 requires no telemetry by default, so a central \"model registry\" that phones home is out. Design it local-first.",
   "requirement": "Model discovery and capability probing run locally on demand with no default telemetry and no phone-home registry.",
   "status": "partial",
   "gap": "Two of the three clauses fail.\n\n1. \"Model discovery … runs locally on demand\" — there is no discovery call at all. `harness.py:177-201` is a hand-transcribed snapshot of one `cursor-agent --list-models` run; it goes stale silently and nothing detects that. Needed: a local on-demand enumeration (the same `_run_probe` subprocess pattern already in dispatch.py) replacing or refreshing the literal, plus a test that fails when the registry and the machine disagree.\n\n2. \"capability probing\" — ADR-0025's Δ̂/φ̂ paired probe exists only as a seeded Monte Carlo simulation in the research tree, imported by nothing. Nothing in the run path estimates a candidate model's capability gap, so ADR-0054's `str",
   "evidence": "PRIVACY CLAUSE MET AND ENFORCED. [measured] `tests/test_budget.py:807` `test_product_tree_has_no_outbound_or_credential_capability` AST-walks every `src/consilient/**/*.py` against `FORBIDDEN_IMPORT_ROOTS` (test_budget.py:20-38: `http`, `httpx`, `requests`, `socket`, `urllib`, `urllib3`, `openrouter",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "UNVERIFIABLE: no matching message found in his transcripts."
  },
  {
   "id": "R27",
@@ -153,7 +165,8 @@
   "gap": "Three things are missing. (1) No routing decision anywhere consults an OpenRouter spend budget: there is no metered route in the registry, and `check_budget` never reaches the selector — the requirement's second clause (\"or specified budgets within OpenRouter\") has no implementation, only a loop-stop. (2) The subscription headroom the router acts on is never checked for freshness: a snapshot from any date routes silently, and on a fresh checkout it is the hard-coded 21 August figures, so `select()` will keep declaring claude-weekly exhausted and cursor-models 1% used indefinitely. Routing on an unbounded-age number is the same failure class `budget.py` already refuses with `_STATE_MAX_AGE`. ",
   "evidence": "SUBSCRIPTION HALF — WIRED AND ENFORCED [measured]. `src/consilient/harness.py:439` `select()` and `:238` `select_model()` rank candidates by remaining pool headroom, hard-refuse exhausted pools (`_is_exhausted`, `:373`, threshold `EXHAUSTED_USED_PERCENT = 90.0` at `:25`) and refuse unknown headroom ",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R34",
@@ -165,7 +178,8 @@
   "gap": "Three of the five named components have no implementation. (1) Synthetic users: ADR-0055 specifies the run-spec object and the finding object in prose only; no dataclass, no runner, no findings store, and no code path enforcing clause 3 (an unmeasured verifier's pass may not accept) — the guard every future verifier is supposed to inherit. (2) Sandboxes: none exist; dispatch defaults to bypassing the child harness's sandbox (harness.py:39,42), so a driven QA run today would execute unconfined. (3) First-class harness capability: QA has no surface — no `consil` subcommand, no module in src/consilient/, and dispatch drives no QA run; every instrument is an out-of-tree experiment script invoked",
   "evidence": "BUILT+USED: docs/10-research/experiments/exp47/run_exp47.py:1-507 ran a 1,931-mutant census producing beta=0.3132 [0.2926,0.3346] (results-exp47.json, register line 1464 `DONE`); tests/test_exp47.py:19-60 asserts Wilson boundaries, diff extraction and equivalence classification against fixed values ",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R26",
@@ -177,7 +191,8 @@
   "gap": "Two of the five named backends are not execution targets. (1) Ollama has zero presence in src/, scripts/ or tests/ — it cannot be selected, probed, or dispatched; the proven invocation (`codex exec --oss --local-provider ollama -m <model>`) exists only in an experiment adapter driven by a hardcoded synthetic ticket. (2) OpenRouter is a budget-refusal object and a spend reader, never a run target; scripts/dispatch.py has no branch that can invoke it. Closing it needs more than two build_command branches: PoolState (harness.py:65) models only known-percent / unknown headroom, and select_model refuses unknown headroom, so a local £0 backend needs a third \"unmetered, no quota\" pool state rather ",
   "evidence": "[measured] Wired: src/consilient/harness.py:103 HARNESSES registers claude, cursor-composer, grok, codex; scripts/dispatch.py:443 build_command has branches for exactly those four and returns \"no invocation for harness {id}\" at :543 otherwise; probe_all at :272 probes the same four. Real outcomes in",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R29",
@@ -189,7 +204,8 @@
   "gap": "Four distinct gaps. (1) NO ESCALATION PRIMITIVE EXISTS. The harness cannot ask, so \"escalates only for X\" holds vacuously rather than by design. ADR-0033's own Enforcement section (docs/decisions/0033-decide-by-default-ask-only-where-the-user-is-the-only-valid-decider.md:283-287) lists four checks; only the first (an unknown decision class is rejected — events.py HUMAN_ONLY) exists. Bullet 2 \"an autonomous decision event without a `reversal` field fails schema validation\" is unimplemented: events.REQUIRED at events.py:36 is (\"v\",\"ts\",\"event\",\"actor\",\"data\") and `reversal` appears nowhere in src/ — its only occurrences are inside historical fixture strings at tests/test_v0_invariants.py:1985 ",
   "evidence": "[measured] HALF THAT WORKS — \"everything else it decides itself\": src/consilient/harness.py:39 DEFAULT_PERMISSION_MODE=\"bypass\"; BYPASS_FLAGS harness.py:40-45; permission_flags harness.py:313-319; load_permission_mode harness.py:322-337; scripts/dispatch.py:459-460 injects \"Do not wait for confirmat",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R32",
@@ -201,7 +217,8 @@
   "gap": "Nothing detects a stalled dispatched worker and nothing recovers one. The three clauses of the obligation fail separately: (a) DETECT — dispatch.py has only an end-to-end 600s deadline, no mid-run progress sampling; the artefact-progress detector that exists (loop.status) is never applied to a worker because dispatch.py does not import it, so a stalled agent stays stalled for the full timeout, which is exactly the wait Joe complained about; (b) RECOVER — no requeue, restart, re-dispatch, stall event, diagnostic capture or escalation exists anywhere; ADR-0034 §3 (record stall + capture diagnostics + escalate + do not terminate), §5 (lease + fencing epoch before reassignment) and §6 (observabl",
   "evidence": "EXISTS [measured]: (1) src/consilient/loop.py:253-349 `status()` resolves liveness from artefact progress (transcript bytes since the tick's intent record), never a PID; enforced by tests/test_v0_invariants.py:3493-3541, which can fail (writes bytes, asserts the flip, plus an AST scan forbidding pro",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R33",
@@ -213,7 +230,8 @@
   "gap": "Four things are missing, in dependency order. (a) A producer for headroom: nothing writes `.harness/usage/*.json`, so `usage.py`'s collectors have no input and `.harness/headroom.json` is a hand-typed operator observation with no expiry. Needs a probe (exp07/headroom.py already works for Codex) plus a claude status-line and cursor capture, and a freshness gate on `PoolState.observed_at` mirroring budget.py's `_STATE_MAX_AGE` so a stale snapshot refuses instead of being trusted forever. (b) A join between usage.py collectors and harness.pools_from_mapping — today they are two unconnected representations of the same fact, which is why `codex-weekly.used_percent` is still None and Codex is auto",
   "evidence": "WORKS [measured]. Headroom-aware selection is wired into the live run path and demonstrably changes which provider runs: src/consilient/harness.py:118-157 (DEFAULT_POOLS, five pools over four providers), harness.py:373 `_blocked` (real gate: exhausted or >=90% used refuses), harness.py:441 `select` ",
   "effort": "large",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R36",
@@ -225,7 +243,8 @@
   "gap": "Three distinct gaps, in ascending cost.\n\n(1) ADR-0065's two owed checks, both explicitly named at :134-136. (a) The tier-1 third-party import ban -- the AST machinery ALREADY EXISTS at tests/test_v0_invariants.py:3944-3964 (20 lines), but it is scoped to the whole package rather than the tier-1 module list (beta, events, projection, recall, budget, work_items, coordination, routing). It must be SPLIT, not extended: tier 1 keeps the hard ban, tier 2 modules must become permitted to import an adopted library, otherwise the enforced position is \"adopt nothing\", which is the opposite of what Joe asked for. Today no tier-2 module can legally take a dependency. (b) No check records an adopted depe",
   "evidence": "DOCTRINE (real, and one half genuinely practised): docs/decisions/0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md is ACCEPTED 21 Aug 2026 and states the adopt-vs-build test (\"a component whose error rate must be measured is native... one whose errors are self-evident may be adopted\"",
   "effort": "medium",
-  "blocks": true
+  "blocks": true,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R16",
@@ -237,7 +256,8 @@
   "gap": "Everything except the design write-up and the β* algebra. Specifically missing, in dependency order:\n\n(a) A reasoning-capability tri-state on the model registry. `ModelOption` (`src/consilient/harness.py:165-171`) needs a fourth-plus field distinguishing native-and-mandatory / hybrid-toggleable / absent. The design says adopt, don't build (`reasoning-layer.md:26-32`): models.dev is MIT and redistributable; nothing ingests it today. Note the semantics trap the design already names — `supports_reasoning` means \"accepts reasoning params\", not \"reasoning-trained\"; only `reasoning_options`/`mandatory` recovers the tri-state.\n\n(b) The double-application refusal (design condition I1). Nothing anywh",
   "evidence": "BRIEF CORRECTION FIRST: the brief's example is half-stale. `scripts/dispatch.py:73` imports `from consilient.recall import pack as pack_recall` and `scripts/dispatch.py:414` calls it inside `write_brief`, whose docstring records the change (\"Until 21 August 2026 this function wrote the task alone\").",
   "effort": "large",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R17",
@@ -249,7 +269,8 @@
   "gap": "Both halves are missing. (1) `ModelOption` needs a reasoning-capability field, and it must be a tri-state plus unknown — `reasoning-layer.md:23-35` records that `supports_reasoning` booleans from models.dev/LiteLLM mean \"accepts reasoning\", not \"reasoning-trained\", and only OpenRouter's `mandatory` flag or models.dev's `reasoning_options` recover native/hybrid/absent. (2) A hard problem the design doc does not anticipate: the 22 registered ids are Cursor-namespaced (`composer-2.5`, `cursor-grok-4.6-xhigh`, `kimi-k3-max`, `glm-5.2-high`) and will not key into models.dev or LiteLLM without a mapping; several already encode effort in the id suffix (xhigh/high/medium/low) with nothing reading it",
   "evidence": "[measured] The registry exists but carries no reasoning field. `src/consilient/harness.py:156-163` — `@dataclass(frozen=True) class ModelOption` has exactly four fields: `id`, `harness_id`, `family`, `pool`. All 22 entries of `MODELS` (`src/consilient/harness.py:181-203`) are four-positional-argumen",
   "effort": "medium",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R20",
@@ -261,7 +282,8 @@
   "gap": "Everything the obligation covers is missing, and so is the thing it constrains. Needed, in order: (1) a task-close feedback surface at all — three questions rendered from a pre-committed goal record, which itself does not exist (`work_item.opened` carries only a 500-char claim string, `coordination.py:258`); (2) an explicit skip path whose functional consequence is nil — nothing gated, no capability withheld, per ADR-0024's forbidden list; (3) a durable per-task asked/declined record in the append-only log so a skip is never re-asked for that task — no such event kind exists (`work_items.KINDS` is opened/comment/completed only). Because there is no prompt, the \"no re-ask\" guard has nothing t",
   "evidence": "[measured] The obligation lives only in prose. `docs/20-design/feedback-signals.md:57` (\"Asked, at task close only ... skippable with no consequence and no re-ask\") and `:121-122` (friction budget) are its only statements, and line 3 of that same file marks the whole document \"Status: **v1+ design d",
   "effort": "medium",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R21",
@@ -273,7 +295,8 @@
   "gap": "Both limbs missing. Positive limb: no CONTRIBUTORS file, no opt-in naming mechanism, no release-notes or project-stats crediting path — so there is no social recognition to be \"social only\". Negative limb: no test or build check would catch a perk, tier or unlocked feature if one were introduced; the prohibition lives only in two prose paragraphs, the exact pattern release_check.py:17-19 catalogues as thirteen guards that could not fail. Also unbuilt upstream: the feedback/outcome-reporting contributor class itself (zero \"feedback\" hits in src), which is what feedback-signals.md says the credit is for.",
   "evidence": "[measured] Rule stated in prose only: docs/00-context/ways-to-contribute.md:56-58 and docs/20-design/feedback-signals.md:150-153. Nothing implements it. `find . -iname \"*contributor*\"` over the whole tree returns nothing — no CONTRIBUTORS file exists. `grep -rni \"feedback\" src tests scripts --includ",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R35",
@@ -285,7 +308,8 @@
   "gap": "Everything is missing: (a) no adopted open-source collector wired in — no dependency, no config, no emit path; (b) no optional Sentry plugin surface, so \"Sentry optional, never the dependency\" is untestable because neither side exists; (c) no error record store with a stable error identity; (d) no ratchet link — no field recording the enforcement that now prevents an error or an explicit `no_check_yet`; (e) no CI check failing on recurrence of an error marked prevented, which ADR-0036 line 163 names as the one native piece; (f) no self-correction path at all — `scripts/dispatch.py:1058-1059` deliberately refuses retry (\"a silent or failed run is NOT retried on another pool\"), and `docs/20-de",
   "evidence": "[measured] `grep -rniI \"sentry\\|glitchtip\\|opentelemetry\\|sentry_sdk\" src scripts tests .githooks .github packages pyproject.toml` → one hit, `.github/scripts/check_foreign_identifiers.py:97`, a SHA allowlist entry for a cited GitHub URL, not an integration. `grep -rniI \"no_check_yet\\|prevented_by\\|",
   "effort": "medium",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R05",
@@ -297,7 +321,8 @@
   "gap": "There is no executable checker for citation depth — no `.github/scripts/check_source_depth.py` or equivalent, no release_check.py gate, no pre-push step, no CI step, no test. Enforcement is entirely a prose instruction that a human or a dispatched agent must remember, in four separate documents, and the pre-publication-gate skill openly records the enforcement mechanism as \"you\". The single concrete check that was written (RELEASE-PLAN.md:319-322) is PowerShell-only, depends on `rg` being installed, and points at a `$release_root` placeholder path that does not exist — the exact defect release_check.py's own docstring says it was built to fix, for every other item on that checklist but this ",
   "evidence": "[measured] Substrate exists and is populated: `.agents/skills/citing-sources/SKILL.md:14-19` defines [FULL]/[ABS]/[SNIP]/[2ND]; the three publication drafts apply per-citation depth markers — `docs/50-publications/P1-proxy.md` 38, `P2-guards.md` 26, `P3-echo.md` 21 (85 total, counted via `grep -oE '",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R06",
@@ -309,7 +334,8 @@
   "gap": "Two things are missing. (1) Enforcement: nothing appends to the log, nothing prompts an agent to, and nothing fails when it goes stale — so it degraded to a two-day artefact the moment attention moved elsewhere. This is the project's own catalogued failure shape: a documented rule with no check behind it. The cheapest honest fix is a staleness check in tests/test_v0_invariants.py or .githooks/pre-commit comparing the newest `| YYYY-MM-DD` row against the newest commit date and failing when the lag exceeds a threshold, plus a standing line injected by scripts/dispatch.py into every worker prompt. The check must fail on the current tree (it would: newest row 2026-08-20, newest commit 2026-08-2",
   "evidence": "[measured] ATTRIBUTION VERIFIED: .harness/dispatch/joe-messages.txt line 19 contains Joe's verbatim words (\"Keep docs/00-context/friction-log.md updated as you go — every manual step you have to do that Consilience should automate. That log is the v0 backlog.\"). ARTEFACT EXISTS: docs/00-context/fric",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R01",
@@ -321,7 +347,8 @@
   "gap": "Three distinct gaps. (1) NO DOCS LINT. I3 (\"no claim in docs/ without an evidence tag\") is a documented rule with zero enforcement — no script, no CI step, no git hook, no test reads a markdown file. This is the repo's catalogued failure pattern, in its own first rule. (2) THE ENFORCED TAG SET IS INCOMPLETE: PROVENANCE (events.py:51) holds only {measured, cited, asserted}. `simulated` and `algebra` are rejected values, so the exact harm Joe named — \"never report a simulated figure as a fact about the world\" — cannot even be expressed in the one place tags are machine-checked; a simulated figure must currently be mislabelled as one of the other three to pass validation. (3) MIS-TAGGING IS UNC",
   "evidence": "ENFORCED SLICE [measured]: src/consilient/events.py:376-382 `_check_provenance` raises EventError unless a value is in PROVENANCE; called at events.py:345 (quota) and :359 (spend). Tag set at events.py:51 is frozenset({\"measured\",\"cited\",\"asserted\"}). Real failing-capable test at tests/test_v0_invar",
   "effort": "medium",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R09",
@@ -333,7 +360,8 @@
   "gap": "Three things missing. (1) `.githooks/post-commit` does not exist — the working hook body sits orphaned in `.git/hooks/post-commit`, which `core.hooksPath=.githooks` makes unreachable, so no graph refresh has run since the redirect; move the file and add it to the `install_hooks.py:19` existence check. (2) No test asserts `.githooks/post-commit` exists or invokes graphify, so the regression is invisible; `tests/test_hooks.py` must gain an assertion that fails when the hook is absent. (3) MemPalace is absent from the bootstrap entirely — no repo config, no git-hook refresh, no consumer; the store predates the instruction by two days and nothing writes to it. Also missing is ADR-0017's own stal",
   "evidence": "[measured] The git-hook refresh is written but DEAD. `C:/Users/jpbpr/Repositories/consilience/.git/hooks/post-commit:1-4` contains exactly the ADR-0017 hook (\"git-hook updates, not agent-hook updates — per Phase 2 spec\"; runs `graphify.watch._rebuild_code`). But `core.hooksPath=.githooks` is set in ",
   "effort": "medium",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R04",
@@ -345,7 +373,8 @@
   "gap": "Three distinct holes. (1) Nothing verifies a stopping rule was fixed BEFORE the run — 75 of 76 register entries have no commit pin and the only control is an unenforced PR-template checkbox, so a rule written after seeing the result is indistinguishable in the record from one written before it. (2) Nothing verifies a stopping rule exists — 3 of 76 entries have none, including EXP-04 which is marked DONE, contradicting the register's own header rule at line 8-9. (3) Only EXP-01's fired rule is connected to any decision: cli.py's REQUIREMENTS table (lines 99-107) hard-codes seven gate conditions and the \"fired\" check appears in the A1 branch alone, so EXP-16 rule 2, EXP-47 rule 1 and EXP-56 ru",
   "evidence": "ENFORCED: src/consilient/cli.py:283-301 fails Gate A1 when EXP-01's register entry contains \"stopping rule FIRED\", overriding an otherwise-passing beta interval; non-vacuous test at tests/test_v0_invariants.py:2517-2531 (fixture supplies beta 0.3132 [0.2800,0.3464], half-width 0.0332, which would PA",
   "effort": "medium",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R03",
@@ -357,7 +386,8 @@
   "gap": "No check tests the obligation from git history, which is exactly where the brief says it is testable. Three specific things are missing: (1) a checker that, for each commit touching docs/decisions/NNNN-*.md, reads the parent blob's Status and fails when it was ACCEPTED/SUPERSEDED and the whitespace-insensitive diff deletes or modifies body lines without adding a supersession pointer or a dated correction block quoting the prior text — my ad-hoc version of this took ~30 lines and surfaced 9 candidate commits in one run; (2) a trail-integrity check: every \"SUPERSEDED by NNNN\" resolves to an existing file, the superseded ADR carries the back-reference, and every ADR has a row in index.md — this",
   "evidence": "DOCUMENTED TWICE, ENFORCED BY NO HISTORY CHECK. Rule: docs/decisions/README.md:70-74 and .agents/skills/writing-adrs/SKILL.md:74-79 (\"Never rewrite an ACCEPTED ADR to reflect a changed mind... the trail of reversals is the most valuable thing in the directory\"). [measured]\n\nTHE ONE MECHANICAL PART T",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R02",
@@ -369,19 +399,21 @@
   "gap": "Nothing executable verifies the invariant-to-check pairing. There is no artefact that (1) enumerates declared invariants (the 26 V0-NN rows in docs/40-spec/v0-draft.md §11, the 35 V0 ids across docs/, and the 64 ADR \"## Enforcement\" sections) and asserts each names an executable check that exists and is reachable from CI, and (2) fails a commit that adds an invariant declaration without adding its check. The \"same commit\" half is enforced only by an unchecked PR-template box (.github/PULL_REQUEST_TEMPLATE.md:57), which is self-attestation, not a check. Concretely uncovered today: 20 of 35 declared V0 ids are named nowhere in executable code; ADR-0064's vendor allowlist and joint ceiling and ",
   "evidence": "WORKS [measured]: .github/workflows/invariants.yml runs mypy --strict, ruff, 199 pytest invariant tests, check_rename_safety.py --check (:32), check_no_spend_escalation.py --check (:37), check_foreign_identifiers.py --self-test (:47), and a replay drift control (:50-89) whose two assertions can both",
   "effort": "medium",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R18",
   "area": "gates",
   "repeated": false,
-  "quote": "NEVER a training target: \"was this helpful?\" style approval signals.",
+  "quote": "[ATTRIBUTION WITHDRAWN] NEVER a training target: \"was this helpful?\" style approval signals.",
   "requirement": "Stated-approval signals are prohibited as a training or optimisation target anywhere in the system.",
   "status": "partial",
   "gap": "The prohibition is enforced only incidentally and only on one channel. (1) V0-21's declared check does not exist: no test anywhere refuses a satisfaction, thumbs-up or confidence field as a routing or acceptance input — the accept/reject enum test at tests/test_v0_invariants.py:731 was written for V0-18 authorship and blocks a graded rating only as a side effect of the enum. This is a documented-rule-with-nothing-enforcing-it of exactly the catalogued kind. (2) events.validate() has no data-field allowlist, so an approval field can be appended to the authoritative log today; nothing would refuse it and nothing would notice a later consumer reading it. (3) The training-target half has zero en",
   "evidence": "DOCUMENTED, THREE PLACES [measured]: docs/40-spec/v0-draft.md:422 (V0-21: \"no self-report, human or model, is an acceptance or routing input\"); docs/40-spec/v0-draft.md:233-238 (\"the same rule applies to user satisfaction, a thumbs-up, or an answer to 'did that help?'\"); docs/20-design/feedback-sign",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "UNVERIFIABLE: no matching message found in his transcripts."
  },
  {
   "id": "R23",
@@ -393,7 +425,8 @@
   "gap": "Two things are missing. (1) STORAGE: goal-achievement is not recorded anywhere — no task-close question surface, no durability check, no column in projection.py's SCHEMA, no event kind in events.py. So \"stored as separate signals\" is vacuously true rather than satisfied: only the cost side exists (duration_s on dispatch.outcome; provider quota rows in the `usage` table), and there is nothing to keep separate from it. (2) ENFORCEMENT: no test can fail if someone adds a default composite score tomorrow. Nothing in tests/ references docs/20-design/feedback-signals.md, and the repo has doc-invariant tests elsewhere (tests/test_v0_invariants.py:1174-1229 pins doc content for other rules), so the ",
   "evidence": "[measured] DOCUMENTED: docs/20-design/feedback-signals.md:107-116 — section \"Efficiency and achievement are recorded separately — permanently\": \"Achievement (asked + durability) and cost (derived) are **separate records**. No default composite score exists anywhere in the product.\" / \"Any composite ",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R22",
@@ -405,7 +438,8 @@
   "gap": "Missing: a regression guard. Compliance today rests entirely on nobody having written the code - there is no check that fails if a response-rating field, prompt or widget is added tomorrow, and v0-draft.md:422 already asserts such a check exists when it does not. Needed: one invariant test that (i) greps the source tree and the rendered dashboard for approval-signal fields/strings (thumbs, satisfaction, rating, helpful, star, 1-5 scale) and fails on any hit, and (ii) asserts events.validate() rejects an event carrying an approval-style field, so the prohibition lives in the schema rather than in prose. Also missing, but staged not skipped: the positive clause - goal recorded at dispatch, tur",
   "evidence": "PROHIBITION HOLDS IN FACT [measured]. Repo-wide searches found no response-level rating surface: (1) `grep -rniE \"rating|thumbs|upvote|downvote|response[-_ ]?level\" src packages tests scripts` -> only substring false positives (\"orchestrating\", \"operating system\", \"generating\"); (2) `grep -rniE \"\\br",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R25",
@@ -417,7 +451,8 @@
   "gap": "Two gaps, both in enforcement rather than in fact. (1) CONTENT-EXCERPT CLASS IS UNGUARDED. Both gates match only file PATHS and 40-hex SHAs; neither ever reads a corpus file's contents — check_private_corpus.py:138-156 builds needles purely from corpus_paths(). The script's own docstring lines 11-13 records that \"a verbatim quotation from a private assessment document\" was part of the original initial-commit leak, found by a paid cross-family audit rather than by any gate. So the exact class that has already leaked here has a documented rule and no check — the thirteen-catalogued-cases pattern, one sub-class deep. My scan above shows the tree is clean today, so this is an undetected-regressi",
   "evidence": "ENFORCED [measured]: .github/scripts/check_private_corpus.py ran clean — EXIT=0, \"checking against 2854 distinctive paths from 2 corpora\". Soundness repair is genuine: GIT_ENV scrub at line 92; ls_files() lines 95-131 raises BindingError unless `git rev-parse --show-toplevel` resolves to the same di",
   "effort": "small",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  },
  {
   "id": "R31",
@@ -429,6 +464,7 @@
   "gap": "The dial does not exist in any form: no levels, no floor set, no per-kind `--see` overrides, no configuration-load floor validation, no `visibility_change` event, no effective level on `verdict`/`approval` events, and no streaming surface to render at a level (dispatch writes to files, the dashboard is a one-shot static HTML render with no refresh). \"Zero visibility\" and \"full visibility\" are not selectable states — the only variation is `--json` versus text formatting. On the intervention side: the human can HALT the always-on loop mid-tick and can OVERTURN a verdict after the fact, but cannot jump into or correct a dispatched agent run at any point — no stop file honoured by dispatch, no s",
   "evidence": "VISIBILITY HALF — ABSENT. `grep -rn \"visibility\" --include=*.py .` (excluding .venv/ and build/) returns exactly ONE hit repo-wide: tests/test_v0_invariants.py:1988, and that is a JSON string inside a recorded trajectory fixture, not code. `grep -rnE '\"--see\"|\"--level\"|\"--quiet\"|\"--silent\"|\"--fireho",
   "effort": "large",
-  "blocks": false
+  "blocks": false,
+  "quote_provenance": "extracted by audit; not independently re-verified"
  }
 ]

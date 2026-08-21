@@ -44,14 +44,26 @@ def render(reqs: list[dict[str, object]]) -> str:
 
     lines: list[str] = []
     add = lines.append
-    add("# Requirements — derived from the principal's own words\n")
+    add("# Requirements — audit-extracted, attribution not attested\n")
     add(
-        "> **Source of truth: what Joe Brown typed.** Every requirement below carries his verbatim\n"
-        "> quote. Nothing here is inferred from a document, a commit message or an orchestrator's\n"
-        "> summary. That constraint exists because on 21 August 2026 an audit found two rules filed\n"
-        "> under his signature that he never wrote — one of them a loosening that let 71 private\n"
-        "> commit identifiers reach a results file. **A requirement without his words is not a\n"
-        "> requirement.**\n"
+        "> **Provenance warning, 21 August 2026. Read this before citing anything below.**\n"
+        ">\n"
+        "> These requirements were extracted by an automated audit of the principal's messages.\n"
+        '> **At least one quote was fabricated.** Shown R11 — *"Do not let any arm run unbounded.\n'
+        '> Hard turn and token caps."* — he stated plainly that those are not his words. Its\n'
+        "> attribution is withdrawn below, and two further quotes could not be located in his\n"
+        "> transcripts at all.\n"
+        ">\n"
+        "> **The remaining quotes have NOT been independently re-verified.** Two mechanical\n"
+        "> attempts failed: the transcripts interleave his typed messages with tool results,\n"
+        "> injected file contents and assistant replies, so a naive search matches this document\n"
+        "> quoting itself. The first attempt reported 33 of 36 verified and was wrong. Treat every\n"
+        "> quote here as **audit-extracted, not attested**.\n"
+        ">\n"
+        "> **An obligation can be right while its attribution is wrong.** Where that holds the\n"
+        "> requirement is kept on engineering merit and says so — but it carries no claim on the\n"
+        "> principal's authority. Invariant V0-18 means only he can supply that, and a requirement\n"
+        "> he did not write must never be quoted back to him as though he had.\n"
     )
     add(
         "**Generated** from a 72-hour audit of his messages, 18–21 August 2026, assessed against the\n"
@@ -105,7 +117,9 @@ def render(reqs: list[dict[str, object]]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="fail if the document has drifted")
+    parser.add_argument(
+        "--check", action="store_true", help="fail if the document has drifted"
+    )
     args = parser.parse_args()
 
     reqs = json.loads(SOURCE.read_text(encoding="utf-8"))
