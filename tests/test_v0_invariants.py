@@ -2525,7 +2525,15 @@ def test_gate_b4_ignores_bare_ticket_completed_and_repo_aliases(
 
 
 def test_historical_refusal_digests_pin_real_log_rejections():
-    """Ensure HISTORICAL_REFUSAL_DIGESTS accurately pins the exact 3 historical rejections."""
+    """The baseline must match the trajectory, not just the fixture beside it.
+
+    Until 21 Aug 2026 this hashed `HISTORICAL_REFUSAL_LINES` from this file and checked the
+    digests were in `cli.HISTORICAL_REFUSAL_DIGESTS` — two hand-written constants agreeing
+    with each other. Both could drift from the log together and nothing would notice, while
+    `_capture_condition` silently widened A3's tolerance. Measured: the three pinned digests
+    are exactly the three refusals in `.harness/log`, with none unpinned. That is the
+    property; the fixture agreeing with the constant is only the mechanism.
+    """
     import hashlib
     from consilient.cli import HISTORICAL_REFUSAL_DIGESTS
 
@@ -2533,6 +2541,17 @@ def test_historical_refusal_digests_pin_real_log_rejections():
     for line in HISTORICAL_REFUSAL_LINES:
         digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
         assert digest in HISTORICAL_REFUSAL_DIGESTS, f"digest {digest} not in baseline"
+
+    log = Path(".harness/log")
+    if not log.exists():  # pragma: no cover - repository-only check
+        pytest.skip("no repository trajectory in this checkout")
+    real = {rejection.content_digest for rejection in read_all(log)[1]}
+    assert real == set(HISTORICAL_REFUSAL_DIGESTS), (
+        "the tolerated baseline and the trajectory's actual refusals have diverged; "
+        f"{len(real - set(HISTORICAL_REFUSAL_DIGESTS))} refusal(s) in the log are not "
+        f"pinned, {len(set(HISTORICAL_REFUSAL_DIGESTS) - real)} pinned digest(s) match "
+        "nothing in the log"
+    )
 
 
 
