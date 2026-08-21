@@ -62,6 +62,8 @@ docs/10-research/experiments/exp27/collector-state.json
 # them belongs in the record, and a single `git add -A` would commit all of them — which is not
 # hypothetical, because `git add -A` swept four brief files into a commit on 20 August 2026.
 .harness/dispatch/
+# Operator quota snapshot. Local to this machine; not evidence and not publishable.
+.harness/headroom.json
 # Briefs written for a dispatched agent, which live in a clone's root by convention.
 brief-*.md
 

@@ -60,6 +60,8 @@ Read these before anything else. Everything downstream depends on them.
 | [0054](0054-route-by-measured-capability-against-a-verifier-contract-never-by-a-harness-label.md) | **Route by measured capability against a verifier contract, never by a harness label** | 🟡 |
 | [0055](0055-simulated-users-produce-runs-not-verdicts.md) | **Simulated users produce runs, not verdicts** — an unmeasured verifier's *pass* is not evidence, only its *fail* is; the same instrument tests whether a non-expert can use the harness | 🟡 |
 | [0056](0056-schedule-work-across-prepaid-quota-pools-and-never-shed-to-spend.md) | **Schedule work across prepaid quota pools and never shed onto spend** | 🟡 |
+| [0057](0057-a-users-trajectory-is-their-data.md) | **A user's trajectory is their data** — private by default, never tracked, shared only by explicit consent | ✅ |
+| [0058](0058-orchestration-ships-as-a-script-until-the-cli-surface-is-settled.md) | **Orchestration ships as `scripts/dispatch.py`**; the `consil` CLI surface stays the principal's to settle | ✅ |
 | [0059](0059-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
 
 ## Behaviour and safety
