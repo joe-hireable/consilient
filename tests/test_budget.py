@@ -66,6 +66,12 @@ PRODUCT_IMPORTS = BUDGET_IMPORTS | {
     "contextlib",
     "contextvars",
     "hashlib",
+    # `html` is escaping only. Added 21 Aug 2026 for the observability surface (ADR-0053),
+    # which must escape trajectory content before it reaches a rendered page. It performs no
+    # I/O of any kind, which is the property this allowlist is actually protecting. The
+    # alternative — hand-rolling escaping to avoid an import — would trade an inert stdlib
+    # call for an injection bug, so it is refused.
+    "html",
     "json",
     "math",
     "re",

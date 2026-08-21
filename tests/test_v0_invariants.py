@@ -908,7 +908,11 @@ def test_the_cli_exposes_no_routing_or_blocking_surface():
     for sub in subparsers.choices.values():
         actions |= {a.dest for a in sub._actions}
 
-    assert commands == {"record", "replay", "beta", "doctor"}, commands
+    # `dashboard` added 21 Aug 2026 by ADR-0053. It renders and writes one HTML file;
+    # it accepts nothing, routes nothing and blocks nothing, so it passes the
+    # forbidden-verb check below on its own merits rather than by exemption. The exact
+    # set is asserted so that surface growth is a decision someone had to make here.
+    assert commands == {"record", "replay", "beta", "doctor", "dashboard"}, commands
     for forbidden in (
         "route",
         "dispatch",
@@ -1849,15 +1853,15 @@ HISTORICAL_REFUSAL_LINES: list[str] = [
         '"earliest_promotion": "19 September 2026, one day later for each day missed", '
         '"design": "conditional polling with ETag and If-Modified-Since; each event frozen by upstream id '
         'or content hash; one appended observation per source per run", "idempotent": "a second run '
-        'within the same day returned 304 on every source and zero new events, so the day count cannot be '
+        "within the same day returned 304 on every source and zero new events, so the day count cannot be "
         'inflated by re-running", "invariant_enforced_not_promised": "every emitted record passes '
-        'validate_change_record, which raises on any record claiming to increase headroom, decrease usage, '
-        'move a reset window or mark unknown headroom usable. Eleven tests, including one per forbidden action, '
+        "validate_change_record, which raises on any record claiming to increase headroom, decrease usage, "
+        "move a reset window or mark unknown headroom usable. Eleven tests, including one per forbidden action, "
         'plus one asserting that silence about headroom is not permission.", "no_inference_no_metered_provider": true, '
         '"owed": "the dispatch-time version/capability handshake (procedure step 4) and the three injected fixtures '
-        '(step 5). Neither blocks the clock; both must land before the window closes or the run cannot answer its '
+        "(step 5). Neither blocks the clock; both must land before the window closes or the run cannot answer its "
         'own question.", "scheduling_gap": "the collector must run once a day. Today\'s run is manual. A scheduled '
-        'task or a daily invocation is needed and is not yet in place - if nobody runs it, the window silently '
+        "task or a daily invocation is needed and is not yet in place - if nobody runs it, the window silently "
         'accumulates missing days, which is exactly the failure the register warns about."}}\n'
     ),
     (
@@ -1868,25 +1872,25 @@ HISTORICAL_REFUSAL_LINES: list[str] = [
         '"work_role": "decision owner", "human_decision": "approval", "via": "chat, 20 August 2026", '
         '"quote": "I don\'t have any appetite for granular technical decisions - these need to be made by '
         'agents. Many users will prefer it this way.", "why_it_is_an_ADR_and_not_a_note": "the second sentence '
-        'makes it a statement about who the product is for, not one maintainer\'s preference on one morning", '
+        "makes it a statement about who the product is for, not one maintainer's preference on one morning\", "
         '"unchanged": "the reserved list - money, credentials, anything published or exposed outside the machine, '
         'irrecoverable deletion, and genuine preference questions no fact settles", "now_explicit": "the converse '
-        'the ADR implied and did not say: a technical question with a defensible answer is not a preference '
+        "the ADR implied and did not say: a technical question with a defensible answer is not a preference "
         'question and must not be escalated as one. Escalating one is a defect, not caution.", "named_classes": '
         '["which of two conditionals a quantity is defined on, where one is already implied by the code and the '
         'algebra", "which of several defensible estimators, thresholds or samples", "whether an experiment is '
         're-run and in what order work is done", "how an instrument is repaired and what its tests must cover", '
         '"any change reversible by one git revert, whatever its blast radius on paper"], "the_failure_it_prevents": '
         '"an ask the user cannot cheaply answer gets approved to keep things moving, and a rubber-stamped approval '
-        'launders the agent\'s decision into a human one - worse than deciding, because it destroys the record of who '
+        "launders the agent's decision into a human one - worse than deciding, because it destroys the record of who "
         'actually chose", "obligation_replacing_the_ask": "every such decision carries, in the same commit, the '
-        'reasoning including the option not taken, the reversal command rather than an assurance, and the falsifier. '
-        'A decision recorded without a falsifier is a preference wearing a technical costume and should have been '
+        "reasoning including the option not taken, the reversal command rather than an assurance, and the falsifier. "
+        "A decision recorded without a falsifier is a preference wearing a technical costume and should have been "
         'escalated.", "product_posture": "the harness decides technical questions and reports; the human decides '
-        'irreversible and preferential ones and is asked. A user who wants more say turns the ADR-0035 visibility '
+        "irreversible and preferential ones and is asked. A user who wants more say turns the ADR-0035 visibility "
         'dial up rather than the harness asking more.", "overturning_test": "a user who wanted to be asked, was not, '
-        'and lost something they cared about - measurable, and EXP-33 is where it would show. The unread-approval '
-        'floor is the same signal from the other side: approvals returned faster than they could be read mean the asks '
+        "and lost something they cared about - measurable, and EXP-33 is where it would show. The unread-approval "
+        "floor is the same signal from the other side: approvals returned faster than they could be read mean the asks "
         'were not wanted either."}}\n'
     ),
     (
@@ -1898,25 +1902,25 @@ HISTORICAL_REFUSAL_LINES: list[str] = [
         '"authority": "Joe: \'exp 27 schedule what you need to schedule\' - explicit authorisation for a '
         'system-level change, a Windows scheduled task on his machine", "task": "Consilience-EXP27-Collector, '
         'daily 09:00, first fire 21 August 2026", "verified_by_artefact": "task Ready, next run 21/08 09:00, '
-        'on-demand run returned Last Result 0, log grew 11 to 22 lines, six of six sources reachable - '
+        "on-demand run returned Last Result 0, log grew 11 to 22 lines, six of six sources reachable - "
         'checked rather than inferred from the SUCCESS message", "settings_that_matter": {"StartWhenAvailable": '
         '"a laptop asleep at 09:00 runs on wake rather than skipping the day - the single most important setting", '
         '"RunOnlyIfNetworkAvailable": "a run with no network would record six failures and make the day look '
         'collected when it was not", "RestartOnFailure": "3 attempts 30 minutes apart, so a transient outage does '
         'not cost a day", "DisallowStartIfOnBatteries": "false, because the default would skip on battery, which '
         'on a laptop is most of the time", "InteractiveToken": "runs as Joe with no stored credentials. A day he '
-        'never logs in is a day missed; storing a password to avoid that is not a trade worth making for a read-only '
+        "never logs in is a day missed; storing a password to avoid that is not a trade worth making for a read-only "
         'poll."}, "wrapper_rationale": "a scheduled task that fails silently is worse than none, because the window '
-        'accumulates missing days while looking healthy. run-daily.cmd prefers the worktree, falls back to the main '
-        'checkout so it survives the branch being merged, writes a loud failure if the collector is in neither place, '
+        "accumulates missing days while looking healthy. run-daily.cmd prefers the worktree, falls back to the main "
+        "checkout so it survives the branch being merged, writes a loud failure if the collector is in neither place, "
         'and preserves the exit code.", "branch_note": "the collector currently exists only on branch '
-        'worktree-consilience-cto. Main is still at 27b4bc2, last night\'s handoff, and the main checkout has no '
+        "worktree-consilience-cto. Main is still at 27b4bc2, last night's handoff, and the main checkout has no "
         'collector.py. The wrapper\'s fallback handles the merge whenever it happens.", "how_to_tell_it_stopped": '
-        '"python collector.py prints \'distinct days recorded N of 30\'. If N stops advancing the window has '
-        'stalled regardless of what Task Scheduler claims. Running it by hand is idempotent - a second run the same '
+        "\"python collector.py prints 'distinct days recorded N of 30'. If N stops advancing the window has "
+        "stalled regardless of what Task Scheduler claims. Running it by hand is idempotent - a second run the same "
         'day returns 304 everywhere and adds nothing.", "reversal": "schtasks /Delete /TN Consilience-EXP27-Collector /F. '
         'Touches nothing else, and the collected log survives deletion.", "still_owed": "the dispatch-time capability '
-        'handshake and the three injected fixtures. Neither blocks the clock; both must land before the window '
+        "handshake and the three injected fixtures. Neither blocks the clock; both must land before the window "
         'closes or the run cannot answer its own question."}}\n'
     ),
 ]
@@ -2194,7 +2198,9 @@ def _capture_health_module():
     return module
 
 
-def test_capture_health_reports_a_healthy_trajectory_and_a_broken_one(tmp_path, monkeypatch):
+def test_capture_health_reports_a_healthy_trajectory_and_a_broken_one(
+    tmp_path, monkeypatch
+):
     """A3's evidence must be a check, not a heartbeat.
 
     Until 20 Aug 2026 nothing wrote A3's trajectory daily. The log had files for two days
@@ -2268,8 +2274,19 @@ def test_the_adapter_contract_is_asserted_not_counted():
     guarded here instead, by naming the fields.
     """
     outcome_fields = {
-        "ticket_id", "agent", "domain", "harness", "provider", "model",
-        "ok", "diff", "tokens_in", "tokens_out", "cost_usd", "duration_s", "raw_tail",
+        "ticket_id",
+        "agent",
+        "domain",
+        "harness",
+        "provider",
+        "model",
+        "ok",
+        "diff",
+        "tokens_in",
+        "tokens_out",
+        "cost_usd",
+        "duration_s",
+        "raw_tail",
     }
     ticket_fields = {"id", "goal", "repo_dir", "timeout_s"}
 
@@ -2277,7 +2294,9 @@ def test_the_adapter_contract_is_asserted_not_counted():
     # written before any second runtime existed. That is the text seven backends were built
     # against, so it is the text worth pinning.
     canonical = (ADAPTERS / "adapter_claude_code.py").read_text(encoding="utf-8")
-    missing = {name for name in outcome_fields | ticket_fields if f'"{name}"' not in canonical}
+    missing = {
+        name for name in outcome_fields | ticket_fields if f'"{name}"' not in canonical
+    }
     assert not missing, (
         f"the adapter contract lost {sorted(missing)}; ADR-0047 promoted this boundary and a "
         "redesign must be argued in an ADR, not absorbed"
@@ -2287,8 +2306,12 @@ def test_the_adapter_contract_is_asserted_not_counted():
     # documentation, not a boundary.
     for path in sorted(ADAPTERS.glob("adapter_*.py")):
         text = path.read_text(encoding="utf-8")
-        absent = {name for name in ("ticket_id", "ok", "diff", "raw_tail") if name not in text}
-        assert not absent, f"{path.name} does not speak {sorted(absent)} of the outcome contract"
+        absent = {
+            name for name in ("ticket_id", "ok", "diff", "raw_tail") if name not in text
+        }
+        assert not absent, (
+            f"{path.name} does not speak {sorted(absent)} of the outcome contract"
+        )
 
 
 def test_a_new_adapter_may_not_silently_exceed_the_largest_one():
@@ -2334,11 +2357,11 @@ def test_every_adapter_has_a_declared_credential_shape():
     DECLARED = {
         "claude_code": "sk-ant-",
         "codex": "sk-",
-        "cursor": None,          # editor sign-in; no user-visible key format
-        "cursor_acp": None,      # same credential as cursor
-        "antigravity": None,     # editor sign-in
-        "opencode": None,        # brings its own provider key, covered by that provider
-        "model_backed": None,    # local weights, no credential
+        "cursor": None,  # editor sign-in; no user-visible key format
+        "cursor_acp": None,  # same credential as cursor
+        "antigravity": None,  # editor sign-in
+        "opencode": None,  # brings its own provider key, covered by that provider
+        "model_backed": None,  # local weights, no credential
         "grok": "xai-",
     }
     present = {
@@ -2372,9 +2395,13 @@ def test_ci_secret_scan_also_reads_untracked_files():
     what closes that, and it must not quietly disappear from the workflow.
     """
     workflow = Path(".github/workflows/secret-scan.yml").read_text(encoding="utf-8")
-    assert "--untracked" in workflow, "the CI secret scan stopped reading untracked files"
+    assert "--untracked" in workflow, (
+        "the CI secret scan stopped reading untracked files"
+    )
     assert "--history" in workflow, "the CI secret scan stopped reading history"
-    assert "--self-test" in workflow, "the CI secret scan stopped proving it can still detect"
+    assert "--self-test" in workflow, (
+        "the CI secret scan stopped proving it can still detect"
+    )
 
 
 def test_agent_transcripts_and_briefs_cannot_be_committed():
@@ -2496,19 +2523,30 @@ def test_gate_b4_ignores_bare_ticket_completed_and_repo_aliases(
         ),
     )
     # Internal repo aliases are ignored even with outcome
-    for idx, alias in enumerate(("consilient", "consilience", "joe-hireable/consilient", "consilient-work")):
+    for idx, alias in enumerate(
+        ("consilient", "consilience", "joe-hireable/consilient", "consilient-work")
+    ):
         append(
             log,
             ev(
                 event="attempt.outcome",
-                data={"repository": alias, "attempt_id": f"a-{idx}", "task": f"T-{idx}", "verifier_accept": True},
+                data={
+                    "repository": alias,
+                    "attempt_id": f"a-{idx}",
+                    "task": f"T-{idx}",
+                    "verifier_accept": True,
+                },
             ),
         )
         append(
             log,
             ev(
                 event="ticket.completed",
-                data={"repository": alias, "ticket": f"T-{idx}", "attempt_id": f"a-{idx}"},
+                data={
+                    "repository": alias,
+                    "ticket": f"T-{idx}",
+                    "attempt_id": f"a-{idx}",
+                },
             ),
         )
 
@@ -2525,7 +2563,6 @@ def test_historical_refusal_digests_pin_real_log_rejections():
     for line in HISTORICAL_REFUSAL_LINES:
         digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
         assert digest in HISTORICAL_REFUSAL_DIGESTS, f"digest {digest} not in baseline"
-
 
 
 # ------------------------------------------- publication safety, after the 21 Aug 2026 block
@@ -2572,3 +2609,250 @@ def test_foreign_commit_identifiers_may_only_decrease():
         f"foreign commit identifiers rose to {total}; publishing them would put another "
         "repository's commit history into a public one. Aggregate them instead."
     )
+
+
+# ------------------------------------------------------ V0-30, ADR-0053 (observability)
+# The surface renders the record and never forms an opinion of its own. Three properties
+# make that real rather than promised: it cannot disagree with the CLI about an
+# authoritative number, it cannot render a failing gate in the passing style, and it cannot
+# reach outside the file it wrote. The fifth test pins the honesty of the RACI panel, which
+# is the claim most likely to rot into an invented graph once someone wants one.
+def dashboard_payload(tmp_path, capsys, log=None, db=None):
+    """Run `consil dashboard --json` the way a user would, and return its one contract.
+
+    `db` is a parameter because A2 is legitimately order-dependent: the first `doctor` run
+    against a database that does not exist reports "no prior projection existed" and cannot
+    compare, while the second compares against what the first wrote. Two runs sharing one
+    database therefore differ for a correct reason, and a comparison test must give each
+    run its own so it is measuring drift rather than measuring history.
+    """
+    out = tmp_path / "dash.html"
+    code = main(
+        [
+            "--log",
+            str(log or (tmp_path / "log")),
+            "--db",
+            str(db or (tmp_path / "state.db")),
+            "--json",
+            "dashboard",
+            # `--out` is dashboard-specific, so unlike --json/--log/--db it is only valid
+            # after the subcommand.
+            "--out",
+            str(out),
+        ]
+    )
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert out.exists(), "dashboard reported success without writing the file"
+    return payload, out.read_text(encoding="utf-8")
+
+
+def _seeded_log(tmp_path):
+    log = tmp_path / "log"
+    log.mkdir(parents=True, exist_ok=True)
+    day = datetime.now(timezone.utc).date().isoformat()
+    work = ev(
+        event="work.completed",
+        actor="agent-one",
+        data={
+            "runtime_identity": "claude-code/session-a",
+            "logical_identity": "builder",
+            "work_role": "implementer",
+            "artefacts": ["src/consilient/dashboard.py", "docs/decisions/0053.md"],
+            "principal": HUMAN,
+        },
+    )
+    lines = [
+        canonical(work),
+        canonical(outcome("a-1", "task-one", True)),
+        canonical(verdict("a-1", "reject")),
+    ]
+    (log / (day + ".jsonl")).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return log
+
+
+def test_the_dashboard_cannot_disagree_with_doctor_about_the_gates(tmp_path, capsys):
+    """The page's gate block is `cmd_doctor`'s result, not a second reading of the gates.
+
+    Two surfaces reporting the same thing is two chances to be wrong. This asserts equality
+    of the whole structure rather than of a summary line, so a divergence anywhere in it —
+    a status, a reason, an evidence path — fails here rather than being discovered by
+    someone reading a green page about a stopped system.
+    """
+    log = _seeded_log(tmp_path)
+    payload, _ = dashboard_payload(tmp_path, capsys, log=log)
+    # A2 names the database it compared, in both its reason and its evidence, and it reports
+    # differently on a first run than on a second. So the two runs must start from the same
+    # path AND the same absence, or the test measures ordering rather than drift.
+    (tmp_path / "state.db").unlink()
+    truth = doctor_payload(tmp_path, capsys)
+    assert payload["gates"] == truth["gates"]
+    assert (
+        payload["routing_orchestration_enabled"]
+        == truth["routing_orchestration_enabled"]
+    )
+
+
+def test_the_dashboard_cannot_disagree_with_the_beta_command(tmp_path, capsys):
+    log = _seeded_log(tmp_path)
+    payload, html_text = dashboard_payload(tmp_path, capsys, log=log)
+    code = main(
+        ["--log", str(log), "--db", str(tmp_path / "state.db"), "--json", "beta"]
+    )
+    assert code == 0
+    truth = json.loads(capsys.readouterr().out)
+    for field in ("verdict", "n_rejected", "n_false_accept", "point", "interval"):
+        assert payload["beta"][field] == truth[field], field
+    # The rendered sentence is `Beta.render()`'s own output, so the expert disclosure cannot
+    # paraphrase the number into something friendlier than it is.
+    assert payload["beta_line"] in html_text
+
+
+def test_a_failing_gate_condition_never_renders_in_the_passing_style(tmp_path, capsys):
+    """The defect this project exists to catch, applied to its own dashboard.
+
+    A surface that showed green where a gate fails would be a verifier accepting a bad
+    artefact — beta, committed by the instrument that measures beta.
+    """
+    from consilient import dashboard as dash
+
+    payload, _ = dashboard_payload(tmp_path, capsys, log=_seeded_log(tmp_path))
+    conditions = [c for g in payload["gates"].values() for c in g["conditions"]]
+    assert any(c["status"] != "pass" for c in conditions), (
+        "fixture no longer exercises a failing condition; this test would pass vacuously"
+    )
+
+    rendered = dash.render_html(payload)
+    for condition in conditions:
+        marker = 'class="cond s-' + condition["status"] + '"'
+        assert marker in rendered, condition["id"] + " did not render its own state"
+    assert 'class="verdict is-on"' not in rendered, (
+        "the page declared the system enabled while a condition was failing"
+    )
+    assert "Consilient is watching, not acting." in rendered
+
+    # And the converse: with every condition passing it must be willing to say so, or this
+    # test would be satisfied by a page that is simply always red.
+    happy = json.loads(json.dumps(payload))
+    for gate in happy["gates"].values():
+        for condition in gate["conditions"]:
+            condition["status"] = "pass"
+    happy["routing_orchestration_enabled"] = True
+    assert 'class="verdict is-on"' in dash.render_html(happy)
+
+
+def test_the_rendered_page_references_nothing_outside_itself(tmp_path, capsys):
+    """ADR-0007's surviving prohibitions, enforced rather than promised.
+
+    "A rendered file, not a web app" is only true while the file is self-contained. One
+    `<script src>` or one font URL turns it into a page that needs the network, and every
+    objection ADR-0007 raised about a local server comes back.
+    """
+    _, rendered = dashboard_payload(tmp_path, capsys, log=_seeded_log(tmp_path))
+    for forbidden in ("<script", "src=", "http://", "https://", "@import", "url("):
+        assert forbidden not in rendered, "page reached outside itself via " + forbidden
+
+
+def test_the_dashboard_renders_from_an_empty_trajectory(tmp_path, capsys):
+    """No data is a state to render, not a crash and not a zero.
+
+    The real trajectory has no budget events and no human verdicts, so several panels are
+    already exercising their empty path in production. This pins the fully-empty case.
+    """
+    empty = tmp_path / "log"
+    empty.mkdir(parents=True, exist_ok=True)
+    payload, rendered = dashboard_payload(tmp_path, capsys, log=empty)
+    assert payload["trajectory"]["events"] == 0
+    assert payload["agents"] == []
+    assert payload["beta"]["verdict"] == "insufficient_data"
+    assert payload["usage"]["windows"] == []
+    assert "absence of observation, not an observation of zero" in rendered
+    assert "<h1>" in rendered
+
+
+def test_raci_is_reported_as_underivable_while_the_record_lacks_its_fields(
+    tmp_path, capsys
+):
+    """The honest-absence claim, pinned so it cannot quietly become an invented matrix.
+
+    RACI attaches to a piece of work (ADR-0020), and the trajectory carries no stable
+    work-item identifier, no `accountable`, no `consulted` and no `informed`. The panel must
+    say so. If someone later derives a matrix anyway, this fails — and if the schema gains
+    the fields, the second half fails, which is the reminder to rebuild the panel rather
+    than leave it asserting an absence that is no longer true.
+    """
+    from consilient import dashboard as dash
+
+    payload, rendered = dashboard_payload(tmp_path, capsys, log=_seeded_log(tmp_path))
+    assert payload["raci"]["derivable"] is False
+    assert "cannot be derived" in rendered
+
+    informed = next(x for x in payload["raci"]["letters"] if x["letter"] == "I")
+    assert informed["derivable"] == "no"
+    assert informed["coverage"] == 0
+
+    events, _ = read_all(tmp_path / "log")
+    for field in dash.RACI_FIELDS + dash.WORK_ITEM_FIELDS:
+        assert not any(field in e.data for e in events), (
+            field + " now appears in the trajectory; the RACI panel's claim that it is "
+            "absent is stale and must be rebuilt"
+        )
+
+
+def test_a_non_path_value_is_never_drawn_as_a_directory(tmp_path, capsys):
+    """`artefacts` is free text, and on the real log four of its values are not files.
+
+    Drawing a bare commit identifier as a directory node would state a fact the record does
+    not contain. They are excluded from the graph and reported under their own heading, so
+    neither the invention nor a silent drop is possible.
+    """
+    from consilient import dashboard as dash
+
+    assert dash._is_path("docs/decisions/0053.md")
+    assert dash._is_path("AGENTS.md")
+    assert not dash._is_path("6088e3e")
+    assert not dash._is_path("private handoff memo only")
+
+    log = tmp_path / "log"
+    log.mkdir(parents=True, exist_ok=True)
+    day = datetime.now(timezone.utc).date().isoformat()
+    noisy = ev(
+        event="work.completed",
+        actor="agent-one",
+        data={
+            "runtime_identity": "claude-code/session-a",
+            "artefacts": ["docs/decisions/0053.md", "6088e3e"],
+        },
+    )
+    (log / (day + ".jsonl")).write_text(canonical(noisy) + "\n", encoding="utf-8")
+
+    payload, rendered = dashboard_payload(tmp_path, capsys, log=log)
+    assert [a["path"] for a in payload["artefacts"]] == ["docs/decisions/0053.md"]
+    assert [a["value"] for a in payload["annotations"]] == ["6088e3e"]
+    assert not any(e["group"] == "6088e3e" for e in payload["edges"])
+    # Excluded from the graph, but not lost: it is still reported to the reader.
+    assert "6088e3e" in rendered
+
+
+def test_the_dashboard_adds_no_dependency_outside_the_standard_library():
+    """ADR-0031's stdlib-only core, checked over the whole package.
+
+    ADR-0007 named "no frontend dependency" as its enforcement, and ADR-0053 keeps it. The
+    dashboard is where that rule is most tempting to break.
+    """
+    import ast
+
+    root = Path(__file__).resolve().parents[1] / "src" / "consilient"
+    external = set()
+    for source in sorted(root.glob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name.split(".")[0] for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                # level > 0 is a relative import: our own package, not a dependency.
+                names = [] if node.level else [(node.module or "").split(".")[0]]
+            else:
+                continue
+            external.update(n for n in names if n and n not in sys.stdlib_module_names)
+    assert not external, "consilient imports outside stdlib: " + repr(sorted(external))

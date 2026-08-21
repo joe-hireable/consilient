@@ -33,6 +33,11 @@ entities.json
 # reproducible from the log, and not part of the record.
 .harness/state.db.stale-*
 
+# derived: the observability surface is a rendering of the trajectory (ADR-0053).
+# It embeds the record's contents verbatim, so committing it would duplicate the log
+# into an unreviewed artefact and hand the secret scanner a second copy to miss.
+.harness/dashboard.html
+
 # Transient runner state: a pid and a run id, meaningful only while a run is live.
 # Committing it would assert a lock that is not held.
 docs/10-research/experiments/*/run.lock

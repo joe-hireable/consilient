@@ -24,7 +24,8 @@ Read these before anything else. Everything downstream depends on them.
 | [0001](0001-build-a-meta-harness-not-a-harness.md) | Meta-harness above coding agents (superseded in part by 0027's compositional boundary) | ⛔ |
 | [0005](0005-local-model-library-with-hardware-gating.md) | Local model library with hardware gating (superseded by 0026) | ⛔ |
 | [0006](0006-ticket-store-sqlite-plus-git-log.md) | Ticket store: SQLite for coordination, append-only JSONL in git for the record | ✅ |
-| [0007](0007-cli-only-no-review-surface.md) | CLI only, and **build no review surface** | ✅ |
+| [0007](0007-cli-only-no-review-surface.md) | CLI only, and build no review surface (the diff-review half stands; the no-visibility half superseded by 0053) | ⛔ |
+| [0053](0053-build-one-local-observability-surface-that-renders-the-record.md) | **One local observability surface that renders the record** — `consil dashboard` writes a self-contained file; no server, no port, still no diff review | ✅ |
 | [0009](0009-route-per-task-not-per-step.md) | Route per task, not per step | 🟡 |
 | [0011](0011-evidence-merge-not-meeting.md) | Evidence merge (superseded by 0020) | ⛔ |
 | [0012](0012-composite-beta-with-per-check-diagnostics.md) | Measure composite β directly; per-check as diagnostics | ✅ |
