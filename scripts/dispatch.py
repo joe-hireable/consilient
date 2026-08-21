@@ -45,6 +45,7 @@ from consilient.harness import (  # noqa: E402
     DEFAULT_PERMISSION_MODE,
     DEFAULT_POOLS,
     HARNESSES,
+    MODELS,
     Decision,
     FanoutDecision,
     Harness,
@@ -679,6 +680,23 @@ def build_command(
 ) -> list[str] | str:
     """Return argv, or a refusal reason string."""
     cwd = cwd.resolve()
+    if model is not None:
+        selected = select_model(harness.id, pools=pools, requested=model)
+        if isinstance(selected, str):
+            return selected
+        attended_cursor_other = (
+            harness.id == "cursor-composer"
+            and cursor_pool_for_model(model) == "cursor-other"
+        )
+        if (
+            selected.reasoning_capability == "unknown"
+            and selected not in MODELS
+            and not attended_cursor_other
+        ):
+            return (
+                f"refusing {harness.id} model {model!r}: reasoning capability is "
+                f"unknown ({selected.reasoning_provenance})"
+            )
     brief = brief.resolve()
     bypass = list(permission_flags(harness.id, permissions))
     instruction = (
@@ -837,9 +855,7 @@ def run_harness(
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
-    brief = write_brief(
-        run_dir, task, log_dir=log_dir, in_flight=in_flight, claim_run_id=claim_run_id
-    )
+    brief = (run_dir / "brief.md").resolve()
     stdout_path = (run_dir / "stdout.txt").resolve()
     stderr_path = (run_dir / "stderr.txt").resolve()
     built = build_command(
@@ -871,6 +887,9 @@ def run_harness(
             stdout_path=str(stdout_path),
             stderr_path=str(stderr_path),
         )
+    write_brief(
+        run_dir, task, log_dir=log_dir, in_flight=in_flight, claim_run_id=claim_run_id
+    )
     argv = built
     env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
