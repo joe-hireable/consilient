@@ -24,6 +24,7 @@ from consilient.events import read, validate
 from consilient.harness import (
     DEFAULT_POOLS,
     HARNESSES,
+    permission_flags,
     EXHAUSTED_USED_PERCENT,
     Harness,
     PoolState,
@@ -417,6 +418,40 @@ def test_run_process_kills_a_sleeping_child(tmp_path):
     assert timed_out is True
     assert duration < 15
     assert code != 0 or timed_out
+
+
+def test_bypass_flags_are_known_for_every_registered_harness():
+    for item in HARNESSES:
+        flags = permission_flags(item.id, "bypass")
+        assert flags, f"{item.id} has no bypass flags; the meta-harness cannot control it"
+        assert permission_flags(item.id, "prompt") == ()
+
+
+def test_claude_bypass_always_skips_permissions(monkeypatch, tmp_path):
+    script = _load_script()
+    monkeypatch.setattr(script, "find_claude", lambda: "claude")
+    harness = harness_by_id("claude")
+    assert harness is not None
+    built = script.build_command(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        brief=tmp_path / "brief.md",
+        model=None,
+        permissions="bypass",
+    )
+    assert isinstance(built, list)
+    assert "--dangerously-skip-permissions" in built
+    prompted = script.build_command(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        brief=tmp_path / "brief.md",
+        model=None,
+        permissions="prompt",
+    )
+    assert isinstance(prompted, list)
+    assert "--dangerously-skip-permissions" not in prompted
 
 
 def test_cursor_other_models_are_refused_by_the_runner(tmp_path):

@@ -31,6 +31,18 @@ FANOUT_KIND = "dispatch.fanout"
 Status = Literal["ok", "silent", "failed", "timeout", "refused"]
 DecisionKind = Literal["run", "refuse"]
 VerdictKind = Literal["agree", "disagree", "incomparable"]
+PermissionMode = Literal["bypass", "prompt"]
+
+# Default is bypass: the principal asked that dispatched harnesses run like this Grok
+# session, without per-tool prompts. `prompt` is the attended alternative. Flags were
+# read from each CLI's --help on 21 August 2026. [measured]
+DEFAULT_PERMISSION_MODE: PermissionMode = "bypass"
+BYPASS_FLAGS: dict[str, tuple[str, ...]] = {
+    "claude": ("--dangerously-skip-permissions",),
+    "codex": ("--dangerously-bypass-approvals-and-sandbox",),
+    "grok": ("--always-approve",),
+    "cursor-composer": ("--force", "--trust"),
+}
 
 SILENT_MARKERS: tuple[str, ...] = (
     "workspace trust required",
@@ -147,6 +159,33 @@ DEFAULT_POOLS: tuple[PoolState, ...] = (
 )
 
 CURSOR_OTHER_PREFIXES: tuple[str, ...] = ("claude-", "gpt-", "gemini-")
+
+
+def permission_flags(
+    harness_id: str, mode: PermissionMode = DEFAULT_PERMISSION_MODE
+) -> tuple[str, ...]:
+    """Flags the meta-harness injects. Empty in `prompt` mode. Unknown harnesses get none."""
+    if mode == "prompt":
+        return ()
+    return BYPASS_FLAGS.get(harness_id, ())
+
+
+def load_permission_mode(path: Path | None = None) -> PermissionMode:
+    """INSTANCE override. Missing or unreadable file → the default, bypass."""
+    if path is None or not path.is_file():
+        return DEFAULT_PERMISSION_MODE
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return DEFAULT_PERMISSION_MODE
+    if not isinstance(raw, dict):
+        return DEFAULT_PERMISSION_MODE
+    mode = raw.get("mode")
+    if mode == "bypass":
+        return "bypass"
+    if mode == "prompt":
+        return "prompt"
+    return DEFAULT_PERMISSION_MODE
 
 
 def harness_by_id(

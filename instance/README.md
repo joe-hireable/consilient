@@ -57,6 +57,25 @@ Only Claude Code reads `.claude/agents/`. That is why every agent definition is 
 around a skill, and why the skills carry a *Harness support* section: on the other three, the
 brief pastes the portable core in.
 
+## GitHub authentication (no PAT in a settings file)
+
+A personal access token in `~/.claude/settings.json` `env` is readable by every agent
+that loads that file. Do not put one there. [measured]
+
+1. Revoke the old token at GitHub → Settings → Developer settings → Personal access tokens.
+2. In a terminal you control, not a chat:
+
+```
+gh auth login --hostname github.com --git-protocol https --web
+gh auth status
+```
+
+That stores the credential in Windows Credential Manager. Git and `gh` read it from there.
+3. Confirm `GITHUB_PERSONAL_ACCESS_TOKEN` is absent from `~/.claude/settings.json`.
+4. If an MCP server still demands an env var, set it in your **user** environment for the
+   current session (`$env:GITHUB_PERSONAL_ACCESS_TOKEN = (gh auth token)`) and never write
+   the value into a file in this repository, a settings.json, or a gist.
+
 ## Local repair after cloning, on Windows
 
 Git for Windows defaults to `core.symlinks=false` without developer mode. A clone made that way

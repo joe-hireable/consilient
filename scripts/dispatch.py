@@ -32,11 +32,13 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from consilient.harness import (  # noqa: E402
+    DEFAULT_PERMISSION_MODE,
     DEFAULT_POOLS,
     HARNESSES,
     Decision,
     FanoutDecision,
     Harness,
+    PermissionMode,
     PoolState,
     Probe,
     classify_artefact,
@@ -44,10 +46,12 @@ from consilient.harness import (  # noqa: E402
     describe_registry,
     harness_by_id,
     judge_fanout,
+    load_permission_mode,
     load_pools,
     make_run_id,
     now_ts,
     parse_status,
+    permission_flags,
     record_fanout,
     record_outcome,
     record_refusal,
@@ -64,6 +68,7 @@ if hasattr(sys.stderr, "reconfigure"):
 DEFAULT_LOG = ROOT / ".harness" / "log"
 DEFAULT_HEADROOM = ROOT / ".harness" / "headroom.json"
 DEFAULT_RUNS = ROOT / ".harness" / "dispatch"
+DEFAULT_PERMISSIONS = ROOT / ".harness" / "permissions.json"
 CURSOR_WSL_BINARY = Path("/home/jpbpr/.local/bin/cursor-agent")
 GROK_CANDIDATES = (
     Path.home() / ".grok" / "bin" / "grok.exe",
@@ -392,15 +397,17 @@ def build_command(
     cwd: Path,
     brief: Path,
     model: str | None,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
 ) -> list[str] | str:
     """Return argv, or a refusal reason string."""
     cwd = cwd.resolve()
     brief = brief.resolve()
+    bypass = list(permission_flags(harness.id, permissions))
     if harness.id == "claude":
         binary = find_claude()
         if binary is None:
             return "claude is not on PATH"
-        return [binary, "-p", task]
+        return [binary, *bypass, "-p", task]
     if harness.id == "grok":
         metered = metered_grok_reason()
         if metered is not None:
@@ -409,12 +416,18 @@ def build_command(
         if binary is None:
             return "grok is not on PATH or in ~/.grok/bin"
         extra = optional_flags(help_text([binary]), "--always-approve")
+        for flag in bypass:
+            if flag not in extra:
+                extra.append(flag)
         return [binary, "-p", task, "--cwd", str(cwd), *extra]
     if harness.id == "codex":
         binary = find_codex()
         if binary is None:
             return "codex is not on PATH"
         extra = optional_flags(help_text([binary, "exec"]), "--skip-git-repo-check")
+        for flag in bypass:
+            if flag not in extra:
+                extra.append(flag)
         # Insert extra flags before the prompt so they are not eaten as the task.
         return [binary, "exec", "-C", str(cwd), *extra, task]
     if harness.id == "cursor-composer":
@@ -432,6 +445,9 @@ def build_command(
         extra: list[str] = []
         if native is not None:
             extra = optional_flags(help_text([native]), "--force", "--trust")
+            for flag in bypass:
+                if flag not in extra:
+                    extra.append(flag)
             return [
                 native,
                 "-p",
@@ -456,6 +472,9 @@ def build_command(
             "--force",
             "--trust",
         )
+        for flag in bypass:
+            if flag not in extra:
+                extra.append(flag)
         extra_s = (" " + " ".join(extra)) if extra else ""
         # The task body never enters the shell: only paths we created do.
         inner = (
@@ -475,13 +494,21 @@ def run_harness(
     timeout_s: int,
     model: str | None,
     run_id: str,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
     brief = write_brief(run_dir, task)
     stdout_path = (run_dir / "stdout.txt").resolve()
     stderr_path = (run_dir / "stderr.txt").resolve()
-    built = build_command(harness, task=task, cwd=cwd, brief=brief, model=model)
+    built = build_command(
+        harness,
+        task=task,
+        cwd=cwd,
+        brief=brief,
+        model=model,
+        permissions=permissions,
+    )
     if isinstance(built, str):
         return RunResult(
             harness=harness,
@@ -677,6 +704,7 @@ def dispatch_one(
     timeout_s: int,
     model: str | None,
     dry_run: bool,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "dispatch")
@@ -705,7 +733,14 @@ def dispatch_one(
     harness = decision.harness
     if dry_run:
         brief = write_brief((runs_dir / run_id).resolve(), task)
-        built = build_command(harness, task=task, cwd=cwd, brief=brief, model=model)
+        built = build_command(
+            harness,
+            task=task,
+            cwd=cwd,
+            brief=brief,
+            model=model,
+            permissions=permissions,
+        )
         command = built if isinstance(built, list) else []
         reason = built if isinstance(built, str) else decision.reason
         payload = {
@@ -730,6 +765,7 @@ def dispatch_one(
         timeout_s=timeout_s,
         model=model,
         run_id=run_id,
+        permissions=permissions,
     )
     recorded = record_outcome(
         log_dir,
@@ -769,6 +805,7 @@ def dispatch_fanout(
     timeout_s: int,
     model: str | None,
     dry_run: bool,
+    permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "fanout")
@@ -816,6 +853,7 @@ def dispatch_fanout(
             timeout_s=timeout_s,
             model=model if harness.id == "cursor-composer" else None,
             run_id=child_id,
+            permissions=permissions,
         )
         record_outcome(
             log_dir,
@@ -901,6 +939,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--probe", action="store_true", help="probe installed harnesses and exit")
     parser.add_argument("--dry-run", action="store_true", help="select (and print argv) without running")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--permissions",
+        choices=("bypass", "prompt"),
+        default=None,
+        help="bypass (default) runs children without per-tool prompts; prompt leaves their ask-loop on. "
+        "Overrides .harness/permissions.json.",
+    )
     return parser
 
 
@@ -911,6 +956,11 @@ def main(argv: list[str] | None = None) -> int:
     runs_dir = Path(args.runs).resolve()
     headroom_path = Path(args.headroom).resolve()
     ensure_default_headroom(headroom_path)
+    permissions: PermissionMode = (
+        args.permissions
+        if args.permissions is not None
+        else load_permission_mode(DEFAULT_PERMISSIONS)
+    )
 
     try:
         pools: tuple[PoolState, ...] = load_pools(headroom_path)
@@ -974,6 +1024,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout_s=args.timeout,
             model=args.model,
             dry_run=args.dry_run,
+            permissions=permissions,
         )
         emit(payload, args.json)
         return code
@@ -993,6 +1044,7 @@ def main(argv: list[str] | None = None) -> int:
         timeout_s=args.timeout,
         model=args.model,
         dry_run=args.dry_run,
+        permissions=permissions,
     )
     emit(payload, args.json)
     return code

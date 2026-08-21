@@ -83,3 +83,6 @@ red-cells-evidence.json
 # payload observed from their account, is theirs and stays out of a public repository.
 .harness/limits.json
 .harness/usage/
+# INSTANCE permission mode for dispatched harnesses. PRODUCT default is bypass.
+.harness/permissions.json
+.harness/status.html

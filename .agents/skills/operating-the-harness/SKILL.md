@@ -27,6 +27,7 @@ python -m consilient.cli usage
 python -m consilient.cli dashboard
 python scripts/dispatch.py --probe
 python scripts/dispatch.py "the task"
+python scripts/dispatch.py --permissions prompt "ask me before tools"
 python scripts/verdict.py reject "what was wrong" --checks pass
 ```
 
@@ -43,6 +44,11 @@ without the principal is how a surface change gets laundered.
 refuses an exhausted pool. `--allow-exhausted` spends one; only the principal
 may pass that flag. Claude weekly has been nearly exhausted on this machine;
 Cursor and Grok have not. [measured]
+
+Dispatched children default to **bypass** permissions (`claude --dangerously-skip-permissions`,
+`codex --dangerously-bypass-approvals-and-sandbox`, `grok --always-approve`,
+`cursor-agent --force --trust`). Override with `--permissions prompt` or
+`.harness/permissions.json`. The meta-harness owns that flag, not the child.
 
 Do not open a Claude Code chat to work around a refused pool. That is the
 behaviour this skill exists to stop.
