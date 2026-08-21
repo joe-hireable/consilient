@@ -202,6 +202,10 @@ def main(argv: list[str] | None = None) -> int:
             "foreign commit identifiers",
             [sys.executable, ".github/scripts/check_foreign_identifiers.py"],
         ),
+        # R05: a publication carrying [SNIP]/[2ND] citations is not releasable. Expected
+        # to read FAILED while the drafts carry unverified sources — that is the gate
+        # working, not the checker broken.
+        gate("source depth", [sys.executable, ".github/scripts/check_source_depth.py"]),
         clean_install_gate(),
     ]
 
