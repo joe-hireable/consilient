@@ -39,6 +39,11 @@ entities.json
 # be published deliberately; it must never be published as a side effect of a user's log living
 # in a tracked path. Enforced by test_no_user_trajectory_is_tracked.
 .harness/log/
+# Redacted share bundles are still the user's data. They are held privately if the
+# user consents (ADR-0057); they must never become publishable by occupying a tracked
+# path. The exporter does not exist yet. The ignore rule does, so the third leak is
+# not how we discover the gap. docs/20-design/trajectory-sharing-consent-2026-08-21.md.
+.harness/share/
 .harness/state.db-wal
 .harness/state.db-shm
 # `replay` sets aside a stale projection before rebuilding; it is a local artefact,

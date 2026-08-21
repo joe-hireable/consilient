@@ -274,9 +274,96 @@ def test_human_decision_must_record_its_channel():
         )
 
 
+def test_consent_purposes_are_exactly_improve_consilient():
+    """ADR-0057 authorises one purpose. Adding another is a decision, not a silent widen."""
+    assert events_mod.CONSENT_PURPOSES == {"improve-consilient"}
+
+
+def _consent_grant(actor, **data_over):
+    data = {
+        "purpose": "improve-consilient",
+        "retention_days": 365,
+        "principal": HUMAN,
+        "via": "cli",
+        **data_over,
+    }
+    return ev(event="consent.granted", actor=actor, data=data)
+
+
+def test_principal_can_author_a_consent_grant():
+    validate(_consent_grant(HUMAN))
+
+
+def test_agent_cannot_author_a_consent_grant():
+    with pytest.raises(EventError, match="only the principal may author"):
+        validate(_consent_grant("claude-senior-orchestrator"))
+
+
+def test_an_agent_cannot_author_consent_by_omitting_human_decision():
+    """The 20 August verdict hole, on the event that would authorise data leaving."""
+    grant = _consent_grant("agent")
+    assert "human_decision" not in grant["data"]
+    with pytest.raises(EventError, match="only the principal may author"):
+        validate(grant)
+
+
+def test_consent_grant_without_retention_is_refused():
+    grant = _consent_grant(HUMAN)
+    del grant["data"]["retention_days"]
+    with pytest.raises(EventError, match="retention_days"):
+        validate(grant)
+
+
+def test_consent_grant_with_non_positive_retention_is_refused():
+    with pytest.raises(EventError, match="retention_days"):
+        validate(_consent_grant(HUMAN, retention_days=0))
+    with pytest.raises(EventError, match="retention_days"):
+        validate(_consent_grant(HUMAN, retention_days=True))
+
+
+def test_consent_grant_with_unknown_purpose_is_refused():
+    with pytest.raises(EventError, match="purposes are not bundled"):
+        validate(_consent_grant(HUMAN, purpose="commercial-training"))
+
+
+def test_consent_event_cannot_be_filed_as_a_different_decision():
+    with pytest.raises(EventError, match="may not be filed as anything else"):
+        validate(_consent_grant(HUMAN, human_decision="approval"))
+
+
+def test_principal_can_author_a_consent_withdrawal():
+    validate(
+        ev(
+            event="consent.withdrawn",
+            actor=HUMAN,
+            data={
+                "purpose": "improve-consilient",
+                "principal": HUMAN,
+                "via": "cli",
+            },
+        )
+    )
+
+
+def test_agent_cannot_author_a_consent_withdrawal():
+    with pytest.raises(EventError, match="only the principal may author"):
+        validate(
+            ev(
+                event="consent.withdrawn",
+                actor="codex-root",
+                data={
+                    "purpose": "improve-consilient",
+                    "principal": HUMAN,
+                    "via": "cli",
+                },
+            )
+        )
+
+
 # ---------------------------------------------------------------- V0-28
 @pytest.mark.parametrize(
-    "decision", ("verdict", "approval", "gate_lift", "spend_authorisation")
+    "decision",
+    ("verdict", "approval", "consent", "gate_lift", "spend_authorisation"),
 )
 @pytest.mark.parametrize(
     "via",
@@ -3127,6 +3214,35 @@ def test_no_user_trajectory_is_tracked():
         "a user trajectory file is tracked and would be published on the next release: "
         f"{tracked}. The trajectory is private by default; publish a curated provenance "
         "record instead."
+    )
+
+
+def test_share_payloads_are_not_tracked():
+    """A redacted share bundle is still user data and must not live on a tracked path.
+
+    ADR-0057: data a user chooses to share is held privately, not published. The
+    trajectory log was published by occupying a tracked path; the share directory
+    is gitignored before any exporter exists so that failure cannot recur on the
+    second artefact. docs/20-design/trajectory-sharing-consent-2026-08-21.md.
+    """
+    gitignore = Path(".gitignore").read_text(encoding="utf-8")
+    assert ".harness/share/" in gitignore, (
+        ".harness/share/ is not in .gitignore; a share bundle would be committable "
+        "the moment an exporter writes one"
+    )
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    tracked = subprocess.run(
+        ["git", "ls-files", ".harness/share/"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=True,
+    ).stdout.split()
+    assert tracked == [], (
+        "a share payload is tracked and would be published on the next release: "
+        f"{tracked}"
     )
 
 

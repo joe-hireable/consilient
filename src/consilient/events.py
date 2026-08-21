@@ -4,7 +4,8 @@ The append-only JSONL log is the record; everything else is a projection of it (
 
 Invariants enforced here, each with a test in the same commit:
   V0-01  every event is schema-versioned and append-only.
-  V0-18  a human decision is valid only when the human principal authored it.
+  V0-18  a human decision (approval, consent, gate lift, spend authorisation
+         or verdict) is valid only when the human principal authored it.
   V0-26  multi-contributor events must declare a distinct evidence_class per contributor.
   V0-27  attempt outcomes and their later human verdicts share one stable identity.
   V0-28  a declared non-local channel cannot deliver a human decision.
@@ -63,11 +64,20 @@ TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\
 HUMAN_ONLY = frozenset(
     {
         "approval",
+        "consent",
         "gate_lift",
         "spend_authorisation",
         "verdict",
     }
 )
+
+# ADR-0057: sharing is opt-in, one purpose, private, used to improve Consilient only.
+# Pinning the set makes bundling a failing test rather than a comment. Expanding it is
+# an explicit decision; an existing grant does not become authority for a new purpose.
+CONSENT_GRANTED = "consent.granted"
+CONSENT_WITHDRAWN = "consent.withdrawn"
+CONSENT_KINDS = frozenset({CONSENT_GRANTED, CONSENT_WITHDRAWN})
+CONSENT_PURPOSES = frozenset({"improve-consilient"})
 
 
 class EventError(ValueError):
@@ -160,6 +170,7 @@ def validate(event: object) -> EventPayload:
     _check_usage_contract(event)
     _check_attempt_identity(event)
     _check_attempt_contract(event)
+    _check_consent_contract(event)
     _check_human_authority(event)
     _check_evidence_class(event)
     _check_dispatch_contract(event)
@@ -472,6 +483,36 @@ def _check_attempt_contract(event: EventPayload) -> None:
         raise EventError(f"{VERDICT_CORRECTION_KIND} must carry a non-empty reason")
 
 
+def _check_consent_contract(event: EventPayload) -> None:
+    """A consent event names a permitted purpose; a grant states a retention period.
+
+    ADR-0057 forbids shipping sharing until consent, retention and a checkable use
+    limit exist. The exporter is not in this commit. These two fields are the part
+    of that bar that can be enforced on the record itself: a grant with no purpose
+    or no retention is the gap the ADR named, and omitting `human_decision` must
+    not dodge V0-18 the way omitting it once dodged a verdict.
+    """
+    kind = event["event"]
+    if kind not in CONSENT_KINDS:
+        return
+    data = event["data"]
+    purpose = data.get("purpose")
+    if purpose not in CONSENT_PURPOSES:
+        raise EventError(
+            f"{kind} must declare purpose as one of {sorted(CONSENT_PURPOSES)}; "
+            "ADR-0057 permits sharing only to improve Consilient, and purposes "
+            "are not bundled"
+        )
+    if kind != CONSENT_GRANTED:
+        return
+    retention = data.get("retention_days")
+    if not isinstance(retention, int) or isinstance(retention, bool) or retention <= 0:
+        raise EventError(
+            f"{kind} must carry retention_days as a positive integer; "
+            "a grant with no stated retention is the gap ADR-0057 forbids shipping"
+        )
+
+
 def _check_human_authority(event: EventPayload) -> None:
     """V0-18: an agent may never author a human's decision.
 
@@ -501,6 +542,20 @@ def _check_human_authority(event: EventPayload) -> None:
             raise EventError(
                 f"event carries a human_verdict but declares human_decision {decision!r}; "
                 "a human verdict is a verdict and may not be filed as anything else (V0-18)"
+            )
+
+    # Same shape for consent. A `consent.granted` event *is* a human decision; if we
+    # returned early whenever `human_decision` was absent, an agent could author a
+    # share grant by omitting the field — the verdict hole, reproduced on the event
+    # that would authorise data leaving the machine.
+    if event["event"] in CONSENT_KINDS:
+        if decision is None:
+            decision = "consent"
+        elif decision != "consent":
+            raise EventError(
+                f"event {event['event']} carries human_decision {decision!r}; "
+                "a consent event is a consent and may not be filed as anything else "
+                "(V0-18)"
             )
 
     if decision is None:
