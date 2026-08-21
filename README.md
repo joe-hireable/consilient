@@ -180,7 +180,12 @@ negative or underpowered results ship as research notes rather than waiting for 
 
 ## Start here
 
-**Read, in order:**
+**If you just want to use it**, read
+[`docs/00-context/getting-started.md`](docs/00-context/getting-started.md). Every command on that
+page was run against this tree and its real output pasted in, including the ones that fail and how
+to recover. It assumes none of the vocabulary below.
+
+**If you want to understand why it is built this way**, read in order:
 
 1. [`CONSILIENCE.md`](CONSILIENCE.md) — the definition everything derives from
 2. [`docs/decisions/index.md`](docs/decisions/index.md) — the formal ADR index; the load-bearing four are
