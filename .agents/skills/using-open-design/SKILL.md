@@ -121,28 +121,28 @@ These are `[asserted]` — brand direction from the principal, not measured. The
 critique's Functionality and Hierarchy dimensions are the checks against
 novelty-for-its-own-sake.
 
-## Why critique is a different class of facts
+## What the critique is and is not
 
-Under `CONSILIENCE.md` clause 2, structures that touch the world are
-consilient; structures that only talk are echo. The 5-dimension critique draws
-on HCI literature (hierarchy, readability at distance, click-target sizing) and
-design-craft tradition (typographic alignment, spacing ratios, editorial
-rhythm). That is a different class from:
+The 5-dimension critique is a **structured observation**, not a verifier and not
+an acceptance signal. `design-capability-assessment-2026-08-20.md` §5 rejected
+LLM design critics as echo without ground truth; `interface-beta-2026-08-20.md`
+item 6 refuses visual-LLM judges. A model assigning 0–10 scores to a rendered
+page is a visual-LLM judge, and this skill does not claim otherwise.
 
-- `[simulated]` user studies, which model users rather than observing them.
-- Source-code review, which sees the structure but not the rendered surface.
-- Automated accessibility checks (WCAG contrast, ARIA), which are a third
-  class — mechanical, not judgemental.
+**What it adds over "looks good":** scored dimensions with cited evidence,
+reproducible across reviewers, and a structured action list. That is more
+informative than an unstructured opinion and less informative than a
+deterministic instrument (a layout engine, a raster diff, a schema linter).
 
-The critique therefore qualifies as a different induction under the exogenous-
-signal rule (ADR-0010), provided it runs on a **rendered artefact** rather than
-on source alone. A critique of an HTML file that was never opened in a browser
-is echo wearing a different hat.
+**The narrow window where it adds a genuinely different signal:** when it
+identifies mechanical defects observable only on the rendered surface — broken
+click targets, unreadable contrast, orphaned layout elements, navigation
+failures. Those are implicit-oracle observations. The Functionality dimension
+overlaps this window; the other four dimensions are the model's judgement.
 
-**The critique is not an acceptance signal.** It is a structured observation.
-Acceptance is a human verdict, per `AGENTS.md` working principle 5 and
-`interface-beta-2026-08-20.md` item 6. The critique raises or lowers confidence;
-it does not gate.
+All critique scores are tagged `[asserted]`. Acceptance remains a human
+verdict (working principle 5). The critique raises or lowers confidence; it
+does not gate.
 
 ## What this skill does not do
 

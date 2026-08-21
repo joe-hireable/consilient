@@ -1,6 +1,6 @@
-# 0060. Adopt Open Design's portable contract and critique for design work; the desktop app is a supported composition element, not a runtime dependency
+# 0060. Adopt Open Design's portable contract and critique for design work; the desktop app is an optional local tool, not a runtime dependency
 
-- **Status:** PROVISIONAL
+- **Status:** PROVISIONAL — pending EXP-95 (critique inter-rater reliability)
 - **Date:** 2026-08-21
 - **Deciders:** Joe Brown (the direction, the brand thesis, the installation, the instruction
   that the ADR is needed); cloud agent (the mechanism and the distillation)
@@ -17,95 +17,118 @@ Four forces converged on 21 August 2026.
 local bridges, and that no harness here has a native design capability. `[measured]`
 ADR-0054 names "design with Figma plugins or OpenDesign" as a capability to route to;
 naming is not integration. The result: every UI-generating task falls back to whatever the
-model's pretraining median looks like, and that median converges on a recognisable cluster
-— Instrument Serif, IBM Plex, Inter/Geist, cyan–violet, bento KPIs, thinking theatre —
-that users identify as "every AI product looks the same". `[asserted]`
+model's pretraining median looks like. `[asserted]`
 
-### 2. The orchestration gap between Claude Design, Cowork and Claude Code is measured
+### 2. The orchestration gap between Claude Design, Cowork and Claude Code is documented
 
-Claude Design's built-in MCP server OAuth flow is broken as of 21 August 2026
-(anthropics/claude-code#69317, #77620, #84798; the `/authorize` endpoint returns HTTP 410).
-`[cited]` Two community workarounds exist (`kuatecno/mcp-design`,
-`e-brokenc0de/claude-design-mcp`); neither is installed. Joe reported this as a concrete
-pain point: design work done in Claude Design cannot easily flow into Claude Code or
-Cowork sessions. Open Design, by contrast, works through files (`DESIGN.md`) that every
-harness can already read — a structural advantage for a meta-harness that orchestrates
-across vendors. `[asserted]`
+Claude Design's built-in MCP server OAuth flow has been broken — `anthropics/claude-code`
+issues #69317 (closed), #77620 (open as of 21 Aug 2026), #84798 (closed). `[cited]` Two
+community workarounds exist (`kuatecno/mcp-design`, `e-brokenc0de/claude-design-mcp`);
+neither is installed. Joe reported this as a concrete pain point: design work done in Claude
+Design cannot easily flow into Claude Code or Cowork sessions. Open Design, by contrast,
+works through files (`DESIGN.md`) that every harness can already read — a structural
+advantage for a meta-harness that orchestrates across vendors. `[asserted]`
 
 ### 3. Joe installed the Open Design desktop on 21 August 2026
 
 `[asserted]` — not re-probed; the binary, version and reachable harnesses are unknown until
-a probe runs. This makes it a composition element on his machine, and composition elements
-need a recorded decision about their relationship to the harness.
+a probe runs. ADR-0007's supersession note states that "the prohibitions on a TUI, a
+desktop app and a local web server survive intact." That prohibition is on *this project
+building* a surface, not on a third-party tool being present on the operator's machine.
+The desktop is present, not built by us, and unprobed. `[asserted]`
 
 ### 4. The brand thesis: outlier, not median
 
-Joe, 21 August 2026 (distilled from three messages; the words below are the agent's
-organisation of his direction, not a verbatim transcript):
+Joe's direction, 21 August 2026, distilled from three messages. The organisation is the
+agent's; the words in the verbatim quotation are Joe's.
 
-> In the age of AI coding and design agents making every website, frontend and piece of
-> content look "great" but identical, **distinction is the scarce resource, not quality.**
-> Attention spans are short. Trust in online media is low. Every AI product uses the same
-> fonts, the same layouts, the same "thinking theatre." The pretraining median is now the
-> visible floor, and the floor is crowded.
->
-> Consilient's brand is **pushing the boundaries of artificial and human intelligence** —
-> not relying on pretraining to produce the "current right thing" but pushing the very idea
-> of what the best looks like. **We are the outliers.** The brand, the design, the product
-> all need to reflect that.
->
-> The frontend is not just a CLI. Consilient needs **full web and mobile app designs** —
-> its equivalent of Claude Cowork, Hermes Agent, ChatGPT Work and Gemini Spark — but its
-> architecture is fundamentally different: more autonomous, needs less frontend, and what
-> frontend it has must be **more beautiful, more unique, and emphatically not the same stuff
-> every AI model spits out.**
+In the age of AI coding and design agents making every website, frontend and piece of
+content look "great" but identical, **distinction is the scarce resource, not quality.**
+Attention spans are short. Trust in online media is low. Every AI product uses the same
+fonts, the same layouts, the same "thinking theatre." The pretraining median is now the
+visible floor, and the floor is crowded.
 
-That thesis is `[asserted]` — it is a brand direction, not a measurement. But it is
-consistent with two things already in evidence:
+Consilient's brand is pushing the boundaries of artificial and human intelligence — not
+relying on pretraining to produce the "current right thing" but pushing the very idea of
+what the best looks like. The brand, the design, the product all need to reflect that.
 
-- `[cited]` The pretraining-median convergence is observable. Open Design's own ban list and
-  "AI-slop median" scoring band (Innovation dimension, 0–4) name the same phenomenon from
-  the design-craft side.
-- `[asserted]` `CONSILIENCE.md` clause 2 already requires **different**, and the different-
-  class rule (ADR-0010) already refuses echo. A visual identity that is the pretraining
-  median is echo in a literal sense — the model reproducing its training distribution rather
-  than introducing a new signal. The brand thesis is an instance of the exogenous-signal
-  rule applied to aesthetics.
+The frontend is not just a CLI. Consilient needs full web and mobile app designs — its
+equivalent of Claude Cowork, Hermes Agent, ChatGPT Work and Gemini Spark — but its
+architecture is fundamentally different: more autonomous, needs less frontend, and what
+frontend it has must be more beautiful, more unique, and emphatically not the same stuff
+every AI model spits out.
 
-The two design concept documents (`frontend-concepts-kimi-2026-08-20.md` and any concurrent
-pass) are a `[simulated]` tie with overlapping CIs. The frontend concept is unsettled and
-needs further work — but this ADR now provides the method, the brand constraint, and the
-upstream relationship by which that work proceeds.
+> "minimalist is good — overwhelm is real so differentiation without just looking
+> ridiculous is a fine balance but we need to find it."
+> — Joe, 21 August 2026
+
+That thesis is `[asserted]` — it is a brand direction, not a measurement. But the
+underlying observation — that AI-assisted output converges, raising individual quality
+while reducing collective diversity — has been measured in an adjacent modality:
+
+- `[cited]` Doshi & Hauser, *Science Advances* 10(28), 2024,
+  DOI 10.1126/sciadv.adn5290: AI-assisted stories rated more creative individually while
+  being measurably more similar to each other. Individual quality up, collective diversity
+  down, described by the authors as a social dilemma.
+- `[cited]` Kleinberg & Raghavan, PNAS 118(22), 2021, *Algorithmic monoculture and social
+  welfare* — the formal model. Already cited in this repository as reference 17 of
+  `docs/50-publications/P3-echo.md`.
+- `[cited]` The "AI-slop median" scoring band (Innovation dimension, 0–4: "Generic AI-slop
+  median") in the upstream Open Design critique skill names the same phenomenon from the
+  design-craft side. The ban list is **not** from upstream — it is original to this
+  repository.
+
+One independent design pass exists (`frontend-concepts-kimi-2026-08-20.md`); a concurrent
+pass was commissioned and is not in the repository; no comparison has been performed. The
+frontend concept is unsettled. `[asserted]`
 
 ## Decision
 
 ### 1. The DESIGN.md contract is the portable design method
 
 All design work in this repository uses the Open Design 9-section `DESIGN.md` format
-(Visual Theme & Atmosphere, Colour Palette & Roles, Typography Rules, Component Stylings,
-Layout Principles, Depth & Elevation, Do's and Don'ts, Responsive Behaviour, Agent Prompt
+(Visual Theme & Atmosphere, Color Palette & Roles, Typography Rules, Component Stylings,
+Layout Principles, Depth & Elevation, Do's and Don'ts, Responsive Behavior, Agent Prompt
 Guide).
 
-**Tokens are non-negotiable once locked.** An agent generating artefacts under a locked
-`DESIGN.md` must not invent hex values, font stacks, or spacing outside the declared
-palette. A violation is a defect, not a style choice.
+**Tokens are the intended palette once locked.** An agent generating artefacts under a
+locked `DESIGN.md` should not invent hex values, font stacks, or spacing outside the
+declared palette. Deviation is reviewable, and the CI check that would enforce this is
+owed — see Enforcement. Until that check ships, this is guidance carried by the skill,
+not an enforced invariant, and the deviation is logged in `gate-bypass-log.md`.
 
 The skill is `.agents/skills/using-open-design/`, carrying the template and a vendored
-critique with provenance. It is procedure, not an invariant; the token rule is enforceable
-by a CI check on files governed by a `DESIGN.md`, but that check is owed, not shipped in
-this commit.
+critique with provenance.
 
-### 2. The 5-dimension critique is a different class of facts
+### 2. The 5-dimension critique is a structured observation, not a verifier
 
 The critique (Philosophy consistency, Visual hierarchy, Detail execution, Functionality,
-Innovation) draws on HCI literature and design-craft tradition. Under ADR-0010's
-exogenous-signal rule, it qualifies as a different induction from source-code review and
-from `[simulated]` user studies, provided it runs on a **rendered artefact**. A critique of
-source is echo.
+Innovation) draws on HCI literature and design-craft tradition.
 
-The critique is not an acceptance signal. It is a structured observation that raises or
-lowers confidence. Acceptance remains a human verdict (working principle 5,
-`interface-beta-2026-08-20.md` item 6).
+**What the critique is.** A structured review that produces scored, evidence-cited
+observations. It is more informative than "looks good" and less informative than a
+deterministic instrument (a layout engine, a raster diff, a schema linter).
+
+**What the critique is not.** It is not a verifier, not an acceptance signal, and not a
+different class of facts in the strong sense of ADR-0010. A model assigning 0–10 scores to a
+rendered page is still a model's judgement, and `design-capability-assessment-2026-08-20.md`
+§5 explicitly rejected "LLM design critique harness" as echo without ground truth —
+listing persona-prompted design critics among CUT structures. `[measured]` — read from the
+committed file. `interface-beta-2026-08-20.md` item 6 refuses visual-LLM judges as
+acceptance signals. `[cited]`
+
+The skill requires critiques to be tagged `[asserted]`. A second critique from a different
+model family is an optional upgrade, not a consilience — because the judgement is still the
+model's, and different families sharing no ground truth do not escape the prior assessment's
+objection.
+
+**The narrow window where the critique adds a genuinely different signal:** when it
+identifies mechanical defects observable only on the rendered surface — broken click targets,
+unreadable contrast, orphaned layout elements, navigation failures. Those are implicit-
+oracle observations in the sense of `qa-automation-and-the-anchor-problem.md`, and they are
+the same class that `design-capability-assessment-2026-08-20.md` §1 permits (layout engine,
+raster diff). The skill's Functionality dimension overlaps this window; the other four
+dimensions do not.
 
 ### 3. The ban list is a default, and the brand thesis is its justification
 
@@ -114,10 +137,12 @@ cyan–violet gradient, chat-column-as-product, bento-grid KPIs, thinking theatr
 rings) is refused by default. A banned element may appear with a comment stating why the
 context makes it appropriate.
 
-The ban list was `[asserted]` when it named the pretraining median. It now has a second
-leg: Joe's brand thesis says Consilient is an outlier, and an outlier's visual identity
-cannot be the mode of its own training distribution. That is still `[asserted]` — no
-measurement of the median exists — but the direction is recorded and adopted.
+The ban list is `[asserted]` — it names the observed pretraining median in the visual
+modality, but no systematic measurement of that median exists here. Doshi & Hauser 2024
+measured convergence in text; visual convergence is the same thesis applied to a different
+modality and remains `[asserted]` until measured. The brand thesis (§4) provides the
+directional justification: an outlier's visual identity cannot be the mode of its own
+training distribution.
 
 ### 4. The brand direction: outlier identity, anti-median, boundary-pushing
 
@@ -146,9 +171,8 @@ overwhelm is real, attention is short, trust is low, and the pretraining median 
 "polished". But anti-median does not mean anti-usable, and different-for-its-own-sake is
 just another kind of noise. The design problem is a fine balance: recognisably *not the
 cluster*, but also recognisably *good*. Quiet enough to reward low attention spans, honest
-enough to survive low trust, distinctive enough that a screenshot is attributable. Joe,
-21 August 2026: "minimalist is good — overwhelm is real so differentiation without just
-looking ridiculous is a fine balance but we need to find it." `[asserted]`
+enough to survive low trust, distinctive enough that a screenshot is attributable.
+`[asserted]`
 
 **What this does not settle.** It does not name the typeface, the palette, the layout
 system, or the motion language. Those belong in the product's `DESIGN.md`, which is the
@@ -168,23 +192,29 @@ next deliverable after this ADR. It settles the *constraints* on that DESIGN.md:
   than to serve the user, it has failed. Anti-median is a direction, not a licence to ignore
   craft.
 
-### 5. The Open Design desktop is a supported composition element, not a runtime dependency
+### 5. The Open Design desktop is an optional local tool, not a runtime dependency
 
 The distinction matters under ADR-0016 and `AGENTS.md`:
 
 - **No `pip install`, `npm install`, or registry resolution** is added. The skill and its
   references are plain markdown files. No harness needs the desktop to function.
   `[measured]` — the skill file is readable without any binary.
-- **The desktop, when installed, is a composition element** in ADR-0027's sense: it reads
-  the same `DESIGN.md` files the skill produces, and its capabilities are subject to the
-  same probe-before-trust rule as any other composition element (ADR-0042, ADR-0054). Joe's
-  installation is `[asserted]` until probed.
+- **The desktop, when installed, is an optional local tool** that reads the same `DESIGN.md`
+  files the skill produces. It is not a dependency this project builds, maintains, or
+  requires. ADR-0007's prohibition on building a desktop app is not engaged — the
+  prohibition is on *this project* building a surface, not on a third-party tool being
+  present. Joe's installation is `[asserted]` until probed; its capabilities are subject to
+  ADR-0042's probe-before-trust rule. `[asserted]`
 - **The relationship to upstream is ADR-0036's.** Adopt, contribute, never silently fork.
   Open Design (nexu-io/open-design) is Apache-2.0, actively maintained (~90 k stars,
-  811 open issues, PRs merged on 21 August 2026), and has a documented contribution path
+  PRs merged on 21 August 2026), and has a documented contribution path
   (`CONTRIBUTING.md`, `od-contribute` skill). `[cited]` Improvements found here — to the
   critique, to the DESIGN.md format, to the skill protocol — are offered upstream per
-  ADR-0036 §2. A fork is debt, logged and paid (ADR-0036 §4).
+  ADR-0036 §2. A fork is debt, logged and paid (ADR-0036 §4). **Note the tension:**
+  ADR-0036 §2 says "not a vendored copy"; ADR-0016 §1 requires vendoring third-party skills
+  ("read in full and committed… pin by content, not by registry reference"). This PR follows
+  ADR-0016 for the skill content and ADR-0036 for the upstream relationship. The upstream
+  URL is recorded in the vendored file. `[asserted]`
 
 ### 6. The frontend concept requires its own DESIGN.md before any artefact is generated
 
@@ -205,111 +235,106 @@ ChatGPT Work / Gemini Spark — is a different product and needs a different des
 
 **This ADR does not produce that DESIGN.md.** It provides the method (Open Design
 contract), the brand constraints (§4), the upstream relationship (§5), and the review method
-(the 5-dimension critique as a different class of facts). The next step is a design brief
-under those constraints, followed by a DESIGN.md authored under this skill's method,
-followed by the critique as a second reader.
+(the critique as a structured observation). The next step is a design brief under those
+constraints, followed by a DESIGN.md authored under this skill's method, followed by the
+critique as a second reader.
 
 ## Evidence
 
 - `[measured]` No Open Design binary was found on this machine on 21 August 2026; the
   portable skill exists and is readable without one.
+- `[cited]` Doshi & Hauser, *Science Advances* 10(28), 2024 — AI-assisted output raises
+  individual quality while reducing collective diversity. The convergence claim in the brand
+  thesis has been measured in text; visual convergence remains `[asserted]`.
+- `[cited]` Kleinberg & Raghavan, PNAS 118(22), 2021 — the formal model of algorithmic
+  monoculture. Already in this repository's bibliography (P3-echo ref. 17).
 - `[cited]` Open Design is Apache-2.0, nexu-io/open-design, ~90 k stars, actively
   maintained. `CONTRIBUTING.md` documents the contribution path.
-- `[cited]` Claude Design's built-in MCP server OAuth is broken as of 21 August 2026
-  (anthropics/claude-code#69317, #77620, #84798). The file-based `DESIGN.md` contract
-  avoids this class of integration failure entirely.
-- `[cited]` ADR-0036 §2: "When an adopted dependency needs to change, the default is a
-  pull request upstream."
+- `[cited]` Claude Design's built-in MCP server OAuth has been broken (anthropics/claude-code
+  #69317 closed, #77620 open, #84798 closed as of 21 Aug 2026).
+- `[cited]` ADR-0036 §2 governs the upstream relationship.
+- `[cited]` `design-capability-assessment-2026-08-20.md` §5 rejected LLM design critique as
+  echo; §1 requires aesthetic output labelled `unverified`. This ADR's §2 narrows the
+  critique accordingly and does not claim it as a verifier.
 - `[asserted]` Joe's brand thesis: outlier identity, anti-median, push the idea of what the
   best looks like. Distilled from three messages on 21 August 2026.
-- `[asserted]` The ban list names the observed pretraining median. No systematic measurement
-  exists.
-- `[asserted]` The critique qualifies as a different class of facts under ADR-0010, with the
-  rendered-artefact caveat.
+- `[asserted]` The ban list names the observed pretraining median in the visual modality. No
+  systematic measurement of visual convergence exists.
 - `[asserted]` Joe installed Open Design on his desktop on 21 August 2026.
 
 ## Evidence against
 
 - **The brand thesis is taste, not measurement.** "We are the outliers" is a positioning
-  statement. It does not follow from any evidence in this repository. The claim that
-  distinction is the scarce resource in the age of AI-generated design is plausible and
-  widely observed but is `[asserted]` here. The risk: a brand thesis adopted without
-  measurement becomes an unfalsifiable preference that resists correction. Mitigated by §4's
-  explicit `[asserted]` tags and by the design critique providing a structured second opinion
-  on whether a result actually achieves distinction. `[asserted]`
+  statement. Doshi & Hauser 2024 measured the convergence phenomenon in text, not in visual
+  design; extrapolating to the visual modality is `[asserted]`. The risk: a brand thesis
+  adopted without measurement becomes an unfalsifiable preference. `[asserted]`
 - **"Anti-median" can produce anti-quality.** Refusing the pretraining median does not
-  guarantee the replacement is better. A typeface chosen *because* no AI would pick it may be
-  a bad typeface. The critique's Functionality dimension (does it *work*?) and the Hierarchy
-  dimension (can a stranger read it?) are the checks against novelty-for-its-own-sake. The
-  brand thesis says "push boundaries", not "ignore usability". `[asserted]`
-- **The ban list is taste.** Same as the previous draft's objection: no systematic
-  measurement of model design output distributions exists. `[asserted]`
-- **Open Design is one project's convention, not a standard.** The 9-section format is not
-  an ISO, a W3C spec, or even a broadly-adopted community norm outside Open Design's
-  ecosystem. Adopting it couples us to their format decisions. Mitigated: the format is
-  simple markdown, the sections are sensible, and the vendored copy insulates against
-  upstream drift. `[asserted]`
-- **"Tokens are non-negotiable" is an invariant stated without a shipped check.** Per
-  ADR-0014, a skill saying "always do X" is a prompt pretending to be enforcement. The
-  token-lockdown rule needs a CI check. That check is owed and not shipped. `[asserted]`
+  guarantee the replacement is better. The critique's Functionality and Hierarchy dimensions
+  are the checks against novelty-for-its-own-sake. `[asserted]`
+- **The critique is weaker than §2's framing implies.** `design-capability-assessment` §5
+  rejected LLM design critics as echo. `interface-beta-2026-08-20.md` item 6 refuses
+  visual-LLM judges as acceptance signals — and a model assigning 0–10 scores to a rendered
+  page is a visual-LLM judge. This ADR narrows the critique to structured observation, but
+  the prior rejection is not formally superseded. `[cited]`
+- **The ban list is taste.** No systematic measurement of model design output distributions
+  exists in the visual modality. `[asserted]`
+- **Open Design is one project's convention, not a standard.** Mitigated by vendored copy
+  and simple markdown format. `[asserted]`
+- **The token-lockdown guidance has no shipped check.** Logged in `gate-bypass-log.md` as a
+  deviation from I1. `[asserted]`
 - **The desktop installation is unprobed.** `[asserted]` until a probe runs.
-- **The critique is one reviewer's judgement.** No inter-rater reliability measurement
-  exists for these five dimensions. `[asserted]`
-- **The frontend concept is unsettled, and this ADR risks becoming a gate that delays it.**
-  "We can't design until we have a DESIGN.md" can stall indefinitely. The escape: the
-  DESIGN.md template is quick to fill, and filling it *is* the design decision, not a
-  prerequisite to one. `[asserted]`
+- **The critique has no measured inter-rater reliability.** EXP-95 is registered to test
+  this. `[asserted]`
+- **The frontend concept is unsettled.** This ADR provides the method but not the result.
+  The escape: the DESIGN.md template is quick to fill, and filling it *is* the design
+  decision. `[asserted]`
+- **ADR-0016 and ADR-0036 pull in opposite directions on vendoring.** ADR-0016 §1 requires
+  vendoring skills; ADR-0036 §2 says "not a vendored copy." This PR follows ADR-0016 for
+  skill content and ADR-0036 for the upstream relationship. The tension is named, not
+  resolved. `[asserted]`
 
 ## Consequences
 
 **Positive.** Design work now has a method that produces a lockable contract rather than
 ad hoc prompts. The brand thesis is recorded and traceable rather than implied. The contract
 is portable across all four harnesses. The critique provides a structured second reading.
-Upstream contributions are documented. The frontend direction is constrained by the brand
-without being prematurely settled.
+Upstream contributions are documented.
 
 **Negative.** One more skill to maintain. The token-lockdown check is owed. The ban list
 may need revision as pretraining distributions shift. The desktop installation is unprobed.
-The brand thesis is `[asserted]` and could calcify into dogma if not tested against real
-user response.
+The brand thesis is `[asserted]` and could calcify into dogma if not tested.
 
 **Neutral but load-bearing.** The frontend DESIGN.md is now explicitly the next step, and
 it cannot be skipped by generating UI directly. Every agent workflow and prompt that touches
-design work must respect the ban list and the brand constraints. That is a
-gate-before-generation constraint, which is the point.
+design work should respect the ban list and the brand constraints.
 
 ## Enforcement
 
-The DESIGN.md token-lockdown rule is stated but not yet enforced by a CI check. The check
-would: for any HTML/CSS file that names a governing `DESIGN.md` (via a comment or
-metadata), verify that colour hex values, font-family declarations, and border-radius
-values match the declared palette. Owed; not shipped in this commit. When shipped, it goes
-in the same commit as the implementation it checks (I1).
-
-The brand constraints (§4) are procedure, carried by the skill, not a CI-enforceable
-invariant. The critique is the review mechanism; the skill's ban list is the prompt-level
-guard. This is an acknowledged weakness: a prompt-level guard is exactly what ADR-0014
-warns against. The honest answer is that aesthetic invariants are harder to lint than
-structural ones, and the critique is the best instrument available until a visual-
-regression tool (e.g. a screenshot-diff that flags banned-font usage) is built. `[asserted]`
+- **Token-lockdown check:** owed, not shipped. The check would verify that colour hex
+  values, font-family declarations, and border-radius values in governed files match the
+  declared palette. When shipped, it goes in the same commit as the implementation (I1).
+  Until then, the deviation is logged in `docs/00-context/gate-bypass-log.md`.
+- **Fails CI:** not yet.
+- **Added in the same commit:** no — owed. This is an acknowledged I1 deviation.
 
 ## What would overturn this
 
-- **A systematic measurement of model design output distributions** showing the ban list is
-  wrong.
-- **The brand thesis being tested against real users** and found to repel rather than
-  attract. Distinction is only valuable if people want what is distinct; "different" and
-  "good" are not synonyms.
-- **Open Design going unmaintained** or its format fragmenting. The vendored copy insulates;
-  a format migration would be owed.
-- **The critique having no inter-rater reliability.**
-- **A better design method emerging** that subsumes the markdown contract.
+- **EXP-95 (critique inter-rater reliability):** two model families score the same five
+  rendered artefacts on the five dimensions. If scores do not correlate (Kendall τ < 0.3
+  across dimensions), the critique is noise. If they correlate, the critique is a weak but
+  real signal and §2's framing is vindicated.
+- **A systematic measurement of visual output convergence** across frontier models on a
+  design-generation task. Doshi & Hauser measured text; if visual output does not converge,
+  the ban list loses its empirical motivation. If it does converge on different elements than
+  the ban list names, the list needs revision.
+- **Open Design going unmaintained** or its format fragmenting.
+- **The brand thesis being tested against real users** and found to repel.
 
 ## Publication candidate?
 
-Possibly. The brand thesis — that the pretraining median is the new floor and distinction is
-the scarce resource — is an observation with broad applicability. If the ban list is ever
-measured rather than asserted, the measurement and the method would be worth a short post.
-The "anti-median as an instance of the exogenous-signal rule" argument is, if correct,
-genuinely novel and connects aesthetics to `CONSILIENCE.md` in a way that has not been
-written elsewhere. `[asserted]`
+Possibly, but the novelty claim must be narrowed. The convergence phenomenon (individual
+quality up, collective diversity down) is already published — Doshi & Hauser 2024 in text,
+Kleinberg & Raghavan 2021 as the formal model. What may be novel is the narrow mapping:
+anti-median aesthetics as an instance of Whewell's second clause (different class of facts
+applied to visual identity). That is a smaller claim than previously stated, and it is
+`[asserted]` — no measurement exists of whether the mapping holds.

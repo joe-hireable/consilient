@@ -6,12 +6,12 @@
 - **Licence:** Apache-2.0
 - **Pinned content hash (git blob SHA):** `0e8d6ccfd1769820b10916083ca152d3a250b4a4`
 - **Fetched:** 21 August 2026
-- **Upstream URL:** https://github.com/nexu-io/open-design/blob/main/design-templates/critique/SKILL.md
+- **Upstream URL:** https://github.com/nexu-io/open-design/blob/0e8d6ccfd1769820b10916083ca152d3a250b4a4/design-templates/critique/SKILL.md
 
 This file carries the five dimensions and their scoring bands so that a harness
 reading only this repository can run a design critique without fetching from the
-upstream registry at agent runtime (ADR-0016: "never resolve from a registry at
-agent runtime"). The workflow steps and HTML-report contract from the upstream skill are omitted
+upstream registry at agent runtime (ADR-0016 requires vendoring third-party
+skills rather than resolving at runtime). The workflow steps and HTML-report contract from the upstream skill are omitted
 here; the full upstream skill also specifies a radar-chart SVG output and an
 HTML artefact shape.
 

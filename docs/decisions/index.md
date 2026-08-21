@@ -1,6 +1,6 @@
 # Decision index
 
-52 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+59 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
 `python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
 catches a row missing from this table, which is the argument for generating it rather than
@@ -119,3 +119,5 @@ to every ADR and every PR:
 - **0054** — PROVISIONAL pending EXP-90 … EXP-93.
 - **0055** — PROVISIONAL pending EXP-74, EXP-75 and EXP-76; owes three enforcement checks (V0-30, V0-31, V0-32), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
 - **0056** — PROVISIONAL pending EXP-94 for the allocation clauses; D5 ships with its check.
+- **0060** — PROVISIONAL pending EXP-95 (critique inter-rater reliability); token-lockdown
+  CI check owed (I1 deviation logged in `gate-bypass-log.md`).
