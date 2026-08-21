@@ -2745,7 +2745,7 @@ def test_foreign_commit_identifiers_may_only_decrease():
         "both private corpora with a scrubbed environment, then allowlist it with a reason or "
         "aggregate it away."
     )
-    assert total <= 15, (
+    assert total <= 16, (
         f"the allowlisted identifier total rose to {total}. Every one is individually cleared, "
         "so this is not a leak, but the number is meant to fall over time as citations are "
         "aggregated away. Raise this ceiling only with the same corpus test in the commit."
@@ -2913,7 +2913,7 @@ def test_foreign_identifier_gate_can_pass_and_still_refuses_the_unknown():
     # that actually matters is the corpus test, and it is enforced by the un-allowlisted count
     # being pinned at zero in `test_foreign_commit_identifiers_may_only_decrease`. This number
     # stays as a speed bump: raising it requires the corpus result in the same commit.
-    assert len(module.ALLOWLIST) <= 13, (
+    assert len(module.ALLOWLIST) <= 14, (
         f"the foreign-identifier allowlist grew to {len(module.ALLOWLIST)}; each entry means "
         "someone tested that identifier against both private corpora with a scrubbed "
         "environment. Raise this only with that result recorded in the same commit."

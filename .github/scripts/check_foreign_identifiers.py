@@ -67,6 +67,10 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 # Removing an entry is always permitted. Adding one means a human re-ran that test and wrote
 # down the answer.
 ALLOWLIST = {
+    "74423b39119b3990866f184beca8b4a8e355f0bc89c0970b0aa9e62f44d75fe7": "experiment-register.md - EXP-96 pins Pallets `itsdangerous` 2.2.0 by commit as its "
+    "second corpus. Pinning the exact revision measured is what makes the result "
+    "reproducible, so removing it would weaken the experiment. Tested 21 Aug 2026 with a "
+    "scrubbed environment against both private corpora: resolves in neither.",
     "8dd61cadb9e983d128ad8bc9d8da9a7aa51fb3142d191f74532e14124f22bcb2": ".agents/skills/using-open-design/references/critique-upstream.md - a public GitHub "
     "permalink pinning a blob in nexu-io/open-design for provenance, the same class as the "
     "julep-ai and mlflow permalinks below. Tested 21 Aug 2026 with a scrubbed environment "
