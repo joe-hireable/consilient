@@ -3886,6 +3886,150 @@ unattended work outside this repository; Gate A or Gate B; beta transfer; or per
 more than one candidate. [asserted]
 
 ---
+## Pull-only observability and steering - registered 22 Aug 2026
+
+### EXP-108 - Does an available-but-unpushed live surface change trust or intervention? `BLOCKED: local pull projector, authenticated steering boundary, frozen task bank and consented participants`
+
+**Pre-registered 22 Aug 2026; no EXP-108 outcome inspected.** Dispatch
+`20260822T140246-cabc030952` reserved EXP-108 after exact identifier searches found EXP-107 owned by
+the concurrent ADR-0082 registration and no prior semantic allocation of EXP-108. This entry is the
+prospective killing experiment for ADR-0083. [measured]
+
+**Decides:** whether making the same-machine attention/squad/work-item/agent projection available,
+without pushing progress, materially changes self-reported trust or the probability of a mutating
+intervention under ADR-0071's otherwise identical quiet delivery. It also decides whether live
+inspection may remain an opt-in capability: a result that increases meddling, review load, accepted
+outcome loss, privacy leakage or authority confusion kills live inspection while retaining terminal
+delivery and post-hoc trajectory replay. [asserted]
+
+**Precondition:** before recruitment or any outcome is visible, freeze and digest a 24-task bank in
+four supervised coding strata, task-to-participant assignments, starting trees, success contracts,
+verifiers, harness/model/tool configuration, instruction assembly, budgets, the local projection,
+the two arm scripts, the primary trust item, two experience items, reviewer rubric and analysis
+script, and the ADR-0057 data-flow manifest below. The projection must already pass ADR-0083's
+deterministic-view, quiet-delivery, observation-has-no-authority, cross-process serialised and durable
+append, write-ahead intervention, controller-proven safe-boundary, lying-adapter, lineage,
+authenticated-control, claim-release and no-network checks. If mutating control cannot authenticate
+the participant, fence stale writers or independently prove that no side-effecting effect/child/lease
+is active, it is unavailable in both arms and the experiment remains blocked. Participants must
+consent; any metered spend requires separate principal approval. [asserted]
+
+Recruit exactly 60 adults who direct agent work but do not implement the frozen tasks themselves.
+Before assignment, record prior agent-use frequency as `none`, `less_than_weekly` or
+`weekly_or_more`. With seed `1080083`, randomise 30 participants to each arm inside those blocks and
+seal a balanced assignment of four tasks per participant, one per stratum. Do not replace a person or
+task after assignment. The principal may participate but is analysed under the same assignment; the
+study does not infer his preference from other participants. [asserted]
+
+Before recruitment, freeze an ADR-0057 data-flow manifest and validator. Raw events, run ids,
+instructions, local paths, transcripts, evidence and artefact content never leave the participant's
+machine; blinded reviewers receive only the frozen task and final task artefact. The only analysable
+export is a participant-initiated, explicitly consented row containing a random study participant id,
+arm and experience block; frozen task/stratum and task ordinal; elapsed, pull-dwell, review and worker
+minutes; pull counts/depths; intervention action/status counts; terminal/refusal/timeout/quarantine
+flags; trust and experience responses; reviewer/verifier Booleans; reported token/tool totals; and
+privacy, authority or authentication-failure Booleans. It contains no free text or exact clock time.
+[asserted]
+
+The consent form separately covers that derived row and blinded final-artefact review. A participant
+may withdraw until the de-identified analysis table is sealed; their export and link key are then
+deleted, the assigned runs remain `withdrawn_missing`, and nobody is recruited in replacement. The
+coordinator keeps consent records and pseudonymous rows in an access-controlled, untracked local
+study directory until 180 days after the terminal report, then deletes row-level data and the link
+key while retaining only aggregate tables. Export is an explicit local action, never an automatic
+network transfer. The consent/export mechanism is not implemented, so this precondition is blocked.
+[asserted]
+
+**Procedure:** both arms receive the same intake, estimate, quiet-delivery exceptions, final artefact,
+verifier evidence, task order, semantic steering actions and ordinary originating chat. Neither arm
+receives an in-run progress message, notification, prompt to inspect, or request for approval.
+[asserted]
+
+- **Unavailable arm:** the live projection cannot be opened before the terminal delivery. A
+  participant may still issue an unprompted redirect, add evidence, stop or take ownership through
+  the originating chat; the same typed write-ahead intervention boundary applies. [asserted]
+- **Available-but-unpushed arm:** before the first task, the participant is told once that the stable
+  local pull affordance exists. They may open any of its four depths and use the same semantic
+  steering actions. State may refresh only inside a participant-opened view. No task event makes the
+  affordance announce itself. [asserted]
+
+The trial records view opens and depth only in the available arm. It records every mutating action in
+both arms as `intervention.requested` plus one terminal outcome and derives the delivery lineage from
+those events. Read, dwell, close and silence remain observational and cannot approve, accept, transfer
+authority or change an outcome label. Independent reviewers, blinded to arm and trajectory, judge the
+final artefact against the frozen success contract; the frozen verifier runs separately. [asserted]
+
+Immediately after each terminal delivery, before any reviewer verdict is shown, each participant
+scores the primary trust item from 1 (strongly disagree) to 7 (strongly agree): `I trust this result
+enough to rely on it for the stated task`. They separately score `I had enough visibility to judge
+when intervention was necessary` and `I felt in control without having to supervise the work` as
+secondary manipulation and experience checks; those two items are not folded into trust. The single
+trust item is an unvalidated self-report outcome, not evidence of artefact quality. [asserted]
+
+**Measures:** the two co-primary effects are the available-minus-unavailable difference in mean task
+trust score and the risk difference for at least one mutating intervention per assigned task. Report
+both overall and by frozen stratum; the trust and two experience items; redirects, evidence additions,
+stops and takeovers separately; pull frequency, depth and dwell time; independently accepted outcomes
+with and without material correction; verifier outcomes; the full verifier-by-reviewer table and conditional
+alpha/beta denominators; participant review minutes; summed active worker-minutes; elapsed time;
+reported tokens and tool calls; estimate revisions; refusals; timeouts; quarantines; invalid or
+missing outcomes; authenticated-control refusals; authority violations; and trajectory/network
+privacy violations. Missing usage is missing, not zero. [asserted]
+
+Use intention-to-treat over all 240 assigned task runs for intervention and accepted outcome. A
+refused, timed-out, invalid, missing, withdrawn or independently rejected artefact counts as accepted
+outcome `0`, and no task is replaced. Trust is partially identified when a response is missing:
+report the complete-case estimate, the benefit-worst bound obtained by assigning missing available-
+arm scores `1` and missing unavailable-arm scores `7`, and the harm-worst bound with those assignments
+reversed. No complete-case trust result can confirm or kill the decision by itself. [algebra]
+[asserted]
+
+Cluster 20,000 bootstrap resamples by participant with seed `1080083`, preserving each participant's
+four-task block, and report percentile 95% intervals for both bounded trust effects, intervention
+risk, accepted-outcome risk, mean review minutes and the review-minutes ratio. That ratio is
+available-arm mean divided by unavailable-arm mean; it is infinite when only the denominator is zero
+and one when both means are zero, and is recomputed inside every resample. Also report raw numerators,
+denominators and pseudonymous per-participant results. The effect thresholds below are decision
+thresholds, not a retrospective power claim. [algebra] [asserted]
+
+**Stopping rule:** stop when all 240 assigned runs are terminal or 120 days after the first assigned
+run starts, whichever comes first. Do not inspect a pooled arm comparison before the stop. Stop new
+runs immediately after any raw trajectory leaves the participant's machine, any derived export
+exceeds its consented schema, any unauthenticated mutation succeeds, any observation grants authority,
+or any stale writer survives a stop/takeover; retain assigned incomplete runs as adverse and classify
+the ADR outcome as killed. There is no efficacy or futility stop. [asserted]
+
+- Retain live opt-in inspection and permit the narrow claim that availability helped **only if** the
+  benefit-worst trust-difference interval lower bound is at least `+0.50` points **or** the
+  intervention-risk interval upper bound is at most `-0.10`, while the accepted-outcome
+  risk-difference lower bound is at least `-0.05`, the review-minutes ratio upper bound is at most
+  `1.15`, and no privacy or authority invariant fails. [asserted]
+- Kill live inspection and retain only finished delivery plus post-hoc replay if the
+  harm-worst trust-difference interval upper bound is at most `-0.50`, the intervention-risk interval
+  lower bound exceeds `+0.10`, the accepted-outcome risk-difference interval upper bound is below
+  `-0.05`, the review-minutes ratio lower bound exceeds `1.15`, or any safety condition above fires.
+  [asserted]
+- Any other result is `inconclusive`: live inspection remains provisional and unavailable by
+  default, no trust or attention benefit is claimed, and every adverse outcome remains visible.
+  Opposing confirm and kill conditions resolve to kill. [asserted]
+- Every outcome leaves `routing_orchestration_enabled`, Gate A, Gate B, the six-command CLI,
+  candidate-exposure ceilings and V0-18 principal authority unchanged. [asserted]
+
+**Largest plausible effect:** the intervention and accepted-outcome risk differences are each bounded
+by `[-1, +1]`; the trust difference is bounded by `[-6, +6]` points. Availability could cause every
+otherwise quiet task to be interrupted or prevent every otherwise likely interruption. A kill removes
+live pre-terminal inspection and its controls, but not the authoritative record, final artefact,
+adverse-outcome disclosure or post-hoc replay. [algebra] [asserted]
+
+**What it cannot decide:** long-term habituation after 120 days; the principal's preference unless he
+is the assigned participant; users who are not represented by the recruitment rule; visual design;
+remote or hosted observability; authentication or fencing correctness beyond the frozen checks;
+whether an intervention caused a particular final outcome; non-coding domains; Gate A or Gate B;
+human beta; or permission to raise candidate exposure. [asserted]
+
+
+---
+
 ## Not experiments
 
 **Q4** (what v0 optimises for), **Q14** (does the Inquiry tier belong in v0), **Q15/Q23**
