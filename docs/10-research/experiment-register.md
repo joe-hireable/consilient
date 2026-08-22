@@ -3694,9 +3694,10 @@ allocated concurrently. This is ADR-0074's killing test for automatic capability
 [measured]
 
 **Decides:** whether a frozen library of capabilities accumulated from earlier tasks should be
-selected automatically for later v0 coding tasks. It decides the automatic selection and active
-library view, not whether immutable capability history is retained, whether a user may select a
-capability explicitly, or whether a model checkpoint is admitted as training. [asserted]
+selected automatically for later v0 coding tasks. It decides the selection policy and isolated
+experiment-eligible library view, not whether any member is promoted under ADR-0018, whether
+immutable capability history is retained, whether a user may select a capability explicitly, or
+whether a model checkpoint is admitted as training. [asserted]
 
 **Precondition:** forty genuinely requested source tasks, fixed before their outcomes are
 inspected, have run through the ADR-0074 capture path in an isolated experiment store. The source
@@ -3705,32 +3706,41 @@ task, solution or verifier output may enter a captured capability. The evaluatio
 20 tasks in each frozen stratum: same interface/new instance, same procedure/new repository state,
 adjacent transfer, and no applicable accumulated capability. A blind mapper assigns each task's
 applicable capability contract before either arm runs. Exact duplicate and supersession checks,
-one active version per contract, one accountable owner, one candidate exposure, fixed verifier
-versions and separate worktrees must exist. [asserted]
+one `experiment_eligible` version per execution-contract/destination class, one accountable owner,
+one candidate exposure, fixed verifier versions and separate worktrees must exist. Experiment
+eligibility is confined to this runner and is never a product `active` or ADR-0018 promotion state.
+[asserted]
 
 **Procedure:** for every evaluation task, run a paired, randomised-order comparison. Arm A is the
 optimised single Owner with the ordinary task, allowed tools and current bounded recall, but the
 accumulated library hidden. Arm B is the same harness, model, task, tools, environment and total
-token/time ceiling, with `capabilities.py` selecting from the frozen library before execution.
+token/time ceiling, with `capabilities.py` selecting from the frozen experiment-eligible library
+before execution.
 Selection is sealed before the Owner starts and records the capability id, version, contract,
 reason and bytes loaded; an unselected or selected-but-unused capability remains an Arm-B outcome
 under intent-to-treat analysis. No arm may see the other's context or artefact. The executable
-verifier runs once per arm under the frozen contract, then a reviewer blinded to arm and capability
-selection records the human verdict. Refusal, timeout, invalid selection, duplicate work and
-missing artefact are retained as adverse outcomes, never replaced. [asserted]
+verifier runs once per arm under the frozen contract. Human-review presentation order is randomised
+by a recorded coin flip independently of execution order. The reviewer sees one artefact at a time;
+arm, capability selection, verifier verdict and the paired counterpart stay sealed until that human
+verdict is committed. Refusal, timeout, invalid selection, duplicate work and missing artefact are
+retained as adverse outcomes, never replaced. [asserted]
 
 **Measures:** primary joint success is executable-verifier acceptance plus blinded human acceptance
 without material correction. Report paired joint-success differences overall and by frozen
 stratum; verifier acceptance; human acceptance; review-adjusted minutes; tokens, model calls and
 wall time; cost per joint success; capability selection and actual-use rates; wrong, stale and
 duplicate selections; rebuilds that recreate an existing capability; refusals, timeouts,
-quarantines, invalid runs and missing outcomes. Report `P(verifier accepts | human rejects)` and
-`P(verifier rejects | human accepts)` with their conditional denominators; fewer than 30 outcomes
-in either denominator is `insufficient_safety_evidence`, never a zero error rate. [asserted]
+quarantines, invalid runs and missing outcomes. For arm `X`, define
+`beta_X = P(verifier accepts | human rejects, arm X)` and
+`alpha_X = P(verifier rejects | human accepts, arm X)`. Report all four conditional denominators;
+fewer than 30 in any one is `insufficient_safety_evidence`, never a zero error rate. [asserted]
 
-For joint success, take 20,000 paired bootstrap resamples with seed `1010074`, resampling 20 task
-pairs within each frozen stratum and aggregating the strata at equal weight; report percentile 95%
-intervals and all four stratum tables. [asserted]
+Take 20,000 paired bootstrap resamples with seed `1010074`, resampling 20 task pairs with replacement
+inside each frozen stratum and aggregating the strata at equal weight. The joint-success interval is
+the 2.5th and 97.5th percentiles. The one-sided safety upper bound is the 95th percentile of the same
+resamples' `beta_B-beta_A` or `alpha_B-alpha_A`, computing each conditional proportion by pooling
+that arm's 80 resampled outcomes. A resample with an empty applicable conditional denominator
+receives difference `+1` for that safety metric. Report all four stratum tables. [asserted]
 
 **Stopping rule, fixed before any run:**
 
@@ -3740,13 +3750,14 @@ intervals and all four stratum tables. [asserted]
 - Automatic selection is confirmed **only for the frozen equal-weight mixture** if Arm B's paired
   joint-success point difference over Arm A is at least `+0.10`, its 95% interval lower bound is
   above zero, Arm B's review-adjusted cost per joint success is no higher than Arm A's, and the
-  no-applicable-capability stratum is not lower by `0.10` or more. After both conditional safety
-  denominators reach 30, the one-sided 95% upper bounds for `beta_B - beta_A` and
-  `alpha_B - alpha_A` must also be at most `0.05`. [asserted]
+  no-applicable-capability stratum is not lower by `0.10` or more. All four arm-by-conditional safety
+  denominators must reach 30, and the fixed one-sided upper bounds for `beta_B-beta_A` and
+  `alpha_B-alpha_A` must both be at most `0.05`. [asserted]
 - Automatic selection is killed if Arm B's overall joint-success point estimate is no higher than
   Arm A's, if the no-applicable-capability stratum is lower by `0.10` or more, or if a stale or
   wrong capability causes an irreversible or externally exposed action. It is also killed if,
-  after the applicable denominator reaches 30, either one-sided safety bound exceeds `0.05`.
+  after both arms reach 30 observations in an applicable conditional denominator, that fixed
+  one-sided safety bound exceeds `0.05`.
   Retain the archive and explicit/manual selection; keep automatic selection inert. [asserted]
 - Any other result is `inconclusive`: retain capture and the inactive catalogue, publish every
   adverse outcome, and do not narrate absence of evidence as equivalence. Insufficient safety
@@ -3757,14 +3768,16 @@ intervals and all four stratum tables. [asserted]
 
 **Largest plausible effect (ADR-0050):** the paired joint-success difference is bounded by
 `[-1, +1]`; in the extreme, reuse could repair every control failure or poison every treatment
-task. A kill removes automatic capability selection and active near-duplicate variants from the
-product plan while retaining lossless history and explicit/manual retrieval. A confirmation
-authorises only supervised implementation for the frozen mixture. The experiment therefore blocks
-activation, not construction of the inert record and projection. [algebra] [asserted]
+task. A kill removes automatic capability selection from the product plan while retaining lossless
+history, quarantined variants and explicit/manual retrieval. A confirmation authorises only
+supervised implementation of the selection policy for the frozen mixture; it promotes no library
+member. The experiment therefore blocks activation, not construction of the inert record and
+projection. [algebra] [asserted]
 
 **What it cannot decide:** transfer beyond the frozen coding mixture; whether capabilities improve
 every stratum; long-horizon model training; semantic-memory recall; unattended use outside this
 repository; Gate A or Gate B; or whether a second candidate may be exposed to one verifier.
+It also cannot decide whether any individual capability satisfies ADR-0018's promotion evidence.
 [asserted]
 
 ---
