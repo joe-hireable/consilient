@@ -543,3 +543,41 @@ falsified — portable cross-harness memory, multi-subscription reach and verifi
 **All three were the orchestrator's own framings, invented that afternoon, not the project's stated
 thesis.** Reporting their deaths as though the idea were failing was a framing error. The thesis in
 `CONSILIENCE.md` was never tested by any of it. [measured: this conversation]
+
+## Gate B4 is authorised on the private corpora, and publication is not
+
+> "Use jobboard-v2 and hireable-3.0 as the other repos but dont publish any of its data publicly"
+
+**The principal has moved one of two rules and re-affirmed the other.** `AGENTS.md` carries them
+separately and they must stay separate: [measured]
+
+1. **Pointing the harness at another repository** — listed under "Ask first". **He has now answered
+   that ask for these two repositories.** Gate B4 requires twenty tickets completed on a repository
+   other than this one, and these are his own commercial repositories, so this is his to authorise.
+2. **Publishing anything from them** — listed under "Never do", and **he re-affirmed it in the same
+   sentence.** It does not move.
+
+**What protects the second rule, verified 22 August 2026** [measured]:
+
+- `.githooks/pre-push` runs `check_foreign_identifiers`, `check_private_corpus --require-corpora` and
+  `check_secrets --history --untracked --self-test`, and **refuses the push if any fails.** The
+  fail-open defect in that hook — a missing checker counted as a pass — was repaired earlier the same
+  day.
+- `check_private_corpus.py` searches for the **real paths that exist in those repositories**, which is
+  the angle that found the original leak when a prefix search structurally could not, plus
+  **content fingerprints**: every line of at least twelve words and eighty characters becomes a
+  SHA-256 shingle, 25,000 retained per corpus. `--require-corpora` means *"I read those corpora"*,
+  not *"those directories exist"*, and a test enforces that reading.
+- `.harness/log/` and `.harness/dispatch/` are untracked. Only five example and handoff files under
+  `.harness/` are tracked, none of them work artefacts.
+
+**The residual risk no mechanical check can close: paraphrase.** An agent describing a private
+repository's architecture in its own words leaks it without matching any shingle or path. **The
+mitigation is a rule, not a gate: B4 work products stay in those repositories, and only aggregate
+counts return here.** [asserted]
+
+**And "aggregate" must mean a number, not a list.** A previous "names and aggregate measured metrics
+may appear" reading is what let **71 private commit identifiers reach a results file**. That reading
+is already recorded in `AGENTS.md` as the orchestrator's inference rather than the principal's words.
+**For B4 the permitted return is: how many tickets completed, how many the harness intervened in, and
+timing. Not which files, not which commits, not what the work was.** [asserted]
