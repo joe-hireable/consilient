@@ -28,7 +28,7 @@ import os
 import re
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -213,6 +213,14 @@ class Event:
     @property
     def data(self) -> EventPayload:
         return cast(EventPayload, self.raw["data"])
+
+
+# A transition validator is pure: it receives the accepted prefix and the
+# rejections exactly as they stand under the per-log lock, plus the validated
+# candidates, and refuses by raising EventError. It performs no I/O of its own.
+TransitionValidator = Callable[
+    [tuple[Event, ...], tuple[Rejection, ...], tuple[EventPayload, ...]], None
+]
 
 
 def validate(event: object) -> EventPayload:
@@ -1046,8 +1054,12 @@ def _budget_transaction(directory: Path) -> Iterator[None]:
 if sys.platform == "win32":
     # O_BINARY: without it the Windows CRT translates "\n" to "\r\n" on write.
     _OPEN_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_BINARY
+    # The transaction reads the prefix through the descriptor that holds the
+    # lock, so it needs read access; see _read_under_lock.
+    _TRANSACTION_OPEN_FLAGS = os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_BINARY
 else:
     _OPEN_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    _TRANSACTION_OPEN_FLAGS = os.O_RDWR | os.O_CREAT | os.O_APPEND
 
 
 def _lock_file(fd: int) -> None:
@@ -1183,6 +1195,163 @@ def _write_validated(path: Path, event: EventPayload) -> EventPayload:
     return event
 
 
+# The compare-and-append transaction (F02). `append` checks a candidate against
+# nothing but itself, so a rule that depends on the current state of the log —
+# "this claim is still unheld", "this revision is still the tip" — had no honest
+# place to run, and ADR-0070's evidence names the consequence: central
+# `events.append()` called only `events.validate()`, so a helper's domain rule
+# could be bypassed through the generic door. [measured: ADR-0070 evidence] The
+# contract now: one per-log transaction validates every candidate before any
+# byte is written, reads the accepted prefix and the rejections while holding
+# the F01 lock, runs a pure transition validator against them, then writes the
+# batch contiguously with one fsync. A rule registered here runs inside that
+# transaction whichever door the caller takes, so `consil record` cannot bypass
+# it. Any failure acknowledges nothing and rolls the whole batch back.
+
+_TRANSITION_VALIDATORS: dict[str, TransitionValidator] = {}
+
+
+def register_transition_validator(
+    kinds: Iterable[str], validator: TransitionValidator
+) -> None:
+    """Bind a pure domain transition validator to event kinds.
+
+    Once a kind is registered, every append of it — through the one-event front
+    door `append()` or through `append_transaction()` — runs the validator
+    against the accepted prefix and rejections while holding the per-log lock,
+    so no caller bypasses the domain rule by choosing a different door. This is
+    the universal boundary ADR-0070's enforcement section names; C01 registers
+    `work_items.validate_transition()` here.
+
+    The budget kinds are refused: budget.state and spend.reserved keep their own
+    serialised path through `append()` (the budget lock), and a second
+    governance path for them would be the bypass this boundary exists to close.
+    Re-registering a kind is refused for the same reason: a rule that can be
+    quietly replaced is not a rule.
+    """
+    kinds = tuple(kinds)
+    if not kinds:
+        raise EventError("register at least one event kind")
+    for kind in kinds:
+        if not isinstance(kind, str) or not kind.strip():
+            raise EventError("registered kinds must be non-empty strings")
+        if kind in (BUDGET_STATE_KIND, SPEND_RESERVED_KIND):
+            raise EventError(
+                f"{kind} keeps the budget serialisation path through append(); "
+                "a second governance path for it would be bypassable"
+            )
+        if kind in _TRANSITION_VALIDATORS:
+            raise EventError(
+                f"{kind} already has a registered transition validator; a rule "
+                "that can be quietly replaced is not a rule"
+            )
+    for kind in kinds:
+        _TRANSITION_VALIDATORS[kind] = validator
+
+
+def _transaction(
+    path: Path,
+    candidates: list[EventPayload],
+    validator: TransitionValidator | None,
+) -> list[EventPayload]:
+    """Compare-and-append under the per-log lock.
+
+    Candidates arrive validated. The accepted prefix and the rejections are read
+    while holding the F01 lock and handed to the caller's validator and to every
+    registered rule governing a candidate's kind; only then is the batch written
+    contiguously and fsynced. Any failure raises and rolls every byte of the
+    batch back: a partial multi-event success is never returned.
+    """
+    for candidate in candidates:
+        _check_clock(candidate)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    created = not path.exists()
+    fd = os.open(path, _TRANSACTION_OPEN_FLAGS)
+    try:
+        _lock_file(fd)
+        try:
+            try:
+                accepted, rejected = _read_under_lock(path, fd)
+            except (OSError, UnicodeDecodeError) as exc:
+                raise EventError(
+                    f"could not read the current prefix of {path.name!r}; the "
+                    "transaction is not acknowledged rather than run against an "
+                    f"assumed empty history: {exc}"
+                ) from exc
+            prefix = tuple(accepted)
+            rejections = tuple(rejected)
+            batch = tuple(candidates)
+            if validator is not None:
+                validator(prefix, rejections, batch)
+            for candidate in batch:
+                registered = _TRANSITION_VALIDATORS.get(candidate["event"])
+                if registered is not None:
+                    registered(prefix, rejections, batch)
+            offset = os.lseek(fd, 0, os.SEEK_END)
+            try:
+                for candidate in batch:
+                    _write_all(fd, (canonical(candidate) + "\n").encode("utf-8"))
+                # fsync inside the lock, exactly as the single-append path: an
+                # acknowledged batch is always durably ordered behind every
+                # earlier acknowledged line, and a failed fsync rolls back
+                # before any later line can be acknowledged over it.
+                _fsync_file(fd)
+            except EventError:
+                _rollback(fd, offset)
+                raise
+        finally:
+            _unlock_file(fd)
+    finally:
+        os.close(fd)
+    if created:
+        try:
+            _fsync_directory(path.parent)
+        except OSError as exc:
+            raise EventError(
+                f"the batch is written and fsynced but the directory entry of "
+                f"{path.name!r} could not be fsynced; the transaction is not "
+                f"acknowledged: {exc}"
+            ) from exc
+    return list(candidates)
+
+
+def append_transaction(
+    log_dir: Path,
+    candidates: list[EventPayload],
+    transition_validator: TransitionValidator,
+) -> list[EventPayload]:
+    """Validate, compare and append one contiguous batch with one acknowledgement.
+
+    Every candidate is validated before any byte is written; the accepted prefix
+    and the rejections are then read while holding the per-log lock and handed
+    to `transition_validator`, which refuses by raising EventError; only then is
+    the batch written contiguously and fsynced. One transaction writes one log,
+    so every candidate must carry the same `ts` date. The budget kinds keep
+    their own serialised path through `append()` and are refused here.
+    """
+    if not candidates:
+        raise EventError("a transaction must carry at least one candidate")
+    checked = [validate(candidate) for candidate in candidates]
+    budgeted = {candidate["event"] for candidate in checked} & {
+        BUDGET_STATE_KIND,
+        SPEND_RESERVED_KIND,
+    }
+    if budgeted:
+        raise EventError(
+            f"{sorted(budgeted)} keep the budget serialisation path through "
+            "append(); a second governance path for them would be bypassable"
+        )
+    dates = {candidate["ts"][:10] for candidate in checked}
+    if len(dates) != 1:
+        raise EventError(
+            "one transaction writes one log; the candidates span dates "
+            f"{sorted(dates)}"
+        )
+    return _transaction(
+        log_dir / f"{next(iter(dates))}.jsonl", checked, transition_validator
+    )
+
+
 def append(path: Path, event: EventPayload) -> EventPayload:
     """Validate and append. The only writer of the log."""
     validate(event)
@@ -1195,7 +1364,40 @@ def append(path: Path, event: EventPayload) -> EventPayload:
                 return _write_validated(path, event)
         except FileExistsError as exc:
             raise EventError("the budget trajectory is busy") from exc
+    if event["event"] in _TRANSITION_VALIDATORS:
+        # A governed kind takes the same transaction as a batch, so the domain
+        # rule runs against the locked prefix whichever door the caller took.
+        return _transaction(path, [event], None)[0]
     return _write_validated(path, event)
+
+
+def _classify_lines(
+    path_label: str, lines: Iterable[str]
+) -> tuple[list[Event], list[Rejection]]:
+    """Split raw lines into accepted events and rejections — the one classifier
+    behind both `read()` and the transaction's locked read, so a line is judged
+    identically through either path."""
+    events: list[Event] = []
+    rejected: list[Rejection] = []
+    for number, line in enumerate(lines, start=1):
+        content_digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            raw = json.loads(line)
+        except json.JSONDecodeError as exc:
+            rejected.append(
+                Rejection(path_label, number, f"not valid JSON: {exc}", content_digest)
+            )
+            continue
+        try:
+            validate(raw)
+        except EventError as exc:
+            rejected.append(Rejection(path_label, number, str(exc), content_digest))
+            continue
+        events.append(Event(raw, path_label, number))
+    return events, rejected
 
 
 def read(path: Path) -> tuple[list[Event], list[Rejection]]:
@@ -1207,30 +1409,29 @@ def read(path: Path) -> tuple[list[Event], list[Rejection]]:
     """
     if not path.exists():
         return [], []
-    events: list[Event] = []
-    rejected: list[Rejection] = []
     with path.open(encoding="utf-8") as fh:
-        for number, line in enumerate(fh, start=1):
-            content_digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                raw = json.loads(line)
-            except json.JSONDecodeError as exc:
-                rejected.append(
-                    Rejection(
-                        str(path), number, f"not valid JSON: {exc}", content_digest
-                    )
-                )
-                continue
-            try:
-                validate(raw)
-            except EventError as exc:
-                rejected.append(Rejection(str(path), number, str(exc), content_digest))
-                continue
-            events.append(Event(raw, str(path), number))
-    return events, rejected
+        return _classify_lines(str(path), fh)
+
+
+def _read_under_lock(path: Path, fd: int) -> tuple[list[Event], list[Rejection]]:
+    """Read the log through the descriptor that holds the per-log lock.
+
+    POSIX flock is advisory, but the Windows byte-range lock refuses a second
+    handle reading the locked region at all, so under the lock the prefix cannot
+    be read through a fresh open; the locking descriptor itself may read it. The
+    bytes are decoded with the same universal-newline rule text mode applies, so
+    a line classifies identically through either path.
+    """
+    os.lseek(fd, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    while True:
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    text = b"".join(chunks).decode("utf-8")
+    normalised = text.replace("\r\n", "\n").replace("\r", "\n")
+    return _classify_lines(str(path), normalised.splitlines(keepends=True))
 
 
 def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
