@@ -1980,7 +1980,11 @@ def test_no_new_commit_may_be_authored_by_a_fixture_identity():
     # Raised 116 → 118 on 22 Aug 2026: merging fleet-retroverifier made one more
     # reachable (cda454f; EXP-43 primary at n=50, 20 Aug 2026 12:47), same defect,
     # same reasoning.
-    assert len(fixture_stamped) <= 118, (
+    # Raised 118 → 120 on 22 Aug 2026: merging fleet-transport made one more reachable
+    # (6275650; ADR-0041/0042 authorship, 20 Aug 2026 15:15), same defect, same
+    # reasoning. This is the last fixture-stamped branch: no further unmerged branch
+    # carries an @local identity, so 120 is the final re-baseline of this raise.
+    assert len(fixture_stamped) <= 120, (
         "a commit was authored by a fixture identity; check `git config user.email` — "
         "worktrees share the primary repository's config"
     )
