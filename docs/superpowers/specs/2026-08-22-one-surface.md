@@ -180,9 +180,11 @@ that state without an artefact canary and an independently enforced authority bo
 
 ### 5.4 Squad and authority boundary
 
-Human-labelled beta is unestimated, so the honest default is one Owner. An additional member needs
-both a different class of facts and a measured exposure ceiling that admits it; agreement over the
-same context has zero evidential weight. [algebra] [asserted]
+Human-labelled beta is unestimated, so the honest default is one independently acceptable
+candidate. Additional evidence roles may feed that candidate only when each introduces a
+decision-changing different class of facts; they do not each consume verifier exposure. A second
+independently acceptable candidate needs a measured candidate-exposure ceiling that admits it.
+Agreement over the same context has zero evidential weight. [cited: ADR-0067] [algebra] [asserted]
 
 V0-18 remains absolute: verdicts, approvals, gate lifts and spend are principal-authored. Current
 chat ingress is not authenticated strongly enough to carry those acts, so the proposed surface must
@@ -198,33 +200,53 @@ zero hand-offs is not evidence of zero external opens. [algebra] [cited: ADR-005
 The weakest sufficient signal is: [asserted]
 
 1. append a private `native_surface.handoff` event whenever the command post sends work outward;
-2. once per active week, ask the principal for eight booleans identifying surfaces opened outside
-   the command post; and
-3. retain no window title, process name, task text, timestamped activity trace or connector-usage
+2. once per active week, ask for eight fixed task-class records, each containing two booleans:
+   `eligible_work_occurred` and `native_surface_opened_for_that_work`; the rows are Claude Code
+   headless repository work, Cursor agent work, Grok Build work, Cowork work, Claude Design work,
+   Figma canvas work, ChatGPT Work work and Grok Bot work;
+3. for each eligible task in either experimental arm, open a private minimal `task_completion`
+   receipt before its outcome with an opaque task ID, fixed task class, expected artefact reference
+   and pre-existing verifier ID, then append the verifier result and adverse outcome afterwards; and
+4. retain no window title, process name, task text, timestamped activity trace or connector-usage
    surveillance. [asserted]
 
-If the weekly answer is absent, independent-open status is `unknown`, never zero. The records remain
-instance data under ADR-0057 and never enter tracked product telemetry. [cited: ADR-0057]
+The task-class qualifier is load-bearing: opening Cursor for manual IDE work does not falsify the
+narrow Cursor-agent retirement, and opening the SuperGrok consumer UI is not evidence about Grok
+Build. A class with `eligible_work_occurred = false` supplies no retirement evidence. If the weekly
+answer is absent, both fields are `unknown`, never false. The records remain instance data under
+ADR-0057 and never enter tracked product telemetry. A missing required completion receipt makes the
+affected class insufficient; it is not silently excluded. [cited: ADR-0057] [asserted]
 
 ### Unwritten EXP-129 candidate — does the front door remove three direct surfaces?
 
 `EXP-129` was collision-checked immediately before this document was written. **No experiment-register
 entry was written, so this is not a pre-registration and no result may cite it as one.** [measured]
 
-- **Population:** the principal's ordinary active work weeks; inactive weeks are excluded before
-  seeing the weekly answer. [asserted]
+- **Population:** the principal's ordinary active work weeks. Eligibility is fixed before seeing
+  the weekly answer as at least one occurrence in the three candidate task classes. [asserted]
 - **Arms:** two usual-work baseline weeks, then four candidate weeks using the one front door.
-  Record the same eight booleans and command-post hand-offs in both arms. [asserted]
-- **Primary outcome:** median number of independently opened named surfaces per active week.
-  [asserted]
-- **Worth-building threshold:** a reduction of at least three surfaces, specifically including the
-  Claude Code, Cursor-agent and Grok-Build task classes when each occurred, without any protected
-  authority breach. [asserted]
+  Record the same eight occurrence/direct-open pairs, native hand-offs and task-level completion
+  receipts in both arms, including baseline tasks performed outside the command post. [asserted]
+- **Primary outcome:** count of qualified retired task classes among Claude Code headless work,
+  Cursor-agent work and Grok-Build work. A class qualifies only if it occurred in at least one
+  baseline week and two candidate weeks, was opened directly for that work in baseline, and was not
+  opened directly for that work in any qualifying candidate week. [asserted]
+- **Completion floor:** for each named task class and arm, the denominator is every eligible task
+  whose independent verifier was named before its outcome; the numerator is the subset whose
+  expected artefact exists and whose verifier accepts. Missing artefacts, refusals, timeouts, killed
+  runs and verifier rejection remain denominator failures. An eligible task lacking a precommitted
+  verifier or completion receipt is `unverified`, reported separately, and makes that class's
+  no-decline comparison insufficient. Candidate completion rate must be at least its same-class
+  baseline rate. [asserted]
+- **Worth-building threshold:** all three candidate task classes qualify, each same-class verified
+  completion rate is not below baseline, and no protected-authority breach occurs. A class without
+  enough occurrences or a complete receipt set makes the result insufficient rather than
+  favourable. [asserted]
 - **Adverse outcomes:** missing weekly answer, hand-off, refusal, timeout, quarantine, native
   takeover, unrecoverable context loss and protected-authority attempt remain visible. [asserted]
 - **Stopping rule:** stop after two eligible baseline and four eligible candidate weeks; do not stop
-  early for a favourable week. Stop adversely on any tracked activity beyond the booleans/hand-offs
-  or any agent-authored principal act. [asserted]
+  early or extend for missing class occurrences. Stop adversely on any tracked activity beyond the
+  fixed pairs/receipts/hand-offs or any agent-authored principal act. [asserted]
 - **Decision:** retain the command post if the threshold passes and accepted task completion does not
   fall; otherwise keep the existing command line and native-launch cards and reject "retirement" as
   the product goal. [asserted]
