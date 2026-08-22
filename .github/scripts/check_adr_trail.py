@@ -48,6 +48,18 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 HISTORY_PIN = "1db009b"
 
+# Commits imported from the public repository's own history on 23 Aug 2026. That repository
+# was built as a series of curated tree snapshots — "Publish the verified tree, ..." — and
+# shares no ancestor with this one, so `git merge` needed `--allow-unrelated-histories` and
+# no such commit can ever be an ancestor of HISTORY_PIN above. A snapshot commit rewrites
+# every ADR file wholesale, which this checker correctly reads as a settled-ADR edit.
+#
+# These are reported, never failed, and the exemption is a fixed list rather than a moved
+# pin: moving the pin would silently excuse unrelated commits, whereas naming one sha
+# excuses exactly the imported history and nothing else. Adding to this list requires the
+# same reasoning recorded beside it.
+IMPORTED_PUBLIC_HISTORY = frozenset({"b2e75e7"})
+
 ADR_FILE = re.compile(r"^(\d{4})-.+\.md$")
 STATUS_LINE = re.compile(r"^\s*-?\s*\*\*Status:?\*\*:?\s*(.+)$", re.IGNORECASE)
 SUPERSEDED_FULL = re.compile(r"SUPERSEDED\s+by\s+\[?(\d{4})", re.IGNORECASE)
@@ -106,7 +118,9 @@ def check_trail_integrity() -> list[str]:
                     f"{path.name}: SUPERSEDED IN PART by {target}, but no {target}-*.md exists"
                 )
         if number not in index_text:
-            problems.append(f"{path.name}: no row in index.md — the index has drifted before")
+            problems.append(
+                f"{path.name}: no row in index.md — the index has drifted before"
+            )
     return problems
 
 
@@ -181,7 +195,9 @@ def check_history() -> tuple[list[str], list[str]]:
                 continue
             message = f"{sha[:9]} silently edits settled ADR {rel}"
             ancestor = _git(["merge-base", "--is-ancestor", sha, HISTORY_PIN])
-            if pin_known and ancestor.returncode == 0:
+            if any(sha.startswith(known) for known in IMPORTED_PUBLIC_HISTORY):
+                reported.append(message + " (imported public snapshot — reported)")
+            elif pin_known and ancestor.returncode == 0:
                 reported.append(message + " (at/before pin — reported)")
             else:
                 failed.append(message)
@@ -193,15 +209,22 @@ def _self_test() -> int:
     cases = [
         ("ACCEPTED", ["body"], ["old body"], "violation"),
         ("ACCEPTED", ["Superseded by 0067"], ["old body"], "ok-settled-with-marker"),
-        ("ACCEPTED", ["Update 21 Aug 2026: corrected"], ["old body"], "ok-settled-with-marker"),
+        (
+            "ACCEPTED",
+            ["Update 21 Aug 2026: corrected"],
+            ["old body"],
+            "ok-settled-with-marker",
+        ),
         ("PROPOSED", ["anything"], ["old body"], "ok"),
         ("ACCEPTED", ["reworded"], [], "ok"),
     ]
     for status, added, removed, expected in cases:
         got = classify_edit(status, added, removed)
         if got != expected:
-            print(f"self-test FAILED: {status}/{added}/{removed} -> {got}, want {expected}",
-                  file=sys.stderr)
+            print(
+                f"self-test FAILED: {status}/{added}/{removed} -> {got}, want {expected}",
+                file=sys.stderr,
+            )
             ok = False
     print("self-test " + ("passed" if ok else "FAILED"))
     return 0 if ok else 1
