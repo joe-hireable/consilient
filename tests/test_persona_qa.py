@@ -24,22 +24,19 @@ def test_persona_specs_cover_all_named_personas() -> None:
     assert set(persona_qa.PERSONAS) == set(persona_qa.JOURNEYS)
 
 
-def test_average_joe_finds_command_count_contradiction() -> None:
+def test_average_joe_has_no_command_count_contradiction() -> None:
     result = persona_qa.journey_average_joe(ROOT)
-    assert result.finding is not None
-    assert "Four commands" in result.finding.discrepancy
+    assert result.finding is None, result.finding.discrepancy if result.finding else ""
 
 
-def test_contributor_finds_stale_contributing_opening() -> None:
+def test_contributor_finds_no_stale_contributing_opening() -> None:
     result = persona_qa.journey_contributor(ROOT)
-    assert result.finding is not None
-    assert "no code yet" in result.finding.discrepancy.lower()
+    assert result.finding is None, result.finding.discrepancy if result.finding else ""
 
 
-def test_operator_finds_unconfigured_usage_ceilings() -> None:
+def test_operator_documents_usage_ceilings() -> None:
     result = persona_qa.journey_operator(ROOT)
-    assert result.finding is not None
-    assert "ceilings: NONE" in result.finding.discrepancy
+    assert result.finding is None, result.finding.discrepancy if result.finding else ""
 
 
 def test_cold_trajectory_refusal_holds() -> None:
@@ -83,3 +80,49 @@ def test_researcher_finds_script_when_present() -> None:
         assert result.finding is None or "results" in result.stopped_at
     else:
         assert result.finding is not None
+
+
+def test_average_joe_ratchet_fails_when_four_commands_returns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = ROOT / "docs/00-context/getting-started.md"
+    original = path.read_text(encoding="utf-8")
+    broken = original.replace("Six commands", "Four commands", 1)
+    path.write_text(broken, encoding="utf-8")
+    try:
+        result = persona_qa.journey_average_joe(ROOT)
+        assert result.finding is not None
+    finally:
+        path.write_text(original, encoding="utf-8")
+    assert persona_qa.journey_average_joe(ROOT).finding is None
+
+
+def test_contributor_ratchet_fails_when_stale_opening_returns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = ROOT / "CONTRIBUTING.md"
+    original = path.read_text(encoding="utf-8")
+    broken = original.replace("Stage 3 is active", "pre-brainstorm and has no code yet", 1)
+    path.write_text(broken, encoding="utf-8")
+    try:
+        result = persona_qa.journey_contributor(ROOT)
+        assert result.finding is not None
+    finally:
+        path.write_text(original, encoding="utf-8")
+    assert persona_qa.journey_contributor(ROOT).finding is None
+
+
+def test_operator_ratchet_fails_when_ceilings_undocumented(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = ROOT / "docs/00-context/getting-started.md"
+    original = path.read_text(encoding="utf-8")
+    broken = original.replace("limits.example.json", "limits-removed.example.json")
+    path.write_text(broken, encoding="utf-8")
+    try:
+        result = persona_qa.journey_operator(ROOT)
+        assert result.finding is not None
+        assert "undocumented" in result.stopped_at
+    finally:
+        path.write_text(original, encoding="utf-8")
+    assert persona_qa.journey_operator(ROOT).finding is None

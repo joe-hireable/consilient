@@ -23,7 +23,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "src"))
 
-from consilient.events import SCHEMA_VERSION, append  # noqa: E402
+from consilient.events import SCHEMA_VERSION, read_all  # noqa: E402
 from consilient.recall import ALWAYS_INCLUDE_KINDS, pack_events  # noqa: E402
 
 EXPERIMENT_ID = "EXP-79"
@@ -67,8 +67,7 @@ class KindMix:
 
 
 def utc_ts(offset_s: int = 0) -> str:
-    base = datetime(2026, 8, 21, 12, 0, 0, tzinfo=timezone.utc)
-    return (base.replace() + __import__("datetime").timedelta(seconds=offset_s)).isoformat()
+    return (datetime.now(timezone.utc) + __import__("datetime").timedelta(seconds=offset_s)).isoformat()
 
 
 def derive_kind_mix() -> KindMix:
@@ -132,6 +131,9 @@ def synthesize_events(size: int, mix: KindMix, *, seed: int) -> list[dict[str, A
                 "run_id": f"synth-{i:05d}",
                 "status": rng.choice(["ok", "failed", "refused"]),
                 "harness": "cursor-composer",
+                "supervised": True,
+                "pool": "cursor-models",
+                "family": "cursor",
             }
         elif kind == "work_item.opened":
             data = {
@@ -152,8 +154,12 @@ def synthesize_events(size: int, mix: KindMix, *, seed: int) -> list[dict[str, A
             }
         elif kind == "capability.gap":
             data = {
-                "asked": "run cursor-agent",
-                "tried": ["dispatch"],
+                "asked": f"synthetic gap {i}",
+                "attempted": "cursor-composer",
+                "detail": "synthetic failure for scale test",
+                "repair": "none",
+                "run_id": f"synth-{i:05d}",
+                "source": "exp79",
                 "failure": "refused",
                 "closure": "escalate",
             }
@@ -164,12 +170,19 @@ def synthesize_events(size: int, mix: KindMix, *, seed: int) -> list[dict[str, A
 
 
 def write_scratch_log(log_dir: Path, events: list[dict[str, Any]]) -> None:
+    """Write synthetic events without append clock skew (historical simulation)."""
     log_dir.mkdir(parents=True, exist_ok=True)
     for old in log_dir.glob("*.jsonl"):
         old.unlink()
+    by_day: dict[str, list[dict[str, Any]]] = {}
     for event in events:
         day = event["ts"][:10]
-        append(log_dir / f"{day}.jsonl", event)
+        by_day.setdefault(day, []).append(event)
+    for day, day_events in by_day.items():
+        path = log_dir / f"{day}.jsonl"
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            for event in day_events:
+                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def event_in_pack(pack_text: str, event: dict[str, Any]) -> bool:
@@ -227,7 +240,11 @@ def arm_a(mix: KindMix) -> dict[str, Any]:
         row = {"size": size, **measure_retention(events)}
         rows.append(row)
         cc = row["all_coordination_critical"]
-        if cc["rate"] is not None and cc["rate"] < 0.50:
+        if (
+            degradation_point is None
+            and cc["rate"] is not None
+            and cc["rate"] < 0.50
+        ):
             degradation_point = size
     return {
         "kind_mix_source": mix.source,
@@ -350,6 +367,12 @@ def arm_b(
     timeout_s: int,
     skip_dispatch: bool,
 ) -> dict[str, Any]:
+    if skip_dispatch:
+        return {
+            "verdict": "skipped",
+            "note": "Arm B requires real cursor-agent dispatches; not run in this invocation.",
+        }
+
     workspace = SCRATCH_ROOT / "workspace"
     log_dir = SCRATCH_ROOT / "log"
     runs_root = SCRATCH_ROOT / "runs"
@@ -368,12 +391,7 @@ def arm_b(
             "trajectory_size": size,
             "marker_a": marker_a,
             "marker_b": marker_b,
-            "skipped": skip_dispatch,
         }
-        if skip_dispatch:
-            pairs.append(row)
-            continue
-
         before = target.read_text(encoding="utf-8")
         row["dispatch_a"] = run_dispatch(
             task=agent_brief(marker_a),

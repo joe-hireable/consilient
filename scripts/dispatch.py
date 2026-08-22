@@ -40,7 +40,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from consilient import coordination  # noqa: E402
+from consilient import coordination, instructions  # noqa: E402
 from consilient.capabilities import CapabilityError, select_capabilities  # noqa: E402
 from consilient.error_tracking import (  # noqa: E402
     ErrorRecordError,
@@ -92,6 +92,7 @@ DEFAULT_RUNS = ROOT / ".harness" / "dispatch"
 DEFAULT_PERMISSIONS = ROOT / ".harness" / "permissions.json"
 DEFAULT_ALLOWED_CWDS = ROOT / ".harness" / "allowed-cwds.json"
 DEFAULT_CURSOR_LOCK = ROOT / ".harness" / "cursor-agent.lock"
+DEFAULT_SKILLS = ROOT / ".agents" / "skills"
 CURSOR_WSL_BINARY = Path("/home/jpbpr/.local/bin/cursor-agent")
 GROK_CANDIDATES = (
     Path.home() / ".grok" / "bin" / "grok.exe",
@@ -664,17 +665,20 @@ def write_brief(
     log_dir: Path | None = None,
     in_flight: str = "",
     claim_run_id: str | None = None,
+    assembly: instructions.Assembly | None = None,
 ) -> Path:
-    """Write the task, plus a verbatim recall pack so the child is not amnesiac.
+    """Write the task plus its assembled context so the child is not amnesiac.
 
     Cross-harness memory is the trajectory. Until 21 August 2026 this function
     wrote the task alone, so Cursor could not see what Codex had just done.
 
-    The pack is written to `recall.md` beside the brief and referenced from the
-    brief, and also embedded — the embed is what a child that reads only its brief
-    still sees. Both are bounded at RECALL_LIMIT_CHARS; the bound is the point,
-    because an unbounded coordination section crowds the task out of the context
-    window. `in_flight` is the live-claims table rendered by the caller.
+    The pack is written to `recall.md` beside the brief and referenced from it,
+    and also embedded — the embed is what a child that reads only its brief still
+    sees. Both are bounded at RECALL_LIMIT_CHARS; the bound is the point, because
+    an unbounded coordination section crowds the task out of the context window.
+    An assembly supplies the same pack without a second trajectory read and adds
+    the other instruction layers. `in_flight` is the live-claims table rendered
+    by the caller.
 
     `claim_run_id` is the run id the claim covering this work was opened under
     (the parent's, for a fan-out child). The pre-commit gate refuses a commit
@@ -698,7 +702,21 @@ def write_brief(
             "Stage only paths you created or this brief named; never "
             "`git add -A`.\n"
         )
-    if log_dir is not None:
+    if assembly is not None:
+        recall = assembly.recall_pack
+        body += "\n---\n\n"
+        if recall.strip() and "No events in log" not in recall:
+            recall_path = (run_dir / "recall.md").resolve()
+            recall_path.write_text(recall, encoding="utf-8", newline="\n")
+            body += (
+                "## Context from the trajectory\n\n"
+                "A verbatim recall pack is recorded at `recall.md` beside this brief "
+                f"(bound: {assembly.recall_limit_chars} characters) and assembled below.\n\n"
+            )
+        if in_flight.strip():
+            body += in_flight.strip() + "\n\n"
+        body += "---\n\n" + assembly.text.rstrip() + "\n"
+    elif log_dir is not None:
         try:
             recall = pack_recall(
                 Path(log_dir), query=task[:240], limit_chars=RECALL_LIMIT_CHARS
@@ -951,9 +969,19 @@ def run_harness(
             stdout_path=str(stdout_path),
             stderr_path=str(stderr_path),
         )
+    assembly: instructions.Assembly | None = None
+    if log_dir is not None:
+        assembly = instructions.assemble(DEFAULT_SKILLS, log_dir, task=task)
     write_brief(
-        run_dir, task, log_dir=log_dir, in_flight=in_flight, claim_run_id=claim_run_id
+        run_dir,
+        task,
+        log_dir=log_dir,
+        in_flight=in_flight,
+        claim_run_id=claim_run_id,
+        assembly=assembly,
     )
+    if log_dir is not None and assembly is not None:
+        instructions.record_assembly(log_dir, assembly, task=task)
     argv = built
     env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"

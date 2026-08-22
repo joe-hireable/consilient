@@ -1,0 +1,75 @@
+{
+  "experiment_id": "EXP-79",
+  "date": "2026-08-21T18:08:45.208098+00:00",
+  "arm_a": {
+    "kind_mix_source": ".harness/log/ on 21 Aug 2026: 180 events; brief-kind counts {\"attempt.outcome\": 6, \"capability.gap\": 4, \"dispatch.outcome\": 32, \"work_item.comment\": 6, \"work_item.completed\": 12, \"work_item.opened\": 17}",
+    "recall_limit_chars": 8000,
+    "sizes": [
+      {
+        "size": 100,
+        "pack_chars": 7725,
+        "omitted_events": 63,
+        "always_include": {
+          "total": 37,
+          "retained": 9,
+          "rate": 0.2432
+        },
+        "work_and_attempt": {
+          "total": 32,
+          "retained": 4,
+          "rate": 0.125
+        },
+        "all_coordination_critical": {
+          "total": 69,
+          "retained": 13,
+          "rate": 0.1884
+        }
+      },
+      {
+        "size": 1000,
+        "pack_chars": 7934,
+        "omitted_events": 755,
+        "always_include": {
+          "total": 324,
+          "retained": 10,
+          "rate": 0.0309
+        },
+        "work_and_attempt": {
+          "total": 426,
+          "retained": 4,
+          "rate": 0.0094
+        },
+        "all_coordination_critical": {
+          "total": 750,
+          "retained": 14,
+          "rate": 0.0187
+        }
+      },
+      {
+        "size": 10000,
+        "pack_chars": 7868,
+        "omitted_events": 7654,
+        "always_include": {
+          "total": 3057,
+          "retained": 12,
+          "rate": 0.0039
+        },
+        "work_and_attempt": {
+          "total": 4388,
+          "retained": 5,
+          "rate": 0.0011
+        },
+        "all_coordination_critical": {
+          "total": 7445,
+          "retained": 17,
+          "rate": 0.0023
+        }
+      }
+    ],
+    "retention_degradation_point": 10000
+  },
+  "arm_b": {
+    "verdict": "skipped",
+    "note": "Arm B requires real cursor-agent dispatches; not run in this invocation."
+  }
+}

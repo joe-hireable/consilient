@@ -173,3 +173,15 @@ is a paragraph in someone else's documentation, not a paper.
 If, over the next twenty dispatches, a worker briefed with `dispatching-workers` returns the same
 rate of unusable results as one briefed without it, then these skills are decoration and this
 decision is wrong. The measurement is cheap, and nobody has taken it.
+
+## Update: 2026-08-22 — the unnumbered falsifier is now EXP-127
+
+The original `Falsifier` section deliberately left its matched
+with-skill/without-skill trial unnumbered because experiment identifiers are allocated by dispatch.
+The specification audit's tightened invariant correctly exposed that this left a PROVISIONAL ADR
+without a registered experiment. Dispatch `20260822T150837-e38a1f7e4c` allocated EXP-127 after a
+collision search and registered the fixed 20-pair comparison before any outcome was inspected.
+[measured]
+
+EXP-127 can confirm or kill the claimed behavioural value of `dispatching-workers`; it does not
+settle the independent file-placement and instance/product boundaries in this ADR. [asserted]

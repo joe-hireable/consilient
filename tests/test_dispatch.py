@@ -11,6 +11,7 @@ The load-bearing ones:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -27,6 +28,7 @@ from consilient.harness import (
     DEFAULT_POOLS,
     HARNESSES,
     Decision,
+    FanoutDecision,
     permission_flags,
     EXHAUSTED_USED_PERCENT,
     Harness,
@@ -747,6 +749,84 @@ def test_run_harness_scrubs_git_environment(monkeypatch, tmp_path):
 
     assert not any(key.startswith("GIT_") for key in captured)
     assert captured["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
+def test_live_dispatches_consume_recorded_instruction_assemblies(monkeypatch, tmp_path):
+    """Cutting either live caller, delivery, or recording breaks this test."""
+    script = _load_script()
+    active_log = tmp_path / "single-log"
+    observed = []
+
+    def fake_build_command(_harness, **kwargs):
+        return ["agent", str(kwargs["brief"])]
+
+    def fake_run_process(argv, *, stdout_path, **_kwargs):
+        brief_path = Path(argv[-1])
+        brief = brief_path.read_text(encoding="utf-8")
+        events, rejected = script.read_all(active_log)
+        assemblies = [
+            event for event in events if event.kind == "instructions.assembled"
+        ]
+        observed.append(
+            {
+                "brief": brief,
+                "recall": brief_path.with_name("recall.md").read_text(encoding="utf-8"),
+                "assemblies": assemblies,
+                "rejected": rejected,
+            }
+        )
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_text("pong\n", encoding="utf-8")
+        return 0, False, 0.1
+
+    monkeypatch.setattr(script, "build_command", fake_build_command)
+    monkeypatch.setattr(script, "run_process", fake_run_process)
+    grok = harness_by_id("grok")
+    codex = harness_by_id("codex")
+    assert grok is not None and codex is not None
+
+    single, single_code = script.dispatch_one(
+        decision=Decision("run", grok, "selected grok", ("codex",)),
+        task="pong",
+        cwd=tmp_path,
+        log_dir=active_log,
+        runs_dir=tmp_path / "single-runs",
+        timeout_s=5,
+        model=None,
+        dry_run=False,
+    )
+    assert single_code == 0 and single["status"] == "ok"
+
+    active_log = tmp_path / "fanout-log"
+    fanout, fanout_code = script.dispatch_fanout(
+        decision=FanoutDecision("run", grok, codex, "two families", ()),
+        task="pong",
+        cwd=tmp_path,
+        log_dir=active_log,
+        runs_dir=tmp_path / "fanout-runs",
+        timeout_s=5,
+        model=None,
+        dry_run=False,
+    )
+    assert fanout_code == 0 and fanout["status"] == "agree"
+
+    assert [len(item["assemblies"]) for item in observed] == [1, 1, 2]
+    for item in observed:
+        brief = item["brief"]
+        assert brief.startswith("pong\n")
+        assert "# Invariant core" in brief
+        assert "# Skills selected for this task" in brief
+        assert "# Recall pack" in brief
+        assert "# Adapted layer" in brief
+        assert "`recall.md` beside this brief" in brief
+        assert "work_item.opened" in item["recall"]
+        assert not item["rejected"]
+        assembly = item["assemblies"][-1]
+        assert assembly.data["recall"]["query"] == "pong"
+        delivered = brief[brief.index("# Invariant core") :]
+        assert assembly.data["assembly_id"] == hashlib.sha256(
+            delivered.encode("utf-8")
+        ).hexdigest()
 
 
 def test_bypass_flags_are_known_for_every_registered_harness():

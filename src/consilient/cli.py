@@ -19,7 +19,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from . import beta as beta_mod
 from . import dashboard as dashboard_mod
@@ -36,6 +36,8 @@ CommandResult = dict[str, Any]
 DEFAULT_LOG = Path(".harness/log")
 DEFAULT_DB = Path(".harness/state.db")
 DEFAULT_DASHBOARD = Path(".harness/dashboard.html")
+TrajectoryState = Literal["missing", "empty", "present"]
+READ_TRAJECTORY_COMMANDS = frozenset({"replay", "beta", "doctor", "dashboard"})
 EXPERIMENT_REGISTER = Path("docs/10-research/experiment-register.md")
 # Every default above is relative to the working directory; the code that reads them comes
 # from wherever the interpreter found `consilient`. Those are two independent inputs, and
@@ -96,6 +98,72 @@ EXP01_BETA = re.compile(
 CRITIC_BETA = re.compile(
     r"critic-beta-measured:\s*([0-9.]+)\s*\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]"
 )
+def trajectory_state(log: Path) -> TrajectoryState:
+    """Distinguish a missing log directory from one that exists but holds no events."""
+    resolved = log.resolve()
+    if resolved.exists() and not resolved.is_dir():
+        return "missing"
+    if not resolved.is_dir():
+        return "missing"
+    if any(resolved.glob("*.jsonl")):
+        events, rejected = read_all(resolved)
+        if events or rejected:
+            return "present"
+        return "empty"
+    return "empty"
+
+
+def _trajectory_refusal(log: Path) -> str:
+    """Human-readable refusal when the default log path points at nothing."""
+    resolved = log.resolve()
+    if resolved.exists() and not resolved.is_dir():
+        return (
+            f"trajectory not configured — {resolved} exists but is not a directory; "
+            "pass --log with a trajectory directory"
+        )
+    return (
+        f"trajectory not configured — no directory at {resolved}; nothing has been "
+        "recorded here. Run from a Consilient checkout or pass --log with an existing "
+        "trajectory directory"
+    )
+
+
+def require_trajectory(log: Path) -> Literal["empty", "present"]:
+    """Refuse when the log directory is absent. Upward search was rejected: it would let a
+    command silently read a parent checkout's trajectory while the user believes they are
+    elsewhere — the wrong-worktree hazard this project was already bitten by. Explicit
+    --log and the provenance block on `doctor` are the supported ways to see which path
+    answered.
+    """
+    state = trajectory_state(log)
+    if state == "missing":
+        raise EventError(_trajectory_refusal(log))
+    return state
+
+
+def _command_needs_trajectory(args: argparse.Namespace) -> bool:
+    if args.command in READ_TRAJECTORY_COMMANDS:
+        return True
+    if args.command == "usage" and not args.fake and not args.record:
+        return True
+    return False
+
+
+def _trajectory_line(result: CommandResult) -> str:
+    traj = result.get("trajectory_source")
+    if not isinstance(traj, dict):
+        return ""
+    path = str(traj.get("path", ""))
+    state = traj.get("state")
+    if state == "empty":
+        return (
+            f"trajectory: {path} (empty — zero events recorded here, not a missing directory)"
+        )
+    if state == "present":
+        return f"trajectory: {path}"
+    return f"trajectory: {path}" if path else ""
+
+
 REQUIREMENTS = {
     "A1": "EXP-01 complete on two differently verified repositories with an interval",
     "A2": "Replay reproduces an identical canonical state digest",
@@ -798,6 +866,9 @@ def render(command: str, result: CommandResult) -> str:
                 f"\n  {result['not_written_by_append']} of {total} logged lines were not "
                 "written by append(), so validate() never ran on them"
             )
+        traj = _trajectory_line(result)
+        if traj:
+            line += f"\n  {traj}"
         return line
     if command == "usage":
         lines = []
@@ -834,9 +905,12 @@ def render(command: str, result: CommandResult) -> str:
             lines.append(
                 f"recorded {result['recorded']} observation(s) to the trajectory"
             )
+        traj = _trajectory_line(result)
+        if traj:
+            lines.append(traj)
         return "\n".join(lines)
     if command == "beta":
-        return beta_mod.Beta(
+        line = beta_mod.Beta(
             verdict=result["verdict"],
             task_family=result["task_family"],
             verifier_version=result["verifier_version"],
@@ -846,27 +920,36 @@ def render(command: str, result: CommandResult) -> str:
             interval=tuple(result["interval"]) if result["interval"] else None,
             window=tuple(result["window"]) if result["window"] else None,
         ).render()
+        traj = _trajectory_line(result)
+        return f"{line}\n  {traj}" if traj else line
     if command == "dashboard":
         traj = result["trajectory"]
         unanswerable = sum(1 for g in result["schema_gaps"] if not g["answerable"])
         gaps = result["capability_gaps"]
         enabled = "yes" if result["routing_orchestration_enabled"] else "no"
-        return (
-            f"wrote {result['written']}\n"
+        lines = [
+            f"wrote {result['written']}",
             f"  {traj['events']} events, {traj['distinct_agents']} agents, "
-            f"{traj['distinct_artefacts']} files written\n"
-            f"  routing/orchestration enabled: {enabled}\n"
-            f"  {result['beta_line']}\n"
+            f"{traj['distinct_artefacts']} files written",
+            f"  routing/orchestration enabled: {enabled}",
+            f"  {result['beta_line']}",
             f"  RACI derivable: {'yes' if result['raci']['derivable'] else 'no'}; "
-            f"{unanswerable} question(s) the record cannot answer\n"
-            f"  capability gaps: {gaps['total']} recorded, {gaps['distinct']} distinct"
-        )
+            f"{unanswerable} question(s) the record cannot answer",
+            f"  capability gaps: {gaps['total']} recorded, {gaps['distinct']} distinct",
+        ]
+        source = _trajectory_line(result)
+        if source:
+            lines.insert(1, f"  {source}")
+        return "\n".join(lines)
     if command == "doctor":
         provenance = result["provenance"]
         lines = [
             f"code: {provenance['code']}",
             f"data: {provenance['data']}  log: {provenance['log']}",
         ]
+        traj = _trajectory_line(result)
+        if traj:
+            lines.append(traj)
         for name, gate in result["gates"].items():
             lines.append(f"Gate {name}: {gate['status'].replace('_', '-').upper()}")
             for condition in gate["conditions"]:
@@ -1009,7 +1092,10 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    log = Path(args.log)
     try:
+        if _command_needs_trajectory(args):
+            require_trajectory(log)
         result = args.handler(args)
     except (EventError, projection.ProjectionError) as exc:
         print(
@@ -1017,6 +1103,11 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    if log.is_dir():
+        result["trajectory_source"] = {
+            "path": str(log.resolve()),
+            "state": trajectory_state(log),
+        }
     print(
         json.dumps(result, ensure_ascii=False, sort_keys=True)
         if args.json

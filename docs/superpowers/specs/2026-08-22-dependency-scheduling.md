@@ -45,7 +45,7 @@ have refused the second admission. The race is in the admission protocol, not in
 [measured: `.harness/log/2026-08-22.jsonl`; `results-exp130.json` A5]
 
 **F3 — killed dispatches hold claims.** A dispatch that is killed never appends a terminal event;
-its claim stays live until `timeout + grace` expires. 14 of 109 claims in the 21–22 Aug window
+its claim stays live until `timeout + grace` expires. 14 of 110 claims in the 21–22 Aug window
 were opened more than once — widened mid-run by re-dispatch — and the terminal events for the
 racing pair above are timeouts at 15:02:10 and 15:06:06, an hour after the work was dispatched.
 Expiry is the only reclamation mechanism, and expiry without fencing is unsafe: the expired holder
@@ -54,9 +54,11 @@ bibliography § 16]
 
 **F4 — hand-derived serial lanes drift.** The build plan's lane table is a second, hand-maintained
 copy of the dependency structure. EXP-130 A1 measured it against the plans' own declared
-`depends_on` edges: 139 units, 872 edges, and the lanes contain 1 cycle (L08 ↔ L09), omit 14
-units entirely, and leave 159 dependency edges (122 cross-lane + 37 intra-lane) ordered by nothing
-the lanes express. Drift is the median case for a dependency edge, not the exception. [measured:
+`depends_on` edges: 55 units carrying 127 declared edges and 180 pairs with overlapping declared
+claims — and the lanes order only some of them. 122 overlapping pairs share no lane entry; 37 of
+those are ordered by nothing at all, neither lane nor dependency. 14 times a unit claims a path
+under a lane's file yet appears in no lane's list; 3 times a lane lists a unit that claims nothing
+under it. No cycles anywhere — the lanes' failure is incompleteness, not contradiction. [measured:
 `results-exp130.json` A1]
 
 ## 2. The retrieved bar
@@ -91,25 +93,31 @@ clashed today, no. Derivation is a check on declared claims, not a replacement f
 EXP-130 (pre-registered in `docs/10-research/experiment-register.md` before any output was
 inspected; stopping rule fixed in advance; deterministic script, frozen local artefacts, no model
 call, no network) built the file-level import graph of this repository with stdlib `ast` —
-106 Python files, 963 resolved import edges, 0 unresolved, 0 cycles — and evaluated derived
-claims (declared paths ∪ transitive dependents) against hand-written ones. [measured:
-`results-exp130.json`; findings: `experiments/exp130/findings-exp130.md`]
+106 Python files, 165 resolved internal import edges with **zero** unresolved internal imports
+(705 unresolved imports are all stdlib/third-party and correctly unresolvable to repository
+files), 0 cycles — and evaluated derived claims (declared paths ∪ transitive dependents) against
+hand-written ones. [measured: `results-exp130.json`; findings:
+`experiments/exp130/findings-exp130.md`]
 
 What derivation buys, measured:
 
-- **It catches what the lanes miss.** 963 import edges vs 872 declared plan edges; the derived
-  closure covers the 159 dependency edges the lane table leaves unordered (F4). [measured: A1, A2]
-- **It does not collapse.** Median derived claim covers 14 of 106 files; maximum 84
-  (`src/consilient/__init__.py`); 0 files reach ≥ 50 % of the repository. The pre-registered
-  god-node loss condition did not fire. [measured: A2]
-- **It refuses more true conflicts.** Replaying 109 real dispatch claims from 21–22 Aug, the
+- **It catches what the lanes miss.** 963 conflict edges under derived claims vs 872 under
+  declared ones; the derived closure covers the 122 overlapping unit pairs the lane table leaves
+  unordered, 37 of which are ordered by nothing at all (F4). [measured: A1, A2]
+- **It does not collapse at the median — and it has one real hub.** Median derived claim names
+  14 paths, so the pre-registered god-node loss condition (median over half of the 106 Python
+  files) did not fire. But `src/consilient/events.py` has 61 transitive dependents — 58 % of the
+  repository, the only file at ≥ 50 %; 2 files sit at ≥ 30 %, and 45.95 % of path-claiming
+  units' derived claims include `events.py`. A refuse-mode check would serialise nearly half the
+  plan on the event schema; that is the measured reason the check ships warn-first. [measured: A2]
+- **It refuses more true conflicts.** Replaying 110 real dispatch claims from 21–22 Aug, the
   derived policy refuses 7 admissions where the declared policy refuses 1 — a strict superset,
   so no false admits. [measured: A5]
 
 What it costs, measured:
 
 - **Width.** Maximum safe concurrency over the build plan falls from 9 units (declared) to 7
-  (derived). [measured: A3]
+  (derived). [measured: A2]
 - **Blindness.** See § 4.
 
 The pre-registered decision rule — treatment refusals more than twice control's selects
@@ -126,11 +134,13 @@ language. The day's coordination failures lived elsewhere. [measured: A4, A5]
   import-derived claim. The fix is isolation (worktrees), which needs no graph at all.
 - **The trajectory log and the admission protocol.** F2's race is between two appends to
   `.harness/log/*.jsonl`; F3's abandonment is a missing append. Both are protocol properties.
-  104 declared plan-dependency pairs couple files with no import edge in either direction —
-  through shared data files, event-kind string literals, and the trajectory schema. The derived
-  policy refuses 0 of these 104.
-- **Non-Python surfaces.** 22 of 139 unit claims name no Python file — specs, ADRs, the
-  experiment register, CI workflows. Today's one real concurrent overlap was two claims on
+  63 event-kind string literals are each shared by two or more files, and 104 file pairs are
+  coupled through those literals with no import edge in either direction — through shared data
+  files and the trajectory schema. Derived claims extend only along import edges, so derivation
+  cannot couple any of these 104 pairs; that follows from the construction, not from a separate
+  measurement. [measured: A4 counts; algebra: the blindness]
+- **Non-Python surfaces.** 22 of the 139 claimed plan paths name no Python file — specs, ADRs,
+  the experiment register, CI workflows. Today's one real concurrent overlap was two claims on
   `docs/10-research/experiment-register.md`: a Markdown file no import graph will ever span.
 - **Cross-repository and runtime coupling.** Anything resolved at runtime (plugin registries,
   subprocess dispatch, MCP) leaves no static import edge.
@@ -166,9 +176,10 @@ authority — they express intent over docs, data and schema surfaces the graph 
 admission, for each `.py` path in a declared claim, compute the transitive-dependents closure
 from the import graph; a declared claim that omits a dependent is *flagged* in the trajectory
 (warn first, refuse only after the warning's false-positive rate is measured — the closure is
-conservative and will over-flag re-export hubs). The lanes stop being a second hand-maintained
-dependency copy: lane order is *derived* from the plans' declared `depends_on` edges, which EXP-130
-showed is acyclic where the hand-written lanes had a cycle. Check: `run_exp130.py` is the
+conservative and one measured hub, `events.py` at 58 % of the repository, would otherwise
+serialise half the plan). The lanes stop being a second hand-maintained dependency copy: lane
+order is *derived* from the plans' declared `depends_on` edges, which EXP-130 showed are acyclic
+and complete where the lanes are incomplete. Check: `run_exp130.py` is the
 instrument; the CI form is a test that the lane table agrees with the declared-edge topological
 order. [measured: A1; asserted: the warn-then-refuse staging]
 
@@ -198,18 +209,20 @@ The strongest objection is that this specification already builds too much, and 
 own numbers make the case. [measured]
 
 - **The width derivation buys is width nobody used.** Peak concurrency today was 8 live claims;
-  the derived policy *costs* width (9 → 7). On a day with 1 real overlap in 109 claims, a
+  the derived policy *costs* width (9 → 7). On a day with 1 real overlap in 110 claims, a
   scheduler optimising for parallel width is solving the problem the repository does not have.
 - **The clash that actually happened was a protocol race**, which D2 fixes without any graph.
   D1 needs no graph either. Of the four failures, derivation addresses only F4 — and F4's
   cheapest fix is deleting the hand-written lane table in favour of the declared edges the plans
   already carry, no import graph required.
-- **Hermetic build systems earned their complexity on codebases with god-node utility modules
-  and thousands of actions.** This repository has 106 Python files and zero files reaching half
-  of them. Bazel's answer — sandboxed enforcement of declared inputs — is a poor fit for a
-  system whose uncontended resources are documents.
-- **The closure is conservative and will over-flag.** 4 files reach ≥ 30 % of the repository;
-  a claim on any of them flags a third of the codebase. Warn-first staging exists precisely
+- **Hermetic build systems earned their complexity on codebases far larger than this one.**
+  This repository has 106 Python files and 165 internal import edges; Bazel's answer — sandboxed
+  enforcement of declared inputs — is a poor fit for a system whose most-contended resources are
+  documents. And the one real hub this repository does have (`events.py`, 58 % dependents
+  closure) is an argument *against* refuse-mode derivation, not for hermeticity.
+- **The closure is conservative and will over-flag.** 2 files reach ≥ 30 % of the repository
+  and `events.py` reaches 58 %; a claim on either flags a third to a half of the codebase.
+  Warn-first staging exists precisely
   because the false-positive rate is unmeasured.
 
 The honest reading: D1 and D2 are protocol repairs justified by measured failures; D3 is

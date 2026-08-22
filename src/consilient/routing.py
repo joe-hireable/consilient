@@ -1,17 +1,16 @@
 """β-conditioned candidate ceilings — the mechanism, deliberately unwired.
 
-README.md states the project's contribution: nothing else "conditions its own routing,
-its parallelism or its acceptance threshold on a measured β". This module is that
-conditioning mechanism. **Nothing in the run path calls it.** It is not imported by
+This module is the project's measured-β conditioning mechanism. **Nothing in the run path
+calls it.** It is not imported by
 `scripts/dispatch.py`, it does not touch `routing_orchestration_enabled`, and it changes
 no gate condition: Stage 3 authorises *building* orchestration, and *depending* on it is
 Gate B, which is not passed.
 
-The identity is ADR-0051's, registered in `docs/20-design/work-modes.md`: an attempt
-that resamples until the verifier accepts exposes the verifier n times, so
-P(bad ships) = 1 − (1−β)ⁿ, inverted for a declared exposure ceiling ε as
-n_max = ⌊ln(1−ε) / ln(1−β)⌋. At EXP-47's measured β = 0.3132 [0.2926, 0.3346] that is
-n_max = 1 for any ε ≤ 0.40 across the whole interval [algebra].
+ADR-0077 corrects the governing identity: until repeated candidate outcomes establish a
+versioned dependence model, the distribution-free union bound is
+P(bad ships) ≤ nβ, so n_max = ⌊ε/β_upper⌋. At EXP-47's measured
+β = 0.3132 [0.2926, 0.3346], that admits one candidate at ε = 0.40 and zero when
+ε < β_upper. [algebra]
 
 Two design points are load-bearing:
 
@@ -41,8 +40,8 @@ from . import beta, projection
 class Ceiling:
     """How many candidates may be attempted against one verifier contract.
 
-    `n_max` is None when the interval's upper bound is exactly 0: P(bad ships) is then
-    0 for every n, and no finite ceiling follows from the identity. That is a statement
+    `n_max` is None when the interval's upper bound is exactly 0: the union bound is then
+    0 for every n, and no finite ceiling follows from the measurement. That is a statement
     about the arithmetic, not a licence — a measured β of exactly 0.0 should be read
     with the sample size it came from.
     """
@@ -60,7 +59,7 @@ class RoutingRefusal:
 
 
 def candidates_ceiling(estimate: beta.Beta, epsilon: float) -> Ceiling | RoutingRefusal:
-    """Invert P(bad ships) = 1 − (1−β)ⁿ for an exposure ceiling ε.
+    """Apply the dependence-robust union-bound ceiling nβ ≤ ε.
 
     A measured β yields the largest n with P(bad ships) ≤ ε, computed at the interval's
     upper bound. Anything else — insufficient data, an unmeasurable oracle — is a
@@ -84,7 +83,7 @@ def candidates_ceiling(estimate: beta.Beta, epsilon: float) -> Ceiling | Routing
     if upper >= 1.0:
         # Every attempt is accepted-and-bad; even one candidate busts any ε < 1.
         return Ceiling(n_max=0, beta_used=upper, epsilon=epsilon)
-    n_max = math.floor(math.log(1.0 - epsilon) / math.log(1.0 - upper))
+    n_max = math.floor(epsilon / upper)
     return Ceiling(n_max=max(n_max, 0), beta_used=upper, epsilon=epsilon)
 
 

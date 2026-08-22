@@ -248,7 +248,7 @@ python -m pytest tests/test_coordination.py tests/test_dispatch.py -q
 
 **Deliverable:** A native item closes only after its matching `attempt.outcome`, sealed artefact digests, every frozen verifier receipt, consumed predecessor bindings and conflict dispositions are durable; later rejection invalidates only exact descendants. [asserted]
 
-**Depends on:** T01. Run after T02 if both would claim current work-item tests in the same branch. [asserted]
+**Depends on:** T01 and E01. Run after T02 if both would claim current work-item tests in the same branch. [asserted]
 
 **Claim exactly:**
 
@@ -411,7 +411,7 @@ python -m pytest tests/test_delivery_recovery.py tests/test_v0_invariants.py -q
 
 **Deliverable:** One deterministic start/window projection, at most one pre-breach exception and one final `delivery.outcome`/card expose the finished artefact or typed adverse terminal result. [asserted]
 
-**Depends on:** T03, T04, D01, D02, S-01 and the effect protocol's local-render classification. [asserted]
+**Depends on:** T03, T04, D01, D02 and S-01. This unit produces a same-machine projection only; any later outward delivery consumes the action-boundary protocol in A05. [asserted]
 
 **Claim exactly:**
 
@@ -440,7 +440,7 @@ python -m pytest tests/test_delivery_outcome.py tests/test_task_dashboard.py tes
 
 **Deliverable:** The existing local transport-ingest boundary accepts one sealed user turn, redacts/brokers secret spans, emits C01/O01/T01/D01 records in order and returns the D04 start projection; `dispatch.py` receives only the sealed ready item. [asserted]
 
-**Depends on:** C01, O01, T01, C03, D01 and S-12. [asserted]
+**Depends on:** C01, O01, T01, C03, D01, D04 and S-12. [asserted]
 
 **Claim exactly:**
 
@@ -469,6 +469,8 @@ Run the focused files above, then the complete suite, strict type check and Ruff
 
 ```powershell
 python -m pytest tests -q
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 python -m mypy --strict src/consilient
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 python -m ruff check .
 ```

@@ -134,19 +134,21 @@ keep the environment.
 Don't ask ChatGPT. Ask Consilient. It sends harnesses. Consilient is the **Agent Command
 Post** (ADR-0061); Claude Code, Cursor, Codex and Grok are the harnesses.
 
-Four commands, and not one of them stands between you and your work.
+Six commands on the observe surface, and not one of them stands between you and your work.
 
 | | |
 |---|---|
 | `consil record` | append one checked event to the log |
 | `consil replay` | rebuild the state from the log and confirm it still matches |
 | `consil beta` | report how often the checks were wrong |
+| `consil usage` | report provider headroom and spend ceilings |
 | `consil doctor` | report which gates are open |
+| `consil dashboard` | render a one-shot HTML summary of the trajectory |
 
 `[measured]` 21 August 2026, against this tree with `PYTHONPATH=src`: `consil --help` lists
-`record`, `replay`, `beta`, `usage`, `doctor`, `dashboard`. An interpreter-global install of
-another worktree still prints only the first four — that is the identity bug `consil` now
-refuses. Run it as `python -m consilient.cli` from this checkout, or `pip install -e .`.
+exactly those six. An interpreter-global install of another worktree may print a stale subset —
+that is the identity bug `consil` now refuses. Run it as `python -m consilient.cli` from this
+checkout, or `pip install -e .`.
 
 **To actually dispatch work**, do not open another chat. From this checkout:
 
@@ -220,6 +222,26 @@ routing/orchestration enabled: no
 
 **It exits 1.** That is correct behaviour while the gates are shut, not a fault, and it means
 `consil doctor && something-else` will never run the something-else `[measured]`. Do not chain it.
+
+### Usage and spend ceilings
+
+`consil usage` reports provider headroom and whether spend ceilings are configured. On a fresh
+checkout you will see:
+
+```
+ceilings: NONE — no spend limits configured at .harness\limits.json; every metered call refuses
+```
+
+That is expected, not a fault: the harness refuses metered calls until **you** copy the shipped
+shape to an instance file the repository never tracks:
+
+```powershell
+Copy-Item .harness\limits.example.json .harness\limits.json
+# edit .harness\limits.json with your numbers — never commit it
+```
+
+`[measured]` `.harness/limits.example.json` is tracked; `.harness/limits.json` is gitignored.
+Until you create the instance file, `ceilings: NONE` is the honest report.
 
 ---
 

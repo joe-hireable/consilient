@@ -380,17 +380,17 @@ def _measured_beta() -> Beta:
     return Beta(MEASURED, None, None, 163, 51, 0.3132, (0.2926, 0.3346), None)
 
 
-def test_ceiling_at_the_exp47_interval_is_one_for_any_epsilon_up_to_040():
+def test_ceiling_at_the_exp47_interval_is_one_at_epsilon_040():
     ceiling = routing.candidates_ceiling(_measured_beta(), 0.40)
     assert isinstance(ceiling, routing.Ceiling)
     assert ceiling.n_max == 1
     assert ceiling.beta_used == pytest.approx(0.3346)  # the top of the interval
 
 
-def test_ceiling_loosens_with_a_larger_exposure_ceiling():
+def test_unmeasured_dependence_keeps_the_union_bound_ceiling():
     ceiling = routing.candidates_ceiling(_measured_beta(), 0.60)
     assert isinstance(ceiling, routing.Ceiling)
-    assert ceiling.n_max == 2
+    assert ceiling.n_max == 1
 
 
 def test_an_absent_beta_is_a_refusal_not_an_assumption():
@@ -605,8 +605,14 @@ def test_dry_run_reports_a_claim_conflict_without_writing_one(tmp_path):
     assert len(after) == len(before)  # a dry run writes nothing
 
 
-def test_build_command_cursor_selects_a_model_from_pool_state(tmp_path):
+def test_build_command_cursor_selects_a_model_from_pool_state(tmp_path, monkeypatch):
     script = _load_script()
+    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(
+        script,
+        "help_text",
+        lambda _argv: "--max-turns <N> --max-tokens <N> --force --trust",
+    )
     cursor = harness_by_id("cursor-composer")
     assert cursor is not None
     built = script.build_command(
@@ -638,8 +644,14 @@ def test_build_command_cursor_family_without_pool_state_refuses(tmp_path):
     assert "headroom" in built or "no eligible model" in built
 
 
-def test_build_command_cursor_family_selection_picks_the_family(tmp_path):
+def test_build_command_cursor_family_selection_picks_the_family(tmp_path, monkeypatch):
     script = _load_script()
+    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(
+        script,
+        "help_text",
+        lambda _argv: "--max-turns <N> --max-tokens <N> --force --trust",
+    )
     cursor = harness_by_id("cursor-composer")
     assert cursor is not None
     built = script.build_command(

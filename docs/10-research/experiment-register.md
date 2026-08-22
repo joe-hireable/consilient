@@ -5395,6 +5395,134 @@ denominators; consent or preference for anyone other than the authenticated owne
 another repository; Gate A, Gate B or permission to raise candidate exposure. [asserted]
 
 ---
+
+### EXP-130 · Can claim sets be derived from the import graph, and what does derivation cost concurrency? `DONE`
+
+**Result:** [`experiments/exp130/findings-exp130.md`](experiments/exp130/findings-exp130.md) —
+mixed by the pre-declared win/loss shape; the pre-registered decision rule (treatment refusals
+7 > 2 × control refusals 1) selects **derivation as a check, not a replacement**. Decided by
+ADR-0091. Stopping rule applied as written; it did not fire. [measured]
+
+**Pre-registered 22 Aug 2026, before any output was inspected.** Dispatch
+`20260822T193039-7269150217` allocated EXP-130 after a whole-tree search (tracked files,
+untracked dispatch state, `.harness` logs and training harvest) found EXP-128 reserved by
+ADR-0087, EXP-129 specified by ADR-0089, and no use of EXP-130 anywhere in the tree. [measured]
+
+**Decides:** whether a dispatch claim set derived from the repository's import graph — declared
+paths plus their transitive dependents — beats today's hand-written claims as a scheduling input
+for this repository's own build plan, measured on frozen local artefacts only. It decides nothing
+about any other repository, and it does not unblock Gate A, Gate B or
+`routing_orchestration_enabled`. [asserted]
+
+**Precondition:** none beyond the current tree. Inputs are frozen at the commit the run starts on:
+the four stream plans under `docs/superpowers/plans/2026-08-22-*-plan.md` (55 units, their
+declared `Claim exactly` path sets and `Depends on` edges), the hand-written serial lane table in
+`docs/superpowers/plans/2026-08-22-build-plan.md`, every `.py` file under `src/`, `scripts/` and
+`tests/` parsed with stdlib `ast` into a file-level import graph, and the local trajectory logs
+`.harness/log/2026-08-19.jsonl` through `2026-08-22.jsonl` (dispatch claims, terminal events and
+outcomes). No model call, no network, no metered resource. [measured]
+
+**Procedure:** single pass, five analyses, no iteration towards a preferred answer.
+
+- **A1 — lane-table drift.** For every pair of units whose declared claim sets overlap under
+  `coordination.paths_overlap` semantics, check whether the hand-written lane table orders them;
+  and for every ordered lane pair, whether the claims actually overlap. Count over-serialised
+  (ordered but disjoint) and under-serialised (overlapping but unordered) pairs.
+- **A2 — concurrency width.** Compute the largest set of units that may run concurrently under
+  (a) hand-written lanes plus logical dependencies and (b) graph-derived claims (declared paths
+  union transitive dependents in the import graph) plus the same dependencies. Report both widths
+  and the median derived claim-set size as a fraction of the 106 Python files.
+- **A3 — failure coverage.** Classify each of the four measured coordination failures of
+  22 Aug 2026 (shared git index, check-then-append race, abandoned claim, hand-derived lane
+  drift) by whether any import-graph-derived claim could have prevented it. The git index is not
+  a Python module; record what the graph cannot see, do not guess.
+- **A4 — coupling the import graph misses.** Count file pairs with no import edge in either
+  direction that both reference the same event-kind string literal (schema coupling through the
+  trajectory), and count claimed plan paths that are not Python files at all (documentation,
+  specifications — no import graph exists for them).
+- **A5 — replay of the day's arrivals.** Replay the dispatch claims recorded 19–22 Aug under two
+  policies: control (declared paths only, today's rule) and treatment (declared paths union
+  transitive dependents). Count admissions, refusals and conflict pairs each policy detects over
+  the same arrival process.
+
+**Measures:** overlap-pair counts and lane agreement from A1; maximum safe concurrency and claim
+bloat from A2; the four-row coverage table from A3; invisible-coupling counts from A4;
+admission/refusal/conflict counts per policy from A5. Every figure is a count over frozen
+artefacts; there are no point estimates of rates and no simulated populations. [algebra]
+
+**Stopping rule, fixed before the run:** the experiment ends after one pass over the frozen
+inputs. A plan unit declaring no paths is counted as `undeclared`, never silently dropped or
+assigned a guessed claim. An import that does not resolve to a repository file is counted as
+`unresolved`, not assumed internal. If the script cannot parse a file, the file is counted as
+`unparseable` and the run continues. Any follow-up question is a new experiment, not a second
+pass. [asserted]
+
+**Pre-declared loss condition:** graph-derived claiming loses if (a) it admits any unit pair whose
+declared write sets overlap (a false admit), or (b) the median derived claim covers more than half
+the repository's Python files (god-node collapse — derivation serialises everything), or (c) it
+detects strictly fewer true overlap pairs than the hand-written lanes. It wins if it detects at
+least one under-serialised pair the lanes missed, admits no false pair, and affords maximum
+concurrency no worse than the lanes. Any other shape is reported as mixed, not rounded to a win.
+[asserted]
+
+**Largest plausible effect (ADR-0050):** a win authorises adding a derivation *check* to the
+dispatch path — a declared claim that omits a transitive dependent is refused — for this
+repository's Python surfaces only. A loss leaves hand-written claims in place and records that
+derivation is over-engineering here; the worktree-isolation answer to the shared index stands
+unscathed either way. The experiment cannot change a gate, the CLI surface, or any claim protocol;
+it informs one ADR. [asserted]
+
+**What it cannot decide:** coupling through data (the trajectory files, the git index, SQLite
+projections), coupling through event-kind strings except as counted in A4, any repository other
+than this one, any language other than Python, and whether derived claims remain correct as the
+codebase grows — the import graph is re-derived per run, and this result is a snapshot.
+[asserted]
+
+---
+
+### EXP-131 · Does the derived-coverage warning survive contact with real dispatches? `READY`
+
+**Pre-registered 22 Aug 2026; no outcome inspected.** Dispatch `20260822T193039-7269150217`
+allocated EXP-131 after a whole-tree search (tracked files and `.harness` state) found no use of
+the ID anywhere. Named as the killing experiment for ADR-0091's D3 check. [measured]
+
+**Decides:** whether the import-graph coverage check on declared dispatch claims (ADR-0091, D3)
+earns promotion from warn to refuse, or is deleted as noise. It decides nothing about gates, the
+CLI surface, or any other repository. [asserted]
+
+**Precondition:** ADR-0091's D3 has shipped in warn mode — admission of a Python-surface claim
+that omits a transitive dependent appends a `claim.coverage_warning` event naming the omitted
+files, and never refuses. Until that event exists in the trajectory this experiment cannot run
+and stays `READY`. [asserted]
+
+**Procedure:** single pass over the trajectory window starting at the first
+`claim.coverage_warning` and ending at the 20th warning or 28 days later, whichever comes first.
+For each warning, join the dispatch's recorded commit events: a warning is a **true positive** if
+any file the dispatch actually staged overlaps the omitted-dependents set it was warned about
+(under `coordination.paths_overlap` semantics), a **false positive** otherwise. A dispatch with
+no commit events counts as `inconclusive`, never as either. [asserted]
+
+**Measures:** counts of true positives, false positives and inconclusives over the frozen window;
+no rates are quoted below n = 20 warnings. [algebra]
+
+**Stopping rule, fixed before the run:** one pass over the frozen window; no re-sampling. If the
+window closes at 28 days with fewer than 20 warnings, the result is `insufficient_data` and the
+check stays in warn mode — it is not deleted for lack of traffic. [asserted]
+
+**Pre-declared loss condition:** if false positives exceed true positives over the window, D3 is
+deleted (the lane-derivation half of ADR-0091 stands regardless — it rests on EXP-130 A1, not on
+this experiment). **Win condition:** true positives ≥ false positives and at least one true
+positive, promoting the check from warn to refuse. Anything else is reported as mixed. [asserted]
+
+**Largest plausible effect (ADR-0050):** one CI check changes severity or is deleted. No gate,
+CLI, protocol or claim-content change is authorised by any outcome. [asserted]
+
+**What it cannot decide:** whether derivation helps on any other codebase; whether a refuse-mode
+check would have prevented a historical clash (EXP-130's A5 already measured the replay answer:
+the one real overlap was a protocol race, invisible to claim content); anything about non-Python
+surfaces. [asserted]
+
+---
 ## Not experiments
 
 **Q4** (what v0 optimises for), **Q14** (does the Inquiry tier belong in v0), **Q15/Q23**

@@ -5,6 +5,9 @@ only, gated by ADR-0015 Stage 2 (trajectory log, verdict prompt, β-meter — no
 This file exists so the modes are designed against the ceiling that constrains them,
 rather than shipped as a feature list and discovered to be a queue generator.
 
+**Updated 22 August 2026:** ADR-0077 separates review capacity from candidate exposure and
+supersedes the unqualified iid verifier-shopping formula below. [algebra]
+
 ## The six modes
 
 One harness, one loader, no per-domain variants (see `architecture-sketch.md`). A mode is
@@ -22,7 +25,7 @@ a *scheduling and attention pattern*, not a different architecture:
 ## The arithmetic warning — read this before wanting the last four `[algebra]`
 
 `findings.md` §5: sustainable throughput is capped by **human review, not agent
-capacity** — `n_max = T_cycle / T_review` ≈ 3 agents at realistic numbers (25-min cycles,
+capacity** — `n_review_capacity = T_cycle / T_review` ≈ 3 agents at realistic numbers (25-min cycles,
 8-min reviews). That result does not care *when* the agents run:
 
 - A cron agent running overnight for 8 h produces ~19 reviewable diffs
@@ -58,10 +61,13 @@ without the queue filling with plausible-looking bad work — which is strictly 
 a queue of honest failures, because it consumes review time at the same rate while
 shipping defects at rate β.
 
-Verifier-shopping caveat (`experiments/capability_context_beta_star.py`, Part C):
-unattended retry loops that resample until checks pass expose the verifier n times —
-P(bad ships) = 1 − (1−β)ⁿ, i.e. 41% at β = 0.10, n = 5. Background modes that "keep
-trying overnight" are the highest-exposure pattern in the product. `[algebra]`
+Verifier-shopping caveat (`experiments/capability_context_beta_star.py`, Part C; corrected by
+ADR-0077): unattended retry loops expose the verifier `n` times. The iid special case is
+`P(bad ships) = 1 − (1−β)ⁿ`, i.e. 41% at `β = 0.10`, `n = 5`. Under unmeasured dependence the safe
+policy is the union bound `P(bad ships) <= n beta_upper`, so
+`n_attempt_max = floor(epsilon / beta_upper)`. An outcome-adaptive overnight retry does not inherit
+an iid exception from sealed candidates. Background modes that “keep trying overnight” are the
+highest-exposure pattern in the product. [algebra] [asserted]
 
 ## Sequencing
 

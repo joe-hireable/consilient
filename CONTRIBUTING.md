@@ -2,10 +2,11 @@
 
 Thanks for considering a contribution.
 
-**This project is pre-brainstorm and has no code yet.** The most useful contribution right
-now is argument: read `docs/00-context/open-questions.md` and try to break the thesis in
-`docs/20-design/architecture-sketch.md`. Issues that kill an idea are worth more than
-issues that agree with it.
+**Stage 3 is active** — the repository ships `src/consilient/`, a full test suite, and runnable
+research instruments. The most useful contributions are still argument and measurement: read
+`docs/00-context/open-questions.md`, try to break the thesis in
+`docs/20-design/architecture-sketch.md`, and ship the check with any invariant you add. Issues
+that kill an idea are worth more than issues that agree with it.
 
 ## Licence
 
