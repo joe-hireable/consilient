@@ -502,3 +502,44 @@ pushed.** The resolution: **nothing is ever pushed at the user; everything is al
 pull.** He may look into any running squad at any moment and intervene; the system never interrupts
 him to report. Quiet delivery is about what the product *sends*; observability is about what the
 product *exposes*. [asserted]
+
+## The job to be done: one interface instead of eight
+
+> "So why is my idea bad then? none of these systems natively dispatch organised squads of agents
+> properly to experiment research and discover before every answer rather than just spitting out
+> whatever the pretrainjng says is the next predicted tokens?
+> that's what's novel but really I just want an interface that I can use singularly rather than
+> havkng to use claude code, cowork, claude design, figma, supergrok, grok bot, cursor, chatgpt work,
+> etc etc all sepsrately"
+
+**Two claims, and the orchestrator had been undervaluing both.**
+
+**First, the novelty claim survives today's three teardowns.** Checked rather than assumed:
+`ruflo`'s default `swarm`, `agent_spawn` and `hive-mind_spawn` surfaces **"mostly persist coordination
+records"** and its 100+ agents are principally Markdown persona manifests; Hermes' delegation is
+opt-in per task and its goal judges **admit false positives without a measured rate**; OpenHands is
+the closest with critic AUC and Best@8 selection but is coding-specific and labelled by merge/diff
+proxies; ChatGPT Work and Cowork offer deep research as **a mode a user invokes**, not the path every
+answer takes. [cited: the three teardowns and the product bar, 22 Aug 2026]
+
+**No surveyed system makes convergent, evidence-gathering work the default route for every answer.**
+It exists as a mode, as a coding feature, or as a registry — not as how the system works. **That is
+the thesis, it was not falsified today, and it is what the three falsified claims were only ever
+proxies for.** [asserted]
+
+**Second, and more useful: the job to be done is unification, and it is measurable.** The principal
+currently operates **eight** surfaces — Claude Code, Cowork, Claude design, Figma, SuperGrok, Grok
+bot, Cursor, ChatGPT Work. **No incumbent can solve this, because each incumbent is one of the
+eight.** Hermes does not reach Figma; Cursor does not do Cowork; ChatGPT Work cannot drive Claude
+Code. **Only something above them can**, which restates the meta-harness position as a user need
+rather than an architectural preference. [asserted]
+
+**The success test is behavioural and needs no β, no gate and no human verdict: does he stop opening
+the other seven?** That is falsifiable, cheap to observe, and it is the first product criterion
+recorded here that requires nothing from him but his ordinary working day. [asserted]
+
+**A correction the orchestrator owes the record.** Across 22 August it reported three differentiators
+falsified — portable cross-harness memory, multi-subscription reach and verifier self-evaluation.
+**All three were the orchestrator's own framings, invented that afternoon, not the project's stated
+thesis.** Reporting their deaths as though the idea were failing was a framing error. The thesis in
+`CONSILIENCE.md` was never tested by any of it. [measured: this conversation]
