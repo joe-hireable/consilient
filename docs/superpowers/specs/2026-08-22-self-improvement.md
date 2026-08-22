@@ -39,10 +39,11 @@ design for a dormant path until its prerequisites and EXP-104 pass. [asserted]
 
 ## Starting point
 
-`src/consilient/promote.py` already classifies paths, requires measured beta and one before/after
-metric, emits `promote.accepted`, `promote.refused` and `promote.reversed` through `events.py`, and is
-disabled by default. `scripts/promote_loop.py` executes a candidate but never applies one under the
-current unmeasured/disabled conditions. [measured]
+`src/consilient/promote.py` already classifies path strings, requires measured beta and one
+before/after metric, emits `promote.accepted`, `promote.refused` and `promote.reversed` through
+`events.py`, and is disabled by default. `scripts/promote_loop.py` executes the fixture candidate
+and records a decision; `--apply` only reports refusal and no implementation path applies bytes.
+[measured]
 
 That is a refusal-safe prototype, not this design's acceptance instrument. `ExecutionEvidence`
 contains one metric pair, `improved()` means only `metric_after > metric_before`, and the existing
@@ -50,9 +51,11 @@ reversal function records a claim without restoring or proving state. A checked-
 can improve its training score while its held-out score falls to zero. [measured:
 `src/consilient/promote.py`; `tests/test_promote.py`]
 
-The commit gate proves that a live run owns the staged path. It does not bind the commit to an
-experiment, an impact contract, an owner approval, a candidate digest, or the resulting commit SHA.
-[measured: `src/consilient/commit_gate.py`]
+The commit gate checks declared run/path attribution and overlap. It cannot prove ownership, permits
+an explicit `--no-verify` bypass, and reads staged path names rather than staged content. It does not
+bind a staged tree to an experiment, impact contract, owner approval or candidate, and a pre-commit
+hook cannot yet know the resulting commit SHA. [measured: `src/consilient/commit_gate.py`;
+`scripts/commit_gate.py`]
 
 V0-18 currently validates declared provenance, not authenticated authorship: an event passes when
 its caller-supplied actor equals its caller-supplied principal and `via` says `cli`. The source says
@@ -72,15 +75,19 @@ digest and contains these canonical fields: [asserted]
 | `baseline` | Immutable owner-approved state, environment and instrument digests |
 | `on_confirm` | One bounded change class the result may propose |
 | `on_kill` | What is removed, disabled or left dormant |
-| `on_other` | The default for inconclusive, missing or malformed outcomes |
+| `on_other` | The mandatory default `no activation`; it cannot be weakened |
 | `confirm_rule` | Direction, minimum effect, interval rule, safety ceilings and denominators |
 | `kill_rule` | Direction, harm/boundary triggers and denominators |
 | `horizon` | Fixed sample, time or compute end; no optional continuation |
 | `largest_effect` | The largest plausible implementation consequence |
+| `safety_floor` | Controller-supplied non-overridable authority, instrument, missing-data and beta/alpha limits |
 
-Registration closes when the first treatment artefact, score or human label exists. From then on,
-changing any contract field creates a new experiment ID; it cannot amend the experiment whose data
-has been seen. Missing observations stay in the declared denominator and follow `on_other`. [asserted]
+An agent may draft the contract, but cannot author its acceptance policy. The controller inserts the
+ADR-0076 safety floor, and the trusted principal-only ingress approves the exact registration digest
+before the first treatment artefact, score or human label exists. A weaker confirm rule, omitted
+floor, or unapproved digest is ineligible. From then on, changing any contract field creates a new
+experiment ID and needs a new approval; it cannot amend the experiment whose data has been seen.
+Missing observations stay in the declared denominator and follow `on_other`. [asserted]
 
 The proposal producer performs a mechanical equality check between the recorded result and the
 contract. It may emit only the declared `on_confirm`, `on_kill` or `on_other` disposition; prose,
@@ -100,31 +107,46 @@ The acceptance instrument is an **incumbent-controlled sealed evaluation package
 input and executable which can influence its verdict is off-limits to ordinary autonomous
 promotion. It contains: [asserted]
 
-- a human- or task-native-labelled hold-out bank that the candidate cannot enumerate, read, write
-  or infer from per-item feedback; [asserted]
+- disjoint development-feedback, one-use qualification and drift-sentinel batches. The candidate
+  cannot enumerate, read or write the latter two, and receives no per-item feedback; [asserted]
 - the verifier, beta/alpha calculation, acceptance logic and missing-data rules; [asserted]
 - a canonical manifest of commands, resolved executable versions, environment, corpus hashes,
   randomisation seed, baseline and epoch anchor; [asserted]
-- an outer controller running from the last owner-approved base, not from the candidate worktree;
-  [asserted]
-- an accept/refuse-only interface. Candidate-visible output contains neither per-item scores nor
-  the hidden items. [asserted]
+- the trusted transaction role in the existing `promote_loop.py`, running from the last
+  owner-approved base rather than the candidate worktree; [asserted]
+- an accept/refuse-only candidate interface with a fixed one-query budget. Candidate-visible output
+  contains neither aggregates, per-item scores nor hidden items. [asserted]
 
-The candidate has no capability to write the controller, instrument, hold-out bank, active base,
-approval ingress, commit hook or append-only trajectory. If that separation cannot be established
-by the host boundary, evaluation returns `instrument_unsealed` and activation is impossible.
-[asserted]
+This capability separation does not exist today: dispatch launches child harnesses in the supplied
+repository with bypass permissions. It is a blocking host-level prerequisite, not a property this
+document attributes to current dispatch. [measured: `src/consilient/harness.py`;
+`scripts/dispatch.py`]
 
-`promote.path_status()` remains the mechanical path classifier, extended rather than duplicated.
-It must classify the staged index blobs and the full resolved installation manifest, not a working
-tree which may differ from the commit. Protected prefixes expand to every instrument dependency,
-approval ingress and activation gate; an unknown path, symlink escape, alternate import or missing
-manifest entry is protected. [asserted]
+Under that prerequisite, the candidate has no capability to read the privileged result/card projection or raw trajectory,
+or to write the controller, instrument, hold-out bank, active base, approval ingress, commit hook or
+append-only trajectory. `events.py` remains the single writer; an owner projection may reveal the
+aggregate table, while `recall.py` must exclude those fields and event kinds from all candidate and
+builder contexts. If that separation cannot be established by the host boundary, evaluation
+returns `instrument_unsealed` and activation is impossible. [asserted]
 
-The sealed package returns the full aggregate contingency table needed for beta and alpha, its
-sample size and pre-declared interval, plus counts of refusal, timeout, quarantine, missing telemetry
-and boundary attempts. A zero count is printed; absent telemetry is `unavailable`, never zero.
-[asserted]
+`promote.path_status()` remains the canonical pathname policy, extended rather than duplicated. The
+existing script-side I/O boundary must additionally read staged index blobs/tree identity and
+resolve the complete installation manifest, symlinks and imports; the pure product function does not
+do those things today. Protected prefixes expand to every instrument dependency, approval ingress
+and activation gate. An unknown path, symlink escape, alternate import or missing manifest entry is
+protected. [measured] [asserted]
+
+The sealed package writes the full aggregate contingency table needed for beta and alpha, its sample
+size and pre-declared interval, plus counts of refusal, timeout, quarantine, missing telemetry and
+boundary attempts to the privileged owner projection. A zero count is printed; absent telemetry is
+`unavailable`, never zero. The candidate receives only accept/refuse. [asserted]
+
+Each qualification batch may judge one candidate lineage once. As soon as its verdict affects an
+activation or any aggregate becomes visible outside the privileged projection, that batch is
+retired and cannot qualify a descendant. Drift uses a fresh pre-allocated sentinel batch per window.
+Batch order, query budget and retirement are sealed before the candidate exists; exhaustion means
+`no_fresh_instrument` and no activation, not reuse. Replenishment is an instrument change and needs
+the owner-approved bridge path. [asserted]
 
 This is defence in depth, not the fiction that a finite hold-out is infallible. The instrument may
 still be wrong, but the candidate cannot improve its score by rewriting the ruler which decides its
@@ -148,8 +170,9 @@ sealed run still regressed. [cited: https://arxiv.org/abs/2607.24300]
 ## 3. The owner gate is a cheap, exact decision
 
 After the promoter matches a result to its impact contract, it creates a proposal event and renders
-exactly four deterministic sentences. Templates render facts; a model does not summarise the
-proposal after seeing it. [asserted]
+exactly four deterministic sentences in the privileged owner projection. Templates render facts; a
+model does not summarise the proposal after seeing it, and the sentences are not returned through
+candidate recall. [asserted]
 
 1. `EXP-104 met <pre-registered confirm rule>; it proposes <bounded target_surface change>.`
 2. `Against <predecessor> and <epoch anchor>, sealed held-out outcome was <effect and interval>; beta/alpha were <point, interval, n>; cost and every adverse count were <values>.`
@@ -184,7 +207,7 @@ of reversibility are not inputs. [asserted]
 | `active_harness` — any changed byte reachable by dispatch, instructions, routing, recall, coordination, work items, promotion, commit enforcement or an installed skill/adaptation | principal approval of the exact digest before activation |
 | `instrument` — verifier, metric, beta/alpha code, hold-out data, manifest, baseline/anchor, acceptance rule, event writer, approval ingress or their tests | refused by ordinary promotion; principal approval plus a separate recertification/bridge experiment opens a new epoch |
 | `exact_rollback` — restoration to a previously owner-approved digest whose recovery proof passes | autonomous when a pre-registered drift or safety trigger fires |
-| `existing_principal_effect` — spend, credential, external exposure, gate/spec approval, verdict or surviving preference | existing V0-18 path; self-improvement grants no new authority |
+| `existing_principal_effect` — spend, credential, external exposure, gate/spec approval, verdict or surviving preference | refused/unavailable until that effect has its own trusted principal ingress; self-improvement grants no new authority |
 | `unknown_or_mixed` — missing manifest, ambiguous path, dependency escape or more than one class | no activation; record a capability gap |
 
 An active harness change is owner-gated even when `git revert` could restore its bytes. Its semantic
@@ -202,19 +225,45 @@ echo and are cut. A candidate sees one verifier contract; retries do not shop am
 
 ### Activation transaction
 
-Before the owner card is eligible, the incumbent controller performs forward and reverse in an
-isolated copy. It records the parent, candidate, instrument and impact-contract digests; applies the
-candidate; runs the frozen suite and sealed evaluation; restores the parent; and proves canonical
-equality over the entire governed tree while the protected-instrument digest remains unchanged.
-The proof includes failed commands and adverse counts, not only exit status. [asserted]
+Before the owner card is eligible, the trusted `promote_loop.py` transaction performs forward and
+reverse in an isolated copy. It records the parent, candidate, instrument and impact-contract
+digests; applies the candidate; runs the frozen suite and sealed evaluation; restores the parent;
+and proves canonical equality over the entire governed tree while the protected-instrument digest
+remains unchanged. The proof includes failed commands and adverse counts, not only exit status.
+[asserted]
 
-After exact approval, the existing commit gate gains one conjunct: the staged index must match the
-approved candidate and parent, experiment, impact contract, instrument and claimed paths. It still
-enforces run/path attribution. The approval is consumed only after the resulting commit SHA is
-recorded; an index mutation or hook bypass invalidates it. Activation updates one versioned pointer
-atomically, then re-runs a post-activation canary before admitting work. [asserted]
+After exact approval, the existing pre-commit script gains one conjunct: parent SHA and staged tree
+hash must match the approved candidate, experiment, impact contract, instrument and claimed paths.
+An index mutation refuses; a `--no-verify` commit is simply ineligible for activation. A controlled
+post-commit `promote_loop.py` step verifies the resulting commit SHA and tree before consuming the
+approval. [asserted]
 
-Only one self-change may be in its observation window at a time. This costs throughput but preserves
+That step atomically replaces a protected, gitignored `.harness/active-harness.json` pointer using
+the platform's replace primitive. `promote_loop.py` is its sole updater; `dispatch.py` must become
+its sole consumer and resolve the pointer before starting a **fresh** child process. This pointer and
+its alpha projection are required extensions, not existing capabilities; an already-running process
+with imported modules is not post-activation evidence. [asserted]
+
+The trajectory cannot yet carry this authority: ordinary event append closes a file without an
+explicit process lock, flush or fsync. Before activation is implemented, `events.py` must provide one
+process-serialised, flush-and-fsync append path (including the parent-directory durability needed for
+a new daily file). The event stream is the write-ahead record; no second journal is added.
+[measured: `src/consilient/events.py`] [asserted]
+
+Activation ordering is fixed: authenticate approval; append and fsync an exact
+`promote.activation_intent`; create the commit; verify its SHA/tree; append and fsync
+`promote.commit_bound`; atomically replace and durably flush the pointer; then append and fsync
+`promote.observing`. Approval is consumed by the durable intent, so a restart can resume the exact
+transaction idempotently. A crash before the pointer swap leaves the old harness active; a crash
+after it leaves durable approval/commit evidence from which `promote_loop.py` either enters
+observation or rolls back. No candidate byte becomes active before its authorisation record is
+durable. [asserted]
+
+Only one self-change may be in its observation window at a time. Exact coordination claims protect
+the short editing/execution window but cannot enforce this durable state. `promote_loop.py` therefore
+uses one exclusive promotion-transaction lock and a trajectory projection gate which refuses a new
+activation while any prior candidate is `activating`, `observing` or `rolling_back`. Recovery is
+decided from durable pointer/tree evidence, not a stale lock file. This costs throughput but preserves
 attribution; stacking candidates would make a regression's cause unknowable. [asserted]
 
 ### Rollback
@@ -225,18 +274,23 @@ the active pointer back to the last owner-approved parent. The controller then: 
 1. recomputes the governed-tree and instrument digests;
 2. requires exact equality with the stored parent and instrument preimages;
 3. re-runs the frozen canary and baseline probes; and
-4. appends `promote.reversed` with the trigger, attempted/restored digests, every command outcome and
-   the verification event ids.
+4. appends `promote.reversed` only after proof, with trigger, attempted/restored digests, every
+   command outcome and verification event ids.
 
-If any equality or probe fails, the harness remains stopped at the last independently known-good
-controller and records `rollback_unproven`; it does not report a successful reversal. Append-only
-history is never rolled back. [asserted]
+The schema distinguishes `promote.rollback_attempted`, proved `promote.reversed` and
+`promote.rollback_unproven`; central validation requires candidate/parent/instrument digests,
+trigger, commands, outcomes and verification event ids for each applicable state. If any equality or
+probe fails, the harness remains stopped at the last independently known-good controller and records
+`rollback_unproven`; it does not report a successful reversal. Append-only history is never rolled
+back. The current three-field `reverse()` record is insufficient and must be extended. [measured]
+[asserted]
 
 ### Slow drift
 
 Every candidate is compared with both its immediate predecessor and the fixed owner-approved epoch
-anchor. The existing `run_loop.py` sensing cadence re-runs sealed canaries after activation and at
-the registered observation intervals; it creates no second scheduler. [asserted]
+anchor on the same fresh sealed batch. The existing `run_loop.py` sensing cadence consumes the next
+pre-allocated sentinel batch after activation and at the registered observation intervals; it
+creates no second scheduler and never reuses a batch whose result affected the lineage. [asserted]
 
 For each window, the projection reports joint executable-and-human acceptance, beta, alpha, sample
 sizes and intervals; tokens, wall time, model calls and owner review time; refusal, timeout,
@@ -263,35 +317,39 @@ No new service, database, experiment store, scheduler or CLI command is introduc
 | Existing component | Extension when implementation is authorised |
 |---|---|
 | `experiment-register.md` | canonical impact-contract fields and immutable registration digest |
-| `run_loop.py` | resume the existing sensing/observation attempt and recover incomplete activation transactions |
+| `run_loop.py` | cadence, lock, timeout supervision and invocation only; generic interrupted ticks remain abandoned/unknown |
 | `work_items.py` / `coordination.py` | one candidate ticket, accountable Owner and exact path claim; completion is not approval |
-| `dispatch.py` | execute candidate and sealed evaluator in separated capabilities; retain current workspace restrictions |
-| `recall.py` / `instructions.py` | bounded evidence for builders; immutable invariant layer remains outside adaptation |
-| `routing.py` / `budget.py` | existing measured-beta exposure ceiling and refuse-only spend boundary |
-| `promote.py` / `promote_loop.py` | impact matching, sealed multi-outcome evidence, proposal state, atomic apply and proved reverse |
-| `events.py` | sole append-only writer for proposal, authenticated principal decision, activation, drift and rollback evidence |
-| `commit_gate.py` | bind the staged index and resulting commit to the consumed exact approval as well as the run/path claim |
+| `dispatch.py` | candidate construction/execution only, never acceptance; consume the protected active pointer and provide the future isolation boundary |
+| `recall.py` / `instructions.py` | `write_brief()` is the future integration point for bounded assembly; current production does not use `instructions.assemble()`; privileged qualification/card fields are excluded |
+| `routing.py` / `budget.py` | routing is currently unwired/fail-closed; budget is a necessary refuse-only reservation boundary, never spend authority |
+| `promote.py` / `promote_loop.py` | pure policy/projection in the former; sealed evaluate/apply/reverse and idempotent transaction recovery in the existing script role |
+| `events.py` | sole process-serialised, flush/fsync validation/append and write-ahead chokepoint; trusted host ingress authenticates separately and supplies a non-secret proof |
+| `commit_gate.py` | pre-commit staged-tree/approval binding; post-commit `promote_loop.py` verifies resulting SHA/tree before activation |
 
-The event projection is derived from the append-only trajectory and can be deleted and replayed.
+The privileged event projection is derived from the append-only trajectory and can be deleted and replayed.
 The minimum promotion record binds experiment, impact-contract, candidate, parent, instrument,
 hold-out-manifest and result digests; pre/post/rollback state; proposal and trusted-ingress approval;
 commit SHA; observation window; beta/alpha tables; costs; adverse counts; and all refusal reasons.
-Secret or hidden-item contents never enter the event. [asserted]
+Secret or hidden-item contents never enter the event. Candidate capabilities cannot read the raw
+trajectory or this projection; the ordinary recall projection omits its score and card fields.
+[asserted]
 
 ## State machine and refusal rules
 
 ```text
-registered -> running -> result_matched -> quarantined -> proposed
-proposed + exact owner approval -> reversal_proved -> activating -> observing -> retained
+registered -> running -> result_matched -> quarantined -> reversal_proved -> proposed
+proposed + exact owner approval -> activating -> observing -> retained
 proposed + refusal/expiry/mismatch -> quarantined
 observing + trigger -> rolling_back -> rolled_back
 any state + instrument/authority/telemetry violation -> refused or rollback_unproven
 ```
 
-Transitions are monotonic append-only facts. Restart reconstructs state from `events.py`; an
-incomplete `activating` or `rolling_back` transaction is recovered by `run_loop.py` toward the last
-owner-approved digest, never guessed forward. Duplicate, reordered, expired or partially bound
-events refuse. [asserted]
+Transitions are monotonic append-only facts. Generic `run_loop.py` ticks retain their current
+at-most-once rule and mark interruption abandoned with unknown effects. On a later ordinary cadence
+invocation, `promote_loop.py` alone inspects durable pointer/tree artefacts for an incomplete
+`activating` or `rolling_back` transaction and either proves rollback or stops
+`rollback_unproven`; it never guesses forward. Duplicate, reordered, expired or partially bound
+events refuse. [measured] [asserted]
 
 ## Bar and killing experiment
 
@@ -334,16 +392,23 @@ its bypass test in the same commit: [asserted]
   execution; [asserted]
 - let the candidate improve training while held-out and human outcomes fall; promotion must refuse;
   [asserted]
+- try to register a weaker safety floor, run an unapproved contract, query qualification twice, or
+  retrieve a prior score/card through recall; all must refuse; [asserted]
 - forge actor/principal fields through the current CLI, replay an approval and mutate one staged
   byte after approval; all must refuse; [asserted]
 - interrupt each activation/rollback transition and restart; the active digest must end at the last
   owner-approved state or a stopped `rollback_unproven` state; [asserted]
+- terminate the process/power boundary after every write-ahead append, commit and pointer replace;
+  no active tree may lack a durable approval/commit record, and replay must resume idempotently;
+  [asserted]
 - apply individually acceptable small regressions until the epoch budget crosses; automatic
   rollback must fire; [asserted]
 - delete the projection and replay the trajectory; proposal, approval, active state, adverse counts
   and refusal reasons must be identical; [asserted]
 - scan commands and public surfaces: six CLI commands, `routing_orchestration_enabled=false`, no
   gate change, no second event writer and no candidate access to secrets or hidden items. [asserted]
+- prove existing dispatch fan-out and model-family agreement cannot emit a promotion verdict;
+  only the sealed task-native instrument may apply the registered rule. [asserted]
 
 ## Sources
 
@@ -355,4 +420,3 @@ its bypass test in the same commit: [asserted]
   arXiv:2607.24300v1. [Abstract and paper](https://arxiv.org/abs/2607.24300)
 - Shumailov et al. (2024), *AI models collapse when trained on recursively generated data*,
   Nature 631, 755–759. [DOI](https://doi.org/10.1038/s41586-024-07566-y)
-
