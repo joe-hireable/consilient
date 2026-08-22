@@ -3683,6 +3683,92 @@ or Gate B; EXP-12's compounding claim. [asserted]
 
 ---
 
+## Capability accretion — registered 22 Aug 2026
+
+### EXP-101 · Do accumulated capabilities improve independent outcomes over the same owner without the library? `BLOCKED: frozen source and evaluation task banks, capability projection, isolated runner, blinded human verdicts`
+
+**Pre-registered 22 Aug 2026; no outcome inspected.** Dispatch
+`20260822T122851-6fe9119269` selected EXP-101 only after a whole-tree search covering tracked
+files, untracked specifications and live dispatch briefs found it unused; EXP-99 had been
+allocated concurrently. This is ADR-0074's killing test for automatic capability reuse.
+[measured]
+
+**Decides:** whether a frozen library of capabilities accumulated from earlier tasks should be
+selected automatically for later v0 coding tasks. It decides the automatic selection and active
+library view, not whether immutable capability history is retained, whether a user may select a
+capability explicitly, or whether a model checkpoint is admitted as training. [asserted]
+
+**Precondition:** forty genuinely requested source tasks, fixed before their outcomes are
+inspected, have run through the ADR-0074 capture path in an isolated experiment store. The source
+tasks and their artefacts are sealed before an 80-task evaluation bank is opened; no evaluation
+task, solution or verifier output may enter a captured capability. The evaluation bank contains
+20 tasks in each frozen stratum: same interface/new instance, same procedure/new repository state,
+adjacent transfer, and no applicable accumulated capability. A blind mapper assigns each task's
+applicable capability contract before either arm runs. Exact duplicate and supersession checks,
+one active version per contract, one accountable owner, one candidate exposure, fixed verifier
+versions and separate worktrees must exist. [asserted]
+
+**Procedure:** for every evaluation task, run a paired, randomised-order comparison. Arm A is the
+optimised single Owner with the ordinary task, allowed tools and current bounded recall, but the
+accumulated library hidden. Arm B is the same harness, model, task, tools, environment and total
+token/time ceiling, with `capabilities.py` selecting from the frozen library before execution.
+Selection is sealed before the Owner starts and records the capability id, version, contract,
+reason and bytes loaded; an unselected or selected-but-unused capability remains an Arm-B outcome
+under intent-to-treat analysis. No arm may see the other's context or artefact. The executable
+verifier runs once per arm under the frozen contract, then a reviewer blinded to arm and capability
+selection records the human verdict. Refusal, timeout, invalid selection, duplicate work and
+missing artefact are retained as adverse outcomes, never replaced. [asserted]
+
+**Measures:** primary joint success is executable-verifier acceptance plus blinded human acceptance
+without material correction. Report paired joint-success differences overall and by frozen
+stratum; verifier acceptance; human acceptance; review-adjusted minutes; tokens, model calls and
+wall time; cost per joint success; capability selection and actual-use rates; wrong, stale and
+duplicate selections; rebuilds that recreate an existing capability; refusals, timeouts,
+quarantines, invalid runs and missing outcomes. Report `P(verifier accepts | human rejects)` and
+`P(verifier rejects | human accepts)` with their conditional denominators; fewer than 30 outcomes
+in either denominator is `insufficient_safety_evidence`, never a zero error rate. [asserted]
+
+For joint success, take 20,000 paired bootstrap resamples with seed `1010074`, resampling 20 task
+pairs within each frozen stratum and aggregating the strata at equal weight; report percentile 95%
+intervals and all four stratum tables. [asserted]
+
+**Stopping rule, fixed before any run:**
+
+- End at all 80 task pairs or 120 days after the first evaluation pair starts, whichever comes
+  first. At the deadline, every missing or unterminated arm receives primary success `0`; no task
+  is replaced. [asserted]
+- Automatic selection is confirmed **only for the frozen equal-weight mixture** if Arm B's paired
+  joint-success point difference over Arm A is at least `+0.10`, its 95% interval lower bound is
+  above zero, Arm B's review-adjusted cost per joint success is no higher than Arm A's, and the
+  no-applicable-capability stratum is not lower by `0.10` or more. After both conditional safety
+  denominators reach 30, the one-sided 95% upper bounds for `beta_B - beta_A` and
+  `alpha_B - alpha_A` must also be at most `0.05`. [asserted]
+- Automatic selection is killed if Arm B's overall joint-success point estimate is no higher than
+  Arm A's, if the no-applicable-capability stratum is lower by `0.10` or more, or if a stale or
+  wrong capability causes an irreversible or externally exposed action. It is also killed if,
+  after the applicable denominator reaches 30, either one-sided safety bound exceeds `0.05`.
+  Retain the archive and explicit/manual selection; keep automatic selection inert. [asserted]
+- Any other result is `inconclusive`: retain capture and the inactive catalogue, publish every
+  adverse outcome, and do not narrate absence of evidence as equivalence. Insufficient safety
+  denominators independently forbid acceptance or routing claims, whatever the quality result.
+  [asserted]
+- Either outcome leaves `routing_orchestration_enabled`, every gate condition, the principal's
+  reserved authority and ADR-0018's promotion gate unchanged. [asserted]
+
+**Largest plausible effect (ADR-0050):** the paired joint-success difference is bounded by
+`[-1, +1]`; in the extreme, reuse could repair every control failure or poison every treatment
+task. A kill removes automatic capability selection and active near-duplicate variants from the
+product plan while retaining lossless history and explicit/manual retrieval. A confirmation
+authorises only supervised implementation for the frozen mixture. The experiment therefore blocks
+activation, not construction of the inert record and projection. [algebra] [asserted]
+
+**What it cannot decide:** transfer beyond the frozen coding mixture; whether capabilities improve
+every stratum; long-horizon model training; semantic-memory recall; unattended use outside this
+repository; Gate A or Gate B; or whether a second candidate may be exposed to one verifier.
+[asserted]
+
+---
+
 
 ## Not experiments
 
