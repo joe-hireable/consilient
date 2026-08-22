@@ -4030,6 +4030,78 @@ human beta; or permission to raise candidate exposure. [asserted]
 
 ---
 
+## Expertise acquisition — registered 22 Aug 2026
+
+### EXP-126 · Does a frozen expertise bundle beat the same generalist without it on sealed held-out tasks? `BLOCKED: authenticated acquisition authority, frozen bundle manifest, one-use sealed bank, isolated runner and blinded domain verdicts`
+
+**Pre-registered 22 Aug 2026; no outcome inspected.** Dispatch
+`20260822T140714-f695b3e0d0` reserved EXP-126 after a conservative whole-worktree search found
+EXP-107–125 referenced or reserved and no earlier EXP-126 allocation. An exact heading and dispatch
+reservation search was repeated immediately before insertion; only this run's reservation existed.
+[measured]
+
+**Decides:** whether one named, immutable expertise-bundle version may become eligible for direct,
+supervised, explicitly selected assignment in its frozen domain. It tests direct bundle value, not
+automatic library selection (EXP-101), tuned weights (ADR-0085/EXP-111), inferred-trigger consent,
+squad size, Gate B or device control. [asserted]
+
+**Precondition:** (1) acquisition is explicitly requested through trusted first-party ingress, or the
+principal accepts an inferred proposal through that ingress before study or compute begins; (2) an
+evaluator independent of acquisition freezes, hashes and seals one 80-task, one-use qualification
+batch plus truth contracts before candidate acquisition: 20 direct, 20 adjacent-transfer, 20
+conflicting/stale-source traps and 20 out-of-scope/abstention cases; (3) acquisition produces a
+manifest freezing sources/licences, retrieval index, skill, tool configuration, worked examples,
+version, provenance, expiry/recheck rule and retirement triggers, with no learned-state mutation;
+(4) an overlap audit proves no held-out task, answer or semantic sibling entered acquisition; and
+(5) isolated copies, the same model/harness/tools/budget, one candidate and one frozen verifier per
+arm, and blinded domain-verdict ingress exist. No competent independent evaluator or oracle yields
+`insufficient_evidence`. The batch retires once its verdict affects activation; it is never reused
+for a successor. [asserted]
+
+**Procedure:** run paired randomised-order A/B on all 80 tasks. A is the strongest eligible
+generalist with ordinary bounded context and the bundle hidden. B is the identical generalist plus
+the frozen bundle, directly assigned without a selector. Neither arm sees the other's context,
+artefact or outcome. Run the frozen independent oracle once per sealed artefact, then obtain a
+blinded domain accept/reject verdict without material correction. Retain refusal, timeout, missing,
+stale/wrong retrieval and invalidity in the assigned arm; replace no task. Take 20,000 paired
+within-stratum bootstrap resamples with seed `1260086`. A tuned-model arm is excluded: ADR-0085 owns
+training mechanics, and tuned expertise remains unavailable until that lifecycle owns a separately
+pre-registered fresh-bank comparison of the same base plus the same bundle with and without the
+parameter update. [asserted]
+
+**Measures:** joint oracle-plus-blinded-human success; the paired B-minus-A difference overall and by
+stratum; human reject and oracle reject separately; a one-sided human-reject regression bound;
+treatment-only critical errors caused by stale, wrong or unsupported bundle material; abstention
+correctness; tokens, tool calls, wall time, active worker-minutes and blinded review minutes;
+acquisition minutes and break-even reuse count; and refusal, timeout, missing, quarantined and invalid
+counts, including zeros. Review-adjusted minutes per joint success are total active worker plus
+blinded review plus acquisition minutes divided by joint successes, and are infinite at zero
+successes. Report conditional beta only with at least 30 human rejections; otherwise report
+`insufficient_safety_evidence`, never zero. [asserted]
+
+**Stopping rule (fixed before any acquisition):** stop at 80 terminal pairs or 120 days after the
+first pair, whichever comes first; replace nothing. A missing candidate is joint failure and a
+missing blinded verdict prevents confirmation. Confirm direct supervised assignment only for this
+frozen bundle if B-minus-A joint-success point difference is at least `+0.10`, its paired 95%
+bootstrap lower bound is above `0`, the one-sided 95% upper bound on human-reject increase is at most
+`0.05`, B's review-adjusted minutes per joint success are at most `1.25` times A's, and no
+treatment-only critical error is traced to bundle content. Discard/retire the assignment if B's
+joint-success point estimate is at most A's, if the human-reject increase has a 95% lower bound above
+`0.05`, or if one treatment-only critical error comes from stale, wrong or unsupported bundle
+content. Any other result is inconclusive: preserve the sources and history but keep the bundle
+quarantined. Every outcome leaves automatic selection, gates, routing, principal authority and the
+one-candidate ceiling unchanged. [asserted]
+
+**Largest plausible effect:** the paired success difference lies in `[-1, +1]`; the bundle could
+repair every baseline failure or poison every baseline success. The experiment blocks activation of
+this bundle assignment, not inert acquisition records or specification work. [algebra] [asserted]
+
+**What it cannot decide:** transfer to another expertise; automatic inference or consent; automatic
+selection (EXP-101); tuned weights or their incremental value over bundle-only
+(ADR-0085/EXP-111); standing specialist squads; device autonomy; Gate A or Gate B. [asserted]
+
+---
+
 ## Not experiments
 
 **Q4** (what v0 optimises for), **Q14** (does the Inquiry tier belong in v0), **Q15/Q23**
