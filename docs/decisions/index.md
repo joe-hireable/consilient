@@ -151,5 +151,16 @@ to every ADR and every PR:
 - **0078** — PROVISIONAL pending EXP-35 and EXP-59.
 - **0079** — PROVISIONAL pending EXP-106.
 - **0080** — PROVISIONAL pending EXP-105 for the Tier 1 preparation signal only.
+- **0081** — PROVISIONAL pending EXP-109, which can remove the hard consilience gate.
 - **0082** — PROVISIONAL pending EXP-107.
+- **0083** — PROVISIONAL pending EXP-108, which can remove live inspection. Authenticated principal
+  control and safe process displacement are **not implemented**.
+- **0084** — PROVISIONAL pending EXP-110 for its frozen Claude/Codex package; EXP-101 still governs
+  whether automatic capability reuse improves outcomes.
 - **0085** — PROVISIONAL pending EXP-111.
+- **0086** — PROVISIONAL pending EXP-126, which confirms or kills specialist assignment for its frozen
+  expertise only; no universal activation follows.
+- **0087** — PROPOSED. **EXP-128 is deliberately unwritten**, and the ADR-0077 fusion owner its brief
+  assumed is absent from the tracked tree.
+- **0089** — PROPOSED. The retirement behaviour is unmeasured and **EXP-129 is specified in the
+  companion document but deliberately unwritten in the register.**

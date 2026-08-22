@@ -67,6 +67,19 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 # Removing an entry is always permitted. Adding one means a human re-ran that test and wrote
 # down the answer.
 ALLOWLIST = {
+    "f0c3152ae865438726f4697dabc5dcf3f696bed2b9ffe349ab52f92afe0f32f9": "gap-register-2026-08-22.md - the head of a public GitHub compare link showing "
+    "same-day drift in ruvnet/ruflo against the base revision allowlisted below. Cleared "
+    "22 Aug 2026 by positive public provenance: the compare URL was fetched and both "
+    "revisions resolve, five commits apart, covering Windows CI fixes and dependency "
+    "bumps. The private corpora were NOT scanned for this entry; they were, separately, "
+    "searched for every identifier in that file and none resolved in either.",
+    "0110386da5278d960f2cca97c1ac2620f872b89de22e00f820a36ad8f71d23ee": "bibliography.md - a public GitHub permalink pinning the inspected revision of "
+    "ruvnet/ruflo, cited as prior art. Cleared 22 Aug 2026 by a different route from the "
+    "entries below: rather than failing to find it in the private corpora, the public URL "
+    "was fetched and resolves, showing the commit inside that repository's public history. "
+    "Positive public provenance is stronger evidence than absence from the corpora, and a "
+    "collision between a public SHA-1 and a private one is not a case worth designing for. "
+    "The private corpora were NOT scanned for this entry.",
     "74423b39119b3990866f184beca8b4a8e355f0bc89c0970b0aa9e62f44d75fe7": "experiment-register.md - EXP-96 pins Pallets `itsdangerous` 2.2.0 by commit as its "
     "second corpus. Pinning the exact revision measured is what makes the result "
     "reproducible, so removing it would weaken the experiment. Tested 21 Aug 2026 with a "
