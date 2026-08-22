@@ -105,3 +105,40 @@ boundary gained. A "deep study" phase that reads and reflects is the degrading k
 **"Almost unimaginably impressive things off the bat."** Today `consil` is observe-only and
 `routing_orchestration_enabled` is `false` because four of seven gate conditions fail. [measured] The
 distance is not a criticism of the vision; it is the size of the work.
+
+## Scale: how big the organisation gets, and when
+
+> "Yes and the bigger the task the more it needs. I.e. building a website needs branding team,
+> development team, motion design team, qa testing and automation team etc etc. for better than best
+> standard. Writing a single doc does not. For everything we need to be defining what better than best
+> looks like. Consilient might advise the user it'll take a while but then comes back whenever it's
+> done with the better than best finished product.
+>
+> For small tasks we always need to understand what best and better than best looks like before
+> delivering but smaller squads are appropriate in many cases."
+
+**This names a layer ADR-0067 does not cover, and the two are compatible once the layer is named.**
+
+ADR-0067 governs **one scoped decision**: the smallest evidence-grounded squad, default one, a member
+added only when it brings a truth-relevant anchor nobody else has. That rule is about *evidence*.
+
+The statement above is about **decomposition**: a website is not one decision, it is branding,
+development, motion, QA and more — dozens of scoped decisions, each of which may still be best served
+by a squad of one. **So a large deliverable gets a large organisation not because each decision needs
+more agents, but because it contains more decisions.** Conflating the two would produce committees on
+trivial questions, which is the failure ADR-0067 exists to prevent.
+
+Three obligations follow, and none is currently built:
+
+1. **Decompose before composing.** The size of the organisation is a property of the *work
+   breakdown*, not of the task's apparent importance. What is missing is the step that turns one
+   request into a stream map.
+2. **Define better-than-best before delivering — for everything, including small tasks.** Working
+   principle 9 already requires naming the incumbent before building; this extends it to *every*
+   task rather than to capability claims. A one-page document still has a bar; it is just cheaper to
+   find. **The success criterion is written before the work, not after.**
+3. **Deliver asynchronously and honestly.** *"Consilient might advise the user it'll take a while but
+   then comes back whenever it's done."* This makes duration a first-class part of the contract with
+   the principal: an estimate up front, and a finished artefact rather than a progress report. It also
+   means a long-running organisation must survive restarts, which the loop runtime addresses and
+   nothing yet ties to a user-visible commitment. [measured: no such commitment exists in the code]
