@@ -237,3 +237,46 @@ harder-working and more capable users, the gap between a well-taught Machine and
 widens with use. Both goals are stated and both are wanted; the design should make the *floor* high —
 impressive from the first day, per the product statement — while leaving the ceiling unbounded.
 Nothing here resolves that, and it should not be resolved by quietly dropping one of them. [asserted]
+
+## Do not over-constrain, and do not create work
+
+> "We have to consider that all the models have safety constraints baked in so we dont need to
+> overconstrain here.
+>
+> It must not create work or friction but remove it. It must reduce user stress and overwhelm by
+> handling everything for them and not overloading them with responsibilities or tasks to approve
+> things unless absolutely essential"
+
+**On over-constraining.** Every model this harness dispatches to — Claude, Codex, Cursor's own,
+Grok — carries its own safety training and refusal behaviour. A second policy layer on top is mostly
+redundant, and redundancy here is not free: it produces refusals the user cannot predict, cannot
+appeal, and did not ask for. **Consilient's constraints should protect the record and the principal's
+authority, not re-litigate model safety.** That is what the existing invariants already do: V0-18
+protects authorship, the commit gate protects attribution, the leak gates protect the private corpora
+and the user's own data. **None of them is a content policy, and none should become one.**
+
+**On friction — this is a measurable product property, not a sentiment.** An approval request is a
+transfer of work from the machine to the person. Every one has to justify itself.
+
+**The escalation bar is "irreversible and consequential", never "the agent is uncertain."** Those are
+different tests and conflating them is the failure. Working principle 11 already settles uncertainty:
+decide at the best available estimate, name the experiment that would improve it, carry on.
+**Escalating because you are unsure is a violation of principle 11 wearing the costume of caution.**
+
+What genuinely reaches the principal: money leaving an account; a credential; anything published or
+sent outside the machine; deleting or overwriting something unrecoverable; a decision only he can
+author under V0-18; and a genuine preference no fact can settle. **Everything else is the machine's to
+decide, with the reversal path recorded** — which is requirement R30, still unbuilt. [measured]
+
+**Measured on this session, 21–22 August 2026.** The orchestrator escalated to the principal roughly
+eight times. Five were legitimate: the publication push (one-way, and the orchestrator was blocked
+from executing it), a ruling on ADR-0066, the two rules misattributed to him under V0-18, and the
+reconciliation of public and local histories where the alternative would have destroyed merged
+contributor work. **Three were not**: which subsystem to specify first, after he had already said to
+decide; whether quarantined V0-18 lines should carry a correction event, where the orchestrator held a
+view and asked anyway; and the CLI surface question, which ADR-0067 answered without him. [measured]
+
+**The common failure in all three: escalating from uncertainty rather than from authority.** That
+ratio — avoidable escalations over total — is the friction metric this product should hold itself to,
+and it should ratchet downward like every other count in this repository. **A Machine that asks its
+Finch to decide what it could have decided has added work, not removed it.** [asserted]
