@@ -189,11 +189,16 @@ hash cycle. [cited: ADR-0068] The subsequent plan event supplies `plan_id`, `pla
 event reference; those fields are deliberately not retrofitted into the earlier commitment.
 [asserted]
 
-Each stream produced by that plan then becomes a durable `work_item.opened` carrying ADR-0072's
-required plan and stream fields plus `{commitment_id, commitment_revision, commitment_digest}`.
-[asserted] This distinct-kind join is the compatibility rule: one central writer can validate the
-pre-plan request commitment, plan-bound native work items and legacy dispatch claims without
-pretending they share one schema. [asserted]
+Each stream produced by that plan then becomes a durable `work_item.opened` carrying
+`item_schema: "native.v1"`, ADR-0072's required plan and stream fields, and
+`{commitment_id, commitment_revision, commitment_digest}`. [asserted] Pure read validation recognises
+that schema and the frozen legacy dispatch-claim shape so history remains replayable; after the
+native schema is activated, central `events.append()` admits only the discriminated shape and
+`scripts/dispatch.py` must migrate in the same commit. [asserted] A legacy event without
+`item_schema` is read-only and generic append refuses it; no timestamp heuristic silently turns old
+shape into new authority. [asserted] The distinct `work_item.committed` kind therefore avoids a
+third overloaded shape rather than pretending the two existing opened shapes are identical.
+[asserted]
 
 ### 5.2 Tamper evidence, stated narrowly
 
@@ -343,26 +348,29 @@ pass through the central writer. [asserted]
    supersession, changed digest and unauthorised actor; concurrent appends prove the history check and
    write share one lock, while testing only a work-item helper is insufficient.
    [asserted]
-2. Canonical commitment hashing is deterministic across key order and changes for any success,
+2. `events.read()` accepts a frozen legacy dispatch-claim fixture, while generic append refuses that
+   shape after activation and accepts only `item_schema: "native.v1"`; dispatch migrates in the same
+   implementation commit. [asserted]
+3. Canonical commitment hashing is deterministic across key order and changes for any success,
    non-goal, source-turn or authority edit. [asserted]
-3. A retained downstream prefix anchor detects an edit or reorder inside its anchored prefix; the
+4. A retained downstream prefix anchor detects an edit or reorder inside its anchored prefix; the
    test does not claim detection for later events, signing or authorship. [asserted]
-4. A property test generates factual, reversible and principal-only ambiguity and proves zero
+5. A property test generates factual, reversible and principal-only ambiguity and proves zero
    questions for the first two, at most one non-bundled question for the last, and no second question
    after an unclear or absent answer. [asserted]
-5. Unauthenticated chat, replay and self-declared principal strings cannot author any protected
+6. Unauthenticated chat, replay and self-declared principal strings cannot author any protected
    decision; secret fixture bytes and their hashes never appear in trajectory or run artefacts.
    [asserted]
-6. No claim or dispatch is possible before a valid commitment, ADR-0068 plan, plan-bound work item
+7. No claim or dispatch is possible before a valid commitment, ADR-0068 plan, plan-bound work item
    and delivery estimate revision zero cite matching digests. [asserted]
-7. Bounded recall and restart preserve verbatim source turns, active commitment, corrections,
+8. Bounded recall and restart preserve verbatim source turns, active commitment, corrections,
    dissent and adverse outcomes; direct lookup recovers an omitted active commitment. [asserted]
-8. A correction racing completion fences the old digest, preserves the old attempt and reuses only
+9. A correction racing completion fences the old digest, preserves the old attempt and reuses only
    byte-compatible sealed work. [asserted]
-9. A contract test freezes every `DeliveryIntake` field against
+10. A contract test freezes every `DeliveryIntake` field against
    `2026-08-22-chat-delivery.md`; delivery refuses a transcript summary in place of references.
    [asserted]
-10. End-to-end fixtures cover a one-sentence phone request with typos, a genuine preference, an
+11. End-to-end fixtures cover a one-sentence phone request with typos, a genuine preference, an
     unanswered principal-only decision, a mid-flight goal correction, a refusal, a timeout, a
     quarantine and a missing artefact. [asserted]
 
