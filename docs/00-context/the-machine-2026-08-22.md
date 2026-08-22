@@ -280,3 +280,82 @@ view and asked anyway; and the CLI surface question, which ADR-0067 answered wit
 ratio — avoidable escalations over total — is the friction metric this product should hold itself to,
 and it should ratchet downward like every other count in this repository. **A Machine that asks its
 Finch to decide what it could have decided has added work, not removed it.** [asserted]
+
+## The Machine is a consilience engine, and the number is the last step
+
+> "Also with the machine it's not just giving a number. In real life AI terms it would have had to do
+> thousands of things to get to that one number. That's more descriotive of the decision making
+> protocol I have encouraged. It could understand phone calls, texts, cctv, etc etc to understand and
+> correctly predict the social security number of a person in danger. Obviously the application of AI
+> and ML and code here is very different, a lot more generak and within the bounds of the law which
+> the Machine from Person of Interest definitely would not be. Although if it were legal it would be
+> technically possible today."
+
+**This correction is the most important thing recorded in this document, because it means the product
+metaphor and the project's epistemology are the same thing rather than two ideas sitting next to each
+other.** [asserted]
+
+The Machine's output is a social security number. Its *method* is an induction from telephony
+coinciding with an induction from video coinciding with an induction from text and from financial
+movement. **That is Whewell, exactly**: an induction obtained from one class of facts coinciding with
+an induction obtained from another different class, and the coincidence being the test of the truth.
+The number is trustworthy **because** the classes differ. A Machine wired to a thousand telephone
+lines and nothing else would produce a confident number and be wrong, and it would be wrong in the
+specific way this project calls **echo**. [cited: Whewell 1840, via CONSILIENCE.md]
+
+**So the decision-making protocol is fusion, not adjudication.** A conclusion is not reached by asking
+several agents and counting agreement; it is reached by accumulating many small independent readings
+until they converge. This does not contradict ADR-0067's default of one — **it says what the
+justification for a large squad has to look like when one is warranted.** Thousands of small
+inductions on a genuinely high-stakes question is the shape; seven role-labelled agents reading the
+same diff is not. [asserted]
+
+**The gap the analogy makes visible, which is the hardest unsolved problem here.** The Machine's
+classes were genuinely exogenous: separate physical sensors observing the world independently. Agents
+in a harness overwhelmingly share a corpus, a context and often a base model, so their readings are
+correlated in a way CCTV and telephony are not. **The thing that made the Machine's fusion work is
+precisely the thing hardest to obtain in an agent system.** Naming a different class is cheap; having
+one is not. Every squad design in this repository must be measured against that, and the honest
+sources of genuine exogeneity available here are few and should be enumerated rather than assumed:
+executing the artefact, driving a real browser, checking a citation against its actual source,
+reading a fresh corpus, a different model family, and a human verdict. [asserted]
+
+**On law, which the principal drew himself and unprompted.** He named the Machine's surveillance as
+outside the bounds of law and placed Consilient inside them, while noting the capability is
+technically reachable today. That is consistent with the floor already recorded above: **law is the
+minimum, the user configures everything above it, and the default above the floor is maximum
+autonomy.** The distinction he drew is between *capability* and *permission*, and it is the right one.
+[measured: his words, this document]
+
+## Consilient improves itself, and the owner is the gate
+
+> "So when all built according to specs and plans we should already have the best superintelligence
+> product globally and autonomous experiments running to make what we have better and when
+> experiments produce impactful results consilient can use swarms to update itself via my (the
+> founder/moderator/owner of consilient) agents."
+
+**Three claims, and they need separating because their evidence differs sharply.**
+
+*That the built product would be the best globally* is `[asserted]` and cannot be otherwise until it
+is measured against a named incumbent. Working principle 9 binds this: find the bar, then beat it,
+and "nothing exists" is a claim requiring evidence — this repository shipped that claim once and it
+was false. **The bar for the organisation was frozen externally on 22 August 2026 in
+`agentic-organisation-bar-2026-08-22.md`; there is no equivalent frozen bar for the product as a
+whole, and there should be.** [measured]
+
+*That autonomous experiments run continuously* is **partially real**: `docs/10-research/experiment-register.md`
+holds registered claims with pre-declared stopping rules, and experiments have run and produced
+results, including ones that refused to report a figure. What does not exist is the loop's closing
+half. [measured]
+
+*That swarms update Consilient itself when a result is impactful* **does not exist in any form.**
+Nothing reads an experiment result and turns it into a change to the harness. This is the recursive
+half of the product and it is unspecified, so it has been dispatched as its own stream. [measured]
+
+**The gate is the principal, and V0-18 already enforces it.** He describes the update path as running
+"via my … agents" — the owner's agents, not the system acting on its own recognisance. Verdicts,
+approvals, gate lifts and spend must be authored by him. **A self-improving system whose improvements
+it also approves has no external check at all, and that is the one place in this design where the
+maximum-autonomy default must not reach.** The reversibility test governs everything else; changing
+the harness that measures whether changes are good is not reversible in the relevant sense, because
+a bad change corrupts the instrument that would have detected it. [asserted]

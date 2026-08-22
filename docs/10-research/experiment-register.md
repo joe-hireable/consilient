@@ -1948,9 +1948,9 @@ pre-registration, supplied no identifier and explicitly forbade waiting for conf
 [measured]
 
 **Decides:** whether to build squad-specific role manifests, isolation, disagreement state and chat
-summary for the tested v0 coding-task strata. It does not gate the existing one-agent dispatch,
-trajectory, bounded recall, work-item or beta-ceiling primitives, and success does not establish
-transfer outside those strata. [asserted]
+summary for the frozen equal-weight mixture of four v0 coding-task strata. It does not gate the
+existing one-agent dispatch, trajectory, bounded recall, work-item or beta-ceiling primitives, and
+success does not establish a benefit in every stratum or transfer outside that mixture. [asserted]
 
 **Precondition:** exactly 80 prospectively collected, genuinely requested coding tasks from this
 repository, allocated 20 each to four verifier-contract strata named in an immutable task-bank
@@ -1999,12 +1999,13 @@ verifier outcomes, with every missing outcome reported. Confirmation requires at
 rejections **and** 30 human acceptances in each arm; a zero or smaller conditional denominator is
 `insufficient_safety_evidence`, never beta or alpha equal to zero. [asserted]
 
-For joint-success differences, take 20,000 paired bootstrap resamples of the 80 task triplets with
-seed `800067` and report percentile 95% intervals. For each safety difference `rate_C - rate_X`, its
-one-sided 95% upper bound is `Wilson_upper_97.5%(C) - Wilson_lower_97.5%(X)`; the two component bounds
-give at least 95% joint coverage by the union bound. Every improvement and safety condition below
-must pass, so this is an intersection-union decision and no multiplicity discount is taken.
-[algebra] [asserted]
+For joint-success differences, take 20,000 paired bootstrap resamples with seed `800067`, resampling
+20 task triplets within each frozen stratum and aggregating the four strata at equal weight; report
+percentile 95% intervals and all four stratum tables. For each pooled safety difference
+`rate_C - rate_X`, its one-sided 95% upper bound is
+`Wilson_upper_97.5%(C) - Wilson_lower_97.5%(X)`; the two component bounds give at least 95% joint
+coverage by the union bound. Every improvement and safety condition below must pass, so this is an
+intersection-union decision and no multiplicity discount is taken. [algebra] [asserted]
 
 The scalar cost is **review-adjusted minutes**: summed active worker-minutes plus blinded human review
 minutes. Cost per joint success is total review-adjusted minutes divided by joint successes and is
@@ -2017,16 +2018,16 @@ state or 120 days after the first arm starts, whichever comes first. At the dead
 unterminated arms receive primary success `0`; no replacement task is recruited. Publish every
 adverse, incomplete and invalid outcome. [asserted]
 
-- C confirms ADR-0067 **for the four tested strata only** if its paired joint-success point estimate
-  exceeds both A and B by at least `0.10`, both paired 95% interval lower bounds exceed zero, all four
-  one-sided upper bounds for `beta_C - beta_X` and `alpha_C - alpha_X` are at most `0.05`, each arm
-  meets both 30-outcome conditional minima, and C's cost per joint success is no higher than B's.
-  [asserted]
+- C confirms ADR-0067 **for the frozen equal-weight four-stratum mixture only** if its paired
+  joint-success point estimate exceeds both A and B by at least `0.10`, both paired 95% interval
+  lower bounds exceed zero, all four one-sided upper bounds for `beta_C - beta_X` and
+  `alpha_C - alpha_X` are at most `0.05`, each arm meets both 30-outcome conditional minima, and C's
+  cost per joint success is no higher than B's. [asserted]
 - If C passes the joint-success rule against A but not B, the gain belongs to extra budget rather
   than organisation: one agent remains the default and squad-specific implementation is cut for
-  these strata. [asserted]
+  this mixture. [asserted]
 - Once both conditional minima are met, if any beta or alpha upper difference exceeds `0.05`,
-  squad-specific automatic acceptance is cut for these strata even if joint success rises.
+  squad-specific automatic acceptance is cut for this mixture even if joint success rises.
   [asserted]
 - More than 8 protocol-invalid triplets out of the fixed 80 kills the protocol without a quality
   claim. Eight or fewer stay adverse primary outcomes and are reported individually. [asserted]
@@ -2037,13 +2038,14 @@ adverse, incomplete and invalid outcome. [asserted]
 
 **Largest plausible effect (ADR-0050):** failure removes the squad-specific router, role/source
 manifest schema and disagreement UI from the v0 coding plan; success authorises their measured,
-task-conditioned implementation for four strata but never a universal squad default. Therefore this
-experiment blocks those squad-specific components and no existing primitive. [asserted]
+supervised use for the frozen mixture but never a per-stratum or universal squad default. Therefore
+this experiment blocks those squad-specific components and no existing primitive. [asserted]
 
-**What it cannot decide:** transfer beyond the four frozen coding-task strata, unattended use
-outside this repository, whether a different human would accept the artefact, or whether a squad may
-expose one verifier to multiple candidates. Gate B, principal-only authority and the beta-derived
-candidate ceiling remain unchanged whatever the result. [asserted]
+**What it cannot decide:** which stratum drives a pooled result, benefit within any one stratum,
+transfer beyond the frozen equal-weight mixture, unattended use outside this repository, whether a
+different human would accept the artefact, or whether a squad may expose one verifier to multiple
+candidates. Gate B, principal-only authority and the beta-derived candidate ceiling remain unchanged
+whatever the result. [asserted]
 
 ### EXP-98 · Does a frozen minimum-stream organisation beat one capable owner on the same request and budget? `BLOCKED: frozen request bank, organisation runner, isolated worktrees and blinded human verdicts`
 
