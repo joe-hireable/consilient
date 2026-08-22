@@ -359,3 +359,51 @@ it also approves has no external check at all, and that is the one place in this
 maximum-autonomy default must not reach.** The reversibility test governs everything else; changing
 the harness that measures whether changes are good is not reversible in the relevant sense, because
 a bad change corrupts the instrument that would have detected it. [asserted]
+
+## The output is unconstrained, which inverts Finch's safety architecture
+
+> "You are right in that the OUTPUT of the machine is extensively constrained and here will be by
+> design completely unconstrained.n"
+
+**Finch's design was wide input and a pinhole output.** The Machine observed effectively everything
+and was permitted to say nine digits. He could not constrain what it saw, so he constrained what it
+could express, and **that narrowness was the whole of the safety architecture** — not a limitation
+he tolerated but the mechanism he chose. [asserted]
+
+**Consilient inverts both halves.** Its input is lawful and consented rather than total; its output
+is anything — code, a document, a design, a campaign, an action. Four consequences follow, and they
+are not all comfortable.
+
+**1. Output narrowness is unavailable to us, so something else must carry that load.** The two
+candidates already in this design are the **reversibility test** and the **append-only record**.
+That makes them load-bearing rather than hygienic: an unconstrained output that is fully reversible
+and fully attributable is safe in a way an irreversible one is not, *regardless of how wide the
+aperture is*. This is the strongest available argument that the friction rule recorded above is
+sound — **the answer to a wide output is not more approvals, it is better reversal and a complete
+record.** [asserted]
+
+**2. A nine-digit output is self-verifying by consequence.** Reality resolves it within days: the
+person was in danger or they were not. **An unconstrained output has no single oracle.** This is
+precisely why coding is v0 — it is the only domain with a cheap automated oracle, which is where β
+can be measured at all. The Machine never needed a β because its output space was small enough for
+the world to grade it. [measured: CONSILIENCE.md, AGENTS.md]
+
+**3. This raises the evidence bar rather than lowering it, and that is the counter-intuitive part.**
+With a nine-digit output the space of wrong answers is tiny and a wrong answer is quickly falsified.
+With an unbounded output the space of **plausible-but-wrong artefacts is enormous**, and a verifier
+that accepts a bad one may never be caught. **So fusion across genuinely different classes matters
+more here than it did for the Machine, not less** — the Machine could afford thinner evidence
+because its output could not hide. Ours can. [asserted]
+
+**4. What separates this from Samaritan is not a capability limit.** The same fiction runs the
+experiment: comparable capability, unconstrained output, no owner, direct action — and the result is
+a tyrant. The difference here is **not** that Consilient is weaker. It is that the principal's word
+is final, V0-18 makes his authority undelegable, and every action is recorded and attributable.
+**Capability is not the safety property; ownership and provenance are.** That is consistent with the
+maximum-autonomy default rather than in tension with it. [asserted]
+
+**The honest risk, stated plainly.** Maximum autonomy, unconstrained output and an unmeasured β
+compound. The first two are deliberate design choices and they are defensible. **The third is a gap,
+and it is the one that should close** — `consil beta` holds one human rejection against a minimum of
+thirty. The correct response is not to narrow the output or add approvals; it is to measure β so the
+latitude is earned rather than assumed. [measured]
