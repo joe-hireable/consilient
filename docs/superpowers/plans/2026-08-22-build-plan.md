@@ -10,6 +10,12 @@
 
 **Specifications:** Every file present under `docs/superpowers/specs/` at 2026-08-22 15:08 BST, ADR-0067 and ADR-0070 through ADR-0081, ADR-0068 where those specifications make it a direct dependency, the experiment register, `AGENTS.md`, `CONSILIENCE.md`, and `docs/00-context/the-machine-2026-08-22.md`. [measured]
 
+**Document class:** W. [cited: ADR-0073]
+
+**Review by:** 2026-09-22, or immediately after any listed specification/ADR changes status or an activation experiment reports. [asserted]
+
+**Falsifier:** A unit cannot be dispatched from this set without inventing an interface, sharing an unlisted mutable path, or weakening an acceptance command; that failure requires a plan amendment before implementation. [asserted]
+
 ## Inventory correction
 
 The dispatch brief is wrong in both counts. The directory contains **12** specifications, not 13; the requested ADR set contains **13** ADRs (`0067` plus `0070` through `0081`), not 12. [measured: directory census after the consilience-gate artefacts landed] ADR-0068 is an additional direct dependency of chat, task and delivery, so it is included in this plan but not in the requested-count arithmetic. [measured: chat-conversation section 1; task-management sections 3 and 6]
@@ -55,9 +61,9 @@ spec rulings
 F01 durable append -> F02 atomic transition -> F03 stable event identity
    |                       |                       |
    |                       |                       +-> E01 verification records -> G01 anchor report
-   |                       +-> C01 commitment -> T01 native tasks -> T02 atomic claim -> D02 checkpoint -> D03 recovery
-   |                              |                    |              |               |
-   |                              +-> C02 recall       +-> T03 closure+-> C03 intake   +-> D04 delivery
+   |                       +-> C01 commitment -> O01 frozen plan -> T01 native tasks -> T02 atomic claim -> D02 checkpoint -> D03 recovery
+   |                              |                                      |              |               |
+   |                              +-> C02 recall                         +-> T03 closure+-> C03 intake   +-> D04 delivery
    |                                                   +-> T04 task view     |
    |                                                                          +-> D01 estimate
    |
@@ -97,7 +103,7 @@ The nearer blocker for live autonomous child-harness actuation is host containme
 ## Recommended build order
 
 1. **Make the record truthful and durable (`F01-F03`).** Every later promise depends on pre-action and closure records surviving concurrency/crash; building above the current writer would multiply races. [measured] [asserted]
-2. **Ship the native task/commitment spine (`C01`, `T01-T04`, `C03`).** It turns work into checkable state and produces the earliest substantial surface without a human dependency. [asserted]
+2. **Ship the native task/commitment spine (`C01`, `O01`, `T01-T04`, `C03`).** It turns work into checkable state and produces the earliest substantial surface without a human dependency. [asserted]
 3. **Ship honest recall and explicit capability use (`M01-M05`) beside task work where paths permit.** This improves every dispatch while leaving automatic reuse inert. [asserted]
 4. **Add estimates, checkpoints and recovery (`D01-D04`).** Their UI waits for authoritative task state, so it cannot become a polished spinner over unverified progress. [asserted]
 5. **Add evidence, decision and consilience reporting (`E01`, `V01`, `P01-P02`, `G01-G03`) without hard activation.** The Owner can obtain and expose different anchors before any provisional gate is trusted. [asserted]
@@ -113,8 +119,8 @@ The stream plans give exact paths per unit. The following lanes are globally ser
 
 | Lane | Required order |
 |---|---|
-| `src/consilient/events.py` | `F01 -> F02 -> F03 -> C01 -> E01 -> M01(event schema) -> M06 -> A01 -> A02 -> P01 -> Q01 -> H02/self-change schemas` [asserted] |
-| `src/consilient/work_items.py` | `C01 -> T01 -> T03 -> C03 -> G03 -> D04` [asserted] |
+| `src/consilient/events.py` | `F01 -> F02 -> F03 -> C01 -> O01 -> E01 -> M01(event schema) -> M06 -> A01 -> A02 -> P01 -> Q01 -> H02/self-change schemas` [asserted] |
+| `src/consilient/work_items.py` | `C01 -> O01 -> T01 -> T03 -> C03 -> G03 -> D04` [asserted] |
 | `src/consilient/projection.py` | `T01 -> T03 -> M02 -> D01 -> V01 -> Q01/Q02 -> G01 -> D04/A08` [asserted] |
 | `src/consilient/coordination.py` | `T02 -> C03 -> D02 -> G03` [asserted] |
 | `scripts/dispatch.py` | `T02 -> M05 -> D02 -> A03 -> A04 -> G03 -> A07 -> S04` [asserted] |
@@ -147,7 +153,7 @@ Safe early parallel work after `F03` is: task schema preparation on `work_items.
 
 - `2026-08-22-foundation-task-delivery-plan.md` — `F`, `C`, `T` and `D` units. [asserted]
 - `2026-08-22-memory-documentation-plan.md` — `M` and `L` units. [asserted]
-- `2026-08-22-evidence-decision-action-plan.md` — `E`, `R`, `V`, `Q`, `D`, `G` and `A` units. [asserted]
+- `2026-08-22-evidence-decision-action-plan.md` — `E`, `R`, `V`, `Q`, `P`, `G` and `A` units. [asserted]
 - `2026-08-22-human-self-improvement-plan.md` — `H` and `S` units, mostly dormant or deferred. [asserted]
 
 ## Whole-program completion check
