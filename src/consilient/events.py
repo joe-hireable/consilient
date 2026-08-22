@@ -24,7 +24,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import sys
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -43,6 +46,7 @@ SCHEMA_VERSION = 1
 REQUIRED = ("v", "ts", "event", "actor", "data")
 
 OUTCOME_KIND = "attempt.outcome"
+VERIFICATION_OUTCOME_KIND = "verification.outcome"
 VERDICT_KIND = "attempt.verdict"
 VERDICT_CORRECTION_KIND = "attempt.verdict.correction"
 DECISION_KIND = "decision.autonomous"
@@ -70,6 +74,9 @@ USAGE_ACTOR = "consilient.usage"
 KNOWLEDGE_RETRIEVED_KIND = "knowledge.retrieved"
 KNOWLEDGE_ACTOR = "consilient.knowledge"
 KNOWLEDGE_STATUSES = frozenset({"ok", "unavailable", "not_configured"})
+VERIFICATION_STATUSES = frozenset(
+    {"completed", "error", "timeout", "refused", "not_run"}
+)
 CAPABILITY_GAP_KIND = "capability.gap"
 GAP_FAILURES = frozenset({"failed", "silent", "refused", "not_implemented"})
 GAP_CLOSURES = frozenset({"retry", "escalate"})
@@ -250,6 +257,7 @@ def validate(event: object) -> EventPayload:
     _check_capability_gap_contract(event)
     _check_attempt_identity(event)
     _check_attempt_contract(event)
+    _check_verification_outcome_contract(event)
     _check_consent_contract(event)
     _check_decision_contract(event)
     _check_response_rating_ban(event)
@@ -643,6 +651,50 @@ def _check_attempt_contract(event: EventPayload) -> None:
         raise EventError(f"{VERDICT_CORRECTION_KIND} must carry a non-empty reason")
 
 
+def _check_verification_outcome_contract(event: EventPayload) -> None:
+    """Keep component outcomes pairable without treating missing work as rejection."""
+    if event["event"] != VERIFICATION_OUTCOME_KIND:
+        return
+
+    data = event["data"]
+    for field in (
+        "verification_id",
+        "attempt_id",
+        "protocol_id",
+        "verifier_id",
+        "verifier_version",
+        "evidence_class",
+    ):
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise EventError(
+                f"{VERIFICATION_OUTCOME_KIND} must carry a non-empty string {field}"
+            )
+
+    digest = data.get("artefact_sha256")
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise EventError(
+            f"{VERIFICATION_OUTCOME_KIND} artefact_sha256 must be 64 lowercase hex characters"
+        )
+
+    status = data.get("status")
+    if status not in VERIFICATION_STATUSES:
+        raise EventError(
+            f"{VERIFICATION_OUTCOME_KIND} status must be one of "
+            f"{sorted(VERIFICATION_STATUSES)}, got {status!r}"
+        )
+
+    if status == "completed":
+        if not isinstance(data.get("verifier_accept"), bool):
+            raise EventError(
+                f"{VERIFICATION_OUTCOME_KIND} verifier_accept must be a boolean when completed"
+            )
+    elif "verifier_accept" in data:
+        raise EventError(
+            f"{VERIFICATION_OUTCOME_KIND} verifier_accept is valid only when completed"
+        )
+
+
 def _check_consent_contract(event: EventPayload) -> None:
     """Consent is purpose-specific; commercial grants authorise one named use.
 
@@ -979,6 +1031,116 @@ def _budget_transaction(directory: Path) -> Iterator[None]:
         lock.unlink(missing_ok=True)
 
 
+# The durability path (F01). Until 22 Aug 2026 the append below was a buffered
+# `path.open("a")` write: no serialisation across processes, so concurrent writers
+# tore lines on the real trajectory, and no fsync, so an acknowledged event could
+# still be lost with the process. [measured: the pinned torn-append incident in
+# `tests/test_v0_invariants.py::test_no_new_event_may_bypass_append`; the `loop.py`
+# ponytail] The contract now: `append` returns only after one complete UTF-8 line is
+# written under a kernel-backed per-log lock and fsynced, and every failure raises —
+# a partial line is never acknowledged, and is rolled back so it is never left
+# behind either. The lock is the log's own descriptor: `fcntl.flock` on POSIX,
+# `msvcrt.locking` on Windows, both released by the kernel when a holder dies, so a
+# killed writer cannot strand the log the way a lock file does.
+
+if sys.platform == "win32":
+    # O_BINARY: without it the Windows CRT translates "\n" to "\r\n" on write.
+    _OPEN_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_BINARY
+else:
+    _OPEN_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+
+
+def _lock_file(fd: int) -> None:
+    """Take the kernel-backed per-log lock; block until held. Death releases it."""
+    if sys.platform == "win32":
+        import msvcrt
+
+        os.lseek(fd, 0, os.SEEK_SET)
+        while True:
+            try:
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                return
+            except OSError:
+                time.sleep(0.005)
+    else:
+        import fcntl
+
+        fcntl.flock(fd, fcntl.LOCK_EX)
+
+
+def _unlock_file(fd: int) -> None:
+    """Best-effort: the descriptor is closed immediately after, which releases the
+    lock regardless, so an unlock failure changes nothing."""
+    if sys.platform == "win32":
+        import msvcrt
+
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+    else:
+        import fcntl
+
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+
+
+def _write_all(fd: int, data: bytes) -> None:
+    """Write every byte or raise; a short write is retried, never acknowledged early."""
+    view = memoryview(data)
+    while len(view) > 0:
+        try:
+            written = os.write(fd, view)
+        except OSError as exc:
+            raise EventError(
+                f"could not write the event line; the append is not acknowledged: {exc}"
+            ) from exc
+        if written <= 0:
+            raise EventError(
+                "a write made no progress; the append is not acknowledged"
+            )
+        view = view[written:]
+
+
+def _fsync_file(fd: int) -> None:
+    try:
+        os.fsync(fd)
+    except OSError as exc:
+        raise EventError(
+            f"could not fsync the event line; the append is not acknowledged: {exc}"
+        ) from exc
+
+
+def _fsync_directory(directory: Path) -> None:
+    """Make a newly created log's directory entry durable where the platform exposes it.
+
+    POSIX exposes directory fsync. The Windows standard library does not, so there
+    this is a no-op and the first-file guarantee covers the file-content fsync and
+    nothing broader.
+    """
+    if sys.platform == "win32":
+        return
+    else:
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+
+def _rollback(fd: int, offset: int) -> None:
+    """Best-effort removal of a failed append's bytes. If the truncate itself fails,
+    the torn bytes stay and `read()` quarantines them as a rejection — a partial
+    line is still never acknowledged."""
+    try:
+        os.ftruncate(fd, offset)
+    except OSError:
+        pass
+
+
 def _write_validated(path: Path, event: EventPayload) -> EventPayload:
     if event["event"] in (BUDGET_STATE_KIND, SPEND_RESERVED_KIND):
         expected = f"{event['ts'][:10]}.jsonl"
@@ -989,8 +1151,35 @@ def _write_validated(path: Path, event: EventPayload) -> EventPayload:
             )
     _check_clock(event)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8", newline="\n") as fh:
-        fh.write(canonical(event) + "\n")
+    created = not path.exists()
+    line = (canonical(event) + "\n").encode("utf-8")
+    fd = os.open(path, _OPEN_FLAGS)
+    try:
+        _lock_file(fd)
+        try:
+            offset = os.lseek(fd, 0, os.SEEK_END)
+            try:
+                _write_all(fd, line)
+                # fsync inside the lock: an acknowledged prefix is always durable,
+                # so a failed fsync rolls back before any later line can be
+                # acknowledged over a non-durable earlier one.
+                _fsync_file(fd)
+            except EventError:
+                _rollback(fd, offset)
+                raise
+        finally:
+            _unlock_file(fd)
+    finally:
+        os.close(fd)
+    if created:
+        try:
+            _fsync_directory(path.parent)
+        except OSError as exc:
+            raise EventError(
+                f"the line is written and fsynced but the directory entry of "
+                f"{path.name!r} could not be fsynced; the append is not "
+                f"acknowledged: {exc}"
+            ) from exc
     return event
 
 

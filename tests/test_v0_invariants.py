@@ -1964,7 +1964,27 @@ def test_no_new_commit_may_be_authored_by_a_fixture_identity():
     fixture_stamped = [
         line for line in result.stdout.splitlines() if line.endswith("@local")
     ]
-    assert len(fixture_stamped) <= 102, (
+    # Raised 102 → 108 on 22 Aug 2026: merging fleet-condensation made three historical
+    # commits reachable (762c3b6, 321d644, b3d3c71; EXP-45 pre-registration, run and
+    # findings, 20 Aug 2026 13:17–13:26), each counted twice (author and committer).
+    # They were stamped by the shared-config defect this test documents, predate its
+    # repair, and are not new fixture authorship; the alternative — rewriting their
+    # authorship — would falsify the record this ratchet exists to keep honest. The
+    # guard against NEW fixture-stamped commits is unchanged.
+    # Raised 108 → 112 on 22 Aug 2026: merging fleet-guards made two more historical
+    # commits reachable (fb0309f, 87e48b6; EXP-48 pre-registration and findings,
+    # 20 Aug 2026 15:17–15:23), same defect, same reasoning as the 102 → 108 raise.
+    # Raised 112 → 116 on 22 Aug 2026: merging fleet-mutation made two more reachable
+    # (5d278c7, 32c1a7b; EXP-47 pre-registration and results, 20 Aug 2026 14:15–14:43),
+    # same defect, same reasoning.
+    # Raised 116 → 118 on 22 Aug 2026: merging fleet-retroverifier made one more
+    # reachable (cda454f; EXP-43 primary at n=50, 20 Aug 2026 12:47), same defect,
+    # same reasoning.
+    # Raised 118 → 120 on 22 Aug 2026: merging fleet-transport made one more reachable
+    # (6275650; ADR-0041/0042 authorship, 20 Aug 2026 15:15), same defect, same
+    # reasoning. This is the last fixture-stamped branch: no further unmerged branch
+    # carries an @local identity, so 120 is the final re-baseline of this raise.
+    assert len(fixture_stamped) <= 120, (
         "a commit was authored by a fixture identity; check `git config user.email` — "
         "worktrees share the primary repository's config"
     )
@@ -2948,7 +2968,16 @@ def test_foreign_commit_identifiers_may_only_decrease():
     # characters instead, the convention ALLOWLIST itself uses to avoid tripping this detector.
     # Allowlisting those would have taken this ceiling past 30 and made it meaningless. Every
     # identifier in that file was resolved against both private corpora: none resolved in either.
-    assert total <= 20, (
+    # Raised 20 → 21 on 22 Aug 2026: `exp96/results-exp96.json` became tracked, adding one
+    # occurrence of the itsdangerous 2.2.0 pin 096c8d4… already allowlisted from
+    # `experiment-register.md` and `run_exp96.py` — corpus-tested against both private corpora
+    # in f83f6c1, "resolves in neither". The full revision is kept in the results artefact
+    # because it is the provenance that makes EXP-96 reproducible, the same class as
+    # `results-exp49.json`. The same day's second new occurrence, a duplicate ruvnet/ruflo
+    # permalink in `agentic-organisation-bar-2026-08-22.md`, was truncated to twelve
+    # characters instead (the gap-register convention), so it adds nothing here. The
+    # unexamined count above is unchanged and remains the guard that bites.
+    assert total <= 21, (
         f"the allowlisted identifier total rose to {total}. Every one is individually cleared, "
         "so this is not a leak, but the number is meant to fall over time as citations are "
         "aggregated away. Raise this ceiling only with the same corpus test in the commit."

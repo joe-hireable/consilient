@@ -285,3 +285,19 @@ back to supervised bounded execution; it may not keep the quiet surface while dr
 
 **No.** Duration calibration, checkpoint recovery and the quiet-versus-streaming trade-off are
 unmeasured, and the current beta evidence is insufficient. [asserted]
+
+## Update: 2026-08-22 — declared provenance is not authentication
+
+Lines 166–168 overstate the current boundary. `events.py` requires the caller-declared `actor` to
+equal the caller-declared `principal` and `via` to equal `"cli"`, but explicitly says that this is
+declared provenance and that no signature verifier exists. `scripts/verdict.py` also accepts
+`--principal` from the caller. V0-18 and V0-28 therefore enforce payload consistency and reject
+declared non-local channels; they do not authenticate that the principal authored the verdict.
+[measured: `src/consilient/events.py:957-978`; `scripts/verdict.py:116-118`]
+
+The decision's policy remains that only the principal may author human `attempt.verdict` ground
+truth. Until trusted first-party ingress authenticates authorship, the present CLI path is not that
+trust boundary and its records must not be described as authenticated principal verdicts. [asserted]
+
+This dated update is appended because the ADR is PROVISIONAL; the original evidence overclaim
+remains visible in the decision trail. [asserted]

@@ -124,9 +124,12 @@ _STOPWORDS = frozenset(
         "below", "between", "could", "does", "doing", "done", "each", "every",
         "from", "have", "here", "into", "just", "like", "made", "make", "more",
         "most", "must", "never", "only", "over", "same", "shall", "should", "some",
-        "such", "than", "that", "their", "them", "then", "there", "these", "they",
+        "such", "than",         "that", "their", "them", "then", "there", "these", "they",
         "this", "those", "through", "under", "until", "upon", "used", "uses",
         "what", "when", "where", "which", "while", "will", "with", "would", "your",
+        # Generic in THIS corpus: every skill description talks about the user and
+        # the system, so neither token discriminates one skill from another.
+        "system", "user",
     }
 )
 

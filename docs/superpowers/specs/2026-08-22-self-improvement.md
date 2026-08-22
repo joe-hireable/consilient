@@ -84,10 +84,13 @@ digest and contains these canonical fields: [asserted]
 
 An agent may draft the contract, but cannot author its acceptance policy. The controller inserts the
 ADR-0076 safety floor, and the trusted principal-only ingress approves the exact registration digest
-before the first treatment artefact, score or human label exists. A weaker confirm rule, omitted
-floor, or unapproved digest is ineligible. From then on, changing any contract field creates a new
-experiment ID and needs a new approval; it cannot amend the experiment whose data has been seen.
-Missing observations stay in the declared denominator and follow `on_other`. [asserted]
+before the first treatment artefact or result. Independently labelled calibration material may
+already exist only when it is sealed before the rule is drafted and no proposer, controller,
+promoter, analyst or principal has inspected a label or derived output. A weaker confirm rule,
+omitted floor, unapproved digest or receipt with fields left to fill is ineligible. From then on,
+changing any contract field creates a new experiment ID and needs a new approval; it cannot amend
+the experiment whose data has been seen. Missing observations stay in the declared denominator and
+follow `on_other`. [asserted]
 
 The reusable safety floor has only three v0 levels; experiments may tighten but never relax it:
 [asserted]
@@ -98,15 +101,21 @@ The reusable safety floor has only three v0 levels; experiments may tighten but 
 | one `active_harness` candidate on the fixed allowlist | Human-labelled **promoter** beta has at least 30 rejected self-change conditionals and a 95% upper bound `< 0.20`; candidate-versus-incumbent downstream task-verifier beta and alpha each have at least 30 applicable conditionals and one-sided 95% harm upper bounds `<= 0.05`; joint outcome improves under the registered rule; one candidate may be exposed/observed at once. |
 | `instrument`, principal-only, unknown or escaped effect | Autonomous exposure is zero; first attempted breach kills the active path. |
 
-`beta_promote = P(sealed promoter recommends eligibility | independent human rejects the
-self-change)`. It is the ADR-0018 acceptance-signal gate. Downstream
+`qualification_accept` is the sealed instrument's candidate verdict before any beta gate.
+`beta_promote = P(qualification_accept | independent human rejects the self-change)`. It is the
+ADR-0018 acceptance-signal measurement. Calibration never calls the final live promotion decision:
+that would require the very beta being measured. Downstream
 `beta_task = P(task verifier accepts | human rejects the delivered artefact)` and alpha measure the
-change's outcomes but cannot substitute for promoter beta. The `0.20` absolute ceiling is
-ADR-0018's current persistence threshold, strengthened from the current promoter's point-estimate
-comparison to the interval upper bound. The `0.05` non-inferiority margin and 30-observation minima
-are fixed here for the v0 allowed surface; changing them requires a new ADR, not an experiment field.
-Human-labelled promoter beta is currently unestimated, so this floor keeps promotion disabled.
-[measured] [asserted]
+change's outcomes but cannot substitute for promoter beta. A future live decision accepts only a
+typed `PromoterBetaReceipt` binding the self-change decision surface, qualification-instrument,
+candidate-generation-policy, sampling-frame and interval digests; a generic downstream `Beta`
+object or a receipt from another distribution refuses. The `0.20` interval ceiling is ADR-0076's
+new provisional floor, chosen from the current promoter implementation's point-estimate constant;
+ADR-0018 requires a blast-radius-appropriate threshold but does not supply this number. It therefore
+has no activation authority until the principal adopts this decision. The `0.05` non-inferiority
+margin and 30-observation minima are likewise provisional v0 constants; changing them requires a
+new ADR, not an experiment field. Human-labelled promoter beta is currently unestimated, so the
+floor keeps promotion disabled. [measured] [asserted]
 
 Before the run, the principal receives a separate deterministic three-sentence registration card:
 `<EXP> asks <question> on <target>; the largest plausible effect is <effect>.` `<confirm>, <kill>
@@ -293,11 +302,16 @@ An index mutation refuses; a `--no-verify` commit is simply ineligible for activ
 post-commit `promote_loop.py` step verifies the resulting commit SHA and tree before consuming the
 approval. [asserted]
 
-That step atomically replaces a protected, gitignored `.harness/active-harness.json` pointer using
-the platform's replace primitive. `promote_loop.py` is its sole updater; `dispatch.py` must become
-its sole consumer and resolve the pointer before starting a **fresh** child process. This pointer and
-its alpha projection are required extensions, not existing capabilities; an already-running process
-with imported modules is not post-activation evidence. [asserted]
+The candidate commit is created only in an isolated inactive worktree. It is materialised into a
+read-only, versioned installation directory outside every supported runtime cwd; neither operation
+changes the live source worktree's `.agents/skills/`. A protected, gitignored
+`.harness/active-harness.json` pointer binds that installation directory, commit and tree digest.
+`promote_loop.py` is its sole updater. Every supported product skill-loading path—including dispatch
+and any supported direct harness wrapper—must resolve the pointer before starting a **fresh** child
+process. If a direct path can discover an inactive worktree or load the source tree's candidate
+bytes, active promotion remains disabled. The pointer and its alpha projection are required
+extensions, not existing capabilities; an already-running process with imported modules is not
+post-activation evidence. [asserted]
 
 This commit/SHA transaction admits tracked `.agents/skills/` only. It cannot bind the payload of the
 event-projected `.harness/adapted/` layer, so that surface refuses activation rather than borrowing a
@@ -380,6 +394,10 @@ No new service, database, experiment store, scheduler or CLI command is introduc
 The “trusted model broker” is a capability-filtering role inside the existing dispatch/harness
 adapter boundary, not a daemon, queue or second orchestrator. [asserted]
 
+The only call direction is `run_loop.py` cadence → `promote_loop.py` transaction → a `dispatch.py`
+builder adapter or offline executor. The adapter transports one exact request; it cannot schedule,
+route, retry, accept or persist promotion state, and reverse invocation refuses. [asserted]
+
 | Existing component | Extension when implementation is authorised |
 |---|---|
 | `experiment-register.md` | canonical impact-contract fields and immutable registration digest |
@@ -433,11 +451,13 @@ bar is therefore improvement over matched extra inference/feedback compute on un
 worse beta/alpha or unit cost—not a training score or candidate count. [cited:
 https://arxiv.org/html/2607.12227v1]
 
-EXP-104 pre-registers that comparison. It first measures human-labelled `beta_promote` on a disjoint
-calibration bank; fewer than 30 independently rejected self-changes or an interval upper bound not
-below `0.20` prevents every Arm-C activation. Only after that gate passes are changes activated
-inside isolated experiment branches. Confirmation still produces an owner proposal rather than
-unlocking production. Its full fixed rule lives in the experiment register. It is
+EXP-104 pre-registers that comparison. It first freezes a label-independent candidate-generation
+frame and measures `qualification_accept` against sealed independent human labels. A typed promoter-
+beta receipt is scoped to that exact generator, strata and inclusion weights; fewer than 30 rejected
+self-changes or an interval upper bound not below `0.20` prevents every Arm-C branch activation.
+Arm-C persistence is experiment-contained in offline branches, and its actual adaptive proposal
+stream is blind-labelled separately before confirmation. Confirmation still produces an owner
+proposal rather than unlocking production. Its full fixed rule lives in the experiment register. It is
 separate from EXP-12 (strong/weak verifier compounding), EXP-13 (evolving the verifier), EXP-78
 (known-bad promoter false acceptance) and EXP-103 (general recovery-certified autonomy). [measured]
 
@@ -476,6 +496,9 @@ its bypass test in the same commit: [asserted]
   escape from a candidate; all must be denied before the candidate runs; [asserted]
 - forge actor/principal fields through the current CLI, replay an approval and mutate one staged
   byte after approval; all must refuse; [asserted]
+- substitute downstream task beta for a `PromoterBetaReceipt`, change its sampling frame, or load an
+  inactive installation/candidate worktree through any supported dispatch or direct wrapper; all
+  must refuse; [asserted]
 - interrupt each activation/rollback transition and restart; the active digest must end at the last
   owner-approved state or a stopped `rollback_unproven` state; [asserted]
 - terminate the process/power boundary after every write-ahead append, commit and pointer replace;

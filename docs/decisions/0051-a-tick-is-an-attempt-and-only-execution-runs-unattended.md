@@ -23,6 +23,16 @@
   identity rather than a result. Gate G4 is also unsatisfied — nothing here is a one-way door, and
   EXP-70 names the deletion explicitly. [algebra]
 
+## Update: 2026-08-22 — decision 5 superseded in part by ADR-0077
+
+[ADR-0077](0077-separate-candidate-exposure-from-verifier-fusion-and-measure-both.md) corrects the
+candidate-exposure rule. The iid expression in decision 5 applies only to a measured, versioned,
+non-adaptive dependence regime; otherwise the distribution-free ceiling is
+`n_attempt_max = floor(epsilon / q_upper)`, with `q_upper := beta_upper` when bad-candidate
+prevalence is unmeasured. [algebra] The recorded `epsilon = 0.40` result remains one candidate, but
+the statement “one for any epsilon at or below 0.40” is false: `epsilon < beta_upper` admits zero.
+[measured] [algebra] The rest of this ADR stands.
+
 ---
 
 ## Context

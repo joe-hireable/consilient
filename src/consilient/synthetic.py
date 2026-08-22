@@ -57,8 +57,15 @@ class RunSpec:
     harness: str
 
     def __post_init__(self) -> None:
-        for field_name in ("id", "task", "success_criterion", "harness"):
-            value = getattr(self, field_name)
+        # Named pairs rather than getattr: the product tree bans dynamic attribute access
+        # because it defeats the AST scan that proves this tree cannot reach a shell, the
+        # network or a credential. A lock with a benign exception is not a lock.
+        for field_name, value in (
+            ("id", self.id),
+            ("task", self.task),
+            ("success_criterion", self.success_criterion),
+            ("harness", self.harness),
+        ):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(
                     f"RunSpec.{field_name} must be a non-empty string; a run spec "
@@ -95,8 +102,11 @@ class Finding:
     reproduction: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        for field_name in ("run_id", "spec_id", "discrepancy"):
-            value = getattr(self, field_name)
+        for field_name, value in (
+            ("run_id", self.run_id),
+            ("spec_id", self.spec_id),
+            ("discrepancy", self.discrepancy),
+        ):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"Finding.{field_name} must be a non-empty string")
         if self.anchor not in ANCHOR_KINDS:

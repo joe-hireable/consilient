@@ -8,6 +8,16 @@
 - **Executable model:** `0067-model.py` — encodes the sign and regime boundaries; it does not
   estimate the world values that EXP-80 must measure
 
+## Update: 2026-08-22 — composition-and-beta clause superseded in part by ADR-0077
+
+[ADR-0077](0077-separate-candidate-exposure-from-verifier-fusion-and-measure-both.md) preserves this
+ADR's one-Owner and distinct-anchor composition rule but corrects candidate sizing. Component
+verifier passes on one bad artefact form an intersection; independently shippable candidate failures
+form a union. Until candidate dependence is measured under a frozen protocol, routing uses the
+distribution-free ceiling `n_attempt_max = floor(epsilon / q_upper)`, setting
+`q_upper := beta_upper` when candidate badness is unmeasured. [algebra] The current result at
+`epsilon = 0.40` remains one candidate; below `beta_upper` it is zero, not one. [measured] [algebra]
+
 ## Context
 
 A different model family is **not**, by itself, a different class of facts. ADR-0054 attaches

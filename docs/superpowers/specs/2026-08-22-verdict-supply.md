@@ -1,8 +1,8 @@
 # Verdict supply: automate the preparation, never the principal
 
-**Correction: a later repair does not make a consequence-derived rate a lower bound on beta;
-without an independently known-bad denominator it identifies only a lower-bound count for candidate
-false shipments, and the current CLI does not authenticate the principal.** [algebra] [measured]
+**Correction: a later repair does not make a consequence-derived rate a lower bound on
+human-verdict beta; at best it proves a lower-bound count for latent-contract false shipments in one
+frozen cohort, and the current CLI does not authenticate the principal.** [algebra] [measured]
 
 - **Date:** 2026-08-22. [measured]
 - **Status:** specification; ADR-0080 is PROVISIONAL and EXP-105 decides whether the
@@ -15,16 +15,20 @@ false shipments, and the current CLI does not authenticate the principal.** [alg
 
 ## 1. Answer first: zero verdicts may be automated
 
-`consil beta --json` currently reports one **declared-principal** rejection, one false accept, no
-point estimate and a minimum of 30 human rejections. It also reports six quarantined lines. The row
-passes current V0-18 self-consistency checks, but the record does not prove first-party presence.
-[measured: live command and source trace, 2026-08-22]
+`consil beta --json` currently reports one **declared-principal** rejection, projected
+`n_false_accept=1`, no point estimate and a minimum of 30 human rejections. It also reports six
+quarantined lines. The projected false-accept count rests on a manually asserted verifier Boolean;
+the row has no artefact digest, frozen contract, verifier receipt/version or sampling provenance and
+does not prove first-party presence. [measured: live command, source trace and trajectory row,
+2026-08-22]
 
 **Automated replacements: 0 of 30. Required source: 30 of 30 principal-authored. Under current
 declared-principal semantics, 29 further rejections are outstanding. Under the authenticated standard
-specified here, the existing row must be re-attested or 30 authenticated rejections are needed.
-Either route probably needs more cards because human acceptances and `unclear` responses do not enter
-the denominator.** [measured] [algebra]
+specified here, the existing row counts only if its artefact, candidate-time contract, verifier
+receipt/version, independent queue provenance and human choice can all be reconstructed and
+append-only attested; re-attesting the choice alone is insufficient. Otherwise 30 new authenticated
+rejections are needed. Either route probably needs more cards because human acceptances and
+`unclear` responses do not enter the denominator.** [measured] [algebra]
 
 Tier 1 can discover candidate false shipments and Tier 2 can harden a verifier. Neither is a human
 verdict, neither enters `Beta.compute()`, and neither is a candidate-exposure sizing input. [measured]
@@ -34,40 +38,45 @@ That latency is `[asserted]` until EXP-105 measures it. [asserted]
 
 ## 2. Three estimands, never one column with three labels
 
-Let `A` mean the frozen composite verifier accepted an artefact, `T` mean the artefact was latently
-bad under the frozen contract, `H` mean the independently obtained human verdict rejects it, and `C`
-mean a later consequence instrument proves that the artefact was repaired. Human-verdict beta is:
-[algebra]
+Let `A` mean the frozen composite verifier accepted an artefact, `T` mean the artefact violated the
+candidate-time contract, `H` mean the independently obtained human verdict rejects it, and `C` mean
+a later consequence instrument proves that the artefact was repaired. Human-verdict beta and its
+same-oracle joint candidate risk are: [algebra]
 
 $$
-\beta_H = P(A \mid H).
+\beta_H = P(A \mid H),
+\qquad
+q_H = P(A \cap H) = P(H)\beta_H \leq \beta_H.
 $$
 
-Repository history can count observed `A intersection C` events. If the strict repair proof makes
-`C` a subset of latent badness `T`, then: [algebra]
+Repository history can count observed `A intersection C` events. If an executable candidate-time
+contract proof makes `C` a subset of latent badness `T`, then at the population level: [algebra]
 
 $$
-P(A \cap C) \leq P(A \cap T) = q.
+P(A \cap C) \leq P(A \cap T) = q_T \leq \beta_T = P(A \mid T).
 $$
 
-Dividing the observed count by all frozen attempts therefore gives a lower bound on ADR-0077's
-candidate false-shipment probability `q = P(A intersection T)`. It supplies no bound on
-`P(A intersection H)` or `P(A | H)` until human labels are observed. Even an independently enumerated
-latent-bad denominator would estimate an oracle-relative `P(A | T)`, not human-verdict beta. A
-consequence-only history supplies neither denominator and misses silently bad cases. `P(A | C)` or
-`P(C | A)` is not beta and may be biased in either direction. [algebra]
+For a frozen finite cohort `S`, the exact claim is only
+`count_S(A intersection C) <= count_S(A intersection T)`. Dividing by `|S|` gives an empirical cohort
+lower bound on latent-contract `q_T,S` and, weakly, `beta_T,S`; it is not a lower confidence bound for
+either future population quantity. Population transfer would additionally require coverage-valid
+sampling and pre-registered one-sided inference. The cohort result supplies no bound on operational
+`q_H = P(A intersection H)` or human-verdict `beta_H` until human labels are observed.
+Consequence-only history also misses silently bad cases. `P(A | C)` or `P(C | A)` is neither beta and
+may be biased in either direction. [algebra]
 
 The exact label is therefore:
 
-> `repository-consequence lower bound on candidate false-shipment probability q; not human-verdict beta; not a gate or sizing input`
+> `observed finite-cohort repository-consequence lower bound on latent-contract false shipments; not operational q_H, human-verdict beta_H, a gate or a sizing input`
 
 [algebra] [asserted]
 
-This direction matters. ADR-0077 sizes **candidate exposure** from an upper bound on bad-shipment
-risk; it keeps that union separate from **composite verification**, the intersection of component
-passes on one known-bad artefact, and from **evidence fusion**, the Owner's combination of readings.
-A lower bound cannot serve as `q_upper`. Substituting it would admit too many attempts, under either
-the robust `floor(epsilon / q_upper)` ceiling or the iid ceiling where that formula is admissible.
+This direction and oracle both matter. ADR-0077's substitution `q_upper := beta_upper` is valid only
+when `q` and beta share the same badness event; under the current human-verdict meter that is `H`, so
+the operational quantity is `q_H`. A Tier 1 lower bound concerns `T`, not `H`, and cannot serve as an
+upper bound on either. Substituting it would admit too many attempts under either the robust
+`floor(epsilon / q_upper)` ceiling or the iid diagnostic where that formula is admissible. The
+current human-oracle-relative ceiling remains unchanged; it is not a bound on latent-contract harm.
 [algebra]
 
 ## 3. Tier 1: a strict consequence signal, research-only today
@@ -84,10 +93,12 @@ the proof below is `unclassifiable`, never a repair. [asserted]
 
 ### Frozen population and horizon
 
-- The population is candidate revisions on this repository's default branch with a recorded frozen
-  composite outcome and complete component conclusions. A merge or process exit is not an accepted
-  outcome. [asserted]
-- The consequence horizon is the next **50 verifier-recorded candidate revisions** on that branch.
+- The population is every `candidate.exposed` record on this repository's default branch, appended
+  before its verifier outcome. Its record binds the candidate identity, artefact digest and verifier
+  contract.
+  Missing or incomplete outcomes remain in the denominator as terminal classes; a merge or process
+  exit is not an accepted outcome. [asserted]
+- The consequence horizon is the next **50 verifier-recorded candidate exposures** on that branch.
   A revision without the complete horizon is right-censored. The volume horizon is fixed before
   inspection so changes in commit velocity do not change the observation opportunity. The value 50
   is `[asserted]`; EXP-105 may show that it yields no evaluable population. [asserted]
@@ -97,24 +108,28 @@ the proof below is `unclassifiable`, never a repair. [asserted]
 
 ### Repair, iteration and abstention
 
-A later revision is a **repair** only through one of two causal anchors: [asserted]
+A later revision is a **proved repair** only when all of the following hold: [asserted]
 
-1. It is a generated revert or carries a validated causal `Fixes:` reference to the candidate, and
-   the complete verifier passes after the revert. A fix-like subject, abbreviated hash match or file
-   overlap does not qualify. [asserted]
-2. A regression test introduced with the repair passes on the candidate's parent, fails on the
-   candidate, and passes on the repair revision under pinned environments. Reverting the repair hunk
-   at the repair revision must make the test fail again. [asserted]
+1. A versioned contract predicate and its source locator existed before the candidate. The later
+   test must be mechanically entailed by that frozen predicate; a new requirement, later preference
+   or agent-authored assertion is not candidate-time evidence. [asserted]
+2. Under pinned environments, one executable witness passes on the candidate's parent, fails on the
+   candidate, and passes on the repair revision. Reverting only the repair hunk at the repair revision
+   must make the same witness fail again. [asserted]
+3. The later revision has a full validated causal reference to the candidate or is its generated
+   revert. This locates the proposed relation but cannot replace the contract and execution proof.
+   A fix-like subject, abbreviated hash or file overlap is discovery only. [asserted]
 
-If the test also fails on the candidate's parent, the later work expresses a new requirement,
-pre-existing defect or drift rather than proving that candidate introduced the failure. It is
-ordinary iteration. Refactors, enhancements, dependency updates, documentation corrections without
-an external source, and agent-authored claims that something was fixed remain iteration or
-`unclassifiable`. [asserted]
+If the witness also fails on the candidate's parent, is not entailed by the pre-candidate contract,
+or cannot isolate the repair hunk, the later work is ordinary iteration or `unclassifiable`, not
+proof that the candidate was bad. Refactors, enhancements, dependency updates, documentation
+corrections without a pre-candidate checkable contract, and agent-authored claims that something was
+fixed remain iteration or `unclassifiable`. [asserted]
 
-Every result reports the full counts: repair, iteration, unclassifiable, right-censored, verifier
-error, replay error and timeout, including explicit zeros. The consequence numerator is shown as a
-count and as `count / all frozen attempts`; no beta headline is rendered. [asserted]
+Every result reports the full counts: proved repair, iteration, unclassifiable, right-censored,
+verifier error, replay error and timeout, including explicit zeros. The consequence numerator is
+shown as a count and as `count / all frozen attempts`, explicitly limited to that cohort; no beta or
+population-`q` headline is rendered. [asserted]
 
 ### What Tier 1 may do
 
@@ -137,14 +152,16 @@ coverage, unclassifiable count, every error/timeout/refusal, and a partial-ident
 [measured] [asserted]
 
 Allowed exact estimands are `mutation_proxy_beta`, `critic_proxy_beta` and
-`repository_consequence_q_lower_bound`; only `human_verdict_beta` may reach the beta projection or a
-sizing consumer. Human prose is not the separation mechanism. [asserted]
+`repository_consequence_false_shipment_cohort_lower_bound`; only `human_verdict_beta` may reach the
+beta projection or a sizing consumer. Human prose is not the separation mechanism. [asserted]
 
-The renderer prefixes every Tier 2 result with `PROXY —` and suppresses a headline figure when the
-census is incomplete, an execution error occurred, fewer than 50 classifiable cases exist,
-unclassifiable share exceeds 0.10, or the partial-identification width exceeds 0.10. It still reports
-all counts and the refusal reason. These thresholds match EXP-96's registered standard; they do not
-make its synthetic-fault distribution human ground truth. [measured] [asserted]
+The renderer prefixes every Tier 2 result with `PROXY —` and suppresses a headline figure unless all
+registered conditions for that proxy pass. For the EXP-96-shaped mutation proxy those conditions are:
+both baselines pass; both censuses complete; each corpus has at least 50 classifiable non-equivalent
+mutants; every Wilson 95% interval has half-width at most 0.05; unclassifiable share is at most 0.10;
+and partial-identification width is at most 0.10. It still reports all counts and the refusal reason.
+Passing those conditions does not make a synthetic-fault distribution human ground truth.
+[measured] [asserted]
 
 The enforcing check is
 `tests/test_verdict_supply.py::test_proxy_estimands_never_project_as_human_beta_or_sizing_input`.
@@ -161,9 +178,34 @@ outputs. Otherwise the measured beta is for a selected stratum, and showing only
 artefacts makes beta equal one by construction. Consequence and proxy results may prepare evidence
 after inclusion; they may not decide inclusion or order. [algebra] [asserted]
 
-Every card is bound to an existing `attempt.outcome`, exact artefact SHA-256, frozen acceptance
-contract, verifier receipt/version and presentation digest. The current `--checks pass|fail` manual
-assertion is insufficient evidence that a verifier ran. [measured] [asserted]
+That independence is not recordable today: there is no pre-outcome candidate-exposure/queue manifest,
+and
+`beta.from_connection(..., sampling_unconditioned=...)` currently drops the argument before calling
+`compute()`. The future path appends `review.queue.opened` before any eligible exposure, fixing
+`stream_cap=90`, `EXP105_prefix_n=30`, the target rejection count, one task-family population, one
+composite verifier protocol/version and contract, start position and the label-blind rule "the first
+90 matching `candidate.exposed` events in trajectory order". No verifier hardening or version change
+enters that stream. `review.queue.frozen` records the complete eligible-universe digest, presented
+prefix and ordered ids at the stopping event. Projection replays the selector from exposure events,
+requires an exact manifest and complete outcome join, and derives `sampling_unconditioned` only
+when replay succeeds; no caller may set it. A metamorphic check changes every verifier, consequence
+and critic value before replay and requires the same identities and order. [measured] [asserted]
+
+The exposure record itself is mandatory at the shared verification-start boundary before any
+component runs; failure to append it refuses execution. Every component-outcome producer requires the
+prior receipt, and projection rejects an outcome whose exposure is absent or later in trajectory
+order. An integration/source-scan check enumerates every verification launch path and fails on a
+bypass. Until that coverage check passes, `sampling_unconditioned` remains false even if a manifest
+replays. [asserted]
+
+Every card joins one selected `candidate.exposed` record to the complete protocol-defined set of
+existing component `verification.outcome` records, reusing their artefact SHA-256 and verifier
+ids/versions rather than creating a second outcome path. Projection derives the composite Boolean
+only when the exact component key-set is complete and stores a rollup digest; a missing/error
+component remains terminal. A separate `review.presentation.frozen` record binds the candidate-time
+contract source/digest, composite rollup digest and rendered presentation digest. The current
+`attempt.outcome` plus `--checks pass|fail` manual assertion is insufficient evidence that a verifier
+ran. [measured] [asserted]
 
 ### The card
 
@@ -190,59 +232,112 @@ answer. [asserted]
 
 Current enforcement is self-consistency, not authentication: `events.py` accepts a declared actor
 equal to a declared principal with `via=cli`, and `scripts/verdict.py --principal` lets the caller
-choose both. Projection then drops the principal and channel. An agent process sharing the OS account
-can therefore manufacture a syntactically valid principal verdict. [measured: source trace and
-executed validation fixture, 2026-08-22]
+choose both. The generic event ledger preserves those fields, but the outcomes/beta projection drops
+them. An agent process sharing the OS account can therefore manufacture a syntactically valid
+principal verdict. [measured: source trace and executed validation fixture, 2026-08-22]
 
-The phone surface is read-only until the response carries an authenticated user-presence assertion
-from a device enrolled by the principal. The assertion binds the one-time challenge, attempt id,
-artefact digest, presentation digest, chosen verdict and expiry. `scripts/verdict.py` remains the
-single ingress and verifies that assertion before calling `events.append()`; `via=cli` alone never
-satisfies authorship. No secret or private key enters the repository or trajectory. [asserted]
+Presence is insufficient. WebAuthn Level 3 says a presence test is normally a touch and explicitly
+does not constitute user verification; `userVerification=required` fails the ceremony unless the UV
+flag is set. It also requires the relying party to verify the challenge, expected origin, RP ID hash,
+credential and signature. [cited: [W3C WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/),
+sections 4, 5.8.6 and 7.2, retrieved 2026-08-22]
 
-This does not require a seventh `consil` command. It is a future mode of the existing script, and the
-platform authenticator is an authority boundary rather than a new model or agent. Until that boundary
-exists, the admissible route remains an actual principal using the local script, and the phone design
-cannot claim to have supplied a verdict. [asserted]
+The phone surface is therefore read-only until a principal-controlled WebAuthn enrolment and recovery
+policy exists. Enrolment/revocation records map a credential public key to the principal in the
+gitignored trajectory; private key material stays in the authenticator. Every ceremony requires user
+verification and binds a fresh durable challenge to the trajectory instance, canonical workspace,
+protocol and queue ids, attempt id, artefact, candidate-time contract, verifier receipt,
+presentation, chosen answer, expiry and idempotency key. The verifier checks credential status,
+signature, challenge, origin, RP ID, UV flag and the registered counter/replay policy, then derives
+actor/principal from the credential mapping rather than caller data. Shared authenticators remain a
+documented residual identity risk. [cited] [asserted]
+
+The trusted return protocol is the same first-party HTTPS WebAuthn relying-party session that renders
+the phone card. `transport.py` may relay only the opaque signed assertion envelope; plaintext
+verdict-shaped Slack, Twilio, email, SMS or webhook payloads remain refused. The event records
+`via=phone_webauthn` and the actual HTTPS relay separately, never `via=cli`. No connector, outward
+service or credential is activated by this specification. [asserted]
+
+A phone cannot use the desktop's HTTP `localhost` exception. The recommended deployment class is a
+principal-approved HTTPS origin on a private interface, with its RP ID, allowed origin, network scope,
+TLS certificate and key held only in gitignored instance state; a hosted endpoint is a separately
+approved alternative, not a fallback. Both create credential/network-exposure decisions reserved to
+the principal. Until one is explicitly configured, the card may be prepared locally but is not
+phone-accessible or write-capable. [cited: W3C WebAuthn Level 3 sections 4 and 7.2] [asserted]
+
+`scripts/verdict.py` remains the user-facing command and gains a future phone mode; there is no
+seventh `consil` command. The append-only trajectory records credential public keys, revocations,
+card/challenge issuance and the signed answer, so no second product store is introduced. The current
+AST boundary and installed dependencies cannot verify WebAuthn/COSE signatures in the shared writer,
+however. A separately approved audited verifier dependency or OS-isolated broker, with its own ADR
+and amended enforcement allowlist, is a real prerequisite. This task adds neither. Until it lands,
+phone responses cannot write a verdict and the existing local script remains declared-principal,
+not machine-authenticated, evidence. [measured] [asserted]
+
+The shared append boundary, not the phone script, is the authority chokepoint. `events.append()` must
+verify the ceremony before any `attempt.verdict`, `attempt.verdict.correction` or `attempt.review`;
+`consil record` and direct Python callers reach the same branch. Corrections use a new challenge bound
+to the prior and replacement verdict plus reason. Projection joins the authenticated event to the
+queue, presentation and `verification.outcome` records and exposes auth method, credential,
+principal, channel, protocol and all bound digests. Legacy or incomplete rows fail closed from the
+authenticated-beta view rather than being upgraded by prose. [asserted]
 
 ### An interrupted answer must not jam beta
 
 `scripts/verdict.py` currently appends the outcome before the verdict, which makes interruption leave
-an unlabelled outcome rather than an orphan verdict. The general writer is still not transactional,
-and a locally valid verdict for an unknown attempt can append and later brick projection. This
-happened once and required hand deletion; the fatal behaviour remains pinned by a test. [measured]
+an unlabelled outcome only when the first full line committed and the second never began. The shared
+writer is unlocked and not fsynced, so a kill can instead leave no line or a truncated line; another
+event kind can interleave. A locally valid verdict for an unknown attempt can also append and brick
+projection. Both torn append and hand-deletion incidents are recorded in this repository. [measured]
 
-Future implementation keeps the existing writer and adds three guards: [asserted]
+Future implementation keeps one writer and adds one per-log transaction boundary for **all** event
+kinds: an OS-released lock, not an existence lock that survives process death; a single UTF-8 byte
+record written with append semantics; and flush plus `fsync` before acknowledgement. For a
+human-only event, the same lock covers challenge lookup/unused check, credential verification,
+one-to-one relational joins, duplicate comparison and append. The verdict event itself consumes the
+challenge. [asserted]
 
-- the verdict writer resolves the existing outcome and exact artefact before append inside a new
-  process-serialised relational transaction; `events.append()` remains the sole event writer;
-  [asserted]
-- a duplicate or unknown-attempt verdict is rejected before write; if a malformed historical or
-  interrupted line is read, the existing `Rejection`/quarantine projection records it and beta still
-  renders; [asserted]
-- flush and `fsync` complete before the UI acknowledges the answer. A crash before acknowledgement
-  safely offers the same card again; a duplicate assertion is idempotently refused. [asserted]
+The idempotency key has exact retry semantics. A retry after commit but before acknowledgement returns
+the original committed receipt as success when every bound field and answer match; a conflicting
+reuse is refused. Fault injection covers before append, partial append, after append before `fsync`,
+after `fsync` before acknowledgement and retry. [asserted]
 
-The smallest checks are
-`test_authenticated_phone_verdict_binds_attempt_artefact_and_choice`,
+Parsing/schema failures continue through `events.Rejection`. Relational failures—unknown/duplicate
+outcome or verdict, invalid correction, missing queue/card/verification join—belong in
+`projection.py`: each becomes a deterministic quarantine row carrying source path, line and digest,
+and replay continues. Human and JSON beta output both show quarantine count/reasons or their exact
+locator, projection-derived sampling status and the human-oracle caveat. A render that merely avoids
+crashing while hiding a rejected row fails. [asserted]
+
+The smallest checks are `test_authenticated_phone_verdict_binds_every_receipt_and_uv`,
+`test_record_and_direct_append_cannot_bypass_authenticated_human_events`,
+`test_authenticated_correction_requires_a_new_bound_challenge`,
 `test_unclear_review_is_terminal_and_never_enters_beta`,
-`test_interruption_leaves_only_an_unlabelled_outcome`, and
-`test_unknown_attempt_verdict_is_quarantined_and_beta_still_renders`. [asserted]
+`test_append_faults_are_replayable_and_retry_returns_the_committed_receipt`,
+`test_relational_rejections_are_quarantined_and_beta_remains_complete`, and
+`test_beta_outputs_show_quarantine_sampling_and_oracle_caveat`. [asserted]
 
 ## 6. EXP-105: agreement without substitution
 
-EXP-105 creates no separately selected human-review sample. It attaches a consequence classification
-to the same independently frozen queue used to collect the remaining human-beta verdicts: re-attest the
-existing row and collect 29 further rejections, or collect 30 authenticated rejections if
-re-attestation is unavailable. Every intervening `Accept` and `Unclear` card stays in the experiment;
-no response is replaced. [asserted]
+EXP-105 creates no consequence-selected human-review sample. It uses the first **30 new cards** from
+the independently precommitted queue above, then stops when all 30 are terminal or 30 days after the
+first card, whichever comes first. The already unblinded legacy row never enters agreement or
+latency, whatever its later provenance disposition. `Accept`, `Reject`, `Unclear`, unanswered and
+invalid cards keep their frozen slots; no response is replaced. After that fixed EXP-105 prefix, the
+same precommitted stream may continue only until the predeclared 29-or-30 authenticated-rejection
+target, 90 terminal cards, or the same 30-day deadline. Failing to reach the target is
+`insufficient_data`; no second unmanifested stream is implied. [asserted]
 
 The principal is blinded to consequence and verifier outcomes until after each verdict. The strict
 instrument emits `consequence_reject` or abstains; absence of a repair never becomes an automatic
 `Accept`. The result reports emitted-signal by `human_reject`/`human_accept`, plus `unclear`, coverage,
-abstention, censoring, every error and latency. Positive predictive value is never reported without
-coverage and the full table because a signal that fires once can agree perfectly while preparing
-almost nothing. [asserted]
+abstention, censoring, every error and latency. Per-card latency starts when the complete card is
+rendered and actionable and ends only when the answer is durably fsynced and acknowledged; it
+includes the authenticator prompt, retry and reveal. `Unclear` is included and any unanswered card at
+the deadline prevents confirmation. Enrolment, recovery and setup minutes are reported separately
+and amortised over all 30 slots. Positive
+predictive value is never reported without coverage and the full table because a signal that fires
+once can agree perfectly while preparing almost nothing. [asserted]
 
 EXP-105 can confirm Tier 1 only as a separate preparation signal. It cannot change the 0/30
 automation answer, V0-18, any gate or candidate sizing. Its exact procedure and stopping rule are

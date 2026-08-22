@@ -88,6 +88,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0082](0082-project-raci-onto-per-work-item-rights-and-require-structural-consultation.md) | **Project RACI onto per-work-item rights and require structural consultation** | 🟡 |
 | [0085](0085-qualify-model-revisions-before-routing-and-seal-fine-tune-evaluation.md) | **Qualify model revisions before routing, defer matrix factorisation, and seal fine-tune evaluation** | 🟡 |
 | [0087](0087-return-one-answer-with-decision-relevant-checks.md) | **Return one answer with decision-relevant checks and answer directly when convergence adds no value** | 📋 |
+| [0091](0091-check-declared-claims-against-the-import-graph-and-keep-declared-claims-authoritative.md) | **Check declared claims against the import graph, and keep declared claims authoritative** — worktree isolation and fenced compare-and-append admission as protocol repairs | 🟡 |
 
 ## Behaviour and safety
 
@@ -167,3 +168,5 @@ to every ADR and every PR:
   assumed is absent from the tracked tree.
 - **0089** — PROPOSED. The retirement behaviour is unmeasured and **EXP-129 is specified in the
   companion document but deliberately unwritten in the register.**
+- **0091** — PROVISIONAL pending EXP-131, which can delete the D3 coverage check; the
+  lane-derivation half rests on EXP-130 (`DONE`, mixed result) and stands regardless.
