@@ -71,6 +71,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0065](0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md) | **What is native, what is adopted, and what is a marketplace** — a component whose error rate must be measured is native; one whose errors are self-evident may be adopted | ✅ |
 | [0066](0066-principal-harvest-is-a-private-training-corpus.md) | **The principal's harvest is a private training corpus**; 30–35B fine-tunes are native backends; the data is never published | ✅ |
 | [0067](0067-front-one-chat-with-one-owner-evidence-squads.md) | **Front one chat with one-owner squads whose added roles bring distinct evidence** | 🟡 |
+| [0074](0074-preserve-records-version-capabilities-and-reserve-training-for-parameter-updates.md) | **Preserve records, version capabilities and reserve training for parameter updates** | 🟡 |
 | [0071](0071-commit-to-a-delivery-window-and-prove-liveness-with-sealed-checkpoints.md) | **Commit to a delivery window, prove liveness with sealed checkpoints, and send only exceptions before delivery** | 🟡 |
 
 ## Behaviour and safety
