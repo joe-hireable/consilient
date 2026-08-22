@@ -1,6 +1,6 @@
 # Decision index
 
-62 ADRs, 21 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+63 ADRs, 22 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
 `python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
 catches a row missing from this table, which is the argument for generating it rather than
@@ -71,6 +71,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0065](0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md) | **What is native, what is adopted, and what is a marketplace** — a component whose error rate must be measured is native; one whose errors are self-evident may be adopted | ✅ |
 | [0066](0066-principal-harvest-is-a-private-training-corpus.md) | **The principal's harvest is a private training corpus**; 30–35B fine-tunes are native backends; the data is never published | ✅ |
 | [0067](0067-front-one-chat-with-one-owner-evidence-squads.md) | **Front one chat with one-owner squads whose added roles bring distinct evidence** | 🟡 |
+| [0071](0071-commit-to-a-delivery-window-and-prove-liveness-with-sealed-checkpoints.md) | **Commit to a delivery window, prove liveness with sealed checkpoints, and send only exceptions before delivery** | 🟡 |
 
 ## Behaviour and safety
 
