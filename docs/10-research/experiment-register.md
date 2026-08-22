@@ -1935,6 +1935,116 @@ that makes ground truth free, and that is exactly the population where a single 
 strong. **This is the honest limitation and it should be stated in any write-up before the result
 is.**
 
+### EXP-80 · Does an evidence-grounded squad beat the strongest single agent on the same task and budget? `BLOCKED: task bank, measured comparator, isolated worktrees and blinded human verdicts`
+
+**Pre-registered 22 Aug 2026. Not run.** This is the end-to-end test for ADR-0067. EXP-14/EXP-16
+already own Owner meetings, EXP-25 owns persona labels versus distinct evidence, EXP-29 owns cheap
+fan-out, and EXP-52 owns consensus by family and evidence class; this entry does not rerun them.
+[measured]
+
+**Identifier allocation:** the root orchestrator for dispatch `20260822T111814-b49738fe69`
+allocated EXP-80 after a whole-tree collision search on 22 August 2026. The brief required a
+pre-registration, supplied no identifier and explicitly forbade waiting for confirmation.
+[measured]
+
+**Decides:** whether to build squad-specific role manifests, isolation, disagreement state and chat
+summary for the tested v0 coding-task strata. It does not gate the existing one-agent dispatch,
+trajectory, bounded recall, work-item or beta-ceiling primitives, and success does not establish
+transfer outside those strata. [asserted]
+
+**Precondition:** exactly 80 prospectively collected, genuinely requested coding tasks from this
+repository, allocated 20 each to four verifier-contract strata named in an immutable task-bank
+manifest before any arm runs. Task text, starting tree, allowed external evidence and verifier
+digest are identical across arms; assignment never changes after an outcome. Each task gets three
+isolated worktrees. The strongest eligible single composition for each stratum must be selected from
+measured, verifier-and-human outcomes before the task bank is frozen; without that evidence the
+experiment remains blocked and the comparator is not called “strongest”. A human maintainer judges
+artefacts blind. All execution is subscription-backed or local. [asserted]
+
+The componentwise execution budgets are fixed now. **A, operational single:** at most 30,000
+reported input-plus-output model tokens, 30 tool calls and 30 summed active worker-minutes per task.
+**B and C:** at most 90,000 tokens, 90 tool calls and 90 worker-minutes per task. C shares each total
+across all members; parallelism does not create free worker-minutes. Reaching any component stops the
+arm. Missing token usage is a protocol-invalid arm, not zero usage. Human review is outside the
+execution ceiling and is measured separately. [asserted]
+
+**Procedure:** before execution, use seed `800067` to randomise all within-task arm orders and blind
+presentation orders. Run three sealed arms. **A, operational single:** the measured strongest single
+with every allowed source and tool at the normal budget. **B, matched-budget single:** the same
+composition at C's total ceiling. **C, squad:** the smallest ADR-0067 composition whose members have
+disjoint assigned anchors, at B's ceiling. No arm sees another arm's output. Every arm may submit one
+candidate digest to the frozen verifier. Obtain a human verdict before unsealing identity. Never
+replace a frozen task or retry away a refusal, timeout, budget exhaustion or invalid run. [asserted]
+
+For C, an anchor identity is `(kind, canonical URI or verifier-contract identifier, content
+SHA-256)`; dynamic responses also record acquisition time and response SHA-256. Append-only access
+records must show the actual sources opened. A triplet is protocol-invalid if an assigned identity
+or hash overlaps between supposedly independent roles, one source is derived from another, a role
+reads another's source/output before sealing, any arm changes the verifier digest or exceeds its
+budget, or C submits more than one candidate digest. A recorded refusal, timeout or missing required
+anchor may submit none but remains adverse. The frozen task brief is shared governance input and is
+excluded from anchor overlap. [asserted]
+
+**Measures:** the full human-accept/reject by verifier-accept/reject table for every arm; primary
+paired joint success (`human accepts unedited AND verifier accepts`); beta
+`P(verifier accepts | human rejects)` and alpha `P(verifier rejects | human accepts)`; paired
+discordant outcomes; reported tokens, tool calls, summed worker-minutes and per-artefact blinded human
+review minutes; refusals, timeouts, budget stops, invalidity reasons and unresolved disagreements.
+Self-reported confidence is excluded. [asserted]
+
+The primary analysis is intention-to-treat over all 80 frozen tasks: a refusal, timeout, missing or
+invalid candidate, missing arm at the deadline, human rejection or verifier rejection is joint
+success `0`; no task leaves the denominator. Beta and alpha use only arms with both actual human and
+verifier outcomes, with every missing outcome reported. Confirmation requires at least 30 human
+rejections **and** 30 human acceptances in each arm; a zero or smaller conditional denominator is
+`insufficient_safety_evidence`, never beta or alpha equal to zero. [asserted]
+
+For joint-success differences, take 20,000 paired bootstrap resamples of the 80 task triplets with
+seed `800067` and report percentile 95% intervals. For each safety difference `rate_C - rate_X`, its
+one-sided 95% upper bound is `Wilson_upper_97.5%(C) - Wilson_lower_97.5%(X)`; the two component bounds
+give at least 95% joint coverage by the union bound. Every improvement and safety condition below
+must pass, so this is an intersection-union decision and no multiplicity discount is taken.
+[algebra] [asserted]
+
+The scalar cost is **review-adjusted minutes**: summed active worker-minutes plus blinded human review
+minutes. Cost per joint success is total review-adjusted minutes divided by joint successes and is
+infinity at zero successes. If B has zero joint successes, the cost comparison is undefined and the
+result is unresolved. Tokens and tool calls remain separate diagnostics rather than being added to
+minutes. [asserted]
+
+**Stopping rule (fixed before the run):** stop when all arms for the 80 frozen tasks reach a terminal
+state or 120 days after the first arm starts, whichever comes first. At the deadline, unrun or
+unterminated arms receive primary success `0`; no replacement task is recruited. Publish every
+adverse, incomplete and invalid outcome. [asserted]
+
+- C confirms ADR-0067 **for the four tested strata only** if its paired joint-success point estimate
+  exceeds both A and B by at least `0.10`, both paired 95% interval lower bounds exceed zero, all four
+  one-sided upper bounds for `beta_C - beta_X` and `alpha_C - alpha_X` are at most `0.05`, each arm
+  meets both 30-outcome conditional minima, and C's cost per joint success is no higher than B's.
+  [asserted]
+- If C passes the joint-success rule against A but not B, the gain belongs to extra budget rather
+  than organisation: one agent remains the default and squad-specific implementation is cut for
+  these strata. [asserted]
+- Once both conditional minima are met, if any beta or alpha upper difference exceeds `0.05`,
+  squad-specific automatic acceptance is cut for these strata even if joint success rises.
+  [asserted]
+- More than 8 protocol-invalid triplets out of the fixed 80 kills the protocol without a quality
+  claim. Eight or fewer stay adverse primary outcomes and are reported individually. [asserted]
+- Any other result is **unresolved**, not evidence of equivalence; one remains the default and
+  squad-specific construction stays blocked. [asserted]
+
+`docs/decisions/0067-model.py` executes these sign and regime boundaries. [measured]
+
+**Largest plausible effect (ADR-0050):** failure removes the squad-specific router, role/source
+manifest schema and disagreement UI from the v0 coding plan; success authorises their measured,
+task-conditioned implementation for four strata but never a universal squad default. Therefore this
+experiment blocks those squad-specific components and no existing primitive. [asserted]
+
+**What it cannot decide:** transfer beyond the four frozen coding-task strata, unattended use
+outside this repository, whether a different human would accept the artefact, or whether a squad may
+expose one verifier to multiple candidates. Gate B, principal-only authority and the beta-derived
+candidate ceiling remain unchanged whatever the result. [asserted]
+
 ### EXP-53 · What does signing the trajectory cost, and what does it fail to cover? `READY`
 **Pre-registered 20 Aug 2026. Not run.**
 **Decides:** whether ed25519 signatures at the `append()` chokepoint — the one mechanism worth

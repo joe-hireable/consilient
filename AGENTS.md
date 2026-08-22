@@ -171,6 +171,15 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
     handed upward is work not done. The rejected options belong in the record — the trail of
     reversals is the most valuable thing in `docs/decisions/` and the first thing people delete.
 
+    **And when several answers are all acceptable, stop deliberating and build.** Joe, 22 August 2026:
+    *"Sometimes especially in tech there is multiple different 'best' ways... as long as it's built
+    with bricks or metal or obsidian or hardened and treated thick wood blablabla then you should pick
+    one and start building with the best fit you can find."* This is a satisficing rule **with a
+    floor**, and the floor is the whole of it: wet sand is refused, brick and steel are
+    interchangeable. **So spend the analysis on locating the floor — what distinguishes wet sand from
+    brick here — and almost none on ranking the materials above it.** Deliberation past the point of
+    an acceptable answer is waste that looks like rigour.
+
     This does **not** license upgrading a tag without evidence, and it does not license presenting an
     estimate as a measurement. Principle 1 still binds: `[asserted]` stays `[asserted]` until
     something is run. **Deciding under uncertainty and pretending to certainty are opposites, not
