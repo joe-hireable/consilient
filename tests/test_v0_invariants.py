@@ -2948,7 +2948,16 @@ def test_foreign_commit_identifiers_may_only_decrease():
     # characters instead, the convention ALLOWLIST itself uses to avoid tripping this detector.
     # Allowlisting those would have taken this ceiling past 30 and made it meaningless. Every
     # identifier in that file was resolved against both private corpora: none resolved in either.
-    assert total <= 20, (
+    # Raised 20 → 21 on 22 Aug 2026: `exp96/results-exp96.json` became tracked, adding one
+    # occurrence of the itsdangerous 2.2.0 pin 096c8d4… already allowlisted from
+    # `experiment-register.md` and `run_exp96.py` — corpus-tested against both private corpora
+    # in f83f6c1, "resolves in neither". The full revision is kept in the results artefact
+    # because it is the provenance that makes EXP-96 reproducible, the same class as
+    # `results-exp49.json`. The same day's second new occurrence, a duplicate ruvnet/ruflo
+    # permalink in `agentic-organisation-bar-2026-08-22.md`, was truncated to twelve
+    # characters instead (the gap-register convention), so it adds nothing here. The
+    # unexamined count above is unchanged and remains the guard that bites.
+    assert total <= 21, (
         f"the allowlisted identifier total rose to {total}. Every one is individually cleared, "
         "so this is not a leak, but the number is meant to fall over time as citations are "
         "aggregated away. Raise this ceiling only with the same corpus test in the commit."

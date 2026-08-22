@@ -82,7 +82,7 @@ Primary sources retrieved 2026-08-22:
 - [OpenHands paper](https://arxiv.org/html/2407.16741), [delegation](https://docs.openhands.dev/sdk/guides/task-tool-set) and [parallel execution](https://docs.openhands.dev/sdk/guides/parallel-tool-execution). [cited]
 - [MetaGPT paper](https://arxiv.org/html/2308.00352) and [ChatDev paper](https://arxiv.org/html/2307.07924). [cited]
 - [Devin Security Swarm](https://docs.devin.ai/work-with-devin/security-swarm), [Agentic MapReduce report](https://devin.ai/blog/agentic-map-reduce) and [evaluation](https://devin.ai/blog/security-swarm-eval). [cited]
-- [Ruflo repository at the inspected revision](https://github.com/ruvnet/ruflo/tree/5234333c3462640ab348363ba4a142945fd2bc47), [benchmark issue](https://github.com/ruvnet/ruflo/issues/2125) and [self-audit](https://github.com/ruvnet/ruflo/blob/5234333c3462640ab348363ba4a142945fd2bc47/docs/reviews/intelligence-system-audit-2026-05-29.md). [cited]
+- [Ruflo repository at the inspected revision](https://github.com/ruvnet/ruflo/tree/5234333c3462), [benchmark issue](https://github.com/ruvnet/ruflo/issues/2125) and [self-audit](https://github.com/ruvnet/ruflo/blob/5234333c3462/docs/reviews/intelligence-system-audit-2026-05-29.md). Revision truncated to twelve characters per the foreign-identifier ratchet convention; the full-length citation lives in `docs/10-research/bibliography.md`. [cited]
 - [Claude Code subagents](https://code.claude.com/docs/en/sub-agents), [Agent Teams](https://code.claude.com/docs/en/agent-teams) and [Anthropic's adjacent multi-agent research report](https://www.anthropic.com/engineering/multi-agent-research-system). [cited]
 
 ## 3. Negative results that constrain the design
