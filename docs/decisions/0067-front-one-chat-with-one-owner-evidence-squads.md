@@ -1,6 +1,6 @@
 # 0067. Front one chat with one-owner squads whose added roles bring distinct evidence
 
-- **Status:** PROVISIONAL — EXP-80 can kill it and can confirm only four tested v0 task strata
+- **Status:** PROVISIONAL — EXP-80 can kill it and can confirm only its frozen v0 task mixture
 - **Date:** 2026-08-22
 - **Deciders:** Joe Brown (product direction only, quoted in the dispatch brief); Codex dispatch
   `20260822T111814-b49738fe69` (provisional mechanism pending EXP-80)
@@ -241,9 +241,10 @@ this ADR. [asserted]
 
 ## What would overturn this
 
-EXP-80 kills the squad-specific protocol if its operational-invalidity threshold fires, if the
-squad fails to beat a same-total-budget strong single agent by the pre-registered material margin,
-or if it worsens beta or alpha beyond the registered non-inferiority margins. [asserted]
+EXP-80 kills the squad-specific protocol for its frozen task mixture if the operational-invalidity
+threshold fires. A safety-margin failure cuts automatic acceptance, and a gain against the normal-
+budget single but not the matched-budget single attributes the gain to compute. Any other failure to
+confirm remains unresolved rather than being narrated as equivalence or a kill. [asserted]
 
 EXP-52 overturns the evidence-manifest premise for its mutation population if shared-evidence
 consensus materially lowers beta. [asserted] If EXP-80 fails, retain the chat, trajectory, tools and

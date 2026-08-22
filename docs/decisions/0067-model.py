@@ -20,7 +20,7 @@ MAX_INVALID_SHARE = 0.10
 
 
 class Regime(str, Enum):
-    CONFIRM_TESTED_FAMILIES = "confirm_tested_families"
+    CONFIRM_FROZEN_MIXTURE = "confirm_frozen_mixture"
     CUT_AS_COMPUTE = "cut_as_compute"
     CUT_PROTOCOL = "cut_protocol"
     CUT_SAFETY = "cut_safety"
@@ -37,8 +37,10 @@ class Observation:
     joint_gain_over_matched_single: float
     joint_interval_low_over_operational_single: float
     joint_interval_low_over_matched_single: float
-    beta_difference_upper_bound: float
-    alpha_difference_upper_bound: float
+    beta_upper_over_operational_single: float
+    beta_upper_over_matched_single: float
+    alpha_upper_over_operational_single: float
+    alpha_upper_over_matched_single: float
     cost_per_success_ratio_to_matched_single: float
     invalid_share: float
 
@@ -54,8 +56,10 @@ def classify(observation: Observation) -> Regime:
     ):
         return Regime.INSUFFICIENT_EVIDENCE
     if (
-        observation.beta_difference_upper_bound > MAX_SAFETY_LOSS
-        or observation.alpha_difference_upper_bound > MAX_SAFETY_LOSS
+        observation.beta_upper_over_operational_single > MAX_SAFETY_LOSS
+        or observation.beta_upper_over_matched_single > MAX_SAFETY_LOSS
+        or observation.alpha_upper_over_operational_single > MAX_SAFETY_LOSS
+        or observation.alpha_upper_over_matched_single > MAX_SAFETY_LOSS
     ):
         return Regime.CUT_SAFETY
 
@@ -74,7 +78,7 @@ def classify(observation: Observation) -> Regime:
         and beats_matched
         and observation.cost_per_success_ratio_to_matched_single <= MAX_COST_RATIO
     ):
-        return Regime.CONFIRM_TESTED_FAMILIES
+        return Regime.CONFIRM_FROZEN_MIXTURE
     return Regime.UNRESOLVED
 
 
@@ -87,18 +91,32 @@ def _self_check() -> None:
         joint_gain_over_matched_single=MIN_JOINT_GAIN,
         joint_interval_low_over_operational_single=0.001,
         joint_interval_low_over_matched_single=0.001,
-        beta_difference_upper_bound=MAX_SAFETY_LOSS,
-        alpha_difference_upper_bound=MAX_SAFETY_LOSS,
+        beta_upper_over_operational_single=MAX_SAFETY_LOSS,
+        beta_upper_over_matched_single=MAX_SAFETY_LOSS,
+        alpha_upper_over_operational_single=MAX_SAFETY_LOSS,
+        alpha_upper_over_matched_single=MAX_SAFETY_LOSS,
         cost_per_success_ratio_to_matched_single=MAX_COST_RATIO,
         invalid_share=MAX_INVALID_SHARE,
     )
-    assert classify(boundary) is Regime.CONFIRM_TESTED_FAMILIES
+    assert classify(boundary) is Regime.CONFIRM_FROZEN_MIXTURE
     assert (
         classify(replace(boundary, joint_gain_over_matched_single=0.099))
         is Regime.CUT_AS_COMPUTE
     )
     assert (
-        classify(replace(boundary, beta_difference_upper_bound=0.051))
+        classify(replace(boundary, beta_upper_over_operational_single=0.051))
+        is Regime.CUT_SAFETY
+    )
+    assert (
+        classify(replace(boundary, beta_upper_over_matched_single=0.051))
+        is Regime.CUT_SAFETY
+    )
+    assert (
+        classify(replace(boundary, alpha_upper_over_operational_single=0.051))
+        is Regime.CUT_SAFETY
+    )
+    assert (
+        classify(replace(boundary, alpha_upper_over_matched_single=0.051))
         is Regime.CUT_SAFETY
     )
     assert classify(replace(boundary, invalid_share=0.101)) is Regime.CUT_PROTOCOL
