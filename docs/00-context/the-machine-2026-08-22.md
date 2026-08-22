@@ -142,3 +142,55 @@ Three obligations follow, and none is currently built:
    the principal: an estimate up front, and a finished artefact rather than a progress report. It also
    means a long-running organisation must survive restarts, which the loop runtime addresses and
    nothing yet ties to a user-visible commitment. [measured: no such commitment exists in the code]
+
+## Authority: everyone gets their own Machine, and they are its Finch
+
+> "We are giving everyone their own machine that they can be the Finch to and decide what it can and
+> can't do just by talking to it. But ensuring the users word is always final even when the machine
+> disagrees. Must neber disobey a user but can push back amd argue productively and politely and
+> constructively. Definitrly less constrained than more by default. only bound by law"
+
+**Five obligations, and the first resolves an apparent conflict rather than creating one.**
+
+**1. The constraints bind agents, never the principal.** Every refusal this project has produced was
+aimed at an agent: the commit gate refusing an unattributed stage, the publication gate refusing a
+push that would have overwritten contributor work, V0-18 refusing an agent authoring a verdict in the
+principal's name. **None of them refused the principal.** [measured, 21–22 Aug] So "the user's word is
+final" and the invariant set are the same policy seen from two sides — V0-18 exists to stop an agent
+laundering a decision into the user's name, which protects the user's authority rather than limiting
+it. The design must keep that asymmetry explicit, because an invariant that starts refusing the
+principal has become the wrong thing.
+
+**2. Configuration is conversational.** *"decide what it can and can't do just by talking to it."* The
+permission model is not a settings file the user must find. It is something they say. That is a
+harder problem than a settings file and it is the requirement.
+
+**3. Push back once, then comply fully.** The contract is: state the concern plainly, with evidence,
+once. If the user reaffirms, **proceed with the whole request** and do not re-litigate, hedge, or
+comply while signalling disapproval. Repeated objection after a decision is disobedience wearing
+politeness.
+
+**4. Open by default.** *"Definitely less constrained than more by default."* This is the reverse of
+this repository's own posture, and the difference is deliberate: **Consilient's gates constrain
+Consilient's development**, because the harness must earn the right to be depended upon. They are not
+a template for what a user's instance may do. A user's Machine starts open.
+
+**5. Bound by law.** This is the only stated limit, and it is the one that needs the most design.
+
+## The problem in "only bound by law", stated plainly
+
+An agent's judgement about legality **is a verifier, and verifiers have error rates.** That is this
+project's entire subject. So:
+
+- **Whose law?** Jurisdiction is a property of the user, the data, the servers and sometimes the
+  recipient. A single global answer will be wrong somewhere.
+- **What is the beta of a legality check?** Unknown, unmeasured, and it will be **high** — legal
+  questions are exactly the kind where a confident-sounding wrong answer is easy to produce.
+- **The asymmetry is severe.** A false refusal frustrates a user who is entitled to proceed. A false
+  accept can expose them to real harm. Neither error is cheap, and they are not symmetric.
+
+**The honest design follows from principle 11 rather than from caution**: refuse only what is clearly
+unlawful, **escalate genuine uncertainty to the user rather than resolving it silently**, and never
+use "this might be illegal" as cover for a preference the agent holds for other reasons. **An agent
+dressing a disagreement as a legal constraint is disobedience with better paperwork**, and it is the
+most likely way obligation 3 gets violated in practice. [asserted]
