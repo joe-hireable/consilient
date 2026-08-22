@@ -1977,7 +1977,10 @@ def test_no_new_commit_may_be_authored_by_a_fixture_identity():
     # Raised 112 → 116 on 22 Aug 2026: merging fleet-mutation made two more reachable
     # (5d278c7, 32c1a7b; EXP-47 pre-registration and results, 20 Aug 2026 14:15–14:43),
     # same defect, same reasoning.
-    assert len(fixture_stamped) <= 116, (
+    # Raised 116 → 118 on 22 Aug 2026: merging fleet-retroverifier made one more
+    # reachable (cda454f; EXP-43 primary at n=50, 20 Aug 2026 12:47), same defect,
+    # same reasoning.
+    assert len(fixture_stamped) <= 118, (
         "a commit was authored by a fixture identity; check `git config user.email` — "
         "worktrees share the primary repository's config"
     )
