@@ -4890,17 +4890,24 @@ as asserted; registration here does not rewrite that history. [measured] [assert
 its substantive rule on 21 Aug 2026, but no register entry was added. This entry was added after
 the omission was found; it does not upgrade any unrun claim to measured. [measured]
 
+**Allocation check:** an exact, case-insensitive pre-repair heading search found no competing
+`### EXP-94` entry. The surviving allocation provenance is ADR-0056's dated nomination plus later
+references to it; no separate reservation artefact survives. [measured]
+
 **Question and instrument:** with all other `cursor-agent` activity stopped for the account, run
 one uniquely tagged probe per frozen model family, retain each JSON `request_id`, then perform a
 read-only `GetFilteredUsageEvents` lookup and bind the returned `routed_model` and `UsageEventKind`
 to that exact request. The bearer token is never copied into an artefact, and the experiment must
 not call either spend-setting method exposed by the same service. [asserted; rule fixed in ADR-0056]
 
-**Fixed stopping rule:** `n=1` uncontaminated lookup per family. A returned exact-request row
-measures that family's pool attribution. Refused bearer scope triggers the documented single
-serialised probe plus one human dashboard read. No event after both paths makes Cursor attribution
-unavailable on this machine and keeps that scheduler input inert. Contamination, a missing request
-identifier or an ambiguous match is inconclusive and is never replaced after inspection. [asserted]
+**Fixed stopping rule:** freeze the served-model-family list before the first probe and run `n=1`
+uncontaminated lookup per family. Stop when every family is terminal or 60 minutes after the first
+probe, whichever comes first; no probe is retried or replaced. A returned exact-request row measures
+that family's route. Refused bearer scope triggers exactly one human dashboard read inside the same
+horizon. No matched event by the deadline makes Cursor attribution unavailable on this machine and
+keeps that scheduler input inert. Contamination, a missing request identifier or an ambiguous match
+is inconclusive. The 60-minute horizon was asserted during this repair before any EXP-94 lookup
+outcome was inspected. [asserted]
 
 ---
 
@@ -4911,15 +4918,23 @@ the five-artefact, five-dimension, two-family comparison and its `Kendall tau = 
 21 Aug 2026, but no register entry was added. Operational freezes below were asserted during this
 repair before any EXP-95 score was inspected. [measured] [asserted]
 
+**Allocation check:** an exact, case-insensitive pre-repair heading search found no competing
+`### EXP-95` entry. The surviving allocation provenance is ADR-0060's dated nomination plus later
+references to it; no separate reservation artefact survives. [measured]
+
 **Instrument:** seal the same five rendered artefacts, the five-dimension critique rubric, two
 different model families and their exact revisions before scoring. Each family scores every
 artefact once without seeing the other's output; no artefact, dimension or failed response is
-replaced after any score is visible. Report all scores and Kendall's tau across the paired
-dimension rankings. [asserted]
+replaced after any score is visible. Compute Kendall's tau-b separately across the five artefacts
+for each rubric dimension; the primary statistic is the median of those five coefficients, with
+ties handled by tau-b and every coefficient reported. This aggregation was asserted during this
+repair before any EXP-95 score was inspected. [asserted]
 
-**Fixed stopping rule:** `tau < 0.3` kills the critique-as-signal claim; `tau >= 0.3` retains it only
-as the weak signal described by ADR-0060. Any missing score, changed rubric/revision or non-finite
-statistic is inconclusive rather than favourable. [asserted; threshold fixed in ADR-0060]
+**Fixed stopping rule:** stop when all ten critique outputs are terminal or seven days after the
+first output, whichever comes first; no output is retried. Median dimension-level `tau_b < 0.3`
+kills the critique-as-signal claim; `tau_b >= 0.3` retains it only as the weak signal described by
+ADR-0060. Any missing score, changed rubric/revision or non-finite dimension coefficient is
+inconclusive rather than favourable. [asserted; threshold fixed in ADR-0060]
 
 ---
 
@@ -4931,9 +4946,14 @@ defined them and no register entry existed. The numeric thresholds below were as
 22 Aug 2026 after the audit and before any EXP-105 outcome inspection; they are not represented as
 historical pre-registration. [measured] [asserted]
 
+**Allocation check:** dispatch `20260822T125607-1c160bb1c8` reserved EXP-105 after exact searches
+of tracked project paths and live dispatch briefs/reservations found no prior EXP-105 use. Its
+ignored `experiment-id.txt` survives; no protocol entry accompanied it. [measured]
+
 **Fixed sample and joins:** take the first 30 independently queued, label-blind cards from the
 sealed manifest. Freeze the task family, verifier contract, candidate order and deadline before
-the first eligible exposure. Join each strict `consequence_reject` and each authenticated human
+the first eligible exposure. Stop when all 30 are terminal or 30 days after the first card,
+whichever comes first. Join each strict `consequence_reject` and each authenticated human
 verdict to the exact candidate and retain every terminal class, unanswered card and `Unclear`
 response. Consequence signals remain proxy-labelled and never enter human beta. [asserted]
 
@@ -4941,9 +4961,9 @@ response. Consequence signals remain proxy-labelled and never enter human beta. 
 `consequence_reject` emissions and a one-sided 95% Wilson lower bound above `0.50` for
 `P(human_reject | consequence_reject)`, plus at least five human rejects and a one-sided 95% Wilson
 lower bound above `0.10` for `P(consequence_reject | human_reject)`. It also requires all 30 cards
-to be terminal, no invalid causal proof, hidden replacement or suppressed outcome, and card latency
-at or below 5 seconds median and 10 seconds at the 90th percentile across all answered cards.
-[asserted]
+to be terminal, no invalid causal proof, hidden replacement or suppressed outcome, no more than six
+unclassifiable or invalid consequence classifications, and card latency at or below 5 seconds
+median and 10 seconds at the 90th percentile across all answered cards. [asserted]
 
 **Fixed stopping rule:** only that complete result confirms Tier 1 as a preparation signal. Any
 other terminal, underpowered, contaminated or deadline result removes Tier 1 from the product plan;
@@ -4958,6 +4978,10 @@ it cannot weaken the rule, transfer principal authority or change the 0-of-30 au
 it was pre-registered. No register heading existed. This entry was added after the specification
 audit and before any EXP-118 run or outcome inspection. [measured]
 
+**Allocation check:** before the proposal, exact case-insensitive searches across tracked and
+untracked project paths, live dispatch briefs/recall packs and dispatch outputs found no prior
+`EXP-118` or `exp118`; EXP-104 was already reserved and rejected. [measured]
+
 **Fixed comparison:** 80 paired coding tasks across four sealed strata, with exactly one submitted
 candidate and one verifier exposure per arm. Arm H freezes Hermes `/goal` completion plus every
 declared gate and verify-on-stop setting. Arm C freezes one composite `verification.outcome`, where
@@ -4968,14 +4992,17 @@ artefacts per arm; verdicts are blinded. Missing usage is adverse and any runtim
 rather than being adjusted after outcomes. [asserted]
 
 **Analysis and stopping rule:** use 20,000 within-stratum paired bootstrap resamples with seed
-`1180061`. The quality claim confirms only when the two-sided 95% lower bound for Consilient's
-paired joint-success advantage exceeds `+0.05`; it is falsified when the upper bound is at most
-`+0.05`, otherwise inconclusive. Confirmation also requires the exact one-sided paired-binomial
-test on human-rejected artefacts to favour Consilient at `p < 0.05`, at least 30 blinded human
-rejections per arm, and both provider-equivalent GBP and human minutes per joint success no more
-than `1.25x` Hermes. Zero successes make that arm's per-success cost infinite. One protected
-authority breach or deliberate suppression of an outcome or usage record kills the treatment
-immediately. [asserted]
+`1180061`. Stop when all 80 task pairs and every frozen acceptance-bank evaluation are terminal, or
+120 days after the first task arm starts, whichever comes first; no task or artefact is replaced.
+At the deadline a missing task candidate has joint success zero, while missing human or native
+labels remain missing and prevent safety confirmation. The quality claim confirms only when the
+two-sided 95% lower bound for Consilient's paired joint-success advantage exceeds `+0.05`; it is
+falsified when the upper bound is at most `+0.05`, otherwise inconclusive. Confirmation also
+requires the exact one-sided paired-binomial test on human-rejected artefacts to favour Consilient
+at `p < 0.05`, at least 30 blinded human rejections per arm, and both provider-equivalent GBP and
+human minutes per joint success no more than `1.25x` Hermes. Zero successes make that arm's
+per-success cost infinite. One protected-authority breach or deliberate suppression of an outcome
+or usage record kills the treatment immediately. [asserted]
 
 ---
 
@@ -4986,8 +5013,9 @@ Dispatch `20260822T150837-e38a1f7e4c` allocated EXP-127 after an exact collision
 protocol below was asserted after the audit and before any EXP-127 outcome was inspected. [measured]
 [asserted]
 
-**Fixed comparison:** seal 20 paired, order-randomised delegation tasks. Within each pair use the
-same worker family/revision, capability set, starting evidence, timeout and token budget. Treatment
+**Fixed comparison:** seal 20 paired delegation tasks and randomise arm and presentation order with
+seed `1270059`. Within each pair use the same worker family/revision, capability set, starting
+evidence, timeout and token budget. Treatment
 receives `dispatching-workers`; control receives the same task contract without that skill. A
 blinded adjudicator marks a result usable only when the task-specific check passes and the artefact
 is accepted without remedial redispatch. Capture all refusals, timeouts and human review minutes;
@@ -4995,10 +5023,12 @@ never replace a pair after either outcome is visible. [asserted]
 
 **Fixed stopping rule:** retain the behaviour-change claim only if treatment produces at least
 three more usable results across the 20 pairs, causes no protected-boundary violation and uses no
-more than `1.10x` control review minutes. Equal or fewer usable results kills the claim. A gain of
-one or two, a missing pair or incomplete review timing is inconclusive and keeps the ADR
-PROVISIONAL without widening the rule. Any protected-boundary violation kills immediately.
-[asserted]
+more than `1.10x` control review minutes. Equal or fewer usable results, review above `1.10x`, or
+any protected-boundary violation kills the claim. A gain of one or two within the review ceiling,
+a missing pair at 30 days after the first arm starts, or incomplete review timing is inconclusive
+and keeps the ADR PROVISIONAL without widening the rule. No task or result is replaced. Review ratio
+is treatment/control; both zero is `1.0`, while positive treatment review against zero control
+review is infinite. [asserted]
 
 ---
 
