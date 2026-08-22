@@ -39,7 +39,7 @@ controls as present. [measured]
 
 | Boundary | Current artefact | Consequence for this specification |
 |---|---|---|
-| Record | `events.py` validates and appends the authoritative JSONL; SQLite, recall and dashboard are projections. [measured] | Every view is derived from that record. No squad database, transcript index or control ledger is added. [asserted] |
+| Record | `events.py` validates and appends the authoritative JSONL; SQLite, recall and dashboard are projections. Its ordinary append has no cross-process serialisation or durability acknowledgement, and the current private trajectory contains malformed concurrent lines. [measured: details withheld under ADR-0057] | Every view is derived from that record. No squad database, transcript index or control ledger is added. Live mutation remains unavailable until the single writer provides serialised, flushed, fsynced admission before an adapter can act. [asserted] |
 | Work | `work_items.py` records opened, commented and completed items; a comment carries an evidence class. It has no Owner-transfer or dependency event. [measured] | Reuse the ticket and evidence comment; extend the event vocabulary only for typed intervention and ownership state. [asserted] |
 | Claims | `coordination.py` projects run, actor, paths, harness, opening and expiry; completion, a terminal dispatch event or timeout plus 300 seconds releases a claim. Acquisition is not atomic and has no fencing epoch. [measured] | Project those fields honestly. Atomic acquisition and fencing remain implementation prerequisites for displacement. [asserted] |
 | Context | Each dispatch preserves `brief.md`, its bounded verbatim recall pack and local stdout/stderr. [measured] | Context inspection can expose those recorded inputs and outputs; it cannot infer hidden state. [asserted] |
@@ -112,17 +112,27 @@ the dispatcher must not emulate an attach by guessing from a PID. [asserted]
 |---|---|---|---|
 | **Attach** | Subscribe read-only to adapter-native run events or transcript output. No bytes enter the agent context. [asserted] | The current tool and slice continue without pause. [asserted] | All state is unchanged; only an optional local `observability.pull` event records that the depth was opened. [asserted] |
 | **Read context** | Render the recorded commitment, instruction assembly, recall pack, tools, evidence, decisions and latest checkpoint for the target run. [asserted] | Execution continues. A read never changes a deadline, claim or verifier. [asserted] | The event prefix and immutable input artefacts; absent live context remains explicitly unavailable. [asserted] |
-| **Redirect** | Append `intervention.requested(action=redirect)` and deliver the new instruction at the next adapter-declared safe boundary. If live injection is unavailable, interrupt and resume the same candidate from the last valid checkpoint under a higher epoch. [asserted] | A running irreversible tool is allowed to reach its safe result unless a safety stop requires tree kill. New work cannot start under the old instruction revision. Incompatible unsealed output is quarantined from admission. [asserted] | Every earlier sealed checkpoint, completed tool result, transcript and old instruction revision. Compatible checkpoints may be reused; the delivery estimate and plan revise when the commitment changed. [asserted] |
+| **Redirect** | Append `intervention.requested(action=redirect)` and deliver the new instruction at the next controller-proven safe boundary. If live injection is unavailable, interrupt and resume the same candidate from the last valid checkpoint under a higher epoch. [asserted] | A running irreversible tool is allowed to reach its safe result unless a safety stop requires tree kill. New work cannot start under the old instruction revision. Incompatible unsealed output is quarantined from admission. [asserted] | Every earlier sealed checkpoint, completed tool result, transcript and old instruction revision. Compatible checkpoints may be reused; the delivery estimate and plan revise when the commitment changed. [asserted] |
 | **Add evidence** | Append a source reference with evidence class, provenance, retrieval date, licence where applicable and digest, then inject its reference at the next safe boundary. [asserted] | The current operation completes; the agent must acknowledge the evidence revision before another operation starts. Decision-changing evidence follows the redirect/replan path. [asserted] | The original and added evidence, their order and every conclusion produced before the addition. The final lineage is `steered`. [asserted] |
 | **Stop / kill** | A controller outside the child writes the intent, revokes the write epoch, kills the process tree, verifies termination, appends the terminal `dispatch.outcome` and closes the claim. It never waits for the killed child to report its own death. [asserted] | No automatic restart. A later continue is a new run of the same candidate from the last valid checkpoint. [asserted] | Trajectory, immutable tool results, transcript and the last sealed checkpoint survive. The current unsealed slice is diagnostic only and may be lost; the record says so. [asserted] |
 | **Take over as Owner** | After authenticated first-party authorship, stop the agent at a safe boundary, seal or quarantine its current slice, append the Owner transfer and issue a higher claim epoch to the principal's local session. [asserted] | Unchanged independent streams may continue; the transferred stream cannot complete autonomously. Returning it to an agent is another explicit transfer and epoch. [asserted] | The whole event/checkpoint chain and all attributable artefacts. Subsequent work is `operator_controlled`, never autonomous. [asserted] |
 
+An adapter does not get to declare its own work safe. A controller-verifiable safe boundary exists
+only when the trajectory projects no unmatched side-effecting tool/effect start for the target
+`(run_id, claim_epoch)`, the controller's child/lease registry contains no live mutation-capable
+handle for that epoch, and the last reusable state is a digest-verified sealed checkpoint or a
+terminal tool result. Any unknown or untracked effect makes the predicate false. A lying-adapter
+fixture which reports `safe` while one effect or child remains live must be refused before injection
+or transfer. These effect events, handles and checkpoints do not exist end to end today, so redirect,
+evidence injection and takeover are unavailable rather than approximately safe. [asserted]
+
 The current killed-claim defect fixes at the control boundary. Today a killed run can remain projected
-live until expiry unless somebody supplies a terminal event; two observed reroutes were blocked until
-such events were written by hand. [measured: private local trajectory, details withheld under
-ADR-0057] The controller which owns the stop must also own terminal recording, claim release and epoch
-revocation. A terminal event from an unauthorised actor or with no matching live intervention must not
-release another run's claim. [asserted]
+live until expiry unless somebody supplies a terminal event. Four killed runs across two recovery
+incidents received hand-authored terminal outcomes; at least one later dispatch recorded a claim-
+overlap refusal before the first pair was closed. [measured: private local trajectory, identities and
+paths withheld under ADR-0057] The controller which owns the stop must also own terminal recording,
+claim release and epoch revocation. A terminal event from an unauthorised actor or with no matching
+live intervention must not release another run's claim. [asserted]
 
 ADR-0071's checkpoint promise is conditional. Before its manifest, digest, atomic ref and fencing
 checks ship, redirect-resume and takeover-resume must refuse rather than claim that a working directory
@@ -143,11 +153,12 @@ to use `work_item.comment` with an evidence class and immutable source reference
 and rejected alternatives use the existing `decision.autonomous` contract rather than a new
 reasoning store. [asserted]
 
-The controller order is fixed: verify the ingress to the extent currently possible; append the
-request; validate target and claim epoch; establish the safe boundary or revoke the epoch; preserve
-or quarantine the in-flight slice; invoke the adapter; append the outcome and any terminal dispatch;
-then reproject. An adapter call with no earlier matching request is a bypass and fails the check.
-[asserted]
+The controller order is fixed: verify the ingress to the extent currently possible; durably admit the
+request through a cross-process serialised append; validate target and claim epoch; prove the safe-
+boundary predicate above or revoke the epoch; preserve or quarantine the in-flight slice; invoke the
+adapter; durably append the outcome and any terminal dispatch; then reproject. A failed or
+unacknowledged request append refuses the mutation. An adapter call with no earlier matching durable
+request is a bypass and fails the check. [asserted]
 
 Remote messages remain untrusted proposals until a trusted local ingress accepts them. The current
 check `actor == principal` plus `via == "cli"` is declared provenance, not authentication; it cannot
@@ -207,6 +218,13 @@ The local client may render the projection itself from `.harness`; a remote clie
 local renderer reports the capability unavailable. Existing `.harness/dashboard.html` may remain an
 offline rendering of the same projector, but it is not an export and stays ignored by Git. [asserted]
 
+EXP-108 does not create an implicit research exception. Before recruitment it must freeze an
+explicit-consent, participant-initiated derived-data export which excludes raw events, run ids,
+instructions, paths, transcripts, evidence and artefact content; blinded reviewers receive only the
+final task artefact. Raw trajectories stay on their owners' machines. The register fixes the allowed
+derived fields, withdrawal and deletion rules; until that mechanism exists, the experiment is
+blocked. [asserted]
+
 ## 9. Reuse boundary and required checks
 
 No second orchestrator, seventh CLI subcommand, dependency, gate change or routing enablement is
@@ -230,16 +248,20 @@ Implementation is incomplete until the smallest runnable checks prove: [asserted
 2. checkpoint and pull events create no conversation message under quiet delivery; [asserted]
 3. arbitrary observation and silence leave every authority and acceptance projection identical;
    [asserted]
-4. no adapter mutation occurs without an earlier matching `intervention.requested`, and every request
-   receives one terminal outcome; [asserted]
-5. mutating intervention deterministically prevents an `autonomous` outcome label; [asserted]
-6. stop and takeover revoke the old epoch, prevent stale writes, record a terminal outcome and release
+4. concurrent large appends from independent processes remain valid canonical events in causal order,
+   and a failed flush/fsync prevents the mocked adapter mutation; [asserted]
+5. no adapter mutation occurs without an earlier durable matching `intervention.requested`, and every
+   request receives one terminal outcome; [asserted]
+6. a lying adapter cannot declare a boundary safe while the event projection or controller registry
+   contains a live side-effecting effect, child or lease; [asserted]
+7. mutating intervention deterministically prevents an `autonomous` outcome label; [asserted]
+8. stop and takeover revoke the old epoch, prevent stale writes, record a terminal outcome and release
    the claim without a manual event; [asserted]
-7. spoofed principal, actor, channel and replay inputs cannot exercise Owner or principal-only
+9. spoofed principal, actor, channel and replay inputs cannot exercise Owner or principal-only
    authority; while authentication is absent those operations refuse; [asserted]
-8. the surface opens no network path, loads no remote resource, emits no telemetry and tracks no
+10. the surface opens no network path, loads no remote resource, emits no telemetry and tracks no
    trajectory artefact; and [asserted]
-9. every admitted squad member exposes a distinct evidence class, while absent human beta renders a
+11. every admitted squad member exposes a distinct evidence class, while absent human beta renders a
    routing refusal rather than a fabricated candidate count. [asserted]
 
 ## 10. Evidence against: the strongest case for showing nothing
