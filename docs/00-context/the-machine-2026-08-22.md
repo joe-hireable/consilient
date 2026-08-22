@@ -407,3 +407,43 @@ compound. The first two are deliberate design choices and they are defensible. *
 and it is the one that should close** — `consil beta` holds one human rejection against a minimum of
 thirty. The correct response is not to narrow the output or add approvals; it is to measure β so the
 latitude is earned rather than assumed. [measured]
+
+## The named incumbent is Hermes Agent
+
+> "Hermes Agent is the best global bar at the moment but personally I think this is easy to beat and
+> we can beat hermes with a few targeted agent swarms and our decision making protocols."
+
+**Naming the incumbent is what working principle 9 requires**, and it converts "best superintelligence
+product globally" from an unfalsifiable claim into a testable one. That alone makes this statement
+load-bearing. [asserted]
+
+**"Easy to beat" is a hypothesis, and it is currently unsupported.** This repository has already
+shipped a novelty claim — that nothing comparable existed — which was **false**. A second flattering
+answer would be worse than the first, so the teardown dispatched on 22 August was briefed to argue
+the opposite case and to report plainly if Hermes is stronger than believed. [measured]
+
+**What is already verifiable on this machine, and it complicates the strategy.** The superpowers
+plugin ships a Hermes tool mapping at
+`.../superpowers/6.3.0/skills/using-superpowers/references/hermes-tools.md`. It records that Hermes
+exposes `delegate_task(goal, context, toolsets, role="leaf")`, a `todo` tool, a `hermes kanban` CLI
+described as being for **multi-agent task boards**, a persistent global instruction file at
+`~/.hermes/SOUL.md`, plus `web_search`, `web_extract`, `terminal` and a skills toolset. [cited:
+retrievable local file]
+
+**If that reading holds, Hermes already has hierarchical agent delegation and cross-agent task
+management** — two of the three capabilities this project intends to win on. The `role="leaf"`
+parameter implies a role hierarchy and therefore nested delegation, though that is an inference from
+a parameter name and the teardown must verify or refute it. [asserted]
+
+**The consequence for strategy, stated plainly.** If swarms and task boards are table stakes rather
+than differentiators, then **the differentiator is not the swarms — it is what the swarms are
+disciplined by.** Nothing in that tool surface measures whether its own checks are right, records who
+authored a decision, makes a principal's authority undelegable, or distinguishes a genuinely
+different class of evidence from echo. **Those are the four things this project has and they are the
+whole of the actual gap.** [asserted]
+
+**Which makes β the product, not the housekeeping.** The principal's bet is on "our decision making
+protocols". The sizing algebra behind those protocols assumes verifiers fail independently, and that
+assumption is under active challenge because agents sharing a corpus do not; and β itself is
+unmeasured, at one human rejection against a minimum of thirty. **The differentiator he is betting on
+is the one thing not yet validated, and that is where effort should go.** [measured]
