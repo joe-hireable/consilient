@@ -65,6 +65,13 @@ PRODUCT_IMPORTS = BUDGET_IMPORTS | {
     "argparse",
     "contextlib",
     "contextvars",
+    # `fcntl`, `msvcrt`, `os` and `time` are the F01 durability primitives: the
+    # kernel-backed per-log lock (flock / locking), unbuffered os.write, fsync and
+    # ftruncate in `events.py`. Added 22 Aug 2026. The dangerous `os` surface stays
+    # banned independently of this list — FORBIDDEN_CALLS still refuses os.system,
+    # os.popen, os.getenv and os.environ.get, the environ subscript check stands, and
+    # their negative controls below stay green.
+    "fcntl",
     "hashlib",
     # `html` is escaping only. Added 21 Aug 2026 for the observability surface (ADR-0053),
     # which must escape trajectory content before it reaches a rendered page. It performs no
@@ -74,10 +81,13 @@ PRODUCT_IMPORTS = BUDGET_IMPORTS | {
     "html",
     "json",
     "math",
+    "msvcrt",
+    "os",
     "re",
     "shutil",
     "sqlite3",
     "sys",
+    "time",
 }
 FORBIDDEN_METHODS = {
     "complete",
