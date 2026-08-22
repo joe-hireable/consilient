@@ -1,6 +1,6 @@
 # Decision index
 
-84 ADRs, 22 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+85 ADRs, 22 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
 `python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number;
 `tests/test_adr_trail.py` catches a numbered ADR missing from this table. 0002 and 0027 appear
@@ -86,6 +86,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0080](0080-keep-consequence-signals-out-of-human-beta.md) | **Keep consequence signals out of human-verdict beta** | 🟡 |
 | [0082](0082-project-raci-onto-per-work-item-rights-and-require-structural-consultation.md) | **Project RACI onto per-work-item rights and require structural consultation** | 🟡 |
 | [0085](0085-qualify-model-revisions-before-routing-and-seal-fine-tune-evaluation.md) | **Qualify model revisions before routing, defer matrix factorisation, and seal fine-tune evaluation** | 🟡 |
+| [0087](0087-return-one-answer-with-decision-relevant-checks.md) | **Return one answer with decision-relevant checks and answer directly when convergence adds no value** | 📋 |
 
 ## Behaviour and safety
 
