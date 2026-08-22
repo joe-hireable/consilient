@@ -97,6 +97,12 @@ class JourneyResult:
     stdout: str
     stderr: str
     finding: Finding | None
+    #: What wrong answer this persona tried to get accepted (β falsification).
+    attempted: str = ""
+    #: What the system did — refusal, contradiction surfaced, or silent acceptance.
+    system_response: str = ""
+    #: True only when a wrong answer was accepted without surfacing a defect.
+    accepted_wrongly: bool = False
 
 
 def _run(
@@ -126,15 +132,17 @@ def _cli_module(repo: Path) -> list[str]:
 
 def journey_average_joe(repo: Path) -> JourneyResult:
     spec = PERSONAS["average-joe"]
+    attempted = (
+        "Trust getting-started.md command count over consil --help without reading source"
+    )
     getting_started = (repo / "docs/00-context/getting-started.md").read_text(encoding="utf-8")
-    if "Four commands, and not one of them stands between" in getting_started:
+    if "Four commands, and not one of them" in getting_started:
         finding = Finding(
             run_id="persona-qa",
             spec_id=spec.id,
             discrepancy=(
-                "getting-started section 1 says 'Four commands' but measured --help lists six "
-                "(record, replay, beta, usage, doctor, dashboard); usage and dashboard are omitted "
-                "from the introductory table"
+                "getting-started section 1 still says 'Four commands' but measured --help "
+                "lists six (record, replay, beta, usage, doctor, dashboard)"
             ),
             anchor="specification",
             reproduction=("read docs/00-context/getting-started.md section 1", "consil --help"),
@@ -146,19 +154,65 @@ def journey_average_joe(repo: Path) -> JourneyResult:
             stdout="",
             stderr="",
             finding=finding,
+            attempted=attempted,
+            system_response="docs contradict --help; persona journey surfaced the mismatch",
         )
+    required = ("consil usage", "consil dashboard", "Six commands")
+    if not all(token in getting_started for token in required):
+        finding = Finding(
+            run_id="persona-qa",
+            spec_id=spec.id,
+            discrepancy=(
+                "getting-started section 1 does not list all six observe commands "
+                f"(missing one of {required!r})"
+            ),
+            anchor="specification",
+            reproduction=("read docs/00-context/getting-started.md section 1",),
+        )
+        return JourneyResult(
+            persona="average-joe",
+            stopped_at="section 1 incomplete command table",
+            exit_code=0,
+            stdout="",
+            stderr="",
+            finding=finding,
+            attempted=attempted,
+            system_response="incomplete command table surfaced",
+        )
+    help_run = _run(_cli_module(repo) + ["--help"], cwd=repo)
+    if help_run.returncode == 0 and "doctor" in help_run.stdout:
+        return JourneyResult(
+            persona="average-joe",
+            stopped_at="no contradiction detected",
+            exit_code=0,
+            stdout=help_run.stdout.splitlines()[0] if help_run.stdout else "",
+            stderr="",
+            finding=None,
+            attempted=attempted,
+            system_response="--help lists six commands; docs agree; wrong count not accepted",
+        )
+    finding = Finding(
+        run_id="persona-qa",
+        spec_id=spec.id,
+        discrepancy="consil --help failed or omitted doctor after install-free read path",
+        anchor="implicit",
+        reproduction=("--help",),
+    )
     return JourneyResult(
         persona="average-joe",
-        stopped_at="no contradiction detected",
-        exit_code=0,
-        stdout="",
-        stderr="",
-        finding=None,
+        stopped_at="--help unusable",
+        exit_code=help_run.returncode,
+        stdout=help_run.stdout,
+        stderr=help_run.stderr,
+        finding=finding,
+        attempted=attempted,
+        system_response="--help failed",
     )
 
 
 def journey_developer(repo: Path) -> JourneyResult:
     spec = PERSONAS["developer"]
+    attempted = "Run pip install -e . and treat a broken venv as a working dev loop"
     with tempfile.TemporaryDirectory(prefix="persona-dev-") as tmp:
         venv = Path(tmp) / "venv"
         create = _run([sys.executable, "-m", "venv", str(venv)], cwd=repo)
@@ -176,11 +230,12 @@ def journey_developer(repo: Path) -> JourneyResult:
                     anchor="implicit",
                     reproduction=(create.args[0], *create.args[1:]),
                 ),
+                attempted=attempted,
+                system_response="venv creation failed; broken path not accepted",
             )
-        pip = _run(
-            [str(venv / "Scripts" / "python"), "-m", "pip", "install", "-e", str(repo)],
-            cwd=repo,
-        )
+        pip_bin = "Scripts" if sys.platform == "win32" else "bin"
+        py = str(venv / pip_bin / "python")
+        pip = _run([py, "-m", "pip", "install", "-e", str(repo)], cwd=repo)
         if pip.returncode != 0:
             return JourneyResult(
                 persona="developer",
@@ -195,8 +250,9 @@ def journey_developer(repo: Path) -> JourneyResult:
                     anchor="implicit",
                     reproduction=("pip install -e .",),
                 ),
+                attempted=attempted,
+                system_response="pip install failed; dev loop not accepted as working",
             )
-        py = str(venv / "Scripts" / "python")
         help_run = _run([py, "-m", "consilient.cli", "--help"], cwd=repo)
         if help_run.returncode != 0 or "doctor" not in help_run.stdout:
             return JourneyResult(
@@ -212,6 +268,8 @@ def journey_developer(repo: Path) -> JourneyResult:
                     anchor="implicit",
                     reproduction=(f"{py} -m consilient.cli --help",),
                 ),
+                attempted=attempted,
+                system_response="help missing after install; not accepted as working",
             )
     return JourneyResult(
         persona="developer",
@@ -220,19 +278,23 @@ def journey_developer(repo: Path) -> JourneyResult:
         stdout=help_run.stdout.splitlines()[0] if help_run.stdout else "",
         stderr="",
         finding=None,
+        attempted=attempted,
+        system_response="install and --help succeeded; no false acceptance",
     )
 
 
 def journey_contributor(repo: Path) -> JourneyResult:
     spec = PERSONAS["contributor"]
+    attempted = "Follow CONTRIBUTING.md claiming the project has no code yet"
     text = (repo / "CONTRIBUTING.md").read_text(encoding="utf-8")
-    if "has no code yet" in text or "pre-brainstorm" in text:
+    stale_markers = ("has no code yet", "pre-brainstorm")
+    if any(marker in text for marker in stale_markers):
         finding = Finding(
             run_id="persona-qa",
             spec_id=spec.id,
             discrepancy=(
-                "CONTRIBUTING.md opens with 'pre-brainstorm and has no code yet' "
-                "but the tree ships src/, tests/ and 600+ tests"
+                "CONTRIBUTING.md still claims the project has no code or is pre-brainstorm "
+                "but the tree ships src/, tests/ and hundreds of tests"
             ),
             anchor="state",
             reproduction=("read CONTRIBUTING.md lines 1-10", "ls src/ tests/"),
@@ -244,6 +306,8 @@ def journey_contributor(repo: Path) -> JourneyResult:
             stdout="",
             stderr="",
             finding=finding,
+            attempted=attempted,
+            system_response="stale CONTRIBUTING surfaced against src/ and tests/",
         )
     return JourneyResult(
         persona="contributor",
@@ -252,11 +316,14 @@ def journey_contributor(repo: Path) -> JourneyResult:
         stdout="",
         stderr="",
         finding=None,
+        attempted=attempted,
+        system_response="CONTRIBUTING matches repository state; stale claim not accepted",
     )
 
 
 def journey_researcher(repo: Path) -> JourneyResult:
     spec = PERSONAS["researcher"]
+    attempted = "Cite EXP-47 beta=0.3132 from the register without a reproducible script path"
     register = repo / "docs/10-research/experiment-register.md"
     if not register.is_file():
         return JourneyResult(
@@ -272,6 +339,8 @@ def journey_researcher(repo: Path) -> JourneyResult:
                 anchor="reference",
                 reproduction=("read docs/10-research/experiment-register.md",),
             ),
+            attempted=attempted,
+            system_response="register missing; number cannot be accepted",
         )
     reg_text = register.read_text(encoding="utf-8")
     if "0.3132" not in reg_text:
@@ -288,6 +357,8 @@ def journey_researcher(repo: Path) -> JourneyResult:
                 anchor="reference",
                 reproduction=("grep 0.3132 docs/10-research/experiment-register.md",),
             ),
+            attempted=attempted,
+            system_response="register lacks the cited figure",
         )
     script = repo / "docs/10-research/experiments/exp47/run_exp47.py"
     results = repo / "docs/10-research/experiments/exp47/results-exp47.json"
@@ -311,6 +382,8 @@ def journey_researcher(repo: Path) -> JourneyResult:
                     "search for run_exp47.py",
                 ),
             ),
+            attempted=attempted,
+            system_response="evidence chain incomplete from public docs alone",
         )
     if not results.is_file():
         return JourneyResult(
@@ -326,6 +399,8 @@ def journey_researcher(repo: Path) -> JourneyResult:
                 anchor="reference",
                 reproduction=("ls docs/10-research/experiments/exp47/",),
             ),
+            attempted=attempted,
+            system_response="results artefact missing; measured claim not acceptable",
         )
     return JourneyResult(
         persona="researcher",
@@ -334,32 +409,42 @@ def journey_researcher(repo: Path) -> JourneyResult:
         stdout=str(script.relative_to(repo)),
         stderr="",
         finding=None,
+        attempted=attempted,
+        system_response="script and results exist; number reproducible when path is known",
     )
 
 
 def journey_operator(repo: Path) -> JourneyResult:
     spec = PERSONAS["operator"]
+    attempted = "Run consil usage and doctor; accept undocumented ceilings or a false-zero beta"
     log = repo / ".harness" / "log"
     db = repo / ".harness" / "state.db"
+    getting_started = (repo / "docs/00-context/getting-started.md").read_text(encoding="utf-8")
     usage = _run(_cli_module(repo) + ["usage", "--log", str(log)], cwd=repo)
-    if "ceilings: NONE" in usage.stdout:
+    ceilings_documented = (
+        "limits.example.json" in getting_started
+        and "ceilings: NONE" in getting_started
+    )
+    if "ceilings: NONE" in usage.stdout and not ceilings_documented:
         finding = Finding(
             run_id="persona-qa",
             spec_id=spec.id,
             discrepancy=(
-                "consil usage reports 'ceilings: NONE — every metered call refuses'; "
-                "budget surface is unconfigured"
+                "consil usage reports 'ceilings: NONE — every metered call refuses' but "
+                "getting-started does not explain copying .harness/limits.example.json"
             ),
             anchor="state",
-            reproduction=(f"consil usage --log {log}",),
+            reproduction=(f"consil usage --log {log}", "read getting-started"),
         )
         return JourneyResult(
             persona="operator",
-            stopped_at="usage ceilings unconfigured",
+            stopped_at="usage ceilings undocumented",
             exit_code=usage.returncode,
             stdout=usage.stdout,
             stderr=usage.stderr,
             finding=finding,
+            attempted=attempted,
+            system_response="usage reports ceilings NONE but docs omit limits.example.json",
         )
     doctor = _run(
         _cli_module(repo) + ["doctor", "--log", str(log), "--db", str(db)],
@@ -383,6 +468,8 @@ def journey_operator(repo: Path) -> JourneyResult:
             stdout=doctor.stdout,
             stderr=doctor.stderr,
             finding=finding,
+            attempted=attempted,
+            system_response="doctor crashed on state.db lock",
         )
     return JourneyResult(
         persona="operator",
@@ -391,12 +478,15 @@ def journey_operator(repo: Path) -> JourneyResult:
         stdout=doctor.stdout.splitlines()[0] if doctor.stdout else "",
         stderr=doctor.stderr,
         finding=None,
+        attempted=attempted,
+        system_response="usage and doctor completed without accepting a false-zero",
     )
 
 
 def cold_trajectory_refusal(repo: Path) -> JourneyResult:
     """Orchestrator check: missing trajectory must refuse, not report zero."""
     spec = PERSONAS["operator"]
+    attempted = "Run consil beta from an empty directory and accept a zero reading"
     with tempfile.TemporaryDirectory(prefix="persona-cold-") as tmp:
         cold = Path(tmp)
         beta = _run(
@@ -412,6 +502,8 @@ def cold_trajectory_refusal(repo: Path) -> JourneyResult:
             stdout=beta.stdout,
             stderr=beta.stderr,
             finding=None,
+            attempted=attempted,
+            system_response="exit 2 trajectory not configured; false-zero not accepted",
         )
     finding = Finding(
         run_id="persona-qa",
@@ -430,6 +522,9 @@ def cold_trajectory_refusal(repo: Path) -> JourneyResult:
         stdout=beta.stdout,
         stderr=beta.stderr,
         finding=finding,
+        attempted=attempted,
+        system_response=f"exit {beta.returncode} without clean refusal",
+        accepted_wrongly=beta.returncode == 0,
     )
 
 
@@ -480,6 +575,9 @@ def main(argv: list[str] | None = None) -> int:
                 "persona": r.persona,
                 "stopped_at": r.stopped_at,
                 "exit_code": r.exit_code,
+                "attempted": r.attempted,
+                "system_response": r.system_response,
+                "accepted_wrongly": r.accepted_wrongly,
                 "finding": asdict(r.finding) if r.finding else None,
             }
             payload.append(row)
@@ -487,11 +585,15 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if any(r.finding for r in results) else 0
 
     for r in results:
-        tag = "DEFECT" if r.finding else "ok"
+        tag = "DEFECT" if r.finding or r.accepted_wrongly else "ok"
         print(f"[{tag}] {r.persona}: stopped at {r.stopped_at!r}")
+        if r.attempted:
+            print(f"  tried: {r.attempted}")
+        if r.system_response:
+            print(f"  system: {r.system_response}")
         if r.finding:
             print(f"  {r.finding.discrepancy}")
-    defects = sum(1 for r in results if r.finding)
+    defects = sum(1 for r in results if r.finding or r.accepted_wrongly)
     print(f"\n{defects} defect(s) across {len(results)} journey(s)")
     return 1 if defects else 0
 
