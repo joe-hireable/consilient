@@ -447,3 +447,58 @@ protocols". The sizing algebra behind those protocols assumes verifiers fail ind
 assumption is under active challenge because agents sharing a corpus do not; and β itself is
 unmeasured, at one human rejection against a minimum of thirty. **The differentiator he is betting on
 is the one thing not yet validated, and that is where effort should go.** [measured]
+
+## Organised superintelligence: the positioning, the squads, and RACI
+
+> "People care about magic and impact. This should be a single chat interface that connects the
+> worlds superintelligence to find the best answer or better than best before shipping it to a user
+> rather than relying on pretrained knowledge of a single model. Consilience, organised
+> superintelligence. It will come from somethong like this that perfectly orchestrates and conducts
+> organised agent teams, swarms, organisations or whatever tbe language should be. Agent squads I
+> think. RACI to ensure decisions are made but explored thoroughly with scientific and mathematical
+> approaches, experimentation. All this process for a single primary response in the user's singular
+> chat interface. Also want maximum observability and ability to steer if they want i.e. jump into
+> running agent processes. The hermes agent kanban stuff sounds good like they have agents not
+> clashing and working collaboratively and in organised ways. We need to do that but better. Smarter.
+> Kanban is the way humans do it applied to agents, we can make them more organised across larger
+> parallel swarms finding the best or better than best before sending to user rather than just
+> spitting out the first predicted tokens of one LLM model."
+
+**The positioning is settled by this paragraph and it is not β.** The product claim is *organised
+superintelligence*: one chat, behind which many agents converge on an answer, versus one model
+emitting its first predicted tokens. **β is how that claim is kept honest; it is never the pitch.**
+The orchestrator had this inverted for most of 22 August and was corrected. [measured]
+
+**The term is squads.** Not teams, not swarms, not organisations — the principal chose it. Use it
+consistently in user-facing language; ADR-0067's "composition" remains the internal term for the
+rule that sizes one. [measured: his words]
+
+**RACI, and the useful discovery is that one letter already exists.** Every specification written on
+22 August carries **exactly one accountable Owner** — ADR-0067's rule, restated in the action
+surface, autonomy, chat and work-item specs. **That is the A, and it is already load-bearing.** R, C
+and I are undefined. [measured]
+
+**C is where consilience lives, and it is the letter that decides whether RACI is real here.** In a
+human organisation, "Consulted" means asked for an opinion. **In this system an opinion is echo.** A
+Consulted party must contribute a **different class of evidence** — an execution result, a retrieved
+primary source, a fresh corpus, a different model family — or it is not Consulted, it is Informed
+with a better title. **RACI adopted without that constraint is exactly the cargo this project exists
+to refuse.** [asserted]
+
+**On kanban: take the coordination, refuse the serialisation.** The principal is right that Hermes'
+board is good and right about why: *"Kanban is the way humans do it applied to agents."* A board
+exists because humans cannot hold shared state, cannot be in two places, and need a visible queue.
+**Agents are genuinely parallel and share an append-only trajectory.** The coordination properties
+worth keeping are atomic claims, dependencies, restart recovery and non-clashing writes — all of
+which `coordination.py` and `work_items.py` already carry. The properties to refuse are the ones that
+exist only because humans serialise: columns as a workflow, standups, handover ceremony, and WIP
+limits set by human attention rather than by measured exposure. [asserted]
+
+**Observability resolves a contradiction that had gone unnoticed, and the resolution is pull, not
+push.** ADR-0071, accepted the same day, commits to quiet delivery: an estimate up front, a finished
+artefact at the end, **no progress reports**. The principal now asks for *"maximum observability and
+ability to steer … jump into running agent processes."* **These conflict only if observability is
+pushed.** The resolution: **nothing is ever pushed at the user; everything is always available to
+pull.** He may look into any running squad at any moment and intervene; the system never interrupts
+him to report. Quiet delivery is about what the product *sends*; observability is about what the
+product *exposes*. [asserted]
