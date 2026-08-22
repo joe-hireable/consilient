@@ -194,3 +194,46 @@ unlawful, **escalate genuine uncertainty to the user rather than resolving it si
 use "this might be illegal" as cover for a preference the agent holds for other reasons. **An agent
 dressing a disagreement as a legal constraint is disobedience with better paperwork**, and it is the
 most likely way obligation 3 gets violated in practice. [asserted]
+
+## The default is maximum autonomy
+
+> "bound by law as minimum and user can configure and manipulate other boundaries but the default
+> should be maximum authority and permissions and capability to the agent. maximum autonomy is what we
+> are advocating for
+>
+> that way smarter people's and people that work harder machines are better."
+
+**Law is the floor, not the ceiling.** Every other boundary is the user's to set, raise or remove, and
+the shipped default sits at maximum authority, permission and capability. This is a deliberate
+inversion of the industry norm, where products ship restrictive and grudgingly widen.
+
+**The second sentence is the product thesis and it deserves stating plainly.** A Machine amplifies
+what its Finch puts into it. Effort, judgement and accumulated instruction compound — which is why
+capabilities must never be lost and memory must persist, since those are the mechanism by which
+investment compounds rather than evaporating each session. The product does not level its users; it
+rewards them.
+
+**The honest corollary, which the design must carry:** amplification is symmetric. Maximum autonomy
+applied to poor direction produces poor outcomes faster and at greater scale. That is not an argument
+for restricting the default — the principal has decided, and the decision is coherent — but it is an
+argument about **what makes maximum autonomy rational rather than reckless.**
+
+**Autonomy is earned by measurement, and that is what beta is for.** A system that cannot say how
+often its own checks wrongly accept a bad artefact has no basis on which to grant itself latitude; one
+that can, has a quantitative reason to widen. This reframes this repository's own gates: with
+`routing_orchestration_enabled: false` and four of seven conditions failing, Consilient is not being
+cautious — **it has not yet earned the autonomy it advocates**, and says so rather than assuming it.
+[measured]
+
+So the two commitments compose rather than conflict:
+
+- **Ship maximum autonomy by default**, because the user is the principal and their word is final.
+- **Measure beta relentlessly**, because that measurement is the only honest argument that the
+  autonomy is safe — for the user, and for anyone downstream of what their Machine does.
+
+**A tension worth carrying rather than resolving prematurely.** The principal has also required that
+this be *"accessible for anyone with average plus intelligence"*. If better machines accrue to
+harder-working and more capable users, the gap between a well-taught Machine and a neglected one
+widens with use. Both goals are stated and both are wanted; the design should make the *floor* high —
+impressive from the first day, per the product statement — while leaving the ceiling unbounded.
+Nothing here resolves that, and it should not be resolved by quietly dropping one of them. [asserted]
