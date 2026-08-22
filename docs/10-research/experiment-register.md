@@ -2045,6 +2045,104 @@ outside this repository, whether a different human would accept the artefact, or
 expose one verifier to multiple candidates. Gate B, principal-only authority and the beta-derived
 candidate ceiling remain unchanged whatever the result. [asserted]
 
+### EXP-98 · Does a frozen minimum-stream organisation beat one capable owner on the same request and budget? `BLOCKED: frozen request bank, organisation runner, isolated worktrees and blinded human verdicts`
+
+**Pre-registered 22 Aug 2026; no outcome inspected.** Dispatch
+`20260822T120918-df89e4f59d` allocated EXP-98 after a whole-tree search covering tracked,
+untracked and ignored dispatch state found no use of that identifier. EXP-80 tests squad
+composition inside one scoped decision; it does not test decomposition across decisions.
+[measured]
+
+**Decides:** whether to build ADR-0068's request-to-stream-map protocol for the frozen v0 coding
+mixture below. It separately decides whether its duration estimator may be shown as a commitment and
+whether its restart path may be called resumable. It changes no gate and cannot authorise unattended
+work in another repository. [asserted]
+
+**Precondition:** freeze 80 prospectively collected, genuinely requested coding deliverables before
+any arm runs: 20 atomic requests with one independently rejectable outcome, 30 separable requests
+with at least three independently rejectable outcomes and one dependency edge, and 30 tightly coupled
+requests meeting the same count but sharing an integration surface. A maintainer freezes each request,
+starting tree, authority, allowed sources, success contract, verifier digests and stratum without
+seeing an arm outcome. Each request gets three isolated worktrees. The strongest eligible single
+composition is selected from measured verifier-and-human outcomes before the bank is frozen; otherwise
+the experiment remains blocked and the comparator is not called strongest. [asserted]
+
+**Procedure:** use seed `980068` to randomise within-request execution and blind-presentation order.
+Run three sealed arms with identical sources, tools and success contract. **A, operational single:**
+one capable Owner at the current normal budget. **B, matched-budget single:** the same Owner at C's
+aggregate ceiling, allowed to plan, checkpoint and iterate internally. **C, organisation:** ADR-0068's
+minimum frozen stream map, with each stream composed under ADR-0067 and one integration Owner. No arm
+sees another's output. Every arm submits one final candidate to the same end-to-end verifier and blind
+human review. [asserted]
+
+Before execution, C's leaf budgets are fixed from completed analogues under the same verifier class;
+their componentwise sum fixes B and C's equal ceilings for reported tokens, tool calls and active
+worker-minutes. A uses the current operational ceiling. Parallelism creates no free budget. Missing
+usage is protocol-invalid, not zero. Each arm also freezes a duration range before starting: A and B
+from completed analogues, C from the resource-constrained critical path plus integration and review.
+The original range is never replaced after an outcome. [asserted]
+
+For the first ten C runs selected by the same seed, terminate the runner after one predecessor has a
+sealed checkpoint and before its first dependent is claimed. Restart from the durable trajectory and
+checkpoint, then verify that the predecessor digest is unchanged, no completed stream reruns, and no
+dependent ran early. A missing checkpoint or changed digest is data loss, not a timeout. [asserted]
+
+**Measures:** the full human-accept/reject by verifier-accept/reject table; primary joint success
+(`human accepts unedited AND every frozen verifier accepts`); beta and alpha with denominators and
+Wilson 95% intervals; paired discordant outcomes; review-adjusted minutes and cost per joint success;
+tokens, tool calls, wall time, blinded human review minutes and principal interventions; original
+duration-range coverage and every reforecast; stream count; integration defects, overwritten shared
+artefacts, dropped requirements, dependency violations, duplicate work, checkpoint loss, refusals,
+timeouts, budget stops and protocol-invalid runs. Self-reported confidence and progress prose are not
+outcomes. [asserted]
+
+The primary analysis is intention-to-treat over all 80 request triplets. A refusal, timeout, missing
+or invalid candidate, missing arm at the deadline, human rejection or any verifier rejection is joint
+success `0`; no request is replaced. Beta and alpha use only arms with both actual human and verifier
+outcomes, while every missing outcome remains reported. Confirmation requires at least 30 human
+rejections and 30 human acceptances in each arm; otherwise safety is
+`insufficient_safety_evidence`, never zero. [asserted]
+
+For joint-success differences, take 20,000 paired bootstrap resamples with seed `980068`, resampling
+within the three frozen strata and preserving their 20:30:30 weights. Report percentile 95% intervals
+and every stratum table. Safety differences use the same one-sided Wilson union-bound construction as
+EXP-80. Review-adjusted cost is summed active worker-minutes plus blinded human review minutes; tokens
+and tool calls remain separate. [algebra] [asserted]
+
+**Stopping rules, fixed before any run:** stop when every arm for all 80 frozen requests reaches a
+terminal state or 120 days after the first arm starts, whichever comes first. At the deadline, unrun
+or unterminated arms receive primary success `0`. Publish every adverse, incomplete and invalid
+outcome. [asserted]
+
+- C confirms the decomposition protocol **for this frozen mixture only** if its joint-success point
+  estimate exceeds both A and B by at least `0.10`, both paired 95% interval lower bounds exceed zero,
+  all four one-sided upper bounds for C's beta/alpha loss against A/B are at most `0.05`, every arm
+  meets both conditional safety minima, C's review-adjusted cost per joint success is no higher than
+  B's, C uses one stream for all 20 atomic requests, and no dependency, overwrite or checkpoint-loss
+  violation occurs. [asserted]
+- If C passes against A but not B, the gain belongs to extra budget rather than decomposition; one
+  capable Owner remains the default. If B meets or beats C, or C increases blinded review minutes per
+  joint success, the overhead objection wins for this mixture. [asserted]
+- More than eight protocol-invalid triplets kills the protocol without a quality claim. Any lost
+  sealed checkpoint or early dependent cuts resumable long-running use immediately, even if final
+  quality rises. Any other result is unresolved, not equivalence. [asserted]
+- The duration method is confirmed separately only if at least 80% of C completions land inside the
+  original displayed range and every predicted miss is recorded before that range closes. Otherwise
+  the duration method is replaced before a duration commitment is shown; the original estimates stay
+  in the record. [asserted]
+
+**Largest plausible effect (ADR-0050):** a confirming result authorises implementation of the frozen
+plan, dependency and checkpoint protocol for the tested mixture. A negative result deletes that layer
+and retains one capable Owner with internal planning; a recovery failure keeps long-running operation
+disabled; an estimate failure removes the user-visible duration commitment until recalibrated. The
+experiment blocks only those claims and components, not existing dispatch, work items, trajectory or
+ADR-0067 composition. [asserted]
+
+**What it cannot decide:** transfer beyond coding or the frozen mixture, unsupervised use outside this
+repository, the value of a larger squad inside any stream, or whether another human would accept the
+artefact. It does not change `routing_orchestration_enabled`, Gate A, Gate B or principal-only
+authority. [asserted]
+
 ### EXP-53 · What does signing the trajectory cost, and what does it fail to cover? `READY`
 **Pre-registered 20 Aug 2026. Not run.**
 **Decides:** whether ed25519 signatures at the `append()` chokepoint — the one mechanism worth
