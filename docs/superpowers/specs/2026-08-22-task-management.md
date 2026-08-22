@@ -1,16 +1,21 @@
 # Task management: evidence-bearing work items across dependent streams
 
 - **Date:** 2026-08-22
-- **Status:** Specification. Decided provisionally by ADR-0072; EXP-98 tests the stream mechanism
-  and EXP-19 tests the human-load boundary. [asserted]
+- **Status:** Specification. Decided provisionally by ADR-0072; EXP-98 tests the stream mechanism,
+  EXP-19 tests the human-load boundary, and EXP-53 tests the signature primitive for trusted
+  ingress without proving human isolation by itself. [cited]
 - **Author:** Codex dispatch `20260822T124219-82dd26876d`. The principal supplied the requirement;
   the mechanism below is this dispatch's design. [measured]
 - **Review by:** 2026-11-22, or immediately after either named experiment reports. [asserted]
 
-The brief is correct about the current instrument: `consil beta` reports insufficient data from one
-human rejection against a minimum of 30. [measured] (local CLI, 2026-08-22) Nothing below converts an
-agent's completion claim, silence, a derived proxy or a remote integration event into one of those
-human verdicts. [asserted]
+Two premises in the brief need correction. [measured] `consil beta` reports one *declared* human
+rejection against a minimum of 30, but `events.py` authenticates only self-declared
+`actor == principal` and `via == "cli"`; `scripts/verdict.py --principal` accepts caller-supplied
+identity. [measured] The row therefore cannot support authenticated human-labelled beta, which
+remains unestimated. [asserted] The brief's logarithmic candidate formula is the iid special case;
+ADR-0077 makes the distribution-free ceiling `floor(epsilon / beta_upper)`, with refusal when beta is
+unmeasured. [cited] Nothing below converts an agent's completion claim, silence, a derived proxy or a
+remote integration event into a human verdict. [asserted]
 
 ## 1. Problem, outcome and boundary
 
@@ -107,14 +112,16 @@ revision that names the prior revision; no item is reopened or rewritten in plac
 | `dependencies` | Zero or more `{ticket, revision, handoff_contract_digest}` edges. Future content cannot honestly have a digest yet; the exact artefact digest is bound when the predecessor seals. [algebra] |
 | `owned_paths` | Canonical mutable paths. A mutating item with no declared paths is not parallel-claimable. [cited] (ADR-0068) |
 | `budget_ref`, `expires_at` | References the existing enforced budget and a timezone-aware upper bound. [asserted] |
+| `exposure_contract` | Frozen `{key, epsilon, rule, beta_version, n_max}`. The key covers the goal lineage and composite-verifier contract so a retry or cosmetic revision cannot reset candidate count. [asserted] |
 | `composition` | One Owner plus only the ADR-0067 roles whose manifests name a non-overlapping, decision-changing evidence anchor. [cited] (ADR-0067) |
 
 ### Attempt and assignment fields
 
 An atomic claim carries `ticket`, `revision`, `attempt_id`, `run_id`, canonical claimed paths,
-`opened_at`, `expires_at`, chosen harness/model/family/pool, capability-context digest, plan digest and
-the exact sealed predecessor artefact and verifier-receipt digests it will consume. [asserted]
-Family is provenance metadata, never an evidence class. [cited] (ADR-0067)
+`opened_at`, `expires_at`, chosen harness/model/family/pool, capability-context digest, plan digest,
+candidate ordinal/exposure state and the exact sealed predecessor artefact and verifier-receipt
+digests it will consume. [asserted] Family is provenance metadata, never an evidence class. [cited]
+(ADR-0067)
 
 ### Closure fields
 
@@ -128,9 +135,12 @@ Family is provenance metadata, never an evidence class. [cited] (ADR-0067)
 - every material conflict and its terminal disposition; and
 - the accountable Owner and the coordinator that validated the transition.
 
-`close_item()` also appends the existing `attempt.outcome` keyed by the same `attempt_id`; this is the
-machine result beta later joins to a separate human verdict. [asserted] A half-written pair is
-quarantined by projection rather than treated as closure. [asserted]
+`close_item()` validates under the same serialised coordination boundary, then appends the existing
+`attempt.outcome` **before** `work_item.completed`, keyed by the same `attempt_id`. [asserted] A crash
+between them leaves an outcome without closure, which is visible and safe to resume idempotently; it
+never leaves a closed item without its outcome. [asserted] The universal `events.append()` boundary,
+not only the convenience helper in `work_items.py`, must refuse a bare or state-invalid completion.
+[asserted]
 
 ## 4. State machine
 
@@ -157,7 +167,8 @@ surface. [asserted] State is derived; no actor sets a free-form status string. [
 | create -> `blocked` or `ready` | Valid frozen contract; acyclic existing predecessors; allowed authority; declared paths; verifier and plan digests. [asserted] | **No.** Schema and graph checks decide the initial state. [asserted] |
 | `blocked` -> `ready` | Each predecessor is `closed`; its required verifier receipt accepted; its actual artefact digest is bound; every affecting conflict has a non-blocking disposition. [asserted] | **No.** A producer's comment or status is ignored. [asserted] |
 | `ready` -> `active` | One serialised read-conflict-open operation proves readiness and no canonical path overlap, then records the assignment and lease. [asserted] | **No.** `coordination.py` is the chokepoint. [asserted] |
-| `active` -> `ready` | Attempt timeout, stall or recoverable failure; no live lease; retry budget remains; any reused checkpoint and Git object verify. [asserted] | **No.** Process identity and launcher exit code are insufficient. [measured] (local failure record) |
+| `ready` or `active` -> `blocked` | A bound predecessor is invalidated or a material affecting conflict is recorded; any live attempt ends adversely and releases its lease before the blocked state projects. [asserted] | **No.** The dependency/conflict record and terminal attempt evidence drive the transition. [asserted] |
+| `active` -> `ready` | Attempt timeout, stall or recoverable failure; no live lease; retry budget remains; any reused checkpoint and Git object verify. A retry after composite-verifier exposure also requires admission for candidate `n + 1`. [asserted] | **No.** Process identity, launcher exit code and the label `retry` are insufficient. [measured] (local failure record) [asserted] |
 | `active` -> `closed` | Artefact digests, accepted receipts from every frozen verifier, matching dependency bindings and terminal conflict dispositions. [asserted] | **Never.** "Done" in agent prose has no transition. [asserted] |
 | non-terminal -> `failed` / `refused` / `cancelled` / `expired` | Typed observed outcome, actor, reason, attempted repair and affected descendants; principal authorship where the reason is principal-only. [asserted] | **No.** The adverse evidence is retained even when zero bytes were produced. [asserted] |
 | any revision -> `invalidated` / `superseded` | Principal verdict rejection, a rejected bound predecessor, or a new contract naming the exact prior digest and cause. [asserted] | **No.** The predecessor graph identifies every affected consumer. [asserted] |
@@ -185,8 +196,19 @@ Assignment is a policy around `dispatch.py`, not a new router. [asserted]
 6. Create a specialist only when its frozen ADR-0067 manifest names a truth-relevant anchor the
    Owner cannot independently acquire under the isolation contract. [cited] (ADR-0067) The specialist
    receives a child attempt, not a second owner or acceptance vote. [asserted]
-7. `routing.py` continues to refuse a beta-derived candidate ceiling while beta is unmeasured; one
-   item therefore exposes one acceptance candidate. [measured] (`routing.py`; local beta output)
+7. Count an exposure when a distinct artefact first reaches the frozen composite verifier. [asserted]
+   A process restart or checkpoint retry before that boundary remains the same candidate; a revised
+   artefact presented after verifier rejection is candidate `n + 1`, whatever its ticket, revision,
+   harness or label. [asserted]
+8. Check the lineage exposure ledger before that boundary. [asserted] With authenticated human beta
+   unestimated, policy admits at most one candidate and refuses automatic exposure `2`; this is the
+   ADR-0067 default, not a measured beta result. [cited] [asserted]
+
+ADR-0077's dependence-robust ceiling is `n_max = floor(epsilon / beta_upper)`; the logarithmic
+formula applies only to a measured frozen iid candidate population. [algebra] `routing.py` implements
+the robust refusal but `dispatch.py` deliberately does not import it. [measured] This specification
+does not wire routing or change `routing_orchestration_enabled`; a future implementation must test
+the dispatch-path exposure boundary rather than citing the isolated routing unit. [asserted]
 
 Headroom decides which eligible prepaid route performs the work; it never changes priority, evidence
 requirements or authority. [asserted] Model family is allowed to break an otherwise equal routing tie
@@ -236,9 +258,19 @@ models and last writer are never resolution evidence. [cited] (`CONSILIENCE.md`)
 
 Machine closure and human judgement use the identity bridge that already exists: one
 `attempt.outcome`, followed later by zero or one `attempt.verdict` with the same `attempt_id`.
-[measured] (`events.py`, `projection.py`) The outcome records what the frozen verifier observed; the
-verdict is valid only when the principal authored it through a trusted first-party channel.
-[measured] (V0-18 and V0-28)
+[measured] (`events.py`, `projection.py`) The current V0-18/V0-28 check is declared provenance, not
+authentication: a caller can set `actor`, `principal` and `via="cli"` consistently. [measured]
+Therefore no authenticated verdict ingress exists today. [measured]
+
+A valid future `attempt.verdict` requires a single-use `human_action_receipt` minted by a first-party
+human-action broker outside every dispatched harness's capability set. [asserted] The verified
+receipt binds principal identity, action, `attempt_id`, delivered artefact digest, issuer/version,
+time and nonce; copying fields into an event is insufficient. [asserted] The universal writer checks
+the receipt and consumes its nonce atomically with append. [asserted] Until that broker exists, the
+CLI and chat may propose or record an unverified feedback signal but may not add a beta verdict.
+[asserted]
+EXP-53 tests signing cost, replay and key custody at this writer boundary; its register explicitly
+does not establish that the signer was human. [cited] (experiment register)
 
 Ordinary work supplies verdicts only when the principal already takes an acceptance action:
 [asserted]
@@ -253,16 +285,16 @@ Ordinary work supplies verdicts only when the principal already takes an accepta
   grader and a proxy revert pattern never become a human verdict. [measured] (current authority and
   beta contracts)
 
-Current code trusts only the local CLI as that first-party channel. [measured] (`events.py`) A future
-chat may write verdicts only after its ingress can prove session authorship; until then it can propose
-an action but cannot file the verdict. [asserted] No extra beta survey is added. [asserted] If no
-ordinary acceptance or rejection occurs, the item remains unreviewed and beta gains no row.
-[asserted]
+Existing verdict rows without a verified receipt remain append-only as `declared_unverified` and are
+excluded from authenticated beta; they are not silently deleted or retroactively blessed. [asserted]
+No extra beta survey is added. [asserted] If no ordinary authenticated acceptance or rejection
+occurs, the item remains unreviewed and beta gains no row. [asserted]
 
-This captures naturally occurring rejections at no additional interaction cost but cannot guarantee
-30 rejections by a date. [asserted] Guaranteeing them would require asking the principal to label
-work or deliberately presenting bad work; both are rejected. [asserted] EXP-19 remains the killing
-test for the existing sampled close prompt, and the beta verdict takes priority if prompts ever
+Once authenticated ingress exists, this captures naturally occurring rejections at no additional
+interaction cost but cannot guarantee 30 rejections by a date. [asserted] Guaranteeing them would
+require asking the principal to label work or deliberately presenting bad work; both are rejected.
+[asserted] EXP-19 remains the killing test for the existing sampled close prompt, and the beta
+verdict takes priority if prompts ever
 compete. [cited] (`feedback-signals.md`)
 
 A principal rejection appends the verdict, invalidates the closed revision and opens a corrective
@@ -303,16 +335,16 @@ never becomes evidence that the principal saw or decided anything. [asserted]
 
 | existing component | minimum extension or reuse |
 |---|---|
-| `work_items.py` | Validate the frozen contract, project the state machine, append evidence-bearing terminal events and pair a valid closure with `attempt.outcome`. [asserted] |
+| `work_items.py` | Validate the frozen contract, project the state machine and prepare evidence-bearing terminal events; `events.append()` remains the sole writer. [asserted] |
 | `coordination.py` | Atomically project readiness, refuse path overlap, bind predecessor receipts, issue/release attempt leases and block unresolved shared-artefact conflicts. [asserted] |
-| `dispatch.py` | Ask `coordination.py` for the next ready item, then reuse existing headroom/family/capability routing. No new selection engine. [asserted] |
-| `events.py`, `projection.py`, `feedback.py` | Reuse the existing autonomous-decision, outcome/verdict, visibility and task-feedback authority contracts. Extend projection only where a query needs an index; SQLite remains disposable. [measured] [asserted] |
-| `recall.py`, `instructions.py`, `routing.py`, `budget.py` | Reuse bounded verbatim context, context layering, beta refusal and spend enforcement unchanged. [measured] |
+| `dispatch.py` | Ask `coordination.py` for the next ready item, then reuse existing headroom/family/capability routing. Record verifier-boundary exposure; do not wire beta routing or add a selection engine under this ADR. [asserted] |
+| `events.py`, `projection.py`, `feedback.py` | Enforce the complete closure schema and state at the universal writer; project outcome-before-closure idempotently; exclude unverified declared verdicts; later verify single-use human-action receipts. SQLite remains disposable. [asserted] |
+| `recall.py`, `instructions.py`, `routing.py`, `budget.py` | Reuse bounded verbatim context, context layering, robust candidate-ceiling arithmetic and spend enforcement; keep `routing.py` outside the run path. [measured] [asserted] |
 | GitHub Projects / Linear / ClickUp | Optional one-way views after explicit external-exposure authority; never required for correctness. [asserted] |
 
-Legacy `dispatch:<run_id>` opened/completed claim events remain replayable. [asserted] New runs claim
-the durable task ticket and identify the attempt separately; migration never rewrites historical
-events. [asserted]
+Legacy `dispatch:<run_id>` opened/completed claim events remain replayable as claim history, not as
+evidence-closed durable items. [asserted] New runs claim the durable task ticket and identify the
+attempt separately; migration never rewrites historical events. [asserted]
 
 ## 10. P0 requirements and acceptance checks
 
@@ -320,7 +352,11 @@ Every item below is P0; removing any one permits false closure, premature execut
 human-authority poisoning. [asserted]
 
 - Given an item has no artefact receipt or a required verifier returned fail/unknown, when any actor
-  attempts closure, then `work_items.py` refuses and no `work_item.completed` is appended. [asserted]
+  calls either `work_items.py` or `events.append()` directly, then the universal writer refuses and
+  no `work_item.completed` is appended. [asserted]
+- Given an accepted outcome was appended and the process dies before completion append, when closure
+  resumes, then the same outcome is reused idempotently and the item was never projected closed
+  during the gap. [asserted]
 - Given a predecessor is not evidence-closed or its digest differs, when a consumer is claimed, then
   `coordination.py` refuses before harness invocation. [asserted]
 - Given two contenders race on overlapping canonical Windows/WSL paths, when both acquire, then one
@@ -330,16 +366,21 @@ human-authority poisoning. [asserted]
   [asserted]
 - Given a material conflict has no allowed disposition, when an affected consumer is projected, then
   it remains `blocked`. [asserted]
-- Given an agent or untrusted transport submits a human verdict, when validation runs, then V0-18 or
-  V0-28 refuses it and beta is unchanged. [measured] (existing checks)
+- Given an agent submits a field-perfect principal payload with `via="cli"` but no valid unused
+  human-action receipt, when universal validation runs, then it refuses and authenticated beta is
+  unchanged. [asserted]
+- Given candidate `1` reached the composite verifier, when a revised artefact, retry, new harness or
+  successor ticket reaches that verifier under the same exposure key, then it is candidate `2` and
+  admission refuses while authenticated beta is unmeasured. [asserted]
 - Given a principal rejects a bound predecessor, when descendants are projected, then every consumer
   of that exact digest is invalidated and no unrelated item is changed. [asserted]
 - Given the runtime restarts, when the same trajectory is replayed, then state, readiness, owners,
   claims, blockers, conflict dispositions and closure evidence are identical. [asserted]
 - Given a projection connector is unavailable or stale, when local state is projected, then readiness
   and closure are unchanged and the projection failure is visible. [asserted]
-- Given beta remains unmeasured, when assignment considers multiple acceptable candidates, then
-  `routing.py` refuses the widened exposure. [measured] (existing check)
+- Given this documentation-only decision, when the current run path is inspected, then `dispatch.py`
+  still does not import `routing.py` and `routing_orchestration_enabled` remains `false`. [measured]
+  (existing check)
 
 Success is zero admitted violations in these mutation/property tests, not a self-reported completion
 rate. [asserted] EXP-98 separately decides whether the dependency organisation beats one capable
@@ -358,6 +399,11 @@ admission rule; retain one evidence-bearing work item and closure contract, but 
 integration items and dependency automation. [asserted] The human-load mechanism is falsified if
 EXP-19 fires; remove the sampled prompt and retain only verdicts arising from ordinary acceptance
 actions. [asserted]
+
+The verdict path remains blocked if EXP-53 rejects signing at the append boundary or if its key
+custody makes the signing capability available to a dispatched harness. [asserted] A passing EXP-53
+result still requires a separate executed proof of human isolation before any row enters
+authenticated beta. [cited] [asserted]
 
 The adoption decision is overturned if a synthetic, no-private-data pilot demonstrates that an
 incumbent can, without a custom authority service: atomically refuse canonical-path clashes; enforce
