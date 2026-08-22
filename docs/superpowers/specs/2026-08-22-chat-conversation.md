@@ -21,9 +21,10 @@ proxy was 0.00% and silent semantic loss remained unmeasured. [measured: local t
 Treat chat as an evidence-bound compiler into the existing trajectory, not as a second state store.
 Persist the user's sanitised words verbatim, resolve factual and reversible ambiguity without asking,
 allow at most one question only for an otherwise-unresolvable principal-only decision, and append one
-versioned `work_item.opened` commitment before planning or execution. ADR-0068 then appends a plan
-that cites that commitment, and delivery consumes a read-only `DeliveryIntake` projection of the two
-records. Corrections append a superseding commitment; nothing rewrites the original. [asserted]
+versioned `work_item.committed` event before planning or execution. ADR-0068 then appends a plan that
+cites that commitment, plan streams become plan-bound `work_item.opened` events, and delivery
+consumes a read-only `DeliveryIntake` projection of the commitment and plan. Corrections append a
+superseding commitment; nothing rewrites the original. [asserted]
 
 ## 2. The bar and the narrower claim
 
@@ -56,10 +57,11 @@ without worsening commitment correctness. [asserted]
 
 ### 3.1 Turn identity
 
-A turn is one received user message and the causally linked visible machine response. Each message
-has a stable `conversation_id`, unique `turn_id`, optional `reply_to_turn_id`, role, authenticated
-transport status and receipt time. Streaming deltas are not turns; the final visible text is.
-[asserted]
+A turn is one final inbound or outbound message. Each turn has a stable `conversation_id`, unique
+`turn_id`, `root_request_turn_id`, optional `reply_to_turn_id`, role, authenticated transport status
+and receipt time. Streaming deltas are not turns; the sealed visible message is. A question, start
+message, exception and final delivery may therefore be separate outbound turns linked to the same
+root request. [asserted]
 
 The conversation view is a projection of trajectory events. Closing a window, restarting a harness
 or changing a client must not change the authoritative turn sequence. [asserted] A client-provided
@@ -109,9 +111,10 @@ For each user turn, the Intake Owner performs these steps in order. [asserted]
    block work merely because the answer is uncertain. [cited: working principles 9 and 11]
 5. Ask only under the rule below. Otherwise freeze the commitment without a confirmation turn.
    [asserted]
-6. Append the commitment, let ADR-0068 freeze the minimum verifiable plan against its digest, then
-   hand `DeliveryIntake` to the delivery stream. No candidate claim, dispatch or external side effect
-   may precede all three records: commitment, plan and delivery estimate revision zero. [asserted]
+6. Append the commitment, let ADR-0068 freeze the minimum verifiable plan against its digest, let the
+   task kernel materialise its plan-bound work items, then hand `DeliveryIntake` to the delivery
+   stream. No candidate claim, dispatch or external side effect may precede matching commitment,
+   plan, work-item and delivery-estimate revision-zero records. [asserted]
 
 ### 4.2 Question budget
 
@@ -145,18 +148,25 @@ trusted ingress is implemented, chat may draft or request protected decisions bu
 
 ### 5.1 Authoritative location and schema
 
-The authoritative artefact is a validated `work_item.opened` event in the existing trajectory, not
-the chat transcript, `brief.md`, a task card or a second database. [asserted] `work_items.open_item()`
-is the construction helper, but the contract must be enforced by `events.validate()` so generic
-`events.append()` and `consil record` cannot bypass it. [measured: central append currently omits
-`work_items.validate()`; asserted enforcement]
+The authoritative artefact is a new `work_item.committed` event in the existing trajectory, not the
+chat transcript, `brief.md`, a task card or a second database. [asserted] It stays in the existing
+work-item domain but has a distinct kind because `work_item.opened` is plan/stream-bound under the
+task-management contract and legacy dispatch claims must remain replayable. [cited:
+`2026-08-22-task-management.md`; ADR-0072]
+
+Pure `events.validate()` enforces event shape, actor class and content digests. Cross-event rules—one
+revision per commitment, exact supersession, current authority and revision fencing—run inside
+`events.append()` under one per-log lock, against state projected again while that lock is held.
+[asserted] The locked writer delegates those domain rules to `work_items.validate_transition()` so
+generic `events.append()` and `consil record` cannot bypass them. [measured: central append currently
+omits `work_items.validate()` and general transition locking; asserted enforcement]
 
 Each commitment revision contains: [asserted]
 
 | Field | Contract |
 |---|---|
-| `ticket`, `revision`, `supersedes` | `ticket` identifies the continuing request; positive `revision` is never reused; revisions after one name the prior commitment digest. [asserted] |
-| `commitment_id`, `commitment_digest` | `commitment_id` uniquely identifies this ticket revision. `commitment_digest` is SHA-256 over canonical UTF-8 JSON for the frozen contract with the digest field omitted. [asserted] |
+| `commitment_id`, `revision`, `supersedes_commitment_digest` | `commitment_id` remains stable for the request; positive `revision` is never reused; revisions after one name the immediately prior digest. [asserted] |
+| `commitment_digest` | SHA-256 over canonical UTF-8 JSON for the frozen contract with the digest field omitted. The digest changes on every contract revision. [asserted] |
 | `conversation_id`, `source_turn_ids`, `source_turn_digest` | Join the interpretation to ordered verbatim source turns and detect substitution or reordering. [asserted] |
 | `request_text`, `goal_text` | The sanitised user request verbatim and the Owner's explicit interpretation; neither silently replaces the other. [asserted] |
 | `success_criteria`, `success_digest`, `non_goals` | Ordered, independently checkable acceptance criteria and explicit exclusions. The digest covers both lists. [asserted] |
@@ -165,7 +175,8 @@ Each commitment revision contains: [asserted]
 | `accountable`, `composition` | Exactly one Owner; every additional member names one non-overlapping, decision-changing evidence anchor under ADR-0067. [cited: ADR-0067] |
 | `assumptions`, `autonomous_decision_refs`, `reserved_decisions` | Every consequential assumption has an evidence tag, falsifier and reversal; protected decisions remain reserved to the principal. [cited: ADR-0033; working principle 11] |
 | `authority_ref`, `verifier_contracts` | Frozen authority envelope and ordered verifier `{id, digest, task_family, required_outcome}` records. [asserted] |
-| `owned_paths`, `budget_ref`, `expires_at` | Canonical mutation scope, reference to the existing budget decision and a timezone-aware upper bound. [asserted] |
+| `mutation_scope`, `budget_ref`, `expires_at` | Canonical request-level mutation envelope, reference to the existing budget decision and a timezone-aware upper bound; the plan later assigns exact owned paths. [asserted] |
+| `question_count`, `question_turn_id` | Zero or one; the turn reference is absent when the count is zero. [asserted] |
 
 ADR-0067—not `routing.py`—sets the default of one Owner. [measured] `routing.py` computes a ceiling on
 candidate attempts against one verifier contract and currently refuses a real-trajectory ceiling
@@ -178,19 +189,27 @@ hash cycle. [cited: ADR-0068] The subsequent plan event supplies `plan_id`, `pla
 event reference; those fields are deliberately not retrofitted into the earlier commitment.
 [asserted]
 
+Each stream produced by that plan then becomes a durable `work_item.opened` carrying ADR-0072's
+required plan and stream fields plus `{commitment_id, commitment_revision, commitment_digest}`.
+[asserted] This distinct-kind join is the compatibility rule: one central writer can validate the
+pre-plan request commitment, plan-bound native work items and legacy dispatch claims without
+pretending they share one schema. [asserted]
+
 ### 5.2 Tamper evidence, stated narrowly
 
 Every plan, estimate, claim, attempt, verifier receipt, outcome, correction and visible start/done
 message cites the exact `commitment_id` and `commitment_digest`. [asserted] The plan record also pins
 the trajectory prefix count and `events.prefix_digest()` through the commitment, and the visible
-start message shows a short form of the commitment digest. [asserted] An in-place edit, reorder or
-partial rewrite is therefore detectable whenever at least one later or externally retained anchor
-survives. [algebra]
+start message shows a short form of the commitment digest. [asserted] An edit, substitution or
+reorder at or before the commitment is therefore detectable whenever the plan, start message or
+another externally retained anchor survives. [algebra]
 
 This is tamper-evidence against accidental or outcome-aware partial rewriting, not cryptographic
 authorship or attacker-proof immutability. [asserted] The current log is unsigned; actor, principal
 and transport fields are self-declared strings; a canonical direct writer can evade `bypassed()`;
 and a whole-log rewrite can recompute unanchored hashes. [measured: `src/consilient/events.py`]
+The commitment anchor alone does not detect a reorder among attempts or outcomes appended after it;
+that requires a retained anchor after those events or a predecessor-prefix chain. [algebra]
 EXP-53 is READY but unrun and decides the cost and limits of signing. [measured:
 `docs/10-research/experiment-register.md`] No surface may call the commitment cryptographically
 tamper-proof until a trusted signing or external anchoring scheme is measured and implemented.
@@ -208,6 +227,11 @@ That message is a projection, not a confirmation question and not the authoritat
 not introduce a fact absent from the commitment, plan or estimate. [asserted] Work starts
 automatically after the required event ordering succeeds. [asserted]
 
+ADR-0068's frozen stream-duration ranges remain scheduling inputs with their evidence and derivation;
+they are not a second user promise. [cited: ADR-0068] `delivery.estimate` revision zero cites those
+inputs, adds the delivery resource snapshot and becomes the sole rendered delivery window and
+revision chain. [cited: ADR-0071; `2026-08-22-chat-delivery.md`] [asserted]
+
 ## 6. Delivery interface
 
 The named boundary is `DeliveryIntake`, a read-only projection rather than a new persisted object.
@@ -216,7 +240,7 @@ The named boundary is `DeliveryIntake`, a read-only projection rather than a new
 ```text
 DeliveryIntake = {
   conversation_id, source_turn_ids,
-  ticket, revision, commitment_id, commitment_digest,
+  commitment_id, commitment_revision, commitment_digest,
   commitment_event_ref, prefix_anchor,
   goal_text, success_digest, non_goals,
   deliverable_contract, accountable,
@@ -236,41 +260,46 @@ remain wholly owned by the delivery specification. [asserted]
 
 ## 7. Correction mid-flight
 
-A correction is a new user turn, not an edit. Intake appends the sanitised verbatim turn and then a
-new `work_item.opened` revision carrying `supersedes`, a structured contract diff and one disposition:
-`continue`, `pause`, `cancel` or `replan`. [asserted]
+A correction is a new user turn, not an edit. If it changes no frozen field, the turn cites the live
+commitment and work continues without a new revision. [asserted] Otherwise intake appends a new
+`work_item.committed` revision carrying `supersedes_commitment_digest`, a structured contract diff
+and one disposition: `pause`, `cancel` or `replan`. [asserted]
 
 From the moment the new revision is accepted: [asserted]
 
 1. no new claim may bind the old digest, and a stale attempt cannot seal completion for it;
    [asserted]
-2. affected work stops at the next safe checkpoint, while an explicit cancellation stops as soon as
-   the harness can do so without corrupting an artefact; [asserted]
+2. affected work stops at the next safe checkpoint and releases its old claim; it can resume only
+   after a new plan/work-item revision atomically claims that sealed checkpoint under the new
+   digest, while cancellation stops as soon as the harness can do so without corrupting an
+   artefact; [asserted]
 3. the original turns, old commitment, attempts, costs, artefacts, verifier evidence, dissent and
    adverse outcomes remain append-only and attributable to the old digest; [asserted]
 4. a sealed result is reusable only when its consumed inputs, deliverable contract, verifier
    contract and relevant digests are byte-identical under the new revision; affected verification
    runs again; [asserted]
-5. ADR-0068 replans changed work and delivery owns any estimate revision; and [asserted]
+5. `pause` leaves the new revision unclaimable, `cancel` makes it terminal, and `replan` invokes
+   ADR-0068 before delivery owns any estimate revision; and [asserted]
 6. the user receives one concise delta message with the new short digest, not another confirmation
    loop. [asserted]
 
-Claim acquisition and revision fencing must be atomic at the trajectory write boundary. The current
-check-then-append claim path and ticket-only completion projection do not provide that guarantee.
+Claim acquisition and revision fencing must be one locked state transition at the trajectory write
+boundary. The current check-then-append claim path and ticket-only completion projection do not
+provide that guarantee.
 [measured: `src/consilient/coordination.py`; `src/consilient/work_items.py`]
 
 ## 8. Components and reuse
 
 | Existing component | Intake responsibility or required extension |
 |---|---|
-| `events.py` | Remains the single append writer; centrally validates turn, commitment, revision, actor and digest rules. [asserted] |
-| `work_items.py` | Constructs versioned commitments and completions; it is not a parallel validator that generic append can bypass. [asserted] |
+| `events.py` | Remains the single append writer; pure validation checks shape/digests, while one per-log locked transition checks history before append. [asserted] |
+| `work_items.py` | Constructs request-level `committed`, plan-bound `opened` and evidence-bound completion events and supplies domain transition validation to the writer. [asserted] |
 | `recall.py` | Adds commitments, corrections, unresolved authority, dissent and adverse outcomes to the protected verbatim set and reports omissions. [asserted] |
 | `instructions.py` | Supplies the bounded pack and records its source identities and digest. [asserted] |
 | ADR-0068 plan | Decomposes only after commitment and cites its digest. [cited: ADR-0068] |
 | `coordination.py` | Atomically fences claims by ticket, revision and commitment digest. [asserted] |
 | `scripts/dispatch.py` | Remains the sole orchestrator and receives only sealed, claimable work; it does not parse chat. [asserted] |
-| `routing.py` | May later bound candidate attempts when its verifier beta contract is measurable; it does not determine Owner/member count. [measured and asserted] |
+| `routing.py` | It does not determine Owner/member count. [measured] It may later bound candidate attempts when its verifier beta contract is measurable. [asserted] |
 | `budget.py` | Supplies a necessary reservation reference, not principal authority to spend; dispatch does not currently call it. [measured: `src/consilient/budget.py`; `scripts/dispatch.py`] |
 
 No second coordinator, task database, delivery loop or CLI subcommand is needed. [asserted]
@@ -282,8 +311,9 @@ authenticated ingress
   -> sanitised conversation.turn
   -> bounded verbatim recall + instruction assembly
   -> one Owner resolves facts/defaults; <= 1 principal-only question
-  -> validated work_item.opened commitment revision
+  -> validated work_item.committed request revision
   -> ADR-0068 frozen plan
+  -> plan-bound work_item.opened stream revisions
   -> DeliveryIntake
   -> delivery.estimate revision 0
   -> visible start projection
@@ -309,21 +339,22 @@ No arrow may be skipped or inferred from a mutable run file. [asserted]
 The implementation is incomplete until the smallest checks below fail on the broken behaviour and
 pass through the central writer. [asserted]
 
-1. Generic `events.append()` rejects a malformed commitment, duplicate ticket revision, invalid
-   supersession, changed digest and unauthorised actor; testing only `open_item()` is insufficient.
+1. Generic `events.append()` rejects a malformed commitment, duplicate commitment revision, invalid
+   supersession, changed digest and unauthorised actor; concurrent appends prove the history check and
+   write share one lock, while testing only a work-item helper is insufficient.
    [asserted]
 2. Canonical commitment hashing is deterministic across key order and changes for any success,
    non-goal, source-turn or authority edit. [asserted]
-3. A retained downstream prefix anchor detects an in-place edit or reorder; the test and UI make no
-   signing/authorship claim. [asserted]
+3. A retained downstream prefix anchor detects an edit or reorder inside its anchored prefix; the
+   test does not claim detection for later events, signing or authorship. [asserted]
 4. A property test generates factual, reversible and principal-only ambiguity and proves zero
    questions for the first two, at most one non-bundled question for the last, and no second question
    after an unclear or absent answer. [asserted]
 5. Unauthenticated chat, replay and self-declared principal strings cannot author any protected
    decision; secret fixture bytes and their hashes never appear in trajectory or run artefacts.
    [asserted]
-6. No claim or dispatch is possible before a valid commitment, ADR-0068 plan and delivery estimate
-   revision zero cite matching digests. [asserted]
+6. No claim or dispatch is possible before a valid commitment, ADR-0068 plan, plan-bound work item
+   and delivery estimate revision zero cite matching digests. [asserted]
 7. Bounded recall and restart preserve verbatim source turns, active commitment, corrections,
    dissent and adverse outcomes; direct lookup recovers an omitted active commitment. [asserted]
 8. A correction racing completion fences the old digest, preserves the old attempt and reuses only
