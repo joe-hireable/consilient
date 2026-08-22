@@ -1964,7 +1964,14 @@ def test_no_new_commit_may_be_authored_by_a_fixture_identity():
     fixture_stamped = [
         line for line in result.stdout.splitlines() if line.endswith("@local")
     ]
-    assert len(fixture_stamped) <= 102, (
+    # Raised 102 → 108 on 22 Aug 2026: merging fleet-condensation made three historical
+    # commits reachable (762c3b6, 321d644, b3d3c71; EXP-45 pre-registration, run and
+    # findings, 20 Aug 2026 13:17–13:26), each counted twice (author and committer).
+    # They were stamped by the shared-config defect this test documents, predate its
+    # repair, and are not new fixture authorship; the alternative — rewriting their
+    # authorship — would falsify the record this ratchet exists to keep honest. The
+    # guard against NEW fixture-stamped commits is unchanged.
+    assert len(fixture_stamped) <= 108, (
         "a commit was authored by a fixture identity; check `git config user.email` — "
         "worktrees share the primary repository's config"
     )
