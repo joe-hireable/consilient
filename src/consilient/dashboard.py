@@ -740,7 +740,8 @@ h2{font-size:21px;margin:0 0 4px}
 h3{font-size:16px;margin:0 0 2px}
 p{margin:0 0 12px;max-width:68ch}
 a{color:var(--accent)}
-code,.mono{font-family:var(--mono);font-size:.87em}
+code,.mono{font-family:var(--mono);font-size:.87em;font-variant-numeric:tabular-nums}
+td.num,.stat .n{font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)}
 .eyebrow{font-family:var(--sans);font-size:11px;font-weight:650;letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted)}
@@ -788,7 +789,7 @@ header.top .sub{color:var(--muted);font-size:13.5px;margin-top:6px}
 #v-graph:checked~.segbar label[for=v-graph],
 #v-time:checked~.segbar label[for=v-time],
 #v-table:checked~.segbar label[for=v-table]{background:var(--surface);color:var(--ink);
-  box-shadow:0 1px 2px rgba(0,0,0,.10)}
+  box-shadow:var(--shadow)}
 #v-graph:checked~.views-body>#w-graph,
 #v-time:checked~.views-body>#w-time,
 #v-table:checked~.views-body>#w-table{display:block}

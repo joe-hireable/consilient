@@ -66,6 +66,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0057](0057-a-users-trajectory-is-their-data.md) | **A user's trajectory is their data** — private by default, never tracked, shared only by explicit consent | ✅ |
 | [0058](0058-orchestration-ships-as-a-script-until-the-cli-surface-is-settled.md) | **Orchestration ships as `scripts/dispatch.py`**; the `consil` CLI surface stays the principal's to settle | ✅ |
 | [0059](0059-package-the-discipline-as-skills-and-separate-instance-from-product.md) | **Package the discipline as skills; agent files are wiring; instance is separate** — a rule may not be introduced in an agent definition three of four runtimes cannot read | 🟡 |
+| [0060](0060-adopt-open-design-portable-contract-and-critique-for-design-work.md) | **Adopt Open Design's portable contract and critique; desktop is an optional local tool, not a runtime dependency**; brand direction: outlier identity, anti-median, minimalist distinction | 🟡 |
 | [0063](0063-instance-cwd-allowlist-is-supervised-dispatch-not-a-gate-pass.md) | **Instance cwd allowlist is supervised dispatch, not a Gate B pass** — no override flag; doctor stays red; the loop still refuses foreign workspaces | ✅ |
 | [0064](0064-add-training-providers-and-supersede-openrouter-as-sole-metered-vendor.md) | **Add training providers and supersede OpenRouter as sole metered vendor** | ✅ |
 | [0065](0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md) | **What is native, what is adopted, and what is a marketplace** — a component whose error rate must be measured is native; one whose errors are self-evident may be adopted | ✅ |
@@ -145,6 +146,8 @@ to every ADR and every PR:
 - **0054** — PROVISIONAL pending EXP-90 … EXP-93.
 - **0055** — PROVISIONAL pending EXP-74, EXP-75 and EXP-76; owes three enforcement checks (V0-30, V0-31, V0-32), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
 - **0056** — PROVISIONAL pending EXP-94 for the allocation clauses; D5 ships with its check.
+- **0060** — PROVISIONAL pending EXP-95 (critique inter-rater reliability); token-lockdown
+  CI check shipped in PR #3 (`check_design_tokens.py`).
 - **0070** — PROPOSED; its matched chat-versus-command trial is not yet allocated an experiment id.
 - **0072** — PROVISIONAL pending EXP-98 for estimate/checkpoint mechanics, EXP-19 for feedback,
   and EXP-53 for signing.

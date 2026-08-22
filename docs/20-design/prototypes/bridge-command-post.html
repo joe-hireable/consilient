@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consilient Agent Command Post &middot; Bridge Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0C0E12;
+      --surface-0: #14171E;
+      --surface-1: #1C202A;
+      --border: #2A2F3D;
+      --fg-primary: #F0F2F5;
+      --fg-secondary: #C4C9D4;
+      --fg-muted: #8B93A5;
+      --fg-tertiary: #8B93A5;
+
+      --action: #E2B340;
+      --action-tint: #2A2412;
+      --valid: #2E9E66;
+      --valid-tint: #11261C;
+      --attention: #DDA136;
+      --attention-tint: #2B2012;
+      --fault: #E05349;
+      --fault-tint: #2D1617;
+
+      --font-display: "Syne", "Cabinet Grotesk", ui-sans-serif, system-ui, sans-serif;
+      --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+      --font-mono: "Space Mono", "Fragment Mono", ui-monospace, SFMono-Regular, monospace;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.55;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono, code, .num {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Command Post Bridge Topbar */
+    header.bridge-bar {
+      background: var(--surface-0);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .bridge-id {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-badge {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .post-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--action-tint);
+      color: var(--action);
+      border: 1px solid var(--action);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 18px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .nav-links a {
+      color: var(--fg-muted);
+      text-decoration: none;
+      padding-bottom: 2px;
+    }
+
+    .nav-links a.active {
+      color: var(--fg-primary);
+      border-bottom: 2px solid var(--action);
+    }
+
+    /* Main Bridge Layout — max-width 1280px per DESIGN.md §5 */
+    .bridge-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr 340px;
+      gap: 20px;
+      padding: 24px;
+      flex: 1;
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .panel {
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      background: var(--surface-1);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--fg-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    /* Left: Fleet Concurrency & Quota Gauges */
+    .concurrency-meter {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .gauge-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .gauge-bar-track {
+      height: 8px;
+      background: var(--bg);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      border: 1px solid var(--border);
+    }
+
+    .gauge-fill {
+      height: 100%;
+      background: var(--valid);
+    }
+
+    .gauge-fill.active {
+      background: var(--action);
+    }
+
+    .quota-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .quota-k {
+      font-size: 11px;
+      color: var(--fg-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .quota-v {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Center: The Mission Matrix & Action Command Post */
+    .ask-container {
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--action);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .ask-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ask-head h2 {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .affordability-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 12px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+    }
+
+    .aff-cell .k {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      margin-bottom: 4px;
+    }
+
+    .aff-cell .v {
+      font-size: 12px;
+      color: var(--fg-secondary);
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    button.btn {
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.1s, transform 0.05s;
+    }
+
+    button.btn:active { transform: scale(0.99); }
+    button.btn-primary { background: var(--action); color: var(--bg); border: 1px solid var(--action); }
+    button.btn-primary:hover { opacity: 0.92; }
+    button.btn-sec { background: transparent; color: var(--fg-primary); border: 1px solid var(--border); }
+    button.btn-sec:hover { background: var(--surface-1); }
+    button.btn-danger { background: transparent; color: var(--fault); border: 1px solid var(--fault); }
+    button.btn-danger:hover { background: var(--fault-tint); }
+
+    /* Workstream Fleet Table */
+    table.fleet-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    table.fleet-tbl th {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    table.fleet-tbl td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--fg-secondary);
+    }
+
+    table.fleet-tbl tr:last-child td { border-bottom: none; }
+    table.fleet-tbl tr:hover td { background: var(--surface-1); }
+
+    /* Right: Capability-Gap Radar & Evidence Anchor */
+    .radar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .radar-row {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .radar-row .name { font-weight: 600; font-size: 12.5px; }
+    .radar-row .route { font-family: var(--font-mono); font-size: 11px; color: var(--action); }
+    .radar-row .anchor { font-family: var(--font-mono); font-size: 10px; color: var(--valid); }
+
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .tag.valid { color: var(--valid); background: var(--valid-tint); border-color: var(--valid); }
+    .tag.attention { color: var(--attention); background: var(--attention-tint); border-color: var(--attention); }
+
+    footer.bottom-bar {
+      background: var(--surface-0);
+      border-top: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    /* Responsive Queries per DESIGN.md §8 */
+    @media (max-width: 1100px) {
+      .bridge-grid {
+        grid-template-columns: 1fr;
+      }
+      .affordability-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .bridge-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 16px;
+      }
+      .affordability-grid {
+        grid-template-columns: 1fr;
+      }
+      .bridge-grid {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Mission Navigation -->
+  <header class="bridge-bar">
+    <div class="bridge-id">
+      <div class="logo-badge">
+        CONSILIENT
+        <span class="post-tag">AGENT COMMAND POST</span>
+      </div>
+      <span class="mono" style="color: var(--fg-muted);">dispatch bridge &middot; rev a539081</span>
+    </div>
+    <nav class="nav-links">
+      <a href="bridge-command-post.html" class="active">01 &middot; Mission Bridge</a>
+      <a href="trajectory-observatory.html">02 &middot; Trajectory Observatory</a>
+      <a href="mobile-signer.html">03 &middot; Enclave Signer</a>
+    </nav>
+    <div style="font-size: 12px; color: var(--valid);" class="mono">
+      &bull; 2/3 SLOTS ACTIVE
+    </div>
+  </header>
+
+  <!-- Command Post 3-Column Workstation -->
+  <main class="bridge-grid">
+
+    <!-- Column 1: Fleet Resource Radar & Concurrency Ceiling -->
+    <aside class="panel">
+      <div class="panel-header">
+        <span>01 &middot; Fleet Concurrency</span>
+        <span class="mono">[asserted] placeholder</span>
+      </div>
+      <div class="panel-body">
+        <div class="concurrency-meter">
+          <div class="gauge-header">
+            <span class="mono">Allocated Slots</span>
+            <span class="mono">2 of 3 slots</span>
+          </div>
+          <div class="gauge-bar-track">
+            <div class="gauge-fill active" style="width: 33.3%;"></div>
+            <div class="gauge-fill active" style="width: 33.3%;"></div>
+            <div class="gauge-fill" style="width: 0%;"></div>
+          </div>
+          <span style="font-size: 11px; color: var(--fg-muted);" class="mono">
+            Placeholder: T_cycle (25m) &divide; T_review (8m) = 3.125 max capacity. (At measured &beta;=0.31, &beta;-conditioned ceiling is 1 slot; EXP-08 pending).
+          </span>
+        </div>
+
+        <div class="quota-card">
+          <div class="quota-k">
+            <span>CLAUDE CODE PRO</span>
+            <span class="tag valid">CONNECTED</span>
+          </div>
+          <div class="quota-v mono">46 MCPs &middot; Max Quota Pool</div>
+        </div>
+
+        <div class="quota-card">
+          <div class="quota-k">
+            <span>CURSOR WORKSPACE LOCK</span>
+            <span class="tag valid">EXCLUSIVE LOCK</span>
+          </div>
+          <div class="quota-v mono">ACP Daemon &middot; 0% Burst Rate</div>
+        </div>
+
+        <div class="quota-card">
+          <div class="quota-k">
+            <span>OPENROUTER (METERED)</span>
+            <span class="tag attention">&pound;31.20 / &pound;50.00</span>
+          </div>
+          <div class="quota-v mono">Hard Cap Enforced [ADR-0056]</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Column 2: Mission Deck & Active Unavoidable Asks -->
+    <section class="panel" style="flex: 1;">
+      <div class="panel-header">
+        <span>02 &middot; Mission Deck &middot; Active Invariants</span>
+        <span class="tag valid">REPLAY IDENTICAL</span>
+      </div>
+      <div class="panel-body">
+
+        <!-- Unavoidable Human Decision Block (ADR-0033 §3 Affordability Contract) -->
+        <div class="ask-container">
+          <div class="ask-head">
+            <div>
+              <span class="tag attention" style="margin-bottom: 4px; display: inline-block;">HUMAN VERDICT MANDATORY</span>
+              <h2>Task #143 &middot; Verification Boundary Promotion</h2>
+            </div>
+            <span class="mono" style="font-size: 11px; color: var(--fg-muted);">Expires in 42m</span>
+          </div>
+
+          <div class="affordability-grid">
+            <div class="aff-cell">
+              <div class="k">01 &middot; Artefact &amp; Checks</div>
+              <div class="v mono"><span style="color: var(--valid);">pytest PASS</span><br><span style="color: var(--valid);">mypy strict PASS</span><br>+184 &minus;22 lines</div>
+            </div>
+            <div class="aff-cell">
+              <div class="k">02 &middot; What Was Tried</div>
+              <div class="v">Autonomous test mutation pass verified against 2026 ground truth.</div>
+            </div>
+            <div class="aff-cell">
+              <div class="k">03 &middot; Default If Expired</div>
+              <div class="v mono" style="color: var(--attention);">Hold workitem;<br>&pound;0 spend incurred.</div>
+            </div>
+            <div class="aff-cell">
+              <div class="k">04 &middot; Cost To Resolve</div>
+              <div class="v">No automated path; &beta; measures human agreement.</div>
+            </div>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn btn-sec" onclick="alert('Opening worktree branch in VSCode...');">Open Diff in Editor</button>
+            <button class="btn btn-danger" onclick="alert('Verdict REJECTED logged.');">Reject &amp; Provide Reason</button>
+            <button class="btn btn-primary" onclick="alert('Verdict ACCEPTED logged to trajectory.');">Accept Verdict</button>
+          </div>
+        </div>
+
+        <!-- Live Fleet Table -->
+        <div style="margin-top: 6px;">
+          <table class="fleet-tbl">
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Target Intent</th>
+                <th>Assigned Harness</th>
+                <th>State</th>
+                <th>Last Artefact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono" style="font-weight: 700; color: var(--fg-primary);">#143</td>
+                <td>Frontend telemetry prototype</td>
+                <td><span class="tag">Claude Code 2.1</span></td>
+                <td><span class="tag attention">Awaiting Verdict</span></td>
+                <td class="mono">19:38:12</td>
+              </tr>
+              <tr>
+                <td class="mono" style="font-weight: 700; color: var(--fg-primary);">#142</td>
+                <td>EXP-95 Inter-rater reliability run</td>
+                <td><span class="tag">Cursor ACP &middot; Sonnet</span></td>
+                <td><span class="tag valid">Executing (21/25)</span></td>
+                <td class="mono">19:35:04</td>
+              </tr>
+              <tr>
+                <td class="mono" style="color: var(--fg-muted);">&mdash;</td>
+                <td style="color: var(--fg-muted);">Slot 3 Available (Resting state)</td>
+                <td><span class="mono" style="color: var(--fg-muted);">&mdash;</span></td>
+                <td><span class="tag" style="color: var(--fg-muted);">Idle</span></td>
+                <td class="mono" style="color: var(--fg-muted);">&mdash;</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Column 3: Capability-Gap Radar (ADR-0054 / Measured Capability) -->
+    <aside class="panel">
+      <div class="panel-header">
+        <span>03 &middot; Measured Capability Radar</span>
+        <span class="tag">ADR-0054</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size: 11.5px; color: var(--fg-muted);">
+          Routing keyed on empirical task family, never vendor marketing labels.
+        </div>
+        <div class="radar-list">
+          <div class="radar-row">
+            <div>
+              <div class="name">Code Generation</div>
+              <div class="anchor">Anchor: Deterministic Suite</div>
+            </div>
+            <div class="route">Claude Code &middot; Opus</div>
+          </div>
+
+          <div class="radar-row">
+            <div>
+              <div class="name">Design Token Audit</div>
+              <div class="anchor">Anchor: Open Design Linter</div>
+            </div>
+            <div class="route">Python &middot; AST Checker</div>
+          </div>
+
+          <div class="radar-row">
+            <div>
+              <div class="name">Browser Verification</div>
+              <div class="anchor">Anchor: Implicit Oracle</div>
+            </div>
+            <div class="route">Playwright &middot; MCP</div>
+          </div>
+
+          <div class="radar-row">
+            <div>
+              <div class="name">Aesthetic Critique</div>
+              <div class="anchor" style="color: var(--attention);">Anchor: Human Verdict</div>
+            </div>
+            <div class="route">Consilient 5-Dim</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Bottom Bar -->
+  <footer class="bottom-bar">
+    <div>AGENT COMMAND POST &middot; DISPATCH SURFACE &middot; IMMUTABLE TRAJECTORY RECORD</div>
+    <div>STATE OVER NARRATIVE &middot; PROVABLY UNIFIED DISPATCH</div>
+  </footer>
+
+</body>
+</html>

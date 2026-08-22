@@ -364,3 +364,13 @@ Grounded for EXP-44 and `public-corpus-study-design.md`.
 | [ABS] | **AIDev Dataset / MSR 2026 Mining Challenge.** *The Rise of AI Teammates in Software Engineering (SE) 3.0: How Autonomous Coding Agents Are Reshaping Software Engineering.* 456,000 pull requests across Devin, Cursor, Claude Code, GitHub Copilot. Captures tool identities and merge outcomes, but lacks ground-truth bug-inducing links or maintainer defect audits. |
 | [ABS] | *Detecting AI Coding Agents in Open Source: A Validated Multi-Method Census of 180 Million Repositories.* arXiv:2606.24429 (June 2026). Applies coarse temporal file-adjacency SZZ proxies to 60M bug-fix commits, finding sub-baseline SZZ ratios (0.33–0.56×) for coding agents. Assumes proxy validity across AI commits rather than testing whether AI authorship degrades the proxy. |
 
+## 16. Heuristic evaluation, usability inspection, and inter-rater agreement (read 21 Aug 2026)
+
+Grounded for EXP-95, ADR-0060, and the `using-open-design` critique protocol.
+
+| Status | Source |
+|---|---|
+| [FULL] | **Jakob Nielsen, Rolf Molich.** *Heuristic evaluation of user interfaces.* Proc. ACM CHI '90, pp. 249–256. DOI 10.1145/97243.97281. The founding empirical baseline for expert heuristic evaluation. Across four experiments, individual evaluators found only 20–51% of known usability problems (aggregate single-evaluator average ~35%). Finding: individual evaluators are weak; aggregating across **3 to 5 independent evaluators** achieves 75–85% defect detection. Serves as the prior for why single-model design critique misses roughly half of all mechanical defects and requires multi-family aggregation (EXP-95). |
+| [FULL] | **J. Richard Landis, Gary G. Koch.** *The measurement of observer agreement for categorical data.* Biometrics, 33(1), 1977, pp. 159–174. The canonical benchmark bands for chance-corrected agreement: <0.00 Poor, 0.00–0.20 Slight, 0.21–0.40 Fair, 0.41–0.60 Moderate, 0.61–0.80 Substantial, 0.81–1.00 Almost Perfect. Cited in EXP-95 for interpreting Kendall's $\bar{\tau}$ and inter-model critique correlations. |
+| [FULL] | **Klaus Krippendorff.** *Content Analysis: An Introduction to Its Methodology.* Sage Publications, 2004 (2nd ed.). Defines Krippendorff's alpha ($\alpha$), the standard non-parametric reliability coefficient capable of handling ordinal, interval, and nominal data with arbitrary missing values and rater counts. Recommends $\alpha \ge 0.800$ for firm conclusions, $\alpha \ge 0.667$ for tentative conclusions, and explicitly rejects $\alpha < 0.667$ as unreliable. Used in EXP-95 for ordinal 0–10 scale critique scoring. |
+
