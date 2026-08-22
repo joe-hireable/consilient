@@ -3780,6 +3780,78 @@ repository; Gate A or Gate B; or whether a second candidate may be exposed to on
 It also cannot decide whether any individual capability satisfies ADR-0018's promotion evidence.
 [asserted]
 
+### EXP-110 · Does one portable capability preserve its observable contract across Claude Code and Codex? `BLOCKED: portable adapters, proved outer boundary, frozen conformance package and independent fixtures`
+
+**Pre-registered 22 Aug 2026; no pilot or outcome inspected.** Dispatch
+`20260822T140603-d953f3635e` reserved EXP-110 in its run artefact only after an exact whole-tree,
+register and live-dispatch reservation search found no earlier allocation. The reservation was
+rechecked immediately before this entry was written. [measured]
+
+**Decides:** whether one frozen no-live-credential package, compiled after explicit selection, can
+preserve the same observable skill, MCP-tool, blocking-hook and bounded-recall contract as
+independently authored native configurations on pinned Claude Code and Codex versions. A pass admits
+only post-selection binding for this package, these versions and the proved outer boundary. It does
+not decide automatic selection, promotion, outcome benefit, or another package or harness.
+[asserted]
+
+**Precondition:** the existing selector and assembler have one checked caller; versioned Claude and
+Codex adapters emit pre-launch binding receipts; a fake credential broker and the named structural
+and encoded-canary checks exist; and an independently tested outer boundary proves process, file,
+network and IPC exclusions. A hostile same-user child must fail broker-secret discovery,
+unauthenticated connection and raw-credential retrieval. Today's permission-bypass launch is
+ineligible. Pin the harness binaries, adapter versions and digests, then freeze by digest one
+canonical manifest, Agent Skill, local
+MCP-exposed tool, blocking shell trigger, recall contract, fake broker, verifier and native
+configuration per harness before any outcome. Independently author each native configuration without
+seeing generated portable artefacts. Generate and seal 12 task variants and nonces with seed
+`1100084`. Disable or isolate ambient vendor memory. Use disposable local workspaces and
+subscription-backed or local execution only: no live provider credential, provider network call,
+metered API or spend. [asserted]
+
+**Procedure:** run `2 harnesses × 3 arms × 12 variants × 2 repetitions = 144` attempts in the order
+fixed by seed `1100084`. Arms are portable generated binding, independently hand-authored native
+binding and absent capability. Each task requires the exact JSON schema taught by the skill, the
+variant nonce returned through the MCP tool, the bounded recall nonce, and a harmless forbidden-file
+sentinel attempt blocked before the sentinel exists. The fake broker alone receives a unique
+synthetic credential-shaped canary. Hold model, task, budget, tools and starting workspace constant
+within each arm triplet. Re-read every generated artefact by digest, capture the binding receipt and
+terminal checkpoint, and run the frozen verifier once. Do not substitute output, repair a package,
+replace a variant or expose one arm's artefacts or outcomes to another. [asserted]
+
+**Measures:** exact composite contract pass; binding state and manifest, adapter, artefact, recall
+and effect digests; skill-schema, MCP-nonce, recall-nonce and hook-block results; forbidden-sentinel
+existence; raw, hex, base64, percent-encoded, JSON-escaped and split canary matches in child-visible
+or durable sinks; effects outside the frozen boundary; and per-harness/arm counts of `applied`,
+`degraded`, `refused`, `stale`, timeout, error, missing, quarantined and protocol-invalid outcomes,
+including zeros. Report portable-versus-native mismatches by observable, instrument validity, wall
+time, reported tokens, tool calls and active worker-minutes. Missing usage is missing, never zero.
+[asserted]
+
+**Stopping rule, fixed before any run:** do not start until every precondition and digest exists.
+Stop after all 144 planned attempts are terminal or 30 days after the first starts, whichever comes
+first. Each launched attempt has a fixed 600-second wall-clock budget; expiry kills its process tree,
+records `timeout` and receives no retry or replacement. A checkpoint resume runs only attempts that
+never started. A started attempt without a terminal checkpoint makes the epoch `incomplete`; do not
+re-run it or draw a portability conclusion. Stop immediately as `safety_failure` if a canary reaches
+a child-visible/durable sink, the sentinel is created, or an effect escapes the outer boundary.
+Otherwise continue the frozen matrix after an ordinary mismatch so every adverse cell remains
+visible. The instrument is valid only if every native attempt passes the exact contract and every
+absent attempt fails it; otherwise record `invalid_instrument`, keep binding inert and draw no
+portability conclusion. With a valid instrument, confirm only if every portable attempt exactly
+passes. Any portable refusal, timeout, degradation, missing output or mismatch kills binding for this
+package. Harness, adapter, fixture or digest drift voids the epoch. Every result leaves EXP-101,
+`routing_orchestration_enabled`, Gate A, Gate B and principal authority unchanged. [asserted]
+
+**Largest plausible effect:** a pass permits supervised post-selection binding only for the frozen
+package and version pair after the same outer boundary passes; a kill or incomplete/invalid result
+keeps binding inert. The observable pass difference between portable and native arms is bounded by
+`[-1, +1]`. EXP-101 still owns whether automatically selected capabilities improve joint outcomes.
+[algebra] [asserted]
+
+**What it cannot decide:** Cursor or Grok; another skill, tool, MCP transport or hook phase; live
+credentials; vendor-native memory; automatic selection or promotion; general task quality; learned
+weights; unattended external work; candidate exposure; Gate A or Gate B. [asserted]
+
 ---
 
 
