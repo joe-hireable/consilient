@@ -702,33 +702,33 @@ CSS = """
 *,*::before,*::after{box-sizing:border-box}
 :root{
   color-scheme:light dark;
-  --ground:#faf9f7; --surface:#fff; --raised:#f3f1ed;
-  --ink:#1a1a18; --ink-2:#4a4843; --muted:#75726b; --rule:#e2ded7;
-  --accent:#2c6560; --accent-soft:#e3efed;
-  --pass:#2b6b3f; --pass-bg:#e8f2e9;
-  --fail:#a02c25; --fail-bg:#fbe9e7;
-  --unknown:#8a6314; --unknown-bg:#faf0dc;
+  --ground:#F6F7F9; --surface:#FFFFFF; --raised:#ECEEF2;
+  --ink:#0C0E12; --ink-2:#3D4453; --muted:#6F778A; --rule:#D6DAE2;
+  --accent:#B88714; --accent-soft:#FAF2DE;
+  --pass:#23864F; --pass-bg:#E9F6EF;
+  --fail:#C53030; --fail-bg:#FDE8E8;
+  --unknown:#B57414; --unknown-bg:#FCF4E4;
   --shadow:0 1px 2px rgba(26,26,24,.05),0 8px 24px -12px rgba(26,26,24,.18);
   --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --serif:ui-serif,Georgia,"Times New Roman",serif;
   --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --ground:#131417; --surface:#1a1c20; --raised:#22252a;
-  --ink:#eceae4; --ink-2:#c3c0b8; --muted:#918d84; --rule:#2e3138;
-  --accent:#5fb3ab; --accent-soft:#1b3330;
-  --pass:#74c288; --pass-bg:#16281c;
-  --fail:#f0897f; --fail-bg:#2e1817;
-  --unknown:#d9a441; --unknown-bg:#2b2213;
+  --ground:#0C0E12; --surface:#14171E; --raised:#1C202A;
+  --ink:#F0F2F5; --ink-2:#C4C9D4; --muted:#8B93A5; --rule:#2A2F3D;
+  --accent:#E2B340; --accent-soft:#2A2412;
+  --pass:#2E9E66; --pass-bg:#11261C;
+  --fail:#E05349; --fail-bg:#2D1617;
+  --unknown:#DDA136; --unknown-bg:#2B2012;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
 }}
 :root[data-theme="dark"]{
-  --ground:#131417; --surface:#1a1c20; --raised:#22252a;
-  --ink:#eceae4; --ink-2:#c3c0b8; --muted:#918d84; --rule:#2e3138;
-  --accent:#5fb3ab; --accent-soft:#1b3330;
-  --pass:#74c288; --pass-bg:#16281c;
-  --fail:#f0897f; --fail-bg:#2e1817;
-  --unknown:#d9a441; --unknown-bg:#2b2213;
+  --ground:#0C0E12; --surface:#14171E; --raised:#1C202A;
+  --ink:#F0F2F5; --ink-2:#C4C9D4; --muted:#8B93A5; --rule:#2A2F3D;
+  --accent:#E2B340; --accent-soft:#2A2412;
+  --pass:#2E9E66; --pass-bg:#11261C;
+  --fail:#E05349; --fail-bg:#2D1617;
+  --unknown:#DDA136; --unknown-bg:#2B2012;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
 }
 body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
