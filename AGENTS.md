@@ -152,6 +152,34 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
     from public data was answered that way** — that is a judgement no test currently makes, and until
     one exists this principle binds by discipline, not by machinery.
 
+11. **No definitive answer is not a reason to stop.** Joe, 22 August 2026: *"If we cant get definitive
+    answers we need to get to the best estimate and ensure those answers are constantly strived for
+    with experimentation. If there are multiple right answers then again, the best of the bunch."*
+
+    Three obligations follow, and they are the ones this project keeps failing:
+
+    **Decide at the best available estimate.** Absence of a measurement is not permission to defer.
+    Produce the answer the evidence supports, **tag it honestly** — `[asserted]` is not a failure —
+    and carry on. Waiting for certainty is how a gate becomes a wall, which
+    `docs/00-context/four-of-seven-gate-conditions-cannot-pass-2026-08-20.md` catalogues at length.
+
+    **Name the experiment that would improve it, in the same breath.** An estimate with no route to
+    becoming a measurement is a guess that has stopped trying. That is what `PROVISIONAL` status is
+    for, and why it requires a named killing experiment.
+
+    **Where several answers are defensible, choose the best and record why the others lost.** A menu
+    handed upward is work not done. The rejected options belong in the record — the trail of
+    reversals is the most valuable thing in `docs/decisions/` and the first thing people delete.
+
+    This does **not** license upgrading a tag without evidence, and it does not license presenting an
+    estimate as a measurement. Principle 1 still binds: `[asserted]` stays `[asserted]` until
+    something is run. **Deciding under uncertainty and pretending to certainty are opposites, not
+    neighbours.**
+
+    **Enforcement:** `tests/test_v0_invariants.py::test_provisional_adrs_name_a_live_experiment` fails
+    when a `PROVISIONAL` ADR names no experiment, or names one absent from the register. A decision
+    that admits it is provisional and offers no way out is the failure this principle exists to stop.
+
 ## Boundaries
 
 ### Always do

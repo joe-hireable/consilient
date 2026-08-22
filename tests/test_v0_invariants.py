@@ -2784,7 +2784,11 @@ def test_foreign_commit_identifiers_may_only_decrease():
         "both private corpora with a scrubbed environment, then allowlist it with a reason or "
         "aggregate it away."
     )
-    assert total <= 16, (
+    # Raised 16 → 17 on 21 Aug 2026: 4c0b901 made EXP-96's `run_exp96.py` tracked, adding
+    # its second per-file copy of the itsdangerous 2.2.0 pin 096c8d4… — the identifier
+    # corpus-tested against both private corpora and allowlisted in f83f6c1 ("resolves in
+    # neither"). The unexamined count above is unchanged and remains the guard that bites.
+    assert total <= 17, (
         f"the allowlisted identifier total rose to {total}. Every one is individually cleared, "
         "so this is not a leak, but the number is meant to fall over time as citations are "
         "aggregated away. Raise this ceiling only with the same corpus test in the commit."
@@ -4843,6 +4847,94 @@ def test_doctor_states_which_code_measured_which_directory(tmp_path, capsys):
     assert str((tmp_path / "log").resolve()) in rendered[1], rendered[1]
 
 
+# --------------------------- missing trajectory is not an empty trajectory, 21 Aug 2026
+def test_cli_read_commands_refuse_a_missing_trajectory_directory(
+    tmp_path, monkeypatch, capsys
+):
+    """The defect the principal hit: defaults to `.harness/log` under cwd and reports zero.
+
+    Measured 21 August 2026 from `C:\\Users\\jpbpr` with no checkout: `consil replay`,
+    `dashboard` and `beta` all reported confident zeros. Each command here is run from a
+    directory with no trajectory directory at all.
+    """
+    monkeypatch.chdir(tmp_path)
+    log = tmp_path / ".harness" / "log"
+    db = tmp_path / ".harness" / "state.db"
+    out_path = tmp_path / ".harness" / "dashboard.html"
+    assert not log.is_dir()
+
+    cases = [
+        (["replay"], {}),
+        (["beta"], {}),
+        (["usage"], {}),
+        (["doctor"], {}),
+        (["dashboard", "--out", str(out_path)], {"out_path": out_path}),
+    ]
+    for argv, extra in cases:
+        capsys.readouterr()
+        code = main(["--log", str(log), "--db", str(db), *argv])
+        captured = capsys.readouterr()
+        assert code == 2, argv
+        assert captured.out == "", f"{argv} printed a report despite a missing log"
+        message = captured.err
+        assert "trajectory not configured" in message, message
+        assert str(log.resolve()) in message, message
+        assert "--log" in message, message
+        assert "0 events" not in message
+        assert "0 human rejections" not in message
+        if out := extra.get("out_path"):
+            assert not out.exists(), f"{argv} wrote {out} without a trajectory"
+
+
+def test_cli_read_commands_report_zero_on_an_empty_trajectory(tmp_path, capsys):
+    """An existing but empty directory is zero — and must say so, with its path visible."""
+    log = tmp_path / "log"
+    log.mkdir(parents=True)
+    db = tmp_path / "state.db"
+
+    capsys.readouterr()
+    replay_code = main(["--log", str(log), "--db", str(db), "replay"])
+    replay_out = capsys.readouterr().out
+    assert replay_code != 2, "an empty trajectory must not be refused"
+    assert "replayed 0 events" in replay_out
+    assert "trajectory not configured" not in replay_out
+    assert str(log.resolve()) in replay_out
+    assert "empty" in replay_out
+
+    capsys.readouterr()
+    assert main(["--log", str(log), "--db", str(db), "beta"]) == 0
+    beta_out = capsys.readouterr().out
+    assert "0 human rejections" in beta_out
+    assert "trajectory not configured" not in beta_out
+    assert str(log.resolve()) in beta_out
+    assert "empty" in beta_out
+
+
+def test_missing_trajectory_guard_is_mutation_tested(tmp_path, monkeypatch, capsys):
+    """Break the guard, confirm this file's refusal test fails, restore, confirm it passes."""
+    from consilient import cli as cli_mod
+
+    monkeypatch.chdir(tmp_path)
+    log = tmp_path / "log"
+    db = tmp_path / "state.db"
+
+    real = cli_mod.require_trajectory
+    monkeypatch.setattr(cli_mod, "require_trajectory", lambda _log: "empty")
+    capsys.readouterr()
+    broken_code = main(["--log", str(log), "--db", str(db), "replay"])
+    broken = capsys.readouterr()
+    assert broken_code != 2, "mutation did not restore the false-zero path"
+    assert "replayed 0 events" in broken.out
+    assert "trajectory not configured" not in broken.err
+
+    monkeypatch.setattr(cli_mod, "require_trajectory", real)
+    capsys.readouterr()
+    fixed_code = main(["--log", str(log), "--db", str(db), "replay"])
+    fixed_err = capsys.readouterr().err
+    assert fixed_code == 2
+    assert "trajectory not configured" in fixed_err
+
+
 # ------------------------------------------ working principle 9, find the bar, 21 Aug 2026
 SUPERLATIVE = re.compile(
     # Deliberately narrow: a claim about EVERYONE ELSE's work, not a self-limiting statement.
@@ -4896,4 +4988,44 @@ def test_a_superlative_claim_carries_its_citation():
     assert not offenders, (
         "a superlative claim in public-facing prose carries no citation. Name the incumbent "
         "and the evidence, or drop the claim:\n  " + "\n  ".join(offenders)
+    )
+
+
+# ------------------------------------------ working principle 11, decide under uncertainty
+def test_provisional_adrs_name_a_live_experiment():
+    """A PROVISIONAL decision must name the experiment that would settle it.
+
+    Joe, 22 August 2026: "If we cant get definitive answers we need to get to the best
+    estimate and ensure those answers are constantly strived for with experimentation."
+
+    PROVISIONAL is the honest status for a decision resting on `[asserted]` evidence, and the
+    writing-adrs skill already requires it to carry "a named experiment that would confirm or
+    kill it". Nothing enforced that. An estimate with no route to becoming a measurement is a
+    guess that has stopped trying, and this repository has thirteen catalogued cases of a
+    documented rule with nothing behind it.
+
+    The check is deliberately narrow. It does not judge whether the experiment is good, only
+    that the ADR names one and that the register knows it. A check that tried to judge quality
+    would fire on everything and get suppressed, and then protect nothing.
+    """
+    register = Path("docs/10-research/experiment-register.md")
+    if not register.exists():  # pragma: no cover - repository-only check
+        pytest.skip("no experiment register in this checkout")
+    known = set(re.findall(r"EXP-\d+", register.read_text(encoding="utf-8")))
+
+    offenders: list[str] = []
+    for adr in sorted(Path("docs/decisions").glob("0*.md")):
+        text = adr.read_text(encoding="utf-8")
+        if not re.search(r"^\s*-?\s*\*\*Status:\*\*.*PROVISIONAL", text, re.MULTILINE | re.IGNORECASE):
+            continue
+        cited = set(re.findall(r"EXP-\d+", text))
+        if not cited:
+            offenders.append(f"{adr.name}: PROVISIONAL but names no experiment")
+        elif not cited & known:
+            unknown = ", ".join(sorted(cited))
+            offenders.append(f"{adr.name}: names {unknown}, absent from the register")
+
+    assert not offenders, (
+        "a PROVISIONAL decision must name the experiment that would settle it, and that "
+        "experiment must exist in the register:\n  " + "\n  ".join(offenders)
     )
