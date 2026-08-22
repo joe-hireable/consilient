@@ -1,10 +1,10 @@
 # Decision index
 
-63 ADRs, 22 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+84 ADRs, 22 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
-`python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number; nothing
-catches a row missing from this table, which is the argument for generating it rather than
-editing it. 0002 and 0027 appear twice by design, in the highlight section and in their own.
+`python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number;
+`tests/test_adr_trail.py` catches a numbered ADR missing from this table. 0002 and 0027 appear
+twice by design, in the highlight section and in their own.
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED/DEPRECATED
@@ -59,7 +59,7 @@ Read these before anything else. Everything downstream depends on them.
 | [0048](0048-open-source-first-and-facilitation-is-prepaid-never-in-arrears.md) | **Open source first; paid facilitation is prepaid, never in arrears** — every capability usable by someone who pays nothing and contacts no server | ✅ |
 | [0049](0049-experiments-inform-they-do-not-gate.md) | **Experiments inform; they do not gate construction** — an unrun experiment justifies a PROVISIONAL assumption with a falsifier, not a stop | ✅ |
 | [0050](0050-gate-on-effect-size-not-on-uncertainty.md) | **Gate on effect size, not on the mere existence of uncertainty** — an entry that does not state its largest plausible effect cannot block a build | ✅ |
-| [0051](0051-a-tick-is-an-attempt-and-only-execution-runs-unattended.md) | **A tick is an attempt, only execution-bearing work runs unattended, and there is no offline consolidation phase**; the retry ceiling is derived from β and is 1 today | 🟡 |
+| [0051](0051-a-tick-is-an-attempt-and-only-execution-runs-unattended.md) | **A tick is an attempt, only execution-bearing work runs unattended, and there is no offline consolidation phase**; retry sizing corrected by [0077](0077-separate-candidate-exposure-from-verifier-fusion-and-measure-both.md) | 🟡 |
 | [0054](0054-route-by-measured-capability-against-a-verifier-contract-never-by-a-harness-label.md) | **Route by measured capability against a verifier contract, never by a harness label** | 🟡 |
 | [0055](0055-simulated-users-produce-runs-not-verdicts.md) | **Simulated users produce runs, not verdicts** — an unmeasured verifier's *pass* is not evidence, only its *fail* is; the same instrument tests whether a non-expert can use the harness | 🟡 |
 | [0056](0056-schedule-work-across-prepaid-quota-pools-and-never-shed-to-spend.md) | **Schedule work across prepaid quota pools and never shed onto spend** | 🟡 |
@@ -70,13 +70,22 @@ Read these before anything else. Everything downstream depends on them.
 | [0064](0064-add-training-providers-and-supersede-openrouter-as-sole-metered-vendor.md) | **Add training providers and supersede OpenRouter as sole metered vendor** | ✅ |
 | [0065](0065-what-is-native-what-is-adopted-and-what-is-a-marketplace.md) | **What is native, what is adopted, and what is a marketplace** — a component whose error rate must be measured is native; one whose errors are self-evident may be adopted | ✅ |
 | [0066](0066-principal-harvest-is-a-private-training-corpus.md) | **The principal's harvest is a private training corpus**; 30–35B fine-tunes are native backends; the data is never published | ✅ |
-| [0067](0067-front-one-chat-with-one-owner-evidence-squads.md) | **Front one chat with one-owner squads whose added roles bring distinct evidence** | 🟡 |
+| [0067](0067-front-one-chat-with-one-owner-evidence-squads.md) | **Front one chat with one-owner squads whose added roles bring distinct evidence**; composition stands, candidate sizing corrected by [0077](0077-separate-candidate-exposure-from-verifier-fusion-and-measure-both.md) | 🟡 |
 | [0074](0074-preserve-records-version-capabilities-and-reserve-training-for-parameter-updates.md) | **Preserve records, version capabilities and reserve training for parameter updates** | 🟡 |
+| [0077](0077-separate-candidate-exposure-from-verifier-fusion-and-measure-both.md) | **Separate candidate-exposure unions from verifier-fusion intersections and measure both** | 🟡 |
 | [0081](0081-refuse-high-consequence-single-anchor-conclusions.md) | **Refuse high-consequence single-anchor conclusions and acquire another anchor** | 🟡 |
 | [0083](0083-expose-squad-state-only-on-pull-and-record-steering-before-it-acts.md) | **Expose squad state only on pull and record steering before it acts** | 🟡 |
 | [0084](0084-compile-portable-capabilities-per-harness-and-refuse-semantic-loss.md) | **Compile portable capabilities per harness and refuse semantic loss** | 🟡 |
 | [0086](0086-acquire-expertise-as-a-proven-capability-bundle-and-tune-only-after-retrieval-loses.md) | **Acquire expertise as a proven capability bundle and tune only after retrieval loses** | 🟡 |
+| [0068](0068-decompose-each-request-into-the-fewest-verifiable-dependent-streams.md) | **Decompose each request into the fewest verifiable dependent streams before composing squads** | 🟡 |
 | [0071](0071-commit-to-a-delivery-window-and-prove-liveness-with-sealed-checkpoints.md) | **Commit to a delivery window, prove liveness with sealed checkpoints, and send only exceptions before delivery** | 🟡 |
+| [0070](0070-make-chat-a-compiler-to-versioned-work-item-commitments.md) | **Make chat a compiler to versioned work-item commitments before dispatch** | 📋 |
+| [0072](0072-close-native-work-items-only-against-evidence-and-project-them-outward.md) | **Close native work items only against evidence and project them outward** | 🟡 |
+| [0078](0078-admit-only-gated-typed-effects-and-record-every-effect.md) | **Admit only gated typed effects and record every effect** | 🟡 |
+| [0079](0079-require-a-durable-decision-before-material-actuation-and-keep-judgement-in-the-skill.md) | **Require a durable decision before material actuation and keep judgement in the skill** | 🟡 |
+| [0080](0080-keep-consequence-signals-out-of-human-beta.md) | **Keep consequence signals out of human-verdict beta** | 🟡 |
+| [0082](0082-project-raci-onto-per-work-item-rights-and-require-structural-consultation.md) | **Project RACI onto per-work-item rights and require structural consultation** | 🟡 |
+| [0085](0085-qualify-model-revisions-before-routing-and-seal-fine-tune-evaluation.md) | **Qualify model revisions before routing, defer matrix factorisation, and seal fine-tune evaluation** | 🟡 |
 
 ## Behaviour and safety
 
@@ -103,6 +112,9 @@ Read these before anything else. Everything downstream depends on them.
 | [0017](0017-bootstrap-harness.md) | Bootstrap harness — Claude Code as a working prototype | 📋 |
 | [0023](0023-pr-review-gates.md) | PR review gates by blast radius; admin bypass is logged | 📋 |
 | [0024](0024-commercialisation-and-telemetry.md) | Commercialisation and telemetry — private by default, per-use re-consent | 📋 |
+| [0073](0073-living-documentation-is-generated-checked-or-append-only.md) | **Living documentation is generated-and-checked or append-only — never maintained**; the principal's words verbatim-with-locator or not at all | 🟡 |
+| [0075](0075-prove-reversibility-close-escalation-and-ratchet-friction.md) | **Prove reversibility, close escalation to six principal-only classes, and ratchet avoidable friction** | 🟡 |
+| [0076](0076-owner-gates-persistent-self-change-and-the-instrument-is-sealed.md) | **The owner gates persistent self-change and the acceptance instrument stays sealed** | 🟡 |
 
 ## Standing invariants
 
@@ -132,3 +144,11 @@ to every ADR and every PR:
 - **0054** — PROVISIONAL pending EXP-90 … EXP-93.
 - **0055** — PROVISIONAL pending EXP-74, EXP-75 and EXP-76; owes three enforcement checks (V0-30, V0-31, V0-32), unwritten because `src/` and `tests/` were owned by concurrent agents on 21 Aug 2026.
 - **0056** — PROVISIONAL pending EXP-94 for the allocation clauses; D5 ships with its check.
+- **0070** — PROPOSED; its matched chat-versus-command trial is not yet allocated an experiment id.
+- **0072** — PROVISIONAL pending EXP-98 for estimate/checkpoint mechanics, EXP-19 for feedback,
+  and EXP-53 for signing.
+- **0078** — PROVISIONAL pending EXP-35 and EXP-59.
+- **0079** — PROVISIONAL pending EXP-106.
+- **0080** — PROVISIONAL pending EXP-105 for the Tier 1 preparation signal only.
+- **0082** — PROVISIONAL pending EXP-107.
+- **0085** — PROVISIONAL pending EXP-111.
