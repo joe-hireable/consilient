@@ -1,4 +1,4 @@
-# Agent catalogue: task profiles over four fact-bearing contracts, crossed with subject expertise
+# Agent catalogue: task profiles crossed with subject expertise, reusing existing role contracts
 
 **Correction:** beta bounds candidate exposure, not squad headcount; model or provider family alone
 has zero evidence credit; a missing required capability is a refusal rather than a degradation; and
@@ -10,7 +10,7 @@ ADR-0077; ADR-0082; ADR-0084; `scripts/dispatch.py:969-981,1280-1304`]
 - **Status:** specification only; [ADR-0093](../../decisions/0093-compose-agent-roles-from-worker-method-and-subject-expertise.md)
   is PROVISIONAL. [measured]
 - **Killing experiment:**
-  [EXP-136](../../10-research/experiment-register.md#exp-136--does-a-worker-method-profile-beat-the-same-capable-generalist-with-the-same-facts-tools-and-budget-blocked)
+  [EXP-136](../../10-research/experiment-register.md#exp-136--does-a-worker-method-profile-beat-the-same-capable-generalist-with-the-same-starting-evidence-access-tools-and-budget-blocked)
   tests whether these profiles add outcome value or are one model in different costumes. [asserted]
 - **Scope:** portable, task-scoped role composition for the closed work taxonomy in
   `2026-08-23-work-taxonomy.md`; no product implementation, source-path promise, new CLI command,
@@ -18,21 +18,21 @@ ADR-0077; ADR-0082; ADR-0084; `scripts/dispatch.py:969-981,1280-1304`]
 
 ## 1. Decision first
 
-An agent role is composed for one work item from two independent axes: a **worker-method profile**
-says what work category is being performed and selects one of four fact-bearing execution contracts,
-while one or more **subject-expertise bundle references** say which domain sources, vocabulary,
-examples and tools are admissible. The task contract, fact contract, bounded memory and target-
-harness binding complete the run-local instance. [asserted]
+An agent assignment is composed for one work item from two independent axes: a **worker-method
+profile** says what work category and procedure are being performed, while one or more **subject-
+expertise bundle references** say which domain sources, vocabulary, examples and tools are
+admissible. ADR-0067's existing role contract, ADR-0082's RACI rights, the task/fact contract, bounded
+memory and target-harness binding complete the run-local instance. [asserted]
 
-`role_instance = worker_profile + worker_contract + expertise_refs + task_contract + fact_contract + capability_binding + bounded_recall`
+`role_instance = worker_profile + assignment_ref(existing_role_contract, raci_rights) + expertise_refs + task_contract + fact_contract + capability_binding + bounded_recall`
 [asserted]
 
-The repository stores thirteen small category profiles, four worker contracts and each versioned
-expertise bundle once. It does not store `researcher-in-genomics`, `researcher-in-payments` or any
-other pair. A role instance is a content-addressed, run-local compilation and expires with its work-
-item assignment. For `P` profiles, `C` contracts and `E` expertise bundles, durable catalogue state
-is `O(P + C + E)`, not `O(P x E)`; compiled instances are receipts rather than catalogue members.
-[algebra] [asserted]
+The repository stores thirteen small category profiles and each versioned expertise bundle once; it
+reuses the role contracts already fixed by ADR-0067. It does not store `researcher-in-genomics`,
+`researcher-in-payments` or any other pair. A role instance is a content-addressed, run-local
+compilation and expires with its work-item assignment. For `P` profiles and `E` expertise bundles,
+durable catalogue state is `O(P + E)`, not `O(P x E)`; compiled instances are receipts rather than
+catalogue members. [algebra] [asserted]
 
 The default is still one accountable Owner, usually the strongest eligible generalist, which may
 execute several worker methods sequentially. A second runtime is admitted only when a task-scoped
@@ -43,24 +43,26 @@ sources and context through another persona or model is echo. [measured: ADR-006
 
 The work-taxonomy stream owns the thirteen measurement labels and their three phases. This document
 gives every category a native task-scoped profile, but a profile does not imply a separate runtime.
-Only four contracts earn evidence-bearing worker status; framing, innovation, synthesis and planning
-remain Owner methods. This resolves the principal's "categories are agents" outcome without turning
-measurement labels into standing staff. [measured] [asserted]
+Acquisition, instrumentation, realisation and assessment are reusable execution patterns, not a new
+role enum: evidence credit and runtime admission remain exactly ADR-0067/0082's concern. Realisation
+is responsible artefact work and supplies no independent anchor. This resolves the principal's
+"categories are agents" outcome without turning measurement labels into standing staff. [measured]
+[asserted]
 
 ## 2. The two axes
 
 ### 2.1 Worker method
 
 `worker_profile` is a closed, versioned mapping from one of the thirteen `work_category` values to a
-procedure, output and refusal rule. An evidence-bearing profile selects one `worker_contract` from
-`acquirer`, `instrumenter`, `realiser` or `assessor`; an Owner profile selects no additional worker.
-This is one method axis with a measurement view and an execution view, not a third taxonomy.
-[asserted]
+procedure, output and refusal rule. It projects work onto an existing ADR-0067 role contract and
+ADR-0082 RACI rights; it does not create a role name. If a profile needs distinct sequential methods,
+it opens linked work-item revisions rather than storing a compound persona. Acquisition,
+instrumentation, realisation and assessment below are explanatory patterns only. [asserted]
 
 A capable generalist may execute any profile. That does not make the profile redundant: it freezes
 method and receipts. It also does not justify another squad member. Another runtime appears only
-when the selected contract needs isolated acquisition or non-overlapping state/capability; otherwise
-the Owner executes the profile directly. [asserted]
+when the ADR-0067 role contract needs isolated acquisition or non-overlapping state/capability;
+otherwise the Owner executes the profile directly. [asserted]
 
 ### 2.2 Subject expertise
 
@@ -81,16 +83,19 @@ ADR-0081; ADR-0082] [asserted]
 
 ## 3. The worker catalogue
 
-The fact-bearing catalogue has four contracts. Each must produce the named sealed observable; if a
-task-specific fact contract cannot bind that observable to an admitted source or execution surface,
-the role does not launch. [asserted]
+The catalogue has thirteen profiles. Non-Owner execution steps are grouped below by four reusable
+patterns; Owner-only profiles appear in the following exhaustive category table. The pattern names
+are not stored identities and do not replace ADR-0067's `Owner`, `Domain specialist`,
+`Executing verifier`, `Adversary`, `Replicator` or `Experimenter` contracts. A fact-bearing assignment
+must produce the named sealed observable; otherwise it does not launch as C/evidence work. [measured]
+[asserted]
 
-| `worker_contract` | Eligible different class of facts | Minimum execution contract | Category profiles |
-|---|---|---|---|
-| `acquirer` | A new primary-source record, public/open dataset observation, browser/live-system observation or repository-state observation absent from the Owner's frozen evidence manifest. [measured: ADR-0081] [asserted] | Retrieve or inspect the named anchor, retain identity/time/digest/locator, licence where relevant, omissions and failures, then seal before synthesis. Snippets and model memory do not satisfy it. [measured: citing-sources skill] [asserted] | `discovery`, `research` [asserted] |
-| `instrumenter` | An executed experiment, simulation, formal/algebraic check or data analysis with frozen premises/procedure and raw outputs. A model-imagined result contributes nothing. [asserted] | Pre-register when empirical, execute the producing script or formal model, retain adverse/missing outcomes and apply the fixed stopping or sensitivity rule. `[simulated]`, `[algebra]` and `[measured]` remain distinct. [measured: running-experiments skill] [asserted] | `experiment`, `simulation`; supports `innovation` only through an executed transfer test. [asserted] |
-| `realiser` | The target artefact, diff, build observation or authorised delivery/read-back receipt from owned state. This is responsible work, not independent evidence that the result is correct. [asserted] | Work from the frozen realisation package, retain artefact and tool-result digests, never reopen the goal/verifier, and perform an effect only inside existing authority. [asserted] | `implementation`, `delivery`; specification when the specification itself is the requested artefact. [asserted] |
-| `assessor` | An independently executed frozen oracle/comparison, hostile counterexample or isolated reacquisition against a candidate hidden from the author path. [measured: ADR-0067; ADR-0081] [asserted] | Bind candidate, comparator and acceptance digests; execute once; retain every unavailable result; give same-diff opinion, persona and family difference zero credit. [asserted] | `assessment`, `verification`; `debate` only when it becomes an executed counterexample or new source acquisition. [asserted] |
+| Execution pattern, not a role enum | Eligible observable | Minimum method | Existing role/RACI projection | Category profiles |
+|---|---|---|---|---|
+| Acquisition | A new primary-source record, public/open dataset observation, browser/live-system observation or repository observation carried through ADR-0082's admitted `artefact_execution` or `novel_corpus_observation` channel, absent from the Owner's frozen evidence manifest. [measured: ADR-0081; ADR-0082] [asserted] | Retrieve or inspect the named anchor, retain identity/time/digest/locator, licence where relevant, omissions and failures, then seal before synthesis. Snippets and model memory do not satisfy it. [measured: citing-sources skill] [asserted] | ADR-0067 `Domain specialist`; `Adversary` for a hostile source; `Replicator` for isolated reacquisition. ADR-0082 C credit still requires structural admission. [measured] [asserted] | `discovery`, `research` [asserted] |
+| Instrumentation | An executed experiment, simulation, formal/algebraic check or data analysis with frozen premises/procedure and raw outputs. A model-imagined result contributes nothing. [asserted] | Pre-register when empirical, execute the producing script or formal model, retain adverse/missing outcomes and apply the fixed stopping or sensitivity rule. `[simulated]`, `[algebra]` and `[measured]` remain distinct. [measured: running-experiments skill] [asserted] | ADR-0067 `Experimenter`, normally ADR-0082 R; a result receives evidence credit only through its sealed observation contract. [asserted] | `experiment`, `simulation`; an `innovation` successor may run a transfer falsifier. [asserted] |
+| Realisation | The target artefact, diff, build observation or authorised delivery/read-back receipt from owned state. This is responsible work, not independent evidence that the result is correct. [asserted] | Work from the frozen realisation package, retain artefact and tool-result digests, never reopen the goal/verifier, and perform an effect only inside existing authority. [asserted] | ADR-0082 R, normally co-held by the Owner. It receives zero consilient anchor credit; a second runtime needs non-overlapping owned state/capability, not a new role label. [measured] [asserted] | `implementation`, `delivery`; specification when the specification itself is the requested artefact. [asserted] |
+| Assessment | An independently executed frozen oracle/comparison, hostile counterexample or isolated reacquisition against a candidate hidden from the author path. [measured: ADR-0067; ADR-0081] [asserted] | Bind candidate, comparator and acceptance digests; execute once; retain every unavailable result; give same-diff opinion, persona and family difference zero credit. [asserted] | ADR-0067 `Executing verifier`, `Adversary` or `Replicator`, with task-scoped ADR-0082 R/C rights frozen before work. [measured] [asserted] | `assessment`, `verification`; `debate` only when it becomes an executed counterexample or new source acquisition. [asserted] |
 
 The Owner/generalist is accountable but is not a fifth evidence role. It supplies governance
 provenance and runs the profiles whose outputs are decisions or plans rather than new facts.
@@ -101,43 +106,43 @@ provenance and runs the profiles whose outputs are decisions or plans rather tha
 | Work category | Native task-scoped profile |
 |---|---|
 | `framing` | Owner resolves the authenticated task, authority, scope, consequence, reversal and unknowns; it receives no independent anchor credit. [asserted] |
-| `discovery` | `acquirer` inspects actual system state and candidate incumbents. [asserted] |
-| `research` | `acquirer` retrieves and verifies primary sources or open data. [asserted] |
-| `experiment` | `instrumenter` freezes and runs the empirical protocol. [asserted] |
-| `simulation` | `instrumenter` runs the declared formal model and sensitivity analysis. [asserted] |
-| `debate` | `assessor` executes a counterexample or contrary acquisition; rhetorical exchange stays Owner deliberation and earns zero credit. [asserted] |
-| `innovation` | Owner proposes the transfer; `acquirer` retrieves the foreign mechanism and `instrumenter` runs its falsifier when those facts are needed. [asserted] |
+| `discovery` | An ADR-0067 `Domain specialist`, `Adversary` or `Replicator` acquisition inspects actual system state and candidate incumbents under the matching R/C rights. [asserted] |
+| `research` | An ADR-0067 `Domain specialist` retrieves and verifies primary sources or open data. [asserted] |
+| `experiment` | The ADR-0067 `Experimenter` freezes and runs the empirical protocol. [asserted] |
+| `simulation` | The ADR-0067 `Experimenter` runs the declared formal model and sensitivity analysis. [asserted] |
+| `debate` | An ADR-0067 `Adversary` executes a counterexample or contrary acquisition; rhetorical exchange stays Owner deliberation and earns zero credit. [asserted] |
+| `innovation` | Owner proposes the transfer; any missing foreign mechanism or falsifier becomes a linked `discovery` and `experiment|simulation` work item under existing roles. [asserted] |
 | `synthesis` | Owner applies the frozen decision rule to sealed evidence, emits one candidate and dispositions dissent; this is derivation, not another anchor. [asserted] |
-| `assessment` | `assessor` executes the frozen comparison/acceptance contract. [asserted] |
-| `planning` | Owner derives the smallest verifiable work graph; live dependency/import facts are acquired through `acquirer` rather than invented. [asserted] |
-| `implementation` | `realiser` creates the target artefact. [asserted] |
-| `verification` | `assessor` executes the independent oracle against the realised artefact. [asserted] |
-| `delivery` | `realiser` performs the authorised hand-off and retains destination read-back or refusal. [asserted] |
+| `assessment` | An ADR-0067 `Executing verifier`, `Adversary` or `Replicator` executes the frozen comparison/acceptance contract. [asserted] |
+| `planning` | Owner derives the smallest verifiable work graph; missing live dependency/import facts become linked `discovery` work rather than inventions. [asserted] |
+| `implementation` | The ADR-0082 R assignment creates the target artefact and receives no independent anchor credit. [asserted] |
+| `verification` | An ADR-0067 `Executing verifier` executes the independent oracle against the realised artefact. [asserted] |
+| `delivery` | The ADR-0082 R assignment performs the authorised hand-off and retains destination read-back or refusal. [asserted] |
 
 Thus every category is executable natively, but only a concrete fact contract can justify another
 runtime. Most requests should still use one Owner/generalist across several profiles. [asserted]
 
 ## 4. Techniques and titles deliberately cut
 
-These names do not become additional `worker_contract` values. Their useful mechanics remain inside
-the profiles or subject axis. [asserted]
+These names do not become additional ADR-0067 role contracts. Their useful mechanics remain inside
+the profiles, existing contracts or subject axis. [asserted]
 
 | Cut role | Why it is cut | Where the real work goes |
 |---|---|---|
-| `framer`, `innovator`, `synthesiser`, `planner` | Their outputs are governance, hypotheses, decisions or work graphs rather than independent evidence. A second agent would add a title without a fact class. [asserted] | Keep the native category profile in the accountable Owner; dispatch an `acquirer` or `instrumenter` only for a concrete missing fact. [asserted] |
+| Standing `framer`, `innovator`, `synthesiser`, `planner` roles | Their outputs are governance, hypotheses, decisions or work graphs rather than independent evidence. A second agent would add a title without a fact class. [asserted] | Keep the native category profile in the accountable Owner; open a linked ADR-0067 acquisition/experiment assignment only for a concrete missing fact. [asserted] |
 | `hypothesiser` | A hypothesis is a falsifiable candidate statement, not a class of observed facts; a persona generating more guesses adds echo. [asserted] | Freeze a content-addressed hypothesis inside `framing`, `innovation`, `experiment` or `simulation` before the run. [asserted] |
-| `mathematical_modeller` | Mathematical modelling is an instrument mode; exact derivation and assumed-model output need different evidence tags, not different agents. [asserted] | `instrumenter` returns `[algebra]` proof/counterexample where exact and `[simulated]` sensitivity otherwise. [asserted] |
-| `data_scientist` | Data science names a broad discipline, not one work purpose; the same dataset operation may discover, experiment, simulate or assess. [asserted] | Use `acquirer`, `instrumenter` or `assessor` according to the estimand, with data tooling in the capability request and domain data in the expertise bundle. [asserted] |
-| `specifier` | A specification is a contract artefact, not an independent fact source. [asserted] | Use Owner `planning` when preparatory or `realiser`/`implementation` when the specification is the requested deliverable. [asserted] |
-| `domain_specialist` | Domain is the orthogonal expertise axis. Encoding it as a worker contract recreates pairwise agents and ambiguous inheritance. [asserted] | Bind one or more ADR-0086 `expertise_refs` to any category profile. [asserted] |
-| `reviewer`, `critic`, `auditor`, `adversary` | The title says nothing about the observation. A review that only rereads the author's material is echo. [measured: ADR-0067] [asserted] | Use `assessor` for an executed oracle/counterexample or `acquirer` for a contrary primary source. [asserted] |
-| `replicator` | Replication is an isolation constraint on acquisition, not a method or evidence class; another model seeing the same evidence is not replication. [measured: ADR-0067; ADR-0082] [asserted] | Re-run `acquirer`, `instrumenter` or `assessor` in an isolated snapshot against a separately named anchor. [asserted] |
+| `mathematical_modeller` | Mathematical modelling is an instrumentation mode; exact derivation and assumed-model output need different evidence tags, not different agents. [asserted] | The `simulation` profile under the existing `Experimenter` contract returns `[algebra]` proof/counterexample where exact and `[simulated]` sensitivity otherwise. [asserted] |
+| `data_scientist` | Data science names a broad discipline, not one work purpose; the same dataset operation may discover, experiment, simulate or assess. [asserted] | Select the work-purpose profile and existing role contract according to the estimand, with data tooling in the capability request and domain data in the expertise bundle. [asserted] |
+| `specifier` | A specification is a contract artefact, not an independent fact source. [asserted] | Use Owner `planning` when preparatory or ADR-0082 R/`implementation` when the specification is the requested deliverable. [asserted] |
+| Permanent domain-specific persona | Domain is the orthogonal expertise axis. A worker type such as `genomics_specialist` recreates pairwise agents and ambiguous inheritance. [asserted] | Bind ADR-0086 `expertise_refs` to the existing ADR-0067 `Domain specialist` contract for one work item. [asserted] |
+| Generic `reviewer`, `critic`, `auditor` | The title says nothing about the observation. A review that only rereads the author's material is echo. [measured: ADR-0067] [asserted] | Use the existing `Executing verifier` or `Adversary` contract only for an executed oracle, counterexample or contrary acquisition. [asserted] |
+| A new `replicator` worker type | Replication is an isolation constraint; another model seeing the same evidence is not replication. [measured: ADR-0067; ADR-0082] [asserted] | Reuse ADR-0067's existing `Replicator` contract in an isolated snapshot against a separately named anchor. [asserted] |
 | `manager`, `coordinator`, `middle_manager` | Existing work items, claims and one Owner already coordinate; another agent adds no truth-relevant fact and cannot inherit the principal's authority. [measured: ADR-0067; ADR-0082] [asserted] | `work_items.py` holds responsibility, `coordination.py` claims work and the Owner decides within existing rights. [measured] |
 | `persona` or model-family roles | Tone, title, prompt and provider change no source class. [measured: ADR-0081; ADR-0082] | Keep model/harness as routing and correlation metadata; credit only the executed observation. [asserted] |
 
-This cut is load-bearing. Adding a new worker contract requires a fact class none of the four can
-express and an EXP-136-class matched test. Adding a category profile requires a successor to the
-work taxonomy. Catalogue growth is not a marketplace count. [asserted]
+This cut is load-bearing. Adding an agent role requires a successor to ADR-0067 and a fact class its
+existing contracts cannot express. Adding a category profile requires a successor to the work
+taxonomy and an EXP-136-class matched test. Catalogue growth is not a marketplace count. [asserted]
 
 ## 5. Dynamic assembly, fail closed
 
@@ -147,8 +152,10 @@ A work-item revision requests a role using the existing ADR-0074 capability and 
 path. The semantic record contains only these concerns; it is not a second manifest format.
 [asserted]
 
-1. `worker_profile`, `worker_contract|null`, their versions and the matching immutable
-   `work_category`/phase. [asserted]
+1. `worker_profile`, its version and matching immutable `work_category`/phase, plus an immutable
+   ADR-0082 `assignment_ref` resolving the existing ADR-0067 role contract and RACI-rights projection.
+   Profile, title and prompt never confer rights. A required second method is a linked successor work
+   item, not another field in one persona. [asserted]
 2. `expertise_refs`, each an immutable ADR-0086 manifest digest or an empty list for a generalist.
    [asserted]
 3. `fact_contract`: acquisition channel, source/anchor contract, expected receipt, evidence-tag
@@ -172,8 +179,10 @@ Today this end-to-end role path does not exist. `select_capabilities()` validate
 and raises on malformed, unknown or unavailable items, but returns metadata only; it has no required
 semantics, optional-loss or application receipt. Live dispatch now calls and records
 `instructions.assemble()`, but exact role requirements are not inputs to that selector and a
-required selected skill can still lose to the general skill/count/character limits. The design
-therefore claims future binding behaviour only. [measured: source inspection, 2026-08-23]
+required selected skill can still lose to the general skill/count/character limits. The main caller
+also reports a selection error and returns `2` without writing the canonical `dispatch.refused` and
+`capability.gap` receipt. The design therefore claims future binding behaviour only. [measured:
+source inspection, 2026-08-23]
 
 ### 5.2 Resolution states
 
@@ -195,10 +204,10 @@ new digest and explicit `degraded_from` reference. That fallback is a different,
 calling the original role degraded would make its false belief durable. No runtime may invent a
 fallback after seeing the unavailable capability or a candidate result. [asserted]
 
-The receipt records the role-instance digest, task/work-item revision, worker/expertise/capability
-versions, harness/adapter probe, generated artefact digests, memory receipt, state, every loss and
-reason, effective effects and fact-contract eligibility. Later observed use is `yes`, `no` or
-`unknown`; selection or loading is not evidence of use. [asserted]
+The receipt records the role-instance digest, task/work-item revision, profile, existing role/RACI,
+expertise and capability versions, harness/adapter probe, generated artefact digests, memory receipt,
+state, every loss and reason, effective effects and fact-contract eligibility. Later observed use is
+`yes`, `no` or `unknown`; selection or loading is not evidence of use. [asserted]
 
 ## 6. Portability: what travels and what does not
 
@@ -240,10 +249,10 @@ same-model agreement cannot enter a training target as correct without an indepe
 authenticated human correction. Hidden evaluation items, answers and semantic siblings remain
 sealed and never enter examples, retrieval or training. [measured: ADR-0076; ADR-0086] [asserted]
 
-The accumulation is by `worker_contract`, category profile and stable failure signature, not by
-every worker/domain pair. Domain facts remain in versioned expertise bundles by default. This
-preserves `O(P + C + E)` state and allows a procedural improvement to be evaluated across domains
-rather than overfit to a fashionable label. [algebra] [asserted]
+The accumulation is by category profile, existing ADR-0067 role contract and stable failure
+signature, not by every worker/domain pair. Domain facts remain in versioned expertise bundles by
+default. This preserves `O(P + E)` catalogue state and allows a procedural improvement to be
+evaluated across domains rather than overfit to a fashionable label. [algebra] [asserted]
 
 ### 7.2 Retrieval ends; training begins
 
@@ -260,20 +269,24 @@ the work recurs enough to repay fitting before sources/base/runtime expire; ever
 rights; dynamic facts remain in retrieval; and a fresh held-out comparison can isolate tuned over
 bundle-only value. [measured: ADR-0086] [asserted]
 
-What would be trained is a worker-contract adapter or checkpoint bound to
-`{worker_contract, worker_profile, base_model_revision, instrument_epoch}` for a stable procedural
-deficit such as tool selection, formal-output discipline or verifier following. It is not trained
-for every subject pair. A domain-conditioned checkpoint is a separate ADR-0085 capability and
-remains exceptional; it must beat the same base with the same profile and expertise bundle but
-without parameter mutation. [asserted]
+What would be trained is a profile adapter or checkpoint bound to
+`{worker_profile, existing_role_contract, base_model_revision, instrument_epoch}` for a stable
+procedural deficit such as tool selection, formal-output discipline or verifier following. It is
+not trained for every subject pair. A domain-conditioned checkpoint is a separate ADR-0085
+capability and remains exceptional; it must beat the same base with the same profile and expertise
+bundle but without parameter mutation. [asserted]
 
 The RTX 5090 makes a bounded local candidate technically feasible; it does not supply consent,
-labels, a stable deficit or outcome value. The system may accumulate eligible records and propose a
-training contract autonomously. Under ADR-0076, no parameter-mutating treatment starts until a
-trusted principal-only receipt binds the exact preregistration, data rights, resource ceiling,
-candidate surface and sealed instrument. After that receipt, fitting and evaluation may run
-autonomously in quarantine; activation remains a separate exact owner-gated promotion. [measured]
-[asserted]
+labels, a stable deficit or outcome value. An inferred training proposal must reuse ADR-0086's gate:
+within a rolling 90 days, at least six completed applicable items spanning 21 days and four calendar
+days, three postcondition signatures, plus either two different-class adverse signals or 180
+measured repeated-acquisition minutes across three items; the conservative half-recurrence estimate
+must remain positive. Rejection/expiry suppresses the `{worker_profile, existing_role_contract,
+base_model_revision, instrument_epoch}` proposal for 90 days absent a new independent critical
+failure. Under ADR-0076, no parameter-mutating treatment starts until a trusted principal-only
+receipt binds the exact preregistration, data rights, resource ceiling, candidate surface and sealed
+instrument. After that receipt, fitting and evaluation may run autonomously in quarantine; activation
+remains a separate exact owner-gated promotion. [measured] [asserted]
 
 The honest automatic deployment frequency today is **zero**. Authenticated ingress, the sealed
 host, bundle-conditioned tuning comparison and active promotion are unavailable, while ADR-0086
@@ -283,20 +296,27 @@ the normal life cycle of every role. [measured]
 ## 8. The incumbent bar and search record
 
 The direct catalogue-and-portability incumbent found on 23 August 2026 is
-[`wshobson/agents` at revision `2b49247f`](https://github.com/wshobson/agents/tree/2b49247f1347d9cbd90edf869e5412563c3945cf),
-MIT. Its pinned README reports 92 composable plugins, 202 agents, 181 skills and 105
-commands from one Markdown source for Claude Code plus Codex, Cursor, OpenCode, Antigravity and
-Copilot. [cited: pinned README and licence, retrieved 2026-08-23]
+[`wshobson/agents` at revision `2b49247f1347`](https://github.com/wshobson/agents/tree/2b49247f1347),
+MIT at the repository root. Its pinned README reports 92 composable plugins, 202 agents, 181 skills and 105
+commands: Claude is the source environment and Codex, Cursor, OpenCode, Antigravity and Copilot are
+five generated targets. One counted external plugin is declared Apache-2.0 and referenced without an immutable
+revision, so the root revision does not pin all 92 plugins. [cited: pinned README, tree and licence,
+retrieved 2026-08-23]
+
+At that verified revision, `git ls-files 'plugins/*/agents/*.md'` followed by parsing each initial
+YAML frontmatter block measured 202 tracked and parsed manifests, 202 unique names, 202 `model`
+fields, 15 `tools` fields and 187 manifests without `tools`; none bound agent-level `skills` or
+`hooks`, although skills exist separately at plugin level. [measured]
 
 That is a real bar, not a straw man. Its adapters emit native formats and its branch-cut report used
-real CLIs for structural discovery. Its own capability matrix also records semantic losses: Codex
-and Cursor drop per-agent tool allowlists, several harnesses lack lifecycle hooks or native command
-semantics, and deeper confirmation that a model actually loaded a Codex skill remained interactive.
+real CLIs for structural discovery. Codex and Cursor drop per-agent tool allowlists and lack lifecycle
+hooks; commands are transformed into target-native skills, TOML or prompt artefacts, while behavioural
+equivalence remains untested. Deeper confirmation that a model actually loaded a Codex skill remained interactive.
 The same revision's branch-cut report covers 191 agents rather than the current 202, so it does not
 establish round-trip coverage for the additional eleven. [cited: pinned `docs/harnesses.md` and
 `docs/round-trip-results.md`, retrieved 2026-08-23]
 
-[`CohesiumAI/assemble` at revision `81f7577`](https://github.com/CohesiumAI/assemble/tree/81f757744254aefb6a6294db014566bc6f729878),
+[`CohesiumAI/assemble` at revision `81f757744254`](https://github.com/CohesiumAI/assemble/tree/81f757744254),
 MIT, is the target-breadth leader found: its README reports 34 agents generated for 21 platforms and
 states that it is a beta configuration generator, not a runtime. It can continue when search is
 unavailable by appending a limitation, which is below ADR-0084's required-semantic refusal boundary.
@@ -308,60 +328,77 @@ Markdown role-prompt/tool manifests; the bounded teardown found 108 Markdown man
 names and only 13 declaring tools. Markdown roles may still be useful, but the count is not a count
 of distinct capabilities or fact classes. [measured: `../../00-context/ruflo-teardown-2026-08-22.md`]
 
+VoltAgent's `awesome-claude-code-subagents` is a dominated one-harness near miss: its pinned README
+advertises 158-plus Claude-only YAML-frontmatter role/tool prompts under MIT and expressly disclaims
+security or correctness review. [cited: revision `c9e51ec0b3d4`, retrieved 2026-08-23]
+
 The 23 August search covered the repository's agent-configuration and organisation bars plus
-`wshobson/agents`, Assemble, Ruflo, Rulesync, Agent Skills, OpenHands microagents, CrewAI and AutoGen
+`wshobson/agents`, Assemble, VoltAgent, Ruflo, Rulesync, Agent Skills, OpenHands microagents, CrewAI and AutoGen
 through their primary repositories/documentation. No one entry led all axes: wshobson led catalogue
 breadth/composability, while Assemble led claimed target breadth. Other near misses specialised in
 one harness, supplied patterns rather than a portable catalogue, or translated files without a
 fail-closed fact and outcome contract. That bounded search does not prove absence. [measured]
 [asserted]
 
-The plain incumbent answer is to adopt a permissively licensed Markdown catalogue and its existing
-adapter rather than write another persona library. [cited] The proposed delta is narrower: orthogonal
-method/expertise composition, a required fact contract, pre-launch `applied|degraded|refused`
-receipts, no evidence credit for model/persona agreement, and EXP-136 against the same capable
-generalist. None of that is an outcome advantage until the experiment runs. [asserted]
+Prompt-disabled, credential-helper-disabled public Git acquisition succeeded for wshobson and
+Assemble on 23 August 2026, which establishes no-account source access only. Their generated target
+configs may still name proprietary models or platforms requiring accounts; unchanged account-free
+execution across targets was not established. [measured] [cited]
+
+The plain incumbent answer is to reuse individually pinned and licence-verified source assets plus
+the source-to-target adapter pattern rather than write another persona library. Existing adapters are
+not adopted unchanged: every target mapping must prove ADR-0084 semantic fidelity or refuse. The
+proposed delta is narrower: orthogonal method/expertise composition, a required fact contract,
+pre-launch `applied|degraded|refused` receipts, no evidence credit for model/persona agreement, and
+EXP-136 against the same capable generalist. None of that is an outcome advantage until the
+experiment runs. [cited] [asserted]
 
 ## 9. EXP-136: test the costumes objection directly
 
-EXP-136 compares one role-method instance with the same capable generalist on the same task, facts,
-expertise bundle, tools, model/harness revision, candidate exposure and aggregate budget. Subject
-knowledge is held equal so the treatment isolates the worker method rather than buying a win with
-extra retrieval or compute. Squad composition is excluded; EXP-80/107 already own that question.
+EXP-136 compares one profiled assignment with the same capable generalist on the same task, starting
+evidence/access, expertise bundle, tools, model/harness revision, candidate exposure and aggregate
+budget. The arms may acquire different observations after treatment; that is part of the profile's
+effect, not a claim that realised facts remain equal. Squad composition is excluded; EXP-80/107
+already own that question. [asserted]
+
+The frozen bank contains 104 paired tasks: eight per work-category profile, with two tasks from each
+of the same four open, permissively licensed subject bundles in every profile stratum. The profile,
+existing ADR-0067 role contract and ADR-0082 rights are selected before outcomes. Each task has an
+executable or primary-source truth contract and a blinded authenticated/domain acceptance verdict.
+The worker arm receives the matching profile; the generalist arm receives the same starting context,
+sources, access and capabilities without it. Order and all resampling use seed `1360093`; isolated
+copies prevent cross-arm access. Each arm emits one candidate, with no retry or replacement.
+Refusals, timeouts, missing results and protocol invalidity remain in the fixed denominator.
 [asserted]
 
-The frozen bank contains 80 paired tasks: 20 per retained worker contract, each contract crossed
-over the same four open, permissively licensed subject bundles. One category profile is selected
-before outcomes for each task. Each task has an executable or primary-source truth contract and a
-blinded authenticated/domain acceptance verdict. The worker arm receives the matching profile; the
-generalist arm receives the same task-native context and capabilities without it. Order is
-counterbalanced with seed `1360093`; isolated copies prevent cross-arm access. Each arm emits one
-candidate, with no retry or replacement. Refusals, timeouts, missing results and protocol invalidity
-remain in the fixed denominator. [asserted]
-
-The experiment stops at 80 terminal pairs or 120 days after the first pair, whichever comes first;
-there is no efficacy early stop and no replacement or retry. It confirms the frozen automatic
-role-profile policy only if the role-minus-generalist joint-success point difference is at least
-`+0.10`, its 20,000-resample paired bootstrap 95% lower bound exceeds `0`, no worker-contract stratum
-has a negative point difference, the one-sided 95% upper bound on human-rejection increase is at
-most `0.05`, review-adjusted minutes per success are at most `1.25x` the generalist and no worker-only
-critical error occurs. A losing contract is cut. A tie/loss overall or worker-only critical error
-kills automatic specialised selection; a harm or cost breach prevents confirmation; every other
-result is inconclusive and defaults to the generalist. [asserted]
+The experiment stops at 104 terminal pairs or 120 days after the first pair, whichever comes first;
+there is no efficacy early stop and no replacement or retry. It confirms profile efficacy conditional
+on the frozen correct category/role assignment only if the role-minus-generalist joint-success point
+difference is at least `+0.10`, the 2.5th percentile of 20,000 paired bootstrap resamples within
+profile strata exceeds `0`, no profile stratum has a negative point difference, the 95th percentile
+of the same resamples for the human-rejection increase is at most `0.05`, the cross-multiplied
+review-adjusted cost-per-success rule is at most `1.25x`, and no worker-only critical error occurs.
+A negative profile stratum cuts that profile treatment. `W <= G` overall or a worker-only critical
+error kills profile-defaulting; other non-confirming results are inconclusive and default to the
+generalist. Even confirmation does not validate the upstream category classifier or automatic
+selector. [asserted]
 
 The largest plausible paired effect is `[-1, +1]`: profiles could repair every generalist failure or
-poison every generalist success. The experiment can remove automatic worker profiles while retaining
+poison every generalist success. The experiment can remove profile defaulting after a frozen assignment while retaining
 the work taxonomy, explicit capabilities and one capable generalist. It cannot validate subject
 expertise, squads, tuning, portability, gates or principal authority. [algebra] [asserted]
 
-## 10. Evidence against: one model in four costumes
+## 10. Evidence against: one model in thirteen profiles
 
-The strongest case against this design is that it is theatre. `wshobson/agents` and Ruflo show how
-quickly catalogues grow into hundreds of Markdown manifests. Most of the observable behaviour still
-comes from the underlying frontier model, task context and tools; names such as researcher,
-architect or reviewer can make the same induction look organisationally independent. Cross-harness
-generation then multiplies files and drift while hooks, permissions and tool semantics silently
-contract. [cited] [measured] [asserted]
+The strongest case against this design is that it is theatre. Wshobson reports 202 Markdown agents;
+the local Ruflo teardown found 108 Markdown manifests and 97 unique names; and Assemble explicitly
+says it has no runtime, daemon or SDK because the host IDE/CLI's LLM reads the generated configs.
+[cited] [measured]
+
+The inference is hostile: most behaviour may come from the underlying model, task context and tools,
+while names such as researcher, architect or reviewer make one induction look organisationally
+independent. Cross-harness generation can then multiply files and drift as hooks, permissions and
+tool semantics contract. [asserted]
 
 The external outcome evidence cuts both ways. Zheng et al. tested 162 roles across four model
 families and 2,410 factual questions and found no overall persona gain, with effects too unstable for
@@ -377,10 +414,11 @@ does not meet its minimum denominator. A dozen role prompts can therefore cost m
 handoffs and make no better decision. [measured: ADR-0067; current beta record]
 
 That objection may be right. The design concedes it structurally: one Owner/generalist remains the
-default; worker methods are composable contracts rather than standing staff; domain is a bundle,
+default; worker profiles are composable procedures over existing contracts rather than standing staff; domain is a bundle,
 not another persona; empty titles are cut; a required execution or source gap refuses; no profile
-receives evidence credit for model family; and EXP-136 compares profiles with the same facts, tools
-and budget. If EXP-136 loses or ties, automatic role-profile selection is removed and the honest
+receives evidence credit for model family; and EXP-136 compares profiles with the same starting
+evidence, access, tools and budget. If EXP-136 loses or ties, profile defaulting after a frozen
+assignment is removed and the honest
 product is one strong agent using excellent tools and the work labels only for measurement.
 [asserted]
 
@@ -389,7 +427,7 @@ product is one strong agent using excellent tools and the work labels only for m
 This document changes no runtime. A future implementation must extend the existing substrates and
 ship these checks with the corresponding behaviour. [measured] [asserted]
 
-- reject an unknown worker contract/profile, category mismatch, mutable role identity or stored
+- reject an unknown profile, category/existing-role/RACI mismatch, mutable role identity or stored
   worker-by-domain pair; [asserted]
 - prove role-instance identity is derived from immutable worker, expertise, task, fact and binding
   digests and can be reconstructed from the trajectory; [asserted]
@@ -401,6 +439,8 @@ ship these checks with the corresponding behaviour. [measured] [asserted]
   expertise bytes are rendered; [asserted]
 - prove each selected capability is applied or named absent and record observed use separately;
   [asserted]
+- prove every pre-launch capability/profile refusal appends the canonical refusal/gap receipt before
+  returning, including the main dispatch error path; [asserted]
 - prove hooks and tools are mapped only at equivalent semantics and stale adapter versions refuse;
   [asserted]
 - prevent credentials, hidden evaluation data and principal authority entering any child or durable
@@ -419,12 +459,12 @@ not a claim that specialised agents outperform one capable generalist. [asserted
 
 ## 12. Reversal and plain answer
 
-Reverse automatic role selection by dispatching the unchanged generalist with the same task,
-capabilities and expertise bundle. Retain the work categories for measurement, capability receipts
-for safety and prior results as adverse history. No stored pair catalogue or model weights need to
-be deleted. [asserted]
+Reverse profile defaulting after a frozen assignment by dispatching the unchanged generalist with
+the same task, capabilities and expertise bundle. Retain the work categories for measurement,
+capability receipts for safety and prior results as adverse history. No stored pair catalogue or
+model weights need to be deleted. [asserted]
 
-The plain answer is: expose thirteen native task profiles over four fact-bearing contracts, keep
-domain expertise separate, compose them per task, and run one strong generalist unless another
-runtime brings a named fact that changes the decision. Cut every title that cannot say what it will
-retrieve, execute or observe. [asserted]
+The plain answer is: expose thirteen native task profiles, reuse ADR-0067/0082 role contracts and
+rights, keep domain expertise separate, compose them per task, and run one strong generalist unless
+another runtime brings a named fact that changes the decision. Cut every new title that cannot say
+what it will retrieve, execute or observe. [asserted]

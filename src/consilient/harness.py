@@ -46,6 +46,15 @@ REASONING_CAPABILITIES: frozenset[str] = frozenset(
 UNMAPPED_REASONING_PROVENANCE = (
     "unmapped model id; no verified reasoning-capability source"
 )
+UNMAPPED_POOL_PROVENANCE = "unmapped model id; no verified pool-assignment source"
+CURSOR_MODELS_POOL_PROVENANCE = (
+    "Cursor Models and Pricing, https://cursor.com/docs/models-and-pricing, "
+    "retrieved 2026-08-23; Composer 2.5 and Cursor Grok 4.5/4.6 are Cursor Models"
+)
+CURSOR_UNVERIFIED_POOL_PROVENANCE = (
+    "Cursor Models and Pricing, https://cursor.com/docs/models-and-pricing, "
+    "retrieved 2026-08-23; exact Kimi/GLM CLI ids are not individually classified"
+)
 
 # Default is bypass: the principal asked that dispatched harnesses run like this Grok
 # session, without per-tool prompts. `prompt` is the attended alternative. Flags were
@@ -177,11 +186,11 @@ CURSOR_OTHER_PREFIXES: tuple[str, ...] = ("claude-", "gpt-", "gemini-")
 
 @dataclass(frozen=True)
 class ModelOption:
-    """One selectable model, its quota pool, and its verified reasoning posture.
+    """One selectable model, its quota pool, and verified routing provenance.
 
     `native` means mandatory reasoning and `hybrid` means a user-selectable native
     mode. Legacy callers default to fail-closed `unknown`; a model name never supplies
-    evidence about reasoning capability.
+    evidence about reasoning capability or pool assignment.
     """
 
     id: str
@@ -190,6 +199,8 @@ class ModelOption:
     pool: str
     reasoning_capability: ReasoningCapability = "unknown"
     reasoning_provenance: str = UNMAPPED_REASONING_PROVENANCE
+    pool_verified: bool = False
+    pool_provenance: str = UNMAPPED_POOL_PROVENANCE
 
     def __post_init__(self) -> None:
         if (
@@ -204,6 +215,13 @@ class ModelOption:
             or not self.reasoning_provenance.strip()
         ):
             raise ValueError("reasoning_provenance must be a non-empty string")
+        if not isinstance(self.pool_verified, bool):
+            raise ValueError("pool_verified must be a bool")
+        if (
+            not isinstance(self.pool_provenance, str)
+            or not self.pool_provenance.strip()
+        ):
+            raise ValueError("pool_provenance must be a non-empty string")
 
 
 def allows_reasoning_scaffold(model: ModelOption) -> bool:
@@ -221,29 +239,41 @@ def allows_reasoning_scaffold(model: ModelOption) -> bool:
 # here, so they register none rather than an invented one. `auto` is deliberately absent:
 # selection must name what it spends. Registry order is the preference order within a
 # family when pools tie — highest measured tier first [asserted].
-MODELS: tuple[ModelOption, ...] = (
-    ModelOption("composer-2.5", "cursor-composer", "composer", "cursor-models"),
-    ModelOption("composer-2.5-fast", "cursor-composer", "composer", "cursor-models"),
-    ModelOption("kimi-k3-max", "cursor-composer", "kimi", "cursor-models"),
-    ModelOption("kimi-k3-high", "cursor-composer", "kimi", "cursor-models"),
-    ModelOption("kimi-k3-low", "cursor-composer", "kimi", "cursor-models"),
-    ModelOption("kimi-k2.7-code", "cursor-composer", "kimi", "cursor-models"),
-    ModelOption("cursor-grok-4.6-xhigh", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.6-xhigh-fast", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.6-high", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.6-high-fast", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.6-medium", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.6-medium-fast", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.6-low", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.6-low-fast", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.5-high", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.5-high-fast", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.5-medium", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.5-medium-fast", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.5-low", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("cursor-grok-4.5-low-fast", "cursor-composer", "grok", "cursor-models"),
-    ModelOption("glm-5.2-max", "cursor-composer", "glm", "cursor-models"),
-    ModelOption("glm-5.2-high", "cursor-composer", "glm", "cursor-models"),
+CURSOR_MODEL_POOL_ASSIGNMENTS: tuple[tuple[str, str, bool, str], ...] = (
+    ("composer-2.5", "composer", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("composer-2.5-fast", "composer", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("kimi-k3-max", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
+    ("kimi-k3-high", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
+    ("kimi-k3-low", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
+    ("kimi-k2.7-code", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
+    ("cursor-grok-4.6-xhigh", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-xhigh-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-high", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-high-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-medium", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-medium-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-low", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-low-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-high", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-high-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-medium", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-medium-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-low", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-low-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("glm-5.2-max", "glm", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
+    ("glm-5.2-high", "glm", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
+)
+
+MODELS: tuple[ModelOption, ...] = tuple(
+    ModelOption(
+        model_id,
+        "cursor-composer",
+        family,
+        "cursor-models",
+        pool_verified=pool_verified,
+        pool_provenance=pool_provenance,
+    )
+    for model_id, family, pool_verified, pool_provenance in CURSOR_MODEL_POOL_ASSIGNMENTS
 )
 
 
@@ -331,6 +361,9 @@ def select_model(
     eligible: list[tuple[int, ModelOption]] = []
     considered: list[str] = []
     for index, option in enumerate(registered):
+        if not option.pool_verified:
+            considered.append(f"{option.id}: pool assignment is unverified")
+            continue
         pool = pool_by_name(option.pool, pool_tuple)
         if pool is None:
             considered.append(f"{option.id}: pool {option.pool} has no headroom snapshot")
@@ -346,7 +379,8 @@ def select_model(
         detail = "; ".join(considered) if considered else "no registered models"
         return (
             f"no eligible model for {harness_id}: every registered model draws on an "
-            f"exhausted or unmeasured pool. {detail}. Pass --model explicitly to spend "
+            f"exhausted or unmeasured pool, or an unverified pool assignment. {detail}. "
+            "Pass --model explicitly to spend "
             "an avoided pool attended."
         )
 

@@ -1,10 +1,10 @@
 # Decision index
 
-85 ADRs, 22 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
+92 ADRs, 23 Aug 2026. [measured] Format and rules: [`README.md`](README.md).
 This table is maintained by hand and has drifted before (C3, `../00-context/corrections-2026-08-21.md`): it read "39 ADRs" while the directory held 48.
 `python .github/scripts/check_record_numbers.py` catches two ADRs sharing a number;
-`tests/test_adr_trail.py` catches a numbered ADR missing from this table. 0002 and 0027 appear
-twice by design, in the highlight section and in their own.
+`tests/test_qa_battery.py::check_generated_index_drift` catches a wrong declared count. Table links
+are maintained manually. 0002 and 0027 appear twice by design, in the highlight section and in their own.
 
 **Status key:** ✅ ACCEPTED · 🟡 PROVISIONAL (rests on simulated/asserted evidence, has a
 named experiment) · 📋 PROPOSED · ⛔ SUPERSEDED/DEPRECATED
@@ -88,7 +88,13 @@ Read these before anything else. Everything downstream depends on them.
 | [0082](0082-project-raci-onto-per-work-item-rights-and-require-structural-consultation.md) | **Project RACI onto per-work-item rights and require structural consultation** | 🟡 |
 | [0085](0085-qualify-model-revisions-before-routing-and-seal-fine-tune-evaluation.md) | **Qualify model revisions before routing, defer matrix factorisation, and seal fine-tune evaluation** | 🟡 |
 | [0087](0087-return-one-answer-with-decision-relevant-checks.md) | **Return one answer with decision-relevant checks and answer directly when convergence adds no value** | 📋 |
+| [0088](0088-make-zero-cost-a-native-fail-closed-routing-ladder.md) | **Make zero-cost a native, fail-closed routing ladder** — local first, fresh free-tier proof, subscriptions next, and metered use only under separate spend authority | 🟡 |
+| [0089](0089-use-one-front-door-and-preserve-native-specialist-surfaces.md) | **Use one front door and preserve native specialist surfaces** | 📋 |
+| [0090](0090-allocate-full-mode-effort-before-execution-and-make-light-mode-explicit.md) | **Allocate full-mode effort before execution and make light mode explicit** | 🟡 |
 | [0091](0091-check-declared-claims-against-the-import-graph-and-keep-declared-claims-authoritative.md) | **Check declared claims against the import graph, and keep declared claims authoritative** — worktree isolation and fenced compare-and-append admission as protocol repairs | 🟡 |
+| [0092](0092-classify-durable-work-and-stop-deliberation-at-an-external-threshold.md) | **Classify durable work and stop deliberation at an external threshold** | 🟡 |
+| [0093](0093-compose-agent-roles-from-worker-method-and-subject-expertise.md) | **Compose thirteen category profiles from existing role contracts and subject expertise; cut evidence-free specialists** | 🟡 |
+| [0094](0094-make-scientific-execution-a-pinned-evidence-producing-profile.md) | **Make scientific execution a pinned evidence-producing profile, not a second laboratory platform** | 🟡 |
 
 ## Behaviour and safety
 
@@ -166,7 +172,20 @@ to every ADR and every PR:
   expertise only; no universal activation follows.
 - **0087** — PROPOSED. **EXP-128 is deliberately unwritten**; ADR-0077 is present and PROVISIONAL and
   remains the live fusion/exposure owner.
+- **0088** — PROVISIONAL pending EXP-132, which separately tests useful supervised zero-cost work and
+  frozen-panel exact-composition safety; it cannot activate automatic routing, and neither local nor
+  free-cloud routing is wired.
 - **0089** — PROPOSED. The retirement behaviour is unmeasured and **EXP-129 is specified in the
   companion document but deliberately unwritten in the register.**
+- **0090** — PROVISIONAL pending EXP-133 and EXP-134. ADR-0092 supersedes only its overlapping
+  category meanings and threshold-transition admission; its modes, profiles and effort envelope
+  remain authoritative.
 - **0091** — PROVISIONAL pending EXP-131, which can delete the D3 coverage check; the
   lane-derivation half rests on EXP-130 (`DONE`, mixed result) and stands regardless.
+- **0092** — PROVISIONAL pending EXP-135, which can remove threshold stopping as a quality claim;
+  category-agent composition remains ADR-0093/EXP-136's separate concern.
+- **0093** — PROVISIONAL pending EXP-136, which can remove category-profile defaulting conditional on
+  a frozen correct assignment while retaining the work taxonomy, explicit capability/fact receipts
+  and one capable generalist.
+- **0094** — PROVISIONAL pending EXP-137, which can remove the scientific profile's claimed outcome
+  advantage while retaining ordinary executable tools and task-local receipts.
