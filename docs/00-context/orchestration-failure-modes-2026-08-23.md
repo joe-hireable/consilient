@@ -172,11 +172,41 @@ a legitimate case, the response is to sharpen the discriminator; raising the thr
 naming the β it buys and the date the discriminator lands.** Documentation of a loosening reads,
 later, as evidence the loosening was considered — which is exactly why it is dangerous.
 
+## F-13 — A crashed dispatch reported as running, and a review that never happened
+
+**Measured.** Six of six failed dispatches died at startup with an unhandled exception, seconds
+after the scheduler printed that the work had been dispatched. One was the only run ever sent to
+one provider, so its usage sat at 17% for two days while the loop reported it busy; the principal
+found it from a usage graph and asked about it three times. Separately, three adversarial reviews
+crashed the same way and were never re-dispatched — three units reached `done` having never been
+checked by a different model family, and nothing recorded that the check had not happened.
+[measured 23 Aug 2026]
+
+**This is not F-01.** F-01 is a loop that cannot progress and reports itself idle. F-13 is a loop
+reporting itself **busy** over work that is already dead — worse, because idleness at least invites
+the question.
+
+**Requirement.** **A crash is detected from an artefact and reported in the same cycle**, never at
+the next check-in and never by a person noticing. The artefact is the worker's own error output; a
+process check has misled this project three times and must not be the evidence. Remediation is
+automatic and **must not consume a retry** — an infrastructure death is not evidence about the work
+(F-05) — and it **must release resources the dead run still holds**, because a crashed dispatch
+keeps its lease for its full duration and blocks the work it was doing.
+
+**And auto-repair must terminate.** Three identical failures is a defect, not bad luck. A repair
+loop that retries a systematic fault until it happens to pass is precisely how a system ships with
+its own failures built in, which is what this whole document exists to prevent. **The third
+identical death escalates instead of repairing.**
+
+**The quietest case is the one to design for.** A crashed *review* leaves no visible gap: the unit
+stays `done`, the queue moves on, and the absence of a check is invisible because absence has no
+artefact. **Anything the system dispatches must be watched, not only the work it counts.**
+
 ---
 
 ## What this set has in common
 
-**Ten of the twelve are the same failure**: a signal that was *available* was not *consumed* — the
+**Eleven of the thirteen are the same failure**: a signal that was *available* was not *consumed* — the
 process list, the observation timestamp, the artefact, the unit's own commits, the register. Only
 F-03 is a genuine architectural constraint, and even that dissolved once the sharing was removed
 rather than arbitrated.
