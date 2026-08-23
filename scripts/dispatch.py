@@ -767,6 +767,159 @@ def git_diff_bytes(cwd: Path) -> int:
     return len((completed.stdout or "").encode("utf-8"))
 
 
+# --- the cheap supervision floor (BU-0) ---------------------------------------------
+#
+# On 23 August 2026 six of six failed dispatches died at startup seconds after the
+# scheduler printed that the work had been sent, and the loop went on reporting itself
+# busy. One of them was the only run ever sent to its provider, so that provider sat at
+# 17% usage for two days while the loop called it busy; the principal found that from a
+# usage graph and asked about it three times. Nothing reported it. [measured, F-13]
+#
+# The bar this clears is not latency. Kubernetes surfaces a crash loop within one probe
+# period, systemd within WatchdogSec, s6 the moment a service fails to notify; a polled
+# check cannot beat any of them and does not claim to. [cited, via the supervision
+# specification] What it does instead is take its evidence from the work rather than
+# from the worker: no PID, no handle, no port. Process checks have reported dead work
+# healthy three times here. [measured, ADR-0034 context]
+
+# Preferential, and ADR-0034 says every parameter in it is. It is the grace a dispatch
+# gets to produce any one of the three artefacts below, and it is far shorter than
+# DEFAULT_TIMEOUT_S so a dispatch that dies on import is caught inside one poll rather
+# than at its deadline. It is not measured, and EXP-73 is the registered experiment
+# that would set it: it measures the false-stall rate of exactly this signal and is
+# BLOCKED on ticks that declare their progress artefact. [asserted]
+START_WINDOW_S = 120
+
+# The dispatcher writes these into the run directory before the child is spawned. They
+# are evidence that we asked, never evidence that anything answered.
+_DISPATCHER_WRITTEN = frozenset({"brief.md", "recall.md"})
+
+
+@dataclass(frozen=True)
+class StartFailure:
+    """One open dispatch that never produced a first artefact.
+
+    ADR-0034 §6: a stall decision records the signal, the threshold, the observed
+    value and the action taken, so an operator can dispute it from the record alone.
+    The action is never termination — §3 defaults to diagnosis, because killing is the
+    irreversible half and the expensive production failure is a watchdog that acts on
+    live work.
+    """
+
+    run_id: str
+    harness: str | None
+    signal: str
+    threshold_s: int
+    observed_s: float
+    observed_bytes: int
+    action: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "harness": self.harness,
+            "signal": self.signal,
+            "threshold_s": self.threshold_s,
+            "observed_s": self.observed_s,
+            "observed_bytes": self.observed_bytes,
+            "action": self.action,
+        }
+
+
+def artefact_bytes_in(run_dir: Path) -> int:
+    """Bytes the child put in its own run directory, excluding what we put there.
+
+    A missing or unreadable directory reads zero, which fails closed: an absent
+    summary is not a pass (F-09).
+    """
+    total = 0
+    try:
+        for entry in run_dir.iterdir():
+            if entry.name in _DISPATCHER_WRITTEN or not entry.is_file():
+                continue
+            total += entry.stat().st_size
+    except OSError:
+        return 0
+    return total
+
+
+def committed_since(cwd: Path, since: str) -> bool:
+    """Whether the run's tree gained a commit since the claim opened.
+
+    Absence of git, or of a repository, is not evidence of progress.
+    """
+    git = which_binary("git")
+    if git is None:
+        return False
+    try:
+        completed = subprocess.run(
+            [git, "-C", str(cwd), "log", "-1", "--since", since, "--format=%H"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            env=GIT_ENV,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return bool((completed.stdout or "").strip())
+
+
+def start_failures(
+    claims: tuple[coordination.Claim, ...],
+    *,
+    runs_dir: Path,
+    now: datetime,
+    start_window_s: int = START_WINDOW_S,
+) -> tuple[StartFailure, ...]:
+    """Open dispatches that produced nothing inside their start window.
+
+    `claims` is `coordination.live_claims`, which already drops any run carrying a
+    terminal dispatch event. That is what stops the Airflow regression, where a task
+    that had logged its own clean exit was marked failed from a stale liveness signal:
+    the terminal record outranks this check, rather than racing it.
+
+    The progress test is Hadoop's disjunction — a task is stalled when it neither
+    reads an input, writes an output, nor updates its status string — over the three
+    artefacts this repository already produces: the child's transcript, the working
+    tree it is editing, and the commits it has landed. All three are needed, and that
+    is measured rather than feared: the first version of this function was run against
+    the live trajectory on 23 August 2026 and flagged six open dispatches, one of them
+    the alive-and-working run that wrote it. A `claude -p` child writes nothing to its
+    transcript until it exits, so the transcript is a terminal signal, not a progress
+    one. [measured]
+
+    Returns records. It terminates nothing, releases nothing and repairs nothing.
+    """
+    found: list[StartFailure] = []
+    for claim in sorted(claims, key=lambda item: item.run_id):
+        opened = datetime.fromisoformat(claim.opened_at).astimezone(timezone.utc)
+        age_s = (now.astimezone(timezone.utc) - opened).total_seconds()
+        if age_s < start_window_s:
+            continue
+        observed = artefact_bytes_in(runs_dir / claim.run_id)
+        if observed > 0:
+            continue
+        tree = Path(claim.cwd) if claim.cwd else None
+        if tree is not None and (
+            git_diff_bytes(tree) > 0 or committed_since(tree, claim.opened_at)
+        ):
+            continue
+        found.append(
+            StartFailure(
+                run_id=claim.run_id,
+                harness=claim.harness,
+                signal="no artefact within the start window",
+                threshold_s=start_window_s,
+                observed_s=round(age_s, 2),
+                observed_bytes=observed,
+                action="diagnose",
+            )
+        )
+    return tuple(found)
+
+
 RECALL_LIMIT_CHARS = 8000
 
 
@@ -1245,6 +1398,20 @@ def _print_human(payload: dict[str, object]) -> None:
                     print(tail.strip())
     if "artefact_bytes" in payload:
         print(f"artefact: {payload['artefact_bytes']} bytes")
+    if "open_dispatches" in payload:
+        print(f"open dispatches: {payload['open_dispatches']}")
+    started_never = payload.get("start_failed")
+    if isinstance(started_never, list):
+        print(f"start_failed: {len(started_never)}")
+        for row in started_never:
+            if not isinstance(row, dict):
+                continue
+            print(
+                f"  {row.get('run_id')} ({row.get('harness')}): {row.get('signal')}; "
+                f"threshold {row.get('threshold_s')}s, observed "
+                f"{row.get('observed_s')}s and {row.get('observed_bytes')} bytes; "
+                f"action {row.get('action')}"
+            )
     command = payload.get("command")
     if isinstance(command, list) and command:
         print("command: " + shlex.join(str(part) for part in command))
@@ -1439,6 +1606,33 @@ def task_with_capabilities(
         f"{task.rstrip()}\n\n---\n\n## Selected capability context\n\n"
         f"```json\n{encoded}\n```\n"
     )
+
+
+def supervise(*, log_dir: Path, runs_dir: Path, as_json: bool) -> int:
+    """The scheduled task behind BU-0. One pass, one report, no repair.
+
+    Detection only: N00 reports what died. Delivering that to the principal is BU-7's
+    single escalation emitter, and releasing the dead run's lease is BU-3. Until those
+    land, a non-zero exit is the whole alert, and saying so is cheaper than implying a
+    channel that does not exist.
+    """
+    now = datetime.now(timezone.utc)
+    try:
+        events, _rejected = read_all(log_dir)
+    except (EventError, OSError) as exc:
+        emit({"status": "refused", "reason": f"trajectory unreadable: {exc}"}, as_json)
+        return 2
+    live = coordination.live_claims(events, now=now)
+    failures = start_failures(live, runs_dir=runs_dir, now=now)
+    emit(
+        {
+            "status": "supervised",
+            "open_dispatches": len(live),
+            "start_failed": [item.as_dict() for item in failures],
+        },
+        as_json,
+    )
+    return 1 if failures else 0
 
 
 def _exit_for(status: str) -> int:
@@ -1949,6 +2143,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--probe", action="store_true", help="probe installed harnesses and exit"
     )
     parser.add_argument(
+        "--supervise",
+        action="store_true",
+        help="report open dispatches that produced no artefact within the start "
+        "window, and exit non-zero if there are any. Reads files only; kills nothing.",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="select (and print argv) without running"
     )
     parser.add_argument("--json", action="store_true")
@@ -1964,6 +2164,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.supervise:
+        # Before anything that probes, refreshes or spends. The party that notices must
+        # not be the party that spawned, so this path reads files and nothing else.
+        return supervise(
+            log_dir=Path(args.log).resolve(),
+            runs_dir=Path(args.runs).resolve(),
+            as_json=args.json,
+        )
     try:
         cwd = resolve_cwd(args.cwd)
     except ValueError as exc:
