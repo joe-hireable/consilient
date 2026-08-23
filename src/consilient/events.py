@@ -37,6 +37,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
+from . import effects
+
 # Event shapes vary by kind at this JSON boundary, so values cannot be narrowed further
 # without changing the runtime validation contract. Every consumed value is checked below.
 EventPayload = dict[str, Any]
@@ -274,6 +276,10 @@ def validate(event: object) -> EventPayload:
     _check_human_authority(event)
     _check_evidence_class(event)
     _check_dispatch_contract(event)
+    try:
+        effects.validate_effect_event(event)
+    except effects.EffectError as exc:
+        raise EventError(str(exc)) from exc
     return event
 
 
@@ -1247,6 +1253,22 @@ def register_transition_validator(
             )
     for kind in kinds:
         _TRANSITION_VALIDATORS[kind] = validator
+
+
+def _validate_effect_receipt_chain(
+    prefix: tuple[Event, ...],
+    rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    try:
+        effects.receipt_chain_validator(prefix, rejections, candidates)
+    except effects.EffectError as exc:
+        raise EventError(str(exc)) from exc
+
+
+register_transition_validator(
+    (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT), _validate_effect_receipt_chain
+)
 
 
 def _transaction(
