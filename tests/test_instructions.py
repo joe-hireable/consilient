@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,7 +13,7 @@ import pytest
 
 from consilient import beta as beta_mod
 from consilient import instructions, promote
-from consilient.events import SCHEMA_VERSION, append, read_all
+from consilient.events import SCHEMA_VERSION, append, canonical, read_all
 from consilient.instructions import (
     ACTIVE,
     ADAPTED,
@@ -38,8 +42,8 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def note(log_dir: Path, text: str) -> None:
-    append(
+def note(log_dir: Path, text: str) -> dict[str, object]:
+    return append(
         log_dir / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl",
         {
             "v": SCHEMA_VERSION,
@@ -47,6 +51,21 @@ def note(log_dir: Path, text: str) -> None:
             "event": "note.made",
             "actor": "test",
             "data": {"text": text},
+        },
+    )
+
+
+def record_event(
+    log_dir: Path, kind: str, data: dict[str, object]
+) -> dict[str, object]:
+    return append(
+        log_dir / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": now(),
+            "event": kind,
+            "actor": "test",
+            "data": data,
         },
     )
 
@@ -251,7 +270,8 @@ def test_a_measured_beta_with_execution_evidence_promotes_and_flows(tmp_path: Pa
 
 def test_every_assembly_is_recorded_with_the_identity_of_every_layer(tmp_path: Path):
     """V0-47."""
-    note(tmp_path, "beta work continued")
+    selected = note(tmp_path, "beta work continued")
+    note(tmp_path, "zanzibar quixotic")
     skills = skills_tree(tmp_path)
     assembly = assemble(skills, tmp_path, task="measure the beta verifier outcome")
     event = record_assembly(tmp_path, assembly, task="measure the beta verifier outcome")
@@ -264,14 +284,98 @@ def test_every_assembly_is_recorded_with_the_identity_of_every_layer(tmp_path: P
     assert [skill["name"] for skill in data["skills"]] == ["alpha-skill"]
     assert data["skills"][0]["matched"] == ["beta", "verifier"]
     assert len(data["skills"][0]["sha256"]) == 64
-    assert data["recall"]["source_events"] == 1
+    assert data["recall"]["source_events"] == 2
     assert len(data["recall"]["source_digest"]) == 64
     assert data["recall"]["sha256"] == promote.digest(assembly.recall_pack)
+    assert data["recall"]["selected_event_ids"] == [selected["event_id"]]
+    assert (
+        data["recall"]["selected_digest"]
+        == hashlib.sha256(canonical(selected).encode("utf-8")).hexdigest()
+    )
+    assert data["recall"]["omitted"] == []
+    assert data["recall"]["context_complete"] is True
+    assert data["recall"]["continuation"] is None
     assert data["adapted"]["status"] == INERT
 
     events, rejected = read_all(tmp_path)
     assert not rejected
     assert events[-1].kind == ASSEMBLED
+
+
+def test_overflow_metadata_points_to_omitted_protected_event_and_reconstructs(
+    tmp_path: Path,
+) -> None:
+    protected = record_event(
+        tmp_path,
+        "review.recorded",
+        {"dissent": "protected dissent", "padding": "x" * 2000},
+    )
+    for index in range(4):
+        note(tmp_path, f"crowd {index} " + "y" * 200)
+    skills = skills_tree(tmp_path)
+
+    assembly = assemble(
+        skills,
+        tmp_path,
+        task="crowd",
+        recall_limit_chars=300,
+    )
+    repeated = assemble(
+        skills,
+        tmp_path,
+        task="crowd",
+        recall_limit_chars=300,
+    )
+
+    assert repeated.recall_pack == assembly.recall_pack
+    assert repeated.sha256 == assembly.sha256
+    event = record_assembly(tmp_path, assembly, task="crowd")
+    recall_data = event["data"]["recall"]
+    assert recall_data["context_complete"] is False
+    assert recall_data["continuation"] == {"event_id": protected["event_id"]}
+    assert {
+        "event_id": protected["event_id"],
+        "event_kind": "review.recorded",
+        "reason": "context_bound",
+        "protected": True,
+    } in recall_data["omitted"]
+    assert str(protected["event_id"]) in assembly.recall_pack
+
+    result = reconstruct(tmp_path, skills, assembly.sha256)
+    assert result.ok, [report for report in result.layers if not report.ok]
+    repo = Path(__file__).parents[1]
+    environment = os.environ | {"PYTHONPATH": str(repo / "src")}
+    fresh = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from pathlib import Path; import sys; "
+            "from consilient.instructions import reconstruct; "
+            "result = reconstruct(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]); "
+            "raise SystemExit(0 if result.ok else 1)",
+            str(tmp_path),
+            str(skills),
+            assembly.sha256,
+        ],
+        cwd=repo,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert fresh.returncode == 0, fresh.stderr
+
+    event["data"]["recall"]["selected_digest"] = "0" * 64
+    event.pop("event_id")
+    event["ts"] = now()
+    append(tmp_path / f"{event['ts'][:10]}.jsonl", event)
+    drift = reconstruct(tmp_path, skills, assembly.sha256)
+    assert not drift.ok
+    assert "selection receipt" in next(
+        report.detail for report in drift.layers if report.layer == "recall"
+    )
 
 
 def test_an_assembly_is_reconstructable_after_the_fact(tmp_path: Path):

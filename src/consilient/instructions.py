@@ -178,6 +178,7 @@ class Assembly:
     skills: tuple[SkillRef, ...]
     skills_omitted: int
     recall_pack: str
+    recall_selection: recall.Selection
     recall_limit_chars: int
     recall_source_events: int
     recall_source_digest: str
@@ -325,6 +326,63 @@ def _source_digest(events: Sequence[Event]) -> str:
     return promote.digest("\n".join(canonical(event.raw) for event in events))
 
 
+def _selection_receipt(selection: recall.Selection) -> dict[str, object]:
+    return {
+        "selected_event_ids": list(selection.selected_event_ids),
+        "selected_digest": selection.selected_digest,
+        "omitted": [
+            {
+                "event_id": omission.event_id,
+                "event_kind": omission.event_kind,
+                "reason": omission.reason,
+                "protected": omission.protected,
+            }
+            for omission in selection.omissions
+        ],
+        "context_complete": selection.context_complete,
+        "continuation": (
+            {"event_id": selection.continuation_event_id}
+            if selection.continuation_event_id is not None
+            else None
+        ),
+    }
+
+
+def _select_recall(
+    events: Sequence[Event], *, query: str, limit_chars: int
+) -> recall.Selection:
+    """Shrink the scan window until its honest receipt fits, then return its provenance."""
+    window = len(events)
+    protected = recall._protected_event_indexes(events)
+    while True:
+        candidate = (
+            events
+            if window >= len(events)
+            else [
+                event
+                for index, event in enumerate(events)
+                if index in protected or index >= len(events) - window
+            ]
+        )
+        try:
+            return recall.select_events(
+                candidate,
+                query=query,
+                limit_chars=limit_chars,
+                scan_complete=window >= len(events),
+                shrink_to_receipt=True,
+            )
+        except ValueError:
+            if window <= 1:
+                return recall.select_events(
+                    candidate,
+                    query=query,
+                    limit_chars=limit_chars,
+                    scan_complete=window >= len(events),
+                )
+            window = max(1, window // 2)
+
+
 def _adapted_from_events(events: Sequence[Event]) -> AdaptedLayer:
     """Project the adapted layer from the record. Content counts only when a
     recorded, unreversed acceptance vouches for its digest (V0-48). A reversal
@@ -394,45 +452,9 @@ def assemble(
     layer; what it cannot enforce is that a caller records at all."""
     if not task.strip():
         raise ValueError("an assembly serves a task; the task text may not be empty")
-    # Bound the scan window, and shrink it until the receipt fits.
-    #
-    # `read_all` returns every event ever recorded, and the recall receipt carries one entry per
-    # OMITTED event -- so the receipt grows with the whole trajectory and eventually cannot fit
-    # inside its own budget. At 1,336 events against an 8,000-character limit it stopped fitting,
-    # `_fit_output` raised, and every dispatch died at startup before it reached a harness. The
-    # log was 3.9 MB and growing by roughly 2 MB a day. [measured 23 Aug 2026]
-    #
-    # A fixed window would only move the cliff: 80 events fit today and 120 did not, but that
-    # ratio is a property of how large events happen to be, and it drifts. So the window shrinks
-    # until the pack fits, which cannot silently stop working as the trajectory changes shape.
-    #
-    # The receipt reports `scan_complete` truthfully. A bounded scan reported as complete would
-    # be a claim about evidence nothing ever looked at, which is the exact defect class this
-    # repository exists to measure.
     events, _ = read_all(log_dir)
-    window = len(events)
-    pack = None
-    last_error: ValueError | None = None
-    while True:
-        candidate = events if window >= len(events) else events[-window:]
-        try:
-            pack = recall.pack_events(
-                candidate,
-                query=task,
-                limit_chars=recall_limit_chars,
-                scan_complete=window >= len(events),
-            )
-            break
-        except ValueError as exc:
-            last_error = exc
-            if window <= 1:
-                raise ValueError(
-                    "the recall receipt does not fit in "
-                    f"{recall_limit_chars} characters even for a single event; the budget is "
-                    f"too small for this trajectory ({last_error})"
-                ) from exc
-            window = max(1, window // 2)
-
+    selection = _select_recall(events, query=task, limit_chars=recall_limit_chars)
+    pack = selection.text
     skills, omitted = select_skills(
         skills_dir, task, limit=skill_limit, budget_chars=skill_chars
     )
@@ -443,6 +465,7 @@ def assemble(
         skills=skills,
         skills_omitted=omitted,
         recall_pack=pack,
+        recall_selection=selection,
         recall_limit_chars=recall_limit_chars,
         recall_source_events=len(events),
         recall_source_digest=_source_digest(events),
@@ -484,6 +507,7 @@ def record_assembly(log_dir: Path, assembly: Assembly, *, task: str) -> EventPay
                     "sha256": promote.digest(assembly.recall_pack),
                     "source_events": assembly.recall_source_events,
                     "source_digest": assembly.recall_source_digest,
+                    **_selection_receipt(assembly.recall_selection),
                 },
                 "adapted": {
                     "status": assembly.adapted.status,
@@ -713,12 +737,39 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
                 )
             )
         else:
-            pack = recall.pack_events(
+            selection = _select_recall(
                 events[:source_events], query=query, limit_chars=limit_chars
             )
+            pack = selection.text
             if promote.digest(pack) != recorded_pack_sha:
                 reports.append(
                     LayerReport("recall", False, "the replayed pack does not match the record")
+                )
+            elif any(
+                key in recall_data
+                for key in (
+                    "selected_event_ids",
+                    "selected_digest",
+                    "omitted",
+                    "context_complete",
+                    "continuation",
+                )
+            ) and _selection_receipt(selection) != {
+                key: recall_data.get(key)
+                for key in (
+                    "selected_event_ids",
+                    "selected_digest",
+                    "omitted",
+                    "context_complete",
+                    "continuation",
+                )
+            }:
+                reports.append(
+                    LayerReport(
+                        "recall",
+                        False,
+                        "the replayed selection receipt does not match the record",
+                    )
                 )
             else:
                 reports.append(
