@@ -71,6 +71,15 @@ PRODUCT_IMPORTS = BUDGET_IMPORTS | {
     # banned independently of this list — FORBIDDEN_CALLS still refuses os.system,
     # os.popen, os.getenv and os.environ.get, the environ subscript check stands, and
     # their negative controls below stay green.
+    # `ast` is a parser and nothing else. Added 23 Aug 2026 for S02, which inspects a
+    # candidate's own source to detect forbidden imports before sealing its evaluation —
+    # the same inspection this file performs. It performs no I/O and cannot execute:
+    # `compile`, `eval`, `exec`, `__import__` and `getattr` remain in FORBIDDEN_CALLS
+    # independently, `promote.py` calls none of them, and their negative controls stay
+    # green. The alternative — a hand-rolled regex over Python source — would trade an
+    # inert stdlib parser for a scanner that misses cases, which is the same trade the
+    # `html` entry below refuses.
+    "ast",
     "fcntl",
     "hashlib",
     # `html` is escaping only. Added 21 Aug 2026 for the observability surface (ADR-0053),
