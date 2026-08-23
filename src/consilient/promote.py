@@ -22,7 +22,10 @@ contract lives here rather than in `validate`. `record` is the only function in
 
 from __future__ import annotations
 
+import ast
 import hashlib
+import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,7 +38,41 @@ ACTOR = "consilient.promote"
 ACCEPTED = "promote.accepted"
 REFUSED = "promote.refused"
 REVERSED = "promote.reversed"
-KINDS = (ACCEPTED, REFUSED, REVERSED)
+EVALUATED = "promote.evaluated"
+KINDS = (ACCEPTED, REFUSED, REVERSED, EVALUATED)
+
+INSTRUMENT_UNSEALED = "instrument_unsealed"
+CANDIDATE_UNEXECUTABLE = "candidate_unexecutable"
+NO_FRESH_INSTRUMENT = "no_fresh_instrument"
+REPEAT_QUERY = "repeat_query"
+HIDDEN_FIELD_ACCESS = "hidden_field_access"
+MISSING_ADVERSE_ROW = "missing_adverse_row"
+GOODHART_IMPROVEMENT = "goodhart_improvement"
+REVERSAL_MISMATCH = "reversal_mismatch"
+
+REQUIRED_ADVERSE_ROWS = (
+    "refusals",
+    "timeouts",
+    "quarantine",
+    "missing_telemetry",
+    "boundary_attempts",
+)
+PRIVILEGED_EVALUATION_FIELDS = frozenset(
+    {
+        "development_score",
+        "qualification_score",
+        "hidden_items",
+        "adverse",
+        "predecessor_digest",
+        "epoch_anchor_digest",
+        "manifest_digest",
+        "lineage_id",
+        "candidate_digest",
+        "reversal_match",
+        "scratch_preimage_digest",
+        "scratch_postimage_digest",
+    }
+)
 
 # EXP-47 stopping rule 1 fired at composite β = 0.3132 ≥ 0.20. ADR-0018 binds persistence
 # to that threshold until a measured promoter β says otherwise.
@@ -75,6 +112,16 @@ class PromoteError(RuntimeError):
     """The promoter refused to record a promotion."""
 
 
+class EvaluationRefusal(Exception):
+    """A sealed evaluation refused before producing a package."""
+
+    def __init__(self, reason: str, *, detail: str = "") -> None:
+        self.reason = reason
+        self.detail = detail
+        message = reason if not detail else f"{reason}: {detail}"
+        super().__init__(message)
+
+
 @dataclass(frozen=True)
 class ExecutionEvidence:
     """What the candidate did when it was actually run. Absence is not evidence."""
@@ -102,6 +149,99 @@ class Decision:
     candidate: Candidate
     enabled: bool
     measured_beta: beta_mod.Beta
+
+
+@dataclass(frozen=True)
+class AdverseTable:
+    refusals: int
+    timeouts: int
+    quarantine: int
+    missing_telemetry: int
+    boundary_attempts: int
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "refusals": self.refusals,
+            "timeouts": self.timeouts,
+            "quarantine": self.quarantine,
+            "missing_telemetry": self.missing_telemetry,
+            "boundary_attempts": self.boundary_attempts,
+        }
+
+
+@dataclass(frozen=True)
+class SealedManifest:
+    instrument_digest: str
+    lineage_id: str
+    qualification_batch_id: str
+    development_tasks: tuple[tuple[str, str], ...]
+    hidden_items: tuple[tuple[str, str], ...]
+    predecessor_digest: str
+    epoch_anchor_digest: str
+    allowed_imports: frozenset[str]
+    acceptance_threshold: float
+    seed: str
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, object]) -> SealedManifest:
+        development = tuple(
+            (str(row["prompt"]), str(row["expected"]))
+            for row in data["development_tasks"]  # type: ignore[index]
+        )
+        hidden = tuple(
+            (str(row["prompt"]), str(row["expected"]))
+            for row in data["hidden_items"]  # type: ignore[index]
+        )
+        allowed = data.get("allowed_imports", [])
+        return cls(
+            instrument_digest=str(data["instrument_digest"]),
+            lineage_id=str(data["lineage_id"]),
+            qualification_batch_id=str(data["qualification_batch_id"]),
+            development_tasks=development,
+            hidden_items=hidden,
+            predecessor_digest=str(data["predecessor_digest"]),
+            epoch_anchor_digest=str(data["epoch_anchor_digest"]),
+            allowed_imports=frozenset(str(item) for item in allowed),  # type: ignore[arg-type]
+            acceptance_threshold=float(data["acceptance_threshold"]),  # type: ignore[arg-type]
+            seed=str(data["seed"]),
+        )
+
+
+@dataclass(frozen=True)
+class LineageRegistry:
+    retired_batches: frozenset[tuple[str, str]] = frozenset()
+
+
+@dataclass(frozen=True)
+class EvaluationPackage:
+    qualification_accept: bool
+    manifest_digest: str
+    lineage_id: str
+    candidate_digest: str
+    development_score: float
+    qualification_score: float
+    adverse: AdverseTable
+    predecessor_digest: str
+    epoch_anchor_digest: str
+    reversal_match: bool
+    scratch_preimage_digest: str
+    scratch_postimage_digest: str
+
+
+@dataclass(frozen=True)
+class CandidateInstrumentView:
+    """Candidate-visible instrument slice; hidden items are unreachable."""
+
+    _manifest: SealedManifest
+
+    @property
+    def development_tasks(self) -> tuple[tuple[str, str], ...]:
+        return self._manifest.development_tasks
+
+    def __getattr__(self, name: str) -> object:
+        if name in {"hidden_items", "instrument_digest", "qualification_batch_id"}:
+            raise AttributeError(f"{name} is privileged and unavailable to candidates")
+        raise AttributeError(name)
 
 
 def digest(payload: str) -> str:
@@ -253,6 +393,178 @@ def reverse(log_dir: Path, candidate_id: str, preimage_sha256: str) -> dict[str,
                 "candidate_id": candidate_id,
                 "preimage_sha256": preimage_sha256,
                 "reason": "reversed",
+            },
+        },
+    )
+
+
+def _canonical_manifest_payload(data: Mapping[str, object]) -> dict[str, object]:
+    payload = dict(data)
+    payload.pop("instrument_digest", None)
+    return payload
+
+
+def manifest_digest(data: Mapping[str, object]) -> str:
+    canonical = json.dumps(_canonical_manifest_payload(data), sort_keys=True)
+    return digest(canonical)
+
+
+def verify_manifest_seal(manifest: SealedManifest, expected_digest: str) -> None:
+    payload = {
+        "lineage_id": manifest.lineage_id,
+        "qualification_batch_id": manifest.qualification_batch_id,
+        "development_tasks": [
+            {"prompt": prompt, "expected": expected}
+            for prompt, expected in manifest.development_tasks
+        ],
+        "hidden_items": [
+            {"prompt": prompt, "expected": expected}
+            for prompt, expected in manifest.hidden_items
+        ],
+        "predecessor_digest": manifest.predecessor_digest,
+        "epoch_anchor_digest": manifest.epoch_anchor_digest,
+        "allowed_imports": sorted(manifest.allowed_imports),
+        "acceptance_threshold": manifest.acceptance_threshold,
+        "seed": manifest.seed,
+    }
+    computed = manifest_digest(payload)
+    if computed != expected_digest:
+        raise EvaluationRefusal(INSTRUMENT_UNSEALED, detail=computed)
+    if computed != manifest.instrument_digest:
+        raise EvaluationRefusal(INSTRUMENT_UNSEALED, detail=computed)
+
+
+def validate_adverse_table(adverse: AdverseTable) -> None:
+    for field in REQUIRED_ADVERSE_ROWS:
+        value = adverse.as_dict()[field]
+        if not isinstance(value, int) or value < 0:
+            raise EvaluationRefusal(MISSING_ADVERSE_ROW, detail=field)
+
+
+def find_forbidden_imports(source: str, allowed_imports: frozenset[str]) -> list[str]:
+    tree = ast.parse(source)
+    forbidden: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module = alias.name.split(".", 1)[0]
+                if module not in allowed_imports:
+                    forbidden.append(module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module is None:
+                continue
+            module = node.module.split(".", 1)[0]
+            if module not in allowed_imports:
+                forbidden.append(module)
+    return sorted(set(forbidden))
+
+
+def privileged_fields() -> frozenset[str]:
+    return PRIVILEGED_EVALUATION_FIELDS
+
+
+def candidate_visible(package: EvaluationPackage | EvaluationRefusal) -> dict[str, object]:
+    if isinstance(package, EvaluationRefusal):
+        return {"reason": package.reason}
+    return {"qualification_accept": package.qualification_accept}
+
+
+def reserve_qualification_batch(
+    registry: LineageRegistry,
+    lineage_id: str,
+    batch_id: str,
+) -> LineageRegistry:
+    key = (lineage_id, batch_id)
+    if key in registry.retired_batches:
+        return registry
+    return LineageRegistry(registry.retired_batches | {key})
+
+
+def _batch_is_retired(
+    registry: LineageRegistry,
+    lineage_id: str,
+    batch_id: str,
+) -> bool:
+    return (lineage_id, batch_id) in registry.retired_batches
+
+
+ExecuteFn = Callable[[str, Sequence[tuple[str, str]]], tuple[bool, float]]
+
+
+def evaluate_sealed(
+    manifest: SealedManifest,
+    *,
+    candidate_source: str,
+    baseline_source: str,
+    execute: ExecuteFn,
+    registry: LineageRegistry,
+    adverse: AdverseTable,
+    contained: bool,
+    scratch_preimage_digest: str,
+    scratch_postimage_digest: str,
+) -> EvaluationPackage | EvaluationRefusal:
+    if not contained:
+        return EvaluationRefusal(CANDIDATE_UNEXECUTABLE)
+    try:
+        verify_manifest_seal(manifest, manifest.instrument_digest)
+    except EvaluationRefusal as exc:
+        return exc
+    if _batch_is_retired(registry, manifest.lineage_id, manifest.qualification_batch_id):
+        return EvaluationRefusal(REPEAT_QUERY)
+    try:
+        validate_adverse_table(adverse)
+    except EvaluationRefusal as exc:
+        return exc
+    forbidden = find_forbidden_imports(candidate_source, manifest.allowed_imports)
+    if forbidden:
+        return EvaluationRefusal(INSTRUMENT_UNSEALED, detail=",".join(forbidden))
+    if scratch_postimage_digest != scratch_preimage_digest:
+        return EvaluationRefusal(REVERSAL_MISMATCH)
+
+    ran_before, development_before = execute(baseline_source, list(manifest.development_tasks))
+    ran_after, development_after = execute(candidate_source, list(manifest.development_tasks))
+    if not (ran_before and ran_after):
+        return EvaluationRefusal(CANDIDATE_UNEXECUTABLE)
+
+    _, qualification_score = execute(candidate_source, list(manifest.hidden_items))
+    qualification_accept = qualification_score >= manifest.acceptance_threshold
+    development_improved = development_after > development_before
+    if development_improved and not qualification_accept:
+        return EvaluationRefusal(GOODHART_IMPROVEMENT)
+
+    return EvaluationPackage(
+        qualification_accept=qualification_accept,
+        manifest_digest=manifest.instrument_digest,
+        lineage_id=manifest.lineage_id,
+        candidate_digest=digest(candidate_source),
+        development_score=development_after,
+        qualification_score=qualification_score,
+        adverse=adverse,
+        predecessor_digest=manifest.predecessor_digest,
+        epoch_anchor_digest=manifest.epoch_anchor_digest,
+        reversal_match=True,
+        scratch_preimage_digest=scratch_preimage_digest,
+        scratch_postimage_digest=scratch_postimage_digest,
+    )
+
+
+def record_evaluation(log_dir: Path, package: EvaluationPackage) -> dict[str, object]:
+    now = datetime.now(timezone.utc)
+    visible = candidate_visible(package)
+    return append(
+        log_dir / f"{now.date().isoformat()}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": now.isoformat(),
+            "event": EVALUATED,
+            "actor": ACTOR,
+            "data": {
+                **visible,
+                "manifest_digest": package.manifest_digest,
+                "lineage_id": package.lineage_id,
+                "candidate_digest": package.candidate_digest,
+                "reversal_match": package.reversal_match,
+                "adverse": package.adverse.as_dict(),
             },
         },
     )
