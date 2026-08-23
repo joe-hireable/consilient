@@ -6090,3 +6090,137 @@ the loop has already lost on its own terms.
 
 **What would kill it:** quality inferior to direct frontier generation, or frontier cost not lower.
 **Both must hold for supervision to be retained**; either failing removes it. [asserted]
+
+---
+
+### EXP-138 · Does evidence-consuming supervision reduce actionable stall exposure and avoidable silence? `BLOCKED: lifecycle projection, contribution reconciliation, attention receipts and frozen fault bank`
+
+**Pre-registered 23 August 2026; no implementation outcome or fault-bank result inspected.** Before
+this heading was written, dispatch `20260823T132214-2271877ec3` searched the register headings,
+decision files, listed worktrees, current dispatch briefs/reservations and trajectory for ADR-0095
+and EXP-138; both counts were zero and no foreign reservation existed. The same dispatch then claimed
+the specification, ADR, register and generated index paths before editing them. [measured]
+
+**Decides:** whether ADR-0095's joined mechanism—one evidence-consuming lifecycle projection, one
+isolated contribution/landing protocol and one consequential-transition outbox—reduces actionable
+stall exposure and required notices which arrive only after the principal asks, without false
+terminal success, notification noise or disproportionate introspection cost. [asserted] It decides
+the joined lifecycle/attention benefit claim and its default use; it does not re-decide ADR-0091's
+independently grounded per-writer worktree, commit-only landing or warn-only EXP-130 coverage check,
+nor the fail-closed rule that tracked dirty output is incomplete. [cited] [asserted]
+
+**Precondition:** ADR-0095's six-axis replay, four no-running predicates, controller-derived terminal
+contribution manifest, fresh observation references, three-valued verifier result, isolated landing
+and transactional `attention.required`/delivery receipt are implemented behind the existing disabled
+orchestration boundary with all F-01–F-10 checks in the companion specification. [asserted] The
+implementation changes no gate or CLI command, keeps `events.py` as the single writer and has a
+trusted local originating-conversation delivery path; any principal-only response still requires
+authenticated first-party authorship. [asserted]
+
+Before either arm runs, an instrument owner who did not implement the treatment freezes and digests
+one local, secret-free fault bank: each of F-01 to F-10 under four controller schedules—uninterrupted,
+controller crash after child effect but before accounting, duplicate replay/delivery, and concurrent
+unrelated work—for 40 paired scenarios. [asserted] Each scenario fixes the event prefix, explicit
+clock, plan/dependency graph, resource observations, Git starting state, expected artefact and
+terminal contribution, exact correct lifecycle classification, required controller action and
+whether an interruption is earned. [asserted] Where a schedule is inapplicable to the named failure,
+the bank substitutes the nearest state-boundary interruption fixed before unsealing and records that
+mapping; no mapping changes after an outcome. [asserted]
+
+The control is the pinned pre-ADR-0095 supervisor and scratch-driver policy expressed as a pure
+replay adapter; the treatment is ADR-0095. [asserted] Both receive byte-identical scenario inputs,
+isolated worktrees and simulated clocks. [asserted] The control cannot be repaired during the run,
+and neither arm may read the other's output. [asserted] A second prospective phase requires 30
+consecutive eligible local Consilient work items, complete local resource/attention telemetry and
+principal consent to receive experiment-labelled exceptions; the control runs shadow-only over the
+same accepted prefixes and cannot act or send. [asserted] Until the bank, pinned adapters, receipts,
+consent and independent oracle exist, EXP-138 remains `BLOCKED`. [asserted]
+
+**Procedure:** use committed seed `1380095` to counterbalance arm order within the 40 paired fault
+scenarios. [asserted] For each arm, start from a fresh isolated tree and empty projection, replay the
+frozen prefix/schedule, allow only the policy's recorded controller actions, and stop the scenario at
+its frozen terminal boundary. [asserted] Retain every event, contribution manifest, Git object,
+classification, verifier/check result, attention requirement, delivery attempt/receipt, process-time
+sample and adverse outcome. [asserted] A timeout, crash, missing receipt, duplicate effect, parser
+error, false success, dirty closure, unclaimed path or instrument failure remains in its assigned arm
+and is never retried or replaced. [asserted]
+
+After all fault-bank runs are sealed, run ADR-0095 prospectively on the next 30 consecutive eligible
+local work items. [asserted] Eligibility is fixed before the first item: a work item enters if its
+trajectory contains a zero-active/non-empty-backlog observation, a terminal contribution, a frozen
+verifier outcome, an all-routes resource observation or a falsified frozen assumption. [asserted]
+The pinned control consumes the same accepted prefix in shadow and records what it would have
+classified or notified, but cannot alter scheduling, delivery or the treatment's evidence. [asserted]
+Record naturally occurring first-party status requests; do not solicit one. [asserted] An independent
+adjudicator sees frozen contracts, artefacts and event times but not arm labels, and marks the first
+available actionable signal, correct state/action and whether a notice was earned. [asserted]
+
+**Measures:** for each fault-bank pair and prospective item, record the confusion table over
+`finished|waiting_dependency|blocked|starved`; false `finished`, success or closure; tracked dirty
+output admitted; unowned landing obligations; duplicate dispatch/landing/effect; unclaimed changed
+paths; work-versus-infrastructure failure counts; stale/unknown observations admitted; verifier
+`failed` versus `check_error`; required, delivered, failed, duplicate and unearned interruptions;
+first-party status requests before delivery; projection/controller process time; trajectory bytes;
+worker wall time; and all adverse/missing outcomes. [asserted]
+
+For each episode, `actionable_stall_exposure_s` is the interval from the independent oracle's first
+available signal that work has no active/startable resolver or has terminal unowned output, to the
+first correct repair start, evidence-bound terminal disposition or on-time adverse delivery receipt.
+[asserted] Waiting with a named resolver is excluded; a missing end is censored at the scenario/item
+deadline and remains adverse. [asserted] Sum exposure per arm and report every episode, not only the
+aggregate. [algebra] `avoidable_silence_count` is required incidents without a matching receipt by
+`deliver_by`; `unearned_interruption_count` is delivered exceptions with no matching required
+incident. [algebra] Zero required incidents is `unavailable`, not zero. [asserted]
+
+Report treatment-minus-control paired differences for total actionable-stall exposure and silence;
+the number of fault classes in which treatment exposure is lower; raw prospective numerator and
+denominator; the fraction of supervisor process time over worker wall time; bytes per accepted event
+and per work item; and every correctness violation. [asserted] No number is generalised beyond the
+frozen bank, pinned supervisor pair and prospective local window. [asserted]
+
+**Stopping rule, fixed before the run:** stop the fault-bank phase after all 80 assigned runs are
+terminal, or 14 calendar days after the first run, whichever comes first. [asserted] Then stop the
+prospective phase after 30 eligible work items are terminal and adjudicated, or 30 calendar days after
+its first item, whichever comes first. [asserted] At either deadline, missing classification,
+artefact, manifest, telemetry, receipt or adjudication is adverse for that arm. [asserted] Inspect no
+aggregate arm result until both phases stop. [asserted] Stop early only for private-data exposure,
+principal-authority breach, escaped write outside an isolated root, oracle/arm leakage or a defective
+instrument; preserve completed cells and report `insufficient_evidence`. [asserted] Do not replace a
+scenario/item, change a deadline, threshold, oracle, schedule, observation lifetime, delivery rule or
+supervisor after any outcome; repair requires a new EXP id. [asserted]
+
+Treatment confirms the joined claim only if every condition holds: all 40 treatment fault scenarios
+match their frozen lifecycle/action oracle; there are zero false `finished`/success/closure results,
+dirty closures, escaped writes, unowned contributions and stale-observation or checker-error admits;
+total fault-bank actionable-stall exposure is at most 50% of control and lower in at least 8 of the
+10 failure classes; fault-bank avoidable silence is at most 20% of control; the prospective phase has
+at least 10 earned interruptions, zero avoidable silences and at most one unearned interruption over
+30 items; and treatment supervisor process time is at most 5% of worker wall time. [asserted] The
+50%, 20%, 8/10, 10-incident, 1/30 and 5% thresholds are preferential acceptance floors fixed before
+the run, not measured facts. [asserted]
+
+**Pre-declared loss condition:** the joined lifecycle/attention default loses on any correctness,
+privacy or authority violation; treatment fault-bank exposure above 50% of control; avoidable silence
+above 20% of control; more than one prospective unearned interruption; any prospective avoidable
+silence once at least 10 required incidents exist; or supervisor process-time overhead above 5%.
+[asserted] Fewer than 10 prospective required incidents, incomplete telemetry or a stopped defective
+instrument is `insufficient_evidence`, not confirmation; the ADR remains provisional and cannot claim
+reduced silence. [asserted] On loss, a successor keeps the independently necessary worktree,
+commit-only landing, dirty-output, fresh-observation and three-valued-check guards, but replaces the
+joined projection/outbox with the smallest state machine that passes the ten correctness fixtures.
+[asserted]
+
+**Largest plausible effect (ADR-0050):** within a fixed episode, treatment can reduce actionable-
+stall exposure and avoidable silence from the entire control interval/count to zero, or add the same
+amount; the paired differences are bounded by the frozen deadlines and number of required incidents.
+[algebra] A complete win can support only the pinned mechanism on the frozen fault bank and local
+window. [asserted] A loss changes what gets built—the joined projection/outbox default—not merely a
+threshold, so the experiment may decide the provisional architecture. [asserted] No outcome measures
+human-labelled beta, proves independence, authorises extra candidates or roles, activates routing,
+passes a gate, adds a CLI command, permits another repository, spends money, publishes output or
+delegates principal authority. [asserted]
+
+**What it cannot decide:** population-level failure rates; another repository, user, scheduler,
+runtime, notification transport or workload; long-run alert fatigue; whether the six internal axes
+are the smallest representation; whether a blocked notice changes human decisions for the better;
+or whether a future incumbent exceeds the retrieved bar. [asserted]

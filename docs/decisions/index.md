@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `0cf5251beb97937fbb777117e811e9531e150eccb840f8a5711509ee07a86da6`
+> **Source SHA-256:** `574dcda8e200337756e5b5f123e6dd2906681cf015498ce4ebfa7216b1856dad`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -99,3 +99,4 @@
 | [0092](0092-classify-durable-work-and-stop-deliberation-at-an-external-threshold.md) | Classify durable work and stop deliberation at an external threshold | PROVISIONAL | supersedes 0090 |
 | [0093](0093-compose-agent-roles-from-worker-method-and-subject-expertise.md) | Compose agent roles from worker method and subject expertise, and cut evidence-free specialists | PROVISIONAL | — |
 | [0094](0094-make-scientific-execution-a-pinned-evidence-producing-profile.md) | Make scientific execution a pinned evidence-producing profile, not a second laboratory platform | PROVISIONAL | — |
+| [0095](0095-project-orchestration-from-consumed-evidence-and-interrupt-on-decision-change.md) | Project orchestration from consumed evidence, isolate contributions, and interrupt on decision change | PROVISIONAL | — |
