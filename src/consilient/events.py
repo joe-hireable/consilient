@@ -79,6 +79,25 @@ KNOWLEDGE_STATUSES = frozenset({"ok", "unavailable", "not_configured"})
 VERIFICATION_STATUSES = frozenset(
     {"completed", "error", "timeout", "refused", "not_run"}
 )
+RECORD_CAPTURED_KIND = "record.captured"
+RECORD_CAPTURED_FIELDS = frozenset(
+    {
+        "record_id",
+        "digest",
+        "byte_count",
+        "media_type",
+        "object_locator",
+        "source",
+        "consent_purpose",
+        "retention_class",
+        "valid_time",
+        "supersedes",
+        "invalidates",
+    }
+)
+RECORD_KIND_ALIASES = frozenset(
+    {"record.capture", "record_captured", "records.captured"}
+)
 CAPABILITY_GAP_KIND = "capability.gap"
 GAP_FAILURES = frozenset({"failed", "silent", "refused", "not_implemented"})
 GAP_CLOSURES = frozenset({"retry", "escalate"})
@@ -264,6 +283,7 @@ def validate(event: object) -> EventPayload:
     if "event_id" in event:
         _check_event_id(event["event_id"])
 
+    _check_record_contract(event)
     _check_budget_contract(event)
     _check_usage_contract(event)
     _check_knowledge_contract(event)
@@ -286,25 +306,166 @@ def validate(event: object) -> EventPayload:
     return event
 
 
-def _check_event_id(value: object) -> None:
-    """Accept one spelling of UUIDv4, so IDs cannot gain aliases in replay."""
+def _check_uuid4(value: object, field: str) -> None:
     if (
         not isinstance(value, str)
         or re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", value)
         is None
     ):
-        raise EventError("event_id must be lower-case hyphenated UUIDv4 text")
+        raise EventError(f"{field} must be lower-case hyphenated UUIDv4 text")
+
+
+def _check_event_id(value: object) -> None:
+    """Accept one spelling of UUIDv4, so IDs cannot gain aliases in replay."""
+    _check_uuid4(value, "event_id")
+
+
+def new_event_id() -> str:
+    """Return the one canonical identity spelling accepted by the trajectory."""
+    raw = bytearray(os.urandom(16))
+    raw[6] = (raw[6] & 0x0F) | 0x40
+    raw[8] = (raw[8] & 0x3F) | 0x80
+    text = raw.hex()
+    return f"{text[:8]}-{text[8:12]}-{text[12:16]}-{text[16:20]}-{text[20:]}"
 
 
 def _prepare_for_append(event: EventPayload) -> EventPayload:
     """Attach one retry-stable identity before validating or attempting durability."""
     if "event_id" not in event:
-        raw = bytearray(os.urandom(16))
-        raw[6] = (raw[6] & 0x0F) | 0x40
-        raw[8] = (raw[8] & 0x3F) | 0x80
-        text = raw.hex()
-        event["event_id"] = f"{text[:8]}-{text[8:12]}-{text[12:16]}-{text[16:20]}-{text[20:]}"
+        event["event_id"] = new_event_id()
     return validate(event)
+
+
+def _check_record_contract(event: EventPayload) -> None:
+    """M01: one exact, private, content-addressed capture event contract."""
+    kind = event["event"]
+    if kind != RECORD_CAPTURED_KIND:
+        if kind in RECORD_KIND_ALIASES or kind.startswith("record."):
+            raise EventError(
+                f"record event kind must be {RECORD_CAPTURED_KIND!r}; aliases are not accepted"
+            )
+        return
+
+    data = event["data"]
+    actual = set(data)
+    if actual != RECORD_CAPTURED_FIELDS:
+        missing = sorted(RECORD_CAPTURED_FIELDS - actual)
+        unexpected = sorted(actual - RECORD_CAPTURED_FIELDS)
+        detail = []
+        if missing:
+            detail.append(f"missing {missing}")
+        if unexpected:
+            detail.append(f"unexpected {unexpected}")
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} body fields are fixed: {'; '.join(detail)}"
+        )
+
+    _check_uuid4(data["record_id"], "record.captured record_id")
+    digest = data["digest"]
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} digest must be 64 lower-case hex characters"
+        )
+    byte_count = data["byte_count"]
+    if (
+        not isinstance(byte_count, int)
+        or isinstance(byte_count, bool)
+        or byte_count < 0
+    ):
+        raise EventError(f"{RECORD_CAPTURED_KIND} byte_count must be a non-negative integer")
+
+    media_type = data["media_type"]
+    if (
+        not isinstance(media_type, str)
+        or re.fullmatch(r"[^\s/]+/[^\s/]+", media_type) is None
+    ):
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} media_type must be one canonical type/subtype string"
+        )
+
+    locator = data["object_locator"]
+    expected_locator = (
+        f".harness/objects/sha256/{digest[:2]}/{digest[2:]}"
+    )
+    if locator != expected_locator:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} object_locator must be the canonical repository-relative "
+            f"SHA-256 locator {expected_locator!r}"
+        )
+
+    source = data["source"]
+    if (
+        not isinstance(source, str)
+        or not source
+        or source != source.strip()
+        or source.startswith("/")
+        or re.match(r"^[A-Za-z]:", source)
+        or "\\" in source
+        or any(part in {"", ".", ".."} for part in source.split("/"))
+    ):
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} source must be one canonical repository-relative path"
+        )
+
+    for field in ("consent_purpose", "retention_class"):
+        value = data[field]
+        if not isinstance(value, str) or not value.strip() or value != value.strip():
+            raise EventError(
+                f"{RECORD_CAPTURED_KIND} must carry canonical non-empty {field} metadata"
+            )
+
+    valid_time = data["valid_time"]
+    if not isinstance(valid_time, dict) or set(valid_time) != {"from", "to"}:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} valid_time must contain exactly 'from' and 'to'"
+        )
+    valid_from = _record_timestamp(valid_time["from"], "valid_time.from")
+    valid_to_raw = valid_time["to"]
+    if valid_to_raw is not None:
+        valid_to = _record_timestamp(valid_to_raw, "valid_time.to")
+        if valid_to < valid_from:
+            raise EventError(
+                f"{RECORD_CAPTURED_KIND} valid_time.to cannot precede valid_time.from"
+            )
+
+    for relation in ("supersedes", "invalidates"):
+        references = data[relation]
+        if not isinstance(references, list):
+            raise EventError(f"{RECORD_CAPTURED_KIND} {relation} must be a list")
+        for reference in references:
+            _check_record_reference(reference, relation)
+
+
+def _record_timestamp(value: object, field: str) -> datetime:
+    if not isinstance(value, str) or TS.fullmatch(value) is None:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} {field} must be RFC3339 with an explicit offset"
+        )
+    try:
+        parsed = datetime.fromisoformat(value)
+        return parsed.astimezone(timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} {field} cannot be normalised to UTC"
+        ) from exc
+
+
+def _check_record_reference(reference: object, relation: str) -> None:
+    fields = {"event_id", "event_kind", "event_sha256"}
+    if not isinstance(reference, dict) or set(reference) != fields:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} {relation} entries must be exact F03 event references"
+        )
+    _check_event_id(reference["event_id"])
+    if reference["event_kind"] != RECORD_CAPTURED_KIND:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} {relation} may reference only record.captured events"
+        )
+    digest = reference["event_sha256"]
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} {relation} event_sha256 must be 64 lower-case hex characters"
+        )
 
 
 def _decimal_field(
@@ -1304,6 +1465,32 @@ def _validate_effect_receipt_chain(
         raise EventError(str(exc)) from exc
 
 
+def _validate_record_relations(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    """Resolve correction edges against the locked, accepted earlier prefix."""
+    for candidate in candidates:
+        if candidate["event"] != RECORD_CAPTURED_KIND:
+            continue
+        data = candidate["data"]
+        for relation in ("supersedes", "invalidates"):
+            for reference in data[relation]:
+                if reference["event_id"] == candidate["event_id"]:
+                    raise EventError(
+                        f"{RECORD_CAPTURED_KIND} {relation} cannot reference itself"
+                    )
+                try:
+                    resolve_reference(reference, prefix)
+                except EventError as exc:
+                    raise EventError(
+                        f"{RECORD_CAPTURED_KIND} {relation} must reference an exact earlier "
+                        f"record.captured event: {exc}"
+                    ) from exc
+
+
+register_transition_validator((RECORD_CAPTURED_KIND,), _validate_record_relations)
 register_transition_validator(
     (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT), _validate_effect_receipt_chain
 )
