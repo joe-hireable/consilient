@@ -225,15 +225,14 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
   loosening filed under someone's signature is the failure worth remembering, and deleting the
   record of it would be the second half of the same mistake.
 
-  **One boundary the rejection does not settle, flagged rather than inferred.** The two repository
-  names appear in this file and in others, because a prohibition cannot be stated without naming
-  what it prohibits. Reading the rejection to forbid the names outright would make the rule itself
-  unwritable. The orchestrator has therefore **not** scrubbed them, and is recording the question
-  instead of answering it: does the rejection forbid their *names* everywhere, or their *contents,
-  metrics and identifiers* while permitting the names where the prohibition itself is stated?
-  Until Joe answers, the names stay only where a rule or a boundary requires them, and nothing
-  else from those repositories appears anywhere. **Inferring the wider reading silently is the
-  exact failure this correction exists to undo.**
+  **The boundary, settled by Joe on 23 August 2026.** The two repository names may appear **only
+  where a rule states the prohibition itself** — here, in the leak checks that enforce it, and in
+  the gitignore that excludes them. Nowhere else. Their contents, excerpts, file paths, commit
+  identifiers and measured metrics remain forbidden everywhere without exception.
+
+  The reading was put to him rather than inferred, because a prohibition cannot be written without
+  naming what it prohibits, and the stricter reading would have made the rule unwritable. **A rule
+  that cannot be stated cannot be enforced**, which is why this boundary exists where it does.
 - Commit secrets or `.env`. `.github/workflows/secret-scan.yml` enforces this against the
   tracked tree and repository history without printing a detected credential.
 - **Put a secret into a public repository, under any circumstances.** Joe's words, 20 Aug 2026,

@@ -6406,6 +6406,50 @@ layout, task wording or node-count distribution; whether unrecorded reasoning is
 evidence anchor is substantively correct; long-run maintenance cost; or whether a future incumbent
 exceeds the retrieved bar. [asserted]
 
+### EXP-143 - What are alpha and delta when measured rather than asserted, and where does beta-star land? `BLOCKED: alpha must be measured after the guard backlog clears, not before`
+
+**Decides:** the value of beta-star, recomputed from measured inputs. [asserted] It does not decide
+whether any gate opens; it decides what the threshold is, and the comparison happens afterwards.
+
+**Why this exists.** beta-star = (1 - alpha) * e^(-k*delta) is the number every routing and gating
+decision is compared against, and **both inputs were invented**. At the values in use it evaluates
+to 0.1119, while the project's own two corrected estimates of actual beta are 0.12 and 0.14 - so at
+the measured error rate no sample size clears the threshold, and the number deciding that was a
+choice rather than an observation. [measured 23 August 2026]
+
+**Alpha first, because it is cheap and nobody has measured it.** alpha is
+P(verifier rejects | artefact is good). A check that rejects an artefact and then accepts the same
+artefact unchanged has, on that occasion, rejected a good one. Rerun history is the standard form of
+this and CI already produces it.
+
+**The ordering constraint, and it is the whole reason this is BLOCKED.** A cross-family review on
+23 August 2026 found **14 of 19 units carry a guard that can be deleted with the unit's own suite
+still green**. A suite that rejects less than it appears to produces an alpha biased DOWNWARD, and
+therefore a beta-star biased UPWARD - in the direction that opens the gate. **Alpha measured before
+the guard backlog is cleared is an artefact of weak tests, not a property of the checks.** So alpha
+is measured after Y05's guard-survival work has run and the backlog is clear, and any beta-star
+computed before then is void.
+
+**Delta** is the capability gap and is measured from routing outcomes across model tiers on a frozen
+task set, not from a published benchmark, because the gap that matters is the one on this work.
+
+**k is not addressed by this experiment**, and remains an invented input to a formula this
+experiment describes as re-derived. Named here so it is not discovered later.
+
+**Stopping rule, fixed in advance.** Report alpha with a Wilson interval over reruns, refusing below
+30 observed rejections of the same artefact, mirroring the beta floor. Report delta with an interval
+over at least three model tiers. **Recompute beta-star from whatever the measurements give, and
+publish it even if it is lower than the current value**, which would make the gate harder rather
+than easier. ADR-0104 commits to accepting that result in advance; this entry records the commitment
+so a later reader can check it was honoured.
+
+**The motivated-measurement risk, recorded rather than mitigated.** This threshold is being
+re-derived at the request of the party who benefits from it moving. The defence is that the
+estimator and stopping rule are fixed before any value is seen. That is a procedural defence and
+procedural defences are weaker than structural ones. [asserted]
+
+**Status:** BLOCKED on the guard backlog. [measured 23 August 2026]
+
 ### EXP-142 - Are a held-out contract suite's errors independent of the checks' errors, or do they fail on the same artefacts? `BLOCKED: no held-out contract exists, and no isolation check enforces that a builder cannot read one`
 
 **Decides:** whether ADR-0103's contract-beta is admissible as the Gate A1 quantity, or is biased in

@@ -143,7 +143,7 @@ records trajectory events, projects them into SQLite and computes β — and doe
 it cannot route, block or accept anything, and a test asserts the CLI exposes no surface that
 could. Everything past instrumentation is gated on ADR-0015 Gate A, which has not been passed.
 
-101 ADRs, 112 registered experiments, 27 invariant checks in CI.
+102 ADRs, 113 registered experiments, 27 invariant checks in CI.
 
 ## What it is for
 
@@ -195,7 +195,7 @@ to recover. It assumes none of the vocabulary below.
    marked
 3. [`docs/10-research/findings.md`](docs/10-research/findings.md) — the simulations
 4. [`docs/10-research/experiment-register.md`](docs/10-research/experiment-register.md) —
-   112 experiments with stopping rules
+   113 experiments with stopping rules
 5. [`docs/00-context/open-questions.md`](docs/00-context/open-questions.md) — what's still open
 
 **Then do these two things, in this order:**
