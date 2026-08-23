@@ -6101,118 +6101,186 @@ decision files, listed worktrees, current dispatch briefs/reservations and traje
 and EXP-138; both counts were zero and no foreign reservation existed. The same dispatch then claimed
 the specification, ADR, register and generated index paths before editing them. [measured]
 
-**Decides:** whether ADR-0095's joined mechanism—one evidence-consuming lifecycle projection, one
-isolated contribution/landing protocol and one consequential-transition outbox—reduces actionable
-stall exposure and required notices which arrive only after the principal asks, without false
-terminal success, notification noise or disproportionate introspection cost. [asserted] It decides
-the joined lifecycle/attention benefit claim and its default use; it does not re-decide ADR-0091's
-independently grounded per-writer worktree, commit-only landing or warn-only EXP-130 coverage check,
-nor the fail-closed rule that tracked dirty output is incomplete. [cited] [asserted]
+**Decides:** whether ADR-0095's joined mechanism—one evidence-consuming lifecycle projection,
+attributable contribution custody and one consequential-transition outbox—beats the fixed smaller
+scheduler on actionable-stall duration and asked-first/late notices in the four joined-mechanism
+classes F-01, F-05, F-06 and F-10, without false terminal success, notification noise or
+disproportionate supervisor CPU share. [asserted] F-02, F-03, F-04, F-07, F-08 and F-09 are shared
+correctness guards and are not credited to the treatment contrast. [asserted] The experiment does not
+re-decide ADR-0091's per-writer worktree, declared-claim or warn-only EXP-130 decisions, F-04's
+commit-only landing requirement, or the fail-closed dirty-output, fresh-observation and three-valued-
+check guards. [cited] [measured] [asserted] Trajectory bytes are reported descriptively; this
+experiment makes no storage- or maintainer-cost claim. [asserted]
 
-**Precondition:** ADR-0095's six-axis replay, four no-running predicates, controller-derived terminal
+**Precondition:** ADR-0095's six-axis replay, exhaustive four-state projection, crash-reconciled
 contribution manifest, fresh observation references, three-valued verifier result, isolated landing
-and transactional `attention.required`/delivery receipt are implemented behind the existing disabled
-orchestration boundary with all F-01–F-10 checks in the companion specification. [asserted] The
-implementation changes no gate or CLI command, keeps `events.py` as the single writer and has a
-trusted local originating-conversation delivery path; any principal-only response still requires
-authenticated first-party authorship. [asserted]
+and causally derived `attention.required`/delivery receipt are implemented behind the existing
+disabled orchestration boundary with all F-01–F-10 checks in the companion specification. [asserted]
+The implementation changes no gate or CLI command, keeps `events.py` as the single writer and has a
+trusted local originating-conversation delivery path; approval, consent and every other
+principal-only response still require authenticated first-party authorship. [asserted]
 
-Before either arm runs, an instrument owner who did not implement the treatment freezes and digests
-one local, secret-free fault bank: each of F-01 to F-10 under four controller schedules—uninterrupted,
+Before any run, an instrument owner who did not implement the treatment freezes and digests one
+local, secret-free fault bank: each of F-01 to F-10 under four controller schedules—uninterrupted,
 controller crash after child effect but before accounting, duplicate replay/delivery, and concurrent
-unrelated work—for 40 paired scenarios. [asserted] Each scenario fixes the event prefix, explicit
-clock, plan/dependency graph, resource observations, Git starting state, expected artefact and
-terminal contribution, exact correct lifecycle classification, required controller action and
-whether an interruption is earned. [asserted] Where a schedule is inapplicable to the named failure,
-the bank substitutes the nearest state-boundary interruption fixed before unsealing and records that
-mapping; no mapping changes after an outcome. [asserted]
+unrelated work—for 40 scenarios. [asserted] Each scenario fixes the event prefix, explicit clock,
+plan/dependency graph, resource observations, Git starting state, expected artefact and terminal
+contribution, exact lifecycle/action oracle, causally expected incident id, first actionable signal,
+first valid repair/disposition, existing delivery commitment, `deliver_by` and episode deadline.
+[asserted] Fault-bank `deliver_by` is 300 simulated seconds after the causal signal and its episode
+deadline is 1,800 simulated seconds after that signal. [asserted] Existing and already-missed work
+commitments remain breach labels but cannot create a retroactive delivery or censoring deadline.
+[asserted] Where a schedule is inapplicable, the bank fixes
+the nearest state-boundary interruption before unsealing and never changes the mapping. [asserted]
 
-The control is the pinned pre-ADR-0095 supervisor and scratch-driver policy expressed as a pure
-replay adapter; the treatment is ADR-0095. [asserted] Both receive byte-identical scenario inputs,
-isolated worktrees and simulated clocks. [asserted] The control cannot be repaired during the run,
-and neither arm may read the other's output. [asserted] A second prospective phase requires 30
-consecutive eligible local Consilient work items, complete local resource/attention telemetry and
-principal consent to receive experiment-labelled exceptions; the control runs shadow-only over the
-same accepted prefixes and cannot act or send. [asserted] Until the bank, pinned adapters, receipts,
+The control is the fixed smaller alternative named in ADR-0095: one trajectory-backed
+`ready|running|blocked|done` scheduler, one contribution check and one actionable-notice rule. It uses
+byte-identical treatment implementations for crash-reconciled dirty-output custody, per-writer
+worktrees, commit-only landing, runtime claim enforcement, fresh observations, three-valued checks,
+transport and delivery receipts. [asserted] It omits only the six-axis join, four-state distinction,
+typed retry/record split and consequential-transition/ratchet logic under test. [asserted] An
+independent control owner implements the table below literally; the historical pre-ADR supervisor and
+mutable `.harness/build_driver.py` are evidence, not controls. [asserted]
+
+Before unsealing the oracle or running an arm, both arm sources, the shared-guard source,
+interpreter/dependency lock, behaviour mapping and SHA-256 digests are committed as experiment
+artefacts and independently checked against the registered contrast. [asserted] Neither arm may be
+repaired after an outcome. [asserted] Both arms run all 40 scenarios, for 80 assigned runs; only
+F-01/F-05/F-06/F-10 contribute to the comparative benefit endpoint, while the other six classes must
+remain correct in both arms. [algebra] All use fresh isolated worktrees and simulated clocks, and no
+arm reads another output. [asserted] A second phase is a treatment-only prospective safety/feasibility
+window over consecutive local Consilient work; any shadow control output is descriptive only and
+cannot supply a paired or causal effect. [asserted] Until the bank, committed comparator, receipts,
 consent and independent oracle exist, EXP-138 remains `BLOCKED`. [asserted]
 
-**Procedure:** use committed seed `1380095` to counterbalance arm order within the 40 paired fault
-scenarios. [asserted] For each arm, start from a fresh isolated tree and empty projection, replay the
-frozen prefix/schedule, allow only the policy's recorded controller actions, and stop the scenario at
-its frozen terminal boundary. [asserted] Retain every event, contribution manifest, Git object,
-classification, verifier/check result, attention requirement, delivery attempt/receipt, process-time
-sample and adverse outcome. [asserted] A timeout, crash, missing receipt, duplicate effect, parser
-error, false success, dirty closure, unclaimed path or instrument failure remains in its assigned arm
-and is never retried or replaced. [asserted]
+The smaller comparator's transition/action table is fixed here, before implementation, and evaluated
+top-to-bottom at a settled tick: [asserted]
 
-After all fault-bank runs are sealed, run ADR-0095 prospectively on the next 30 consecutive eligible
-local work items. [asserted] Eligibility is fixed before the first item: a work item enters if its
-trajectory contains a zero-active/non-empty-backlog observation, a terminal contribution, a frozen
-verifier outcome, an all-routes resource observation or a falsified frozen assumption. [asserted]
-The pinned control consumes the same accepted prefix in shadow and records what it would have
-classified or notified, but cannot alter scheduling, delivery or the treatment's evidence. [asserted]
-Record naturally occurring first-party status requests; do not solicit one. [asserted] An independent
-adjudicator sees frozen contracts, artefacts and event times but not arm labels, and marks the first
-available actionable signal, correct state/action and whether a notice was earned. [asserted]
+| Accepted state after shared guards | Projected state and action | Exception rule |
+|---|---|---|
+| Newly frozen candidate-verifier rejection or delivery-commitment breach | `blocked`; stop accepting the candidate or promise. | Emit once for the rejection/breach. |
+| No remaining item or contribution obligation | `done`; emit the ordinary terminal delivery. | None. |
+| At least one active attempt | `running`; retain it and exclude it from candidates. | None. |
+| No active attempt; at least one dependency/authority-ready item has a fresh available route | `ready`; start the lowest plan-order eligible item. A typed start failure re-enters as `blocked`. | None before the start failure. |
+| Work remains and neither prior row applies | `blocked`; retain the causal blocker but do not distinguish waiting from starvation. | Emit once on entry to `blocked`. |
 
-**Measures:** for each fault-bank pair and prospective item, record the confusion table over
+The comparator uses one failure counter: every non-success attempt, including infrastructure error,
+increments it; and candidate verification plus record integrity are one conjunctive pass/fail result.
+[asserted] Its incident id, five-minute deadline, transport and deduplication are shared with treatment,
+but it has no causal next-action vocabulary or silence/noise ratchet. [asserted] No implementation
+choice may add another transition, action, exception or retry rule; inability to implement this table
+is `insufficient_evidence`, not permission to weaken it. [asserted] A result is limited to this exact
+comparator and does not exclude a better untested smaller scheduler. [asserted]
+
+**Procedure:** use committed seed `1380095` to counterbalance arm order within all 40 paired scenarios.
+[asserted] For each assigned run, start from a
+fresh isolated tree and empty projection, replay the frozen prefix/schedule, allow only the policy's
+recorded controller actions, and stop at the frozen episode deadline or evidence-bound terminal
+disposition. [asserted] Retain every event, contribution manifest, Git object, classification,
+verifier/check result, causally expected incident, materialised outbox row, delivery attempt/receipt,
+first-party request, process-time sample and adverse outcome. [asserted] A timeout, crash, missing
+receipt, duplicate effect, parser error, false success, dirty closure, unclaimed path or arm-local
+instrument failure remains in its assigned run and is never retried or replaced. [asserted]
+
+After the fault-bank runs are sealed and the principal consents to experiment-labelled exceptions,
+record `window_opened_at` and run ADR-0095 on the next 30 consecutive local work items opened after
+that instant; no treatment-produced event controls membership. [asserted] Each item uses
+`opened_at + 24 hours` as its episode deadline and the same causal-signal-plus-300-second `deliver_by`
+formula as the bank; existing commitments remain separately scored breach evidence. [asserted] A
+pinned control may consume the same
+accepted prefixes in shadow for descriptive disagreement counts only; because it cannot act or send,
+its repair times, receipts and treatment-minus-control differences are prohibited. [asserted] Record
+naturally occurring first-party status requests; do not solicit one. [asserted] An independent
+adjudicator first sees frozen contracts, artefacts and causal event times without outbox/delivery data
+and marks expected incidents, first actionable signals and correct states/actions; only then are
+attention rows, receipts and request times unsealed and joined. [asserted]
+
+**Measures:** for each assigned fault-bank run and prospective item, record the confusion table over
 `finished|waiting_dependency|blocked|starved`; false `finished`, success or closure; tracked dirty
 output admitted; unowned landing obligations; duplicate dispatch/landing/effect; unclaimed changed
 paths; work-versus-infrastructure failure counts; stale/unknown observations admitted; verifier
-`failed` versus `check_error`; required, delivered, failed, duplicate and unearned interruptions;
-first-party status requests before delivery; projection/controller process time; trajectory bytes;
-worker wall time; and all adverse/missing outcomes. [asserted]
-
-For each episode, `actionable_stall_exposure_s` is the interval from the independent oracle's first
-available signal that work has no active/startable resolver or has terminal unowned output, to the
-first correct repair start, evidence-bound terminal disposition or on-time adverse delivery receipt.
-[asserted] Waiting with a named resolver is excluded; a missing end is censored at the scenario/item
-deadline and remains adverse. [asserted] Sum exposure per arm and report every episode, not only the
-aggregate. [algebra] `avoidable_silence_count` is required incidents without a matching receipt by
-`deliver_by`; `unearned_interruption_count` is delivered exceptions with no matching required
-incident. [algebra] Zero required incidents is `unavailable`, not zero. [asserted]
-
-Report treatment-minus-control paired differences for total actionable-stall exposure and silence;
-the number of fault classes in which treatment exposure is lower; raw prospective numerator and
-denominator; the fraction of supervisor process time over worker wall time; bytes per accepted event
-and per work item; and every correctness violation. [asserted] No number is generalised beyond the
-frozen bank, pinned supervisor pair and prospective local window. [asserted]
-
-**Stopping rule, fixed before the run:** stop the fault-bank phase after all 80 assigned runs are
-terminal, or 14 calendar days after the first run, whichever comes first. [asserted] Then stop the
-prospective phase after 30 eligible work items are terminal and adjudicated, or 30 calendar days after
-its first item, whichever comes first. [asserted] At either deadline, missing classification,
-artefact, manifest, telemetry, receipt or adjudication is adverse for that arm. [asserted] Inspect no
-aggregate arm result until both phases stop. [asserted] Stop early only for private-data exposure,
-principal-authority breach, escaped write outside an isolated root, oracle/arm leakage or a defective
-instrument; preserve completed cells and report `insufficient_evidence`. [asserted] Do not replace a
-scenario/item, change a deadline, threshold, oracle, schedule, observation lifetime, delivery rule or
-supervisor after any outcome; repair requires a new EXP id. [asserted]
-
-Treatment confirms the joined claim only if every condition holds: all 40 treatment fault scenarios
-match their frozen lifecycle/action oracle; there are zero false `finished`/success/closure results,
-dirty closures, escaped writes, unowned contributions and stale-observation or checker-error admits;
-total fault-bank actionable-stall exposure is at most 50% of control and lower in at least 8 of the
-10 failure classes; fault-bank avoidable silence is at most 20% of control; the prospective phase has
-at least 10 earned interruptions, zero avoidable silences and at most one unearned interruption over
-30 items; and treatment supervisor process time is at most 5% of worker wall time. [asserted] The
-50%, 20%, 8/10, 10-incident, 1/30 and 5% thresholds are preferential acceptance floors fixed before
-the run, not measured facts. [asserted]
-
-**Pre-declared loss condition:** the joined lifecycle/attention default loses on any correctness,
-privacy or authority violation; treatment fault-bank exposure above 50% of control; avoidable silence
-above 20% of control; more than one prospective unearned interruption; any prospective avoidable
-silence once at least 10 required incidents exist; or supervisor process-time overhead above 5%.
-[asserted] Fewer than 10 prospective required incidents, incomplete telemetry or a stopped defective
-instrument is `insufficient_evidence`, not confirmation; the ADR remains provisional and cannot claim
-reduced silence. [asserted] On loss, a successor keeps the independently necessary worktree,
-commit-only landing, dirty-output, fresh-observation and three-valued-check guards, but replaces the
-joined projection/outbox with the smallest state machine that passes the ten correctness fixtures.
+`failed` versus `check_error`; causally expected, materialised, delivered, failed, duplicate and
+unearned interruptions; asked-first incidents; projection/controller process time; trajectory bytes;
+worker wall time including zero; supervisor CPU on zero-worker items; and all adverse/missing outcomes.
 [asserted]
 
-**Largest plausible effect (ADR-0050):** within a fixed episode, treatment can reduce actionable-
-stall exposure and avoidable silence from the entire control interval/count to zero, or add the same
-amount; the paired differences are bounded by the frozen deadlines and number of required incidents.
+For each episode, `actionable_stall_duration_s` is the interval from the independent oracle's first
+available signal that work has no active/startable resolver or has terminal unowned output to the
+first correct repair start or evidence-bound terminal disposition. [asserted] A notice does not stop
+this clock. [asserted] Waiting with a named resolver and boundary is excluded; a missing end is
+censored at the frozen episode deadline and remains adverse. [asserted] `notification_latency_s`
+runs separately from a causally expected incident to its matching receipt and is censored at
+`deliver_by`. [asserted]
+
+For every oracle-expected incident `i`, including one with no `attention.required` row, `D_i=1` only
+when the projected row and matching receipt both precede `deliver_by` and the first first-party status
+request after the causal transition. [algebra] `avoidable_silence_count=sum(1-D_i)`;
+`asked_first_count` counts expected incidents whose first-party request precedes receipt; and
+`unearned_interruption_count` counts delivered exceptions absent from the oracle set. [algebra] Zero
+expected incidents is `unavailable`, not zero. [asserted]
+
+For the fault bank only, report treatment-minus-control paired differences in total actionable-stall
+duration and avoidable silence over F-01/F-05/F-06/F-10, plus the number of those four classes in
+which treatment duration is lower. [asserted] Report correctness in the six shared-guard classes
+separately and do not credit it to the joined mechanism. [asserted] For the prospective treatment-only phase,
+report raw incident numerators/denominators and
+`supervisor_cpu_share = sum(supervisor process time over all 30 items) / sum(worker wall time over all
+30 items, including zeros)`. [algebra] Report supervisor CPU on zero-worker items separately and run
+a zero-worker-heavy fixture; zero aggregate worker wall time is insufficient evidence, never a zero
+ratio. [asserted] Report bytes per accepted event and item descriptively and every correctness violation.
+[asserted] No number is generalised beyond the frozen bank, pinned supervisor pair and prospective
+local window. [asserted]
+
+**Stopping rule, fixed before the run:** stop the fault-bank phase after all 80 assigned runs are
+terminal, or 14 calendar days after the first assigned run, whichever comes first. [asserted] Open the
+prospective clock at recorded `window_opened_at`, then stop after 30 consecutive opened items are
+terminal and adjudicated, or 30 calendar days after that instant, whichever comes first; zero opened
+items therefore still stops. [asserted] Inspect no aggregate arm result until both phases stop.
+[asserted] Do not replace a scenario/item or change a deadline, threshold, oracle, schedule,
+observation lifetime, delivery rule, adapter or supervisor after an outcome; repair requires a new
+EXP id. [asserted]
+
+A digest mismatch, oracle/arm leakage or common recorder defect found before the first assigned run
+keeps the experiment `BLOCKED`; no outcome exists and repair requires a new EXP id. [asserted] After
+the first run starts, private-data exposure, principal-authority breach or an escaped write is an
+immediate treatment loss. [asserted] Any missing treatment classification, manifest, telemetry,
+expected incident, receipt or adjudication is adverse and a loss; a missing control endpoint prevents
+confirmation and is `insufficient_evidence` unless a treatment loss already exists. [asserted]
+
+The exhaustive disposition uses this precedence: [asserted]
+
+1. **`loss`:** any treatment correctness, privacy or authority violation; any treatment expected
+   incident without its projected row and receipt before both `deliver_by` and a first-party request;
+   any completed quantitative threshold below; or any missing treatment outcome. [asserted]
+2. **`insufficient_evidence`:** no loss, but a horizon ends before all control comparisons, 30
+   prospective items, 10 prospective expected incidents, complete common telemetry/adjudication or a
+   positive aggregate worker-wall denominator exist, or the control violates its fixed table/shared-
+   guard contract. The ADR remains provisional and the operational default is the simpler scheduler
+   plus independent guards pending a new experiment. [asserted]
+3. **`confirmed`:** neither prior row applies and every confirmation condition below holds. [asserted]
+
+Treatment confirms the joined claim only if both arms complete all 40 scenarios and treatment matches
+every frozen oracle; the six shared-guard classes F-02/F-03/F-04/F-07/F-08/F-09 remain correct in
+both arms; there are zero treatment false `finished`/success/closure results, dirty closures, escaped
+writes, unowned contributions, stale-observation/checker-error admits, avoidable silences and
+asked-first incidents; treatment fault-bank actionable-stall duration over F-01/F-05/F-06/F-10 is at
+most 50% of control and strictly lower in all 4 classes; fault-bank treatment silence is strictly
+lower than control; the prospective phase contains at least 10 expected incidents, zero silence,
+zero asked-first incidents and at most one unearned interruption over 30 items; and prospective
+`supervisor_cpu_share` is at most 5%. [asserted] The 50%, 4/4, 10-incident, 1/30 and 5% thresholds are
+preferential acceptance floors fixed before the run, not measured facts. [asserted]
+
+**Pre-declared loss condition:** the joined default loses whenever disposition row 1 applies,
+including treatment duration above 50% of control, improvement in fewer than all 4 joined classes,
+no strict fault-bank silence improvement, any treatment silence/asked-first incident, more than one
+prospective unearned interruption or supervisor CPU share above 5%. [asserted] On loss, a successor
+keeps the independently necessary worktree, commit-only landing, dirty-output, fresh-observation and
+three-valued-check guards, but replaces the joined projection/outbox with the smallest state machine
+that passes all ten correctness fixtures. [asserted]
+
+**Largest plausible effect (ADR-0050):** within a fixed fault-bank episode, treatment can reduce
+actionable-stall duration and avoidable silence from the entire control interval/count to zero, or add
+the same amount; paired differences are bounded by the frozen deadlines and oracle-expected incidents.
 [algebra] A complete win can support only the pinned mechanism on the frozen fault bank and local
 window. [asserted] A loss changes what gets built—the joined projection/outbox default—not merely a
 threshold, so the experiment may decide the provisional architecture. [asserted] No outcome measures
@@ -6221,6 +6289,7 @@ passes a gate, adds a CLI command, permits another repository, spends money, pub
 delegates principal authority. [asserted]
 
 **What it cannot decide:** population-level failure rates; another repository, user, scheduler,
-runtime, notification transport or workload; long-run alert fatigue; whether the six internal axes
-are the smallest representation; whether a blocked notice changes human decisions for the better;
-or whether a future incumbent exceeds the retrieved bar. [asserted]
+runtime, notification transport or workload; a causal prospective treatment effect; long-run alert
+fatigue; storage or maintainer cost; whether the six internal axes are the smallest representation;
+whether a better untested smaller scheduler exists; whether a blocked notice changes human decisions
+for the better; or whether a future incumbent exceeds the retrieved bar. [asserted]

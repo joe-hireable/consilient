@@ -56,9 +56,9 @@ This decision extends, rather than restates, these existing contracts: [measured
   replayed ratchet rather than a mutable counter. [cited]
 - ADR-0083: detailed live state is available on pull; ordinary state changes do not create chat
   messages. [cited]
-- ADR-0091: write attempts get isolated indexes, landing takes only worker-owned commits, declared
-  claims remain authoritative and EXP-130's import closure is a warning check, not a replacement.
-  [cited] [measured]
+- ADR-0091: write attempts get isolated indexes, declared claims remain authoritative and EXP-130's
+  import closure is a warning check, not a replacement. [cited] F-04 separately requires landing to
+  take only worker-owned commits. [measured]
 
 ### 2.2 Retrieved bar
 
@@ -118,22 +118,25 @@ ceiling so a broken runner cannot retry forever. [asserted]
 
 ### 3.2 The four no-running states
 
-The following projection is evaluated when there is no `active` attempt. [asserted] Let `remaining`
-be non-terminal items plus every unlanded contribution obligation; let `ready` be items whose
-dependency and authority predicates pass before resource admission; and let a `resolver` be a live or
-ready owned item, or a predeclared future observation/lease boundary that can clear a blocker without
-new principal authority. [asserted]
+The following projection is evaluated at a settled supervision boundary when there is no `active`
+attempt and reconciliation plus admission have found no `startable` item. [asserted] If a fresh
+available route makes an item startable, the controller must start it or record the resulting typed
+failure and re-evaluate before it may report a no-running state. [asserted] Let `R` mean that
+`remaining` contains a non-terminal item or unlanded contribution obligation; let `Q` mean that
+`ready` contains an item whose dependency and authority predicates pass before resource admission;
+and, when `Q` is false, let `C` mean that every critical-path blocker has both a named live, ready or
+scheduled resolver and a future re-evaluation boundary. [asserted]
 
 | State | Mutually exclusive predicate | Required controller action |
 |---|---|---|
-| `finished` | `remaining` is empty and no contribution, verifier, dissent or record-release obligation remains. [asserted] | Emit the evidence-bound terminal delivery once. [asserted] |
-| `starved` | `ready` is non-empty, but every otherwise eligible route is unavailable or `unknown` under a fresh resource observation. [asserted] | Retain the ready work; probe only under the frozen policy. Interrupt only when the exhaustion changes the delivery commitment or leaves no route. [asserted] |
-| `waiting_dependency` | `remaining` is non-empty, `ready` is empty, and every critical-path blocker has a named resolver plus a future re-evaluation boundary. [asserted] | Record the blocker and next observation; do not claim finished and do not spin without that boundary. [asserted] |
-| `blocked` | `remaining` is non-empty, `ready` is empty, and at least one critical-path blocker has no live, ready or scheduled resolver under the current authority and contract. [asserted] | Append an adverse attention incident in the same supervision tick; do not tick quietly. Ask the principal only if the underlying cause independently matches ADR-0075's closed set. [asserted] |
+| `finished` | `not R`. No contribution, verifier, dissent or record-release obligation remains. [asserted] | Emit the evidence-bound terminal delivery once. [asserted] |
+| `starved` | `R and Q`. At the settled boundary, every otherwise eligible route is unavailable or `unknown` under a fresh resource observation. [asserted] | Retain the ready work; probe only under the frozen policy. Interrupt only when the exhaustion changes the delivery commitment or leaves no route. [asserted] |
+| `waiting_dependency` | `R and not Q and C`. [asserted] | Record every blocker and its next observation; do not claim finished and do not spin without that boundary. [asserted] |
+| `blocked` | `R and not Q and not C`, including a named resolver which lacks a future re-evaluation boundary. [asserted] | Append an adverse attention incident in the same supervision tick; do not tick quietly. Ask the principal only if the underlying cause independently matches ADR-0075's closed set. [asserted] |
 
-The precedence is `finished`, then `starved`, then `waiting_dependency`, otherwise `blocked`; the
-predicates above make the result unique. [algebra] A renderer may not collapse any of them into
-`idle`, `working` or `nothing running`. [asserted]
+The four Boolean rows above are disjoint and exhaustive over `R`, `Q` and `C`; `C` is ignored when
+`Q` is true. [algebra] A renderer may not collapse any of them into `idle`, `working` or `nothing
+running`. [asserted]
 
 ADR-0034's artefact rule remains load-bearing. [cited] A new sealed checkpoint, attributable worker
 commit, accepted verifier receipt or terminal contribution manifest can advance progress; a PID,
@@ -165,6 +168,13 @@ quarantined or abandoned with evidence. [asserted] This separates mutual exclusi
 custody: a dead process does not hold a path claim forever, and its work does not disappear with the
 claim. [asserted]
 
+The attempt registry and isolated-root identity are durable before the child starts. [asserted] On
+controller restart or claim expiry, the supervisor must reconcile every non-terminal attempt root and
+append its manifest plus any landing obligation before that work item is eligible for release-driven
+redispatch or closure. [asserted] A crash after a child write but before accounting therefore becomes
+`incomplete` with an owner; an absent terminal event is not evidence of an empty contribution.
+[asserted]
+
 ### 3.4 Fresh observations and three-valued checks
 
 Every cached observation used for admission or routing records `source`, `observed_at`, `valid_for`,
@@ -195,27 +205,36 @@ reachable. [asserted]
 
 Declared claims remain the authority over code, documentation, generated files and failure branches.
 [cited: ADR-0091] EXP-130's transitive import closure stays a warning check because it missed
-non-Python and event-literal coupling and reduced measured safe width. [measured] At the execution
-boundary, the actual contribution manifest must be a subset of the declared claim; an attempt that
-needs another path stops before write/stage/commit and emits `claim_expansion_required`. [asserted]
-The derived warning and actual-diff check are complementary: the former catches a likely omitted
-Python consumer before work, while the latter rejects every undeclared path after observation.
-[asserted]
+non-Python and event-literal coupling and reduced measured safe width. [measured] Before child launch,
+the controller gives the exact runtime a repository-write allowlist equal to the declared claim; a
+route which cannot enforce that path set is ineligible for write work. [asserted] Reads, network and
+non-repository effects are unchanged, so this is narrow claim enforcement rather than the general
+hermetic sandbox rejected by ADR-0091. [asserted]
+
+Both a cooperative API request and a direct shell/tool write to an undeclared repository path must be
+refused before mutation and emit `claim_expansion_required`; neither may expand its own authority.
+[asserted] The terminal actual-diff subset check remains defence in depth and quarantines any runtime
+confinement defect before stage, commit or landing. [asserted] The derived warning, write allowlist and
+actual-diff check are complementary: likely omitted Python consumers are warned before work, every
+write is mediated, and no observed bypass becomes a contribution. [asserted]
 
 ## 5. Mechanism C — a consequential-transition outbox
 
-Detailed state remains pull-only under ADR-0083. [cited] F-10 adds a narrower push rule: when a
-trajectory transition changes what the principal should do next, the single writer atomically
-appends an `attention.required` outbox record alongside the adverse transition before the supervisor
-sleeps or starts unrelated work. [asserted] Delivery is at-least-once and records a separate
-`attention.outcome`; it never decides run state, approval or acceptance. [asserted]
+Detailed state remains pull-only under ADR-0083. [cited] F-10 adds a narrower push rule. A pure
+projection over accepted causal transitions derives the expected incident id, next action and
+deadline independently of any outbox row. [asserted] When a transition changes what the principal
+should do next, the single writer atomically appends the corresponding `attention.required` outbox
+record alongside the adverse transition before the supervisor sleeps or starts unrelated work.
+[asserted] Delivery is at-least-once and records a separate `attention.outcome`; it never decides run
+state, approval or acceptance. [asserted]
 
-`attention.required` carries a stable incident id and deduplication key, causal event/artefact
-references, prior and new principal-next-action, reason class, impact on the delivery commitment,
-minimal secret-free message digest and `deliver_by`. [asserted] `attention.outcome` carries the same
-incident id, `delivered|failed`, transport identity, attempt time and receipt or failure evidence.
-[asserted] Duplicate delivery is tolerated and deduplicated by incident id; a new interruption is
-earned only by a changed action, impact or evidence-bound terminal disposition. [asserted]
+`attention.required` carries the projected stable incident id and deduplication key, causal
+event/artefact references, prior and new principal-next-action, reason class, impact on the delivery
+commitment, minimal secret-free message digest and projected `deliver_by`. [asserted] It cannot choose
+its own deadline. [asserted] `attention.outcome` carries the same incident id, `delivered|failed`,
+transport identity, attempt time and receipt or failure evidence. [asserted] Duplicate delivery is
+tolerated and deduplicated by incident id; a new interruption is earned only by a changed action,
+impact or evidence-bound terminal disposition. [asserted]
 
 ### 5.1 What earns interruption
 
@@ -256,21 +275,30 @@ for detail rather than streaming state. [asserted]
 
 ### 5.2 Silence and noise are paired ratchets
 
-No mutable counter is added. [asserted] From replayed events, for each `attention.required` incident
-`i`, let `D_i=1` when a matching delivery receipt exists by `deliver_by`, otherwise `0`. [algebra]
+No mutable counter is added. [asserted] Let `E` be the incidents and deadlines derived from qualifying
+causal transitions under the frozen rule, whether or not an `attention.required` row was appended.
+[asserted] The production default is `deliver_by = min(causal_event.accepted_at + 300 seconds,
+causal_event.accepted_at + 300 seconds)`, namely five minutes after the accepted transition.
+[algebra] An existing or already-missed delivery commitment is retained as causal breach evidence but
+does not create an impossible retroactive transport deadline. [asserted] The five-minute threshold is
+a preferential interruption bound, not a measured transport fact. [asserted] For every `i` in `E`,
+let `D_i=1` only when both a matching outbox row and delivery
+receipt exist before `deliver_by` and before the first first-party status request after the causal
+transition; otherwise `D_i=0`. [algebra]
 
-`avoidable_silence_count = sum(1 - D_i)` over required incidents. [algebra]
+`avoidable_silence_count = sum(1 - D_i)` over `E`. [algebra]
 
-A principal status request after `attention.required` and before delivery is retained as direct
-evidence that the silence reached the user, but the missed deadline already counts; transport failure
-does not turn silence into success. [asserted] Zero required incidents is `unavailable`, not zero.
+A first-party status request after the qualifying transition and before delivery increments
+`asked_first_count` and makes that incident silent even if a later receipt beats `deliver_by`.
+[asserted] Transport failure and omission of `attention.required` also remain silence; neither can
+remove the incident from `E`. [asserted] Zero expected incidents is `unavailable`, not zero.
 [asserted]
 
-`unearned_interruption_count` is the number of delivered exception messages with no matching open
-`attention.required` incident at delivery time. [algebra] This is the anti-noise half: lowering silence
-by paging every event fails the mechanism. [asserted]
+`unearned_interruption_count` is the number of delivered exception messages with no matching incident
+in `E` at delivery time. [algebra] This is the anti-noise half: lowering silence by paging every event
+fails the mechanism. [asserted]
 
-As in ADR-0075, consecutive non-overlapping windows of 30 required incidents ratchet the avoidable-
+As in ADR-0075, consecutive non-overlapping windows of 30 expected incidents ratchet the avoidable-
 silence ceiling down to the lowest completed-window count; a later rise is a harness defect, not a
 request for the principal to diagnose it. [asserted] Consecutive non-overlapping windows of 30
 exception deliveries apply the same rule to unearned interruptions. [asserted] Both report raw
@@ -283,19 +311,19 @@ specification-only change. [measured] [asserted]
 
 | Failure | Mechanism | Regression check that must fail |
 |---|---|---|
-| **F-01 — silent stall** | Lifecycle projection plus attention outbox. [asserted] | `test_f01_four_no_running_states`: replay four prefixes differing only in remaining work, resolvers and eligible resources; require exactly `finished`, `waiting_dependency`, `blocked`, `starved`. Vary process presence without changing the result, and require `blocked` to append one `attention.required` before the next tick. [asserted] |
-| **F-02 — stranded output** | Terminal contribution manifest plus durable landing owner. [asserted] | `test_f02_dirty_exit_is_incomplete`: let a child exit zero after modifying seven tracked files; require exact path/status/digest entries, `incomplete`, a released claim, a surviving landing obligation and no success/closure projection. [asserted] |
+| **F-01 — silent stall** | Lifecycle projection plus attention outbox. [asserted] | `test_f01_four_no_running_states`: property-check the complete `R/Q/C` truth table at a settled boundary; require exactly `finished`, `waiting_dependency`, `blocked`, `starved`, and require a fresh available route to dispatch rather than classify. Vary process presence without changing the result, and require `blocked` to append one `attention.required` before the next tick. [asserted] |
+| **F-02 — stranded output** | Terminal contribution manifest plus durable landing owner. [asserted] | `test_f02_dirty_exit_is_incomplete`: let a child modify seven tracked files, then crash the controller before accounting. On restart/expiry reconciliation, require exact path/status/digest entries, `incomplete`, a surviving landing obligation, no redispatch before custody and no success/closure projection. [asserted] |
 | **F-03 — shared index** | Runtime-conformant per-attempt worktree/index. [cited: ADR-0091] | `test_f03_parallel_writers_have_distinct_indexes`: two concurrent writers must report different `git rev-parse --git-path index` values, stage only their files and commit successfully; staging a write attempt in the shared main tree must refuse. [asserted] |
-| **F-04 — snapshot merge reverts unseen work** | Serial commit-only landing. [cited: ADR-0091] | `test_f04_landing_takes_only_worker_commits`: branch a worker, land an unrelated main commit, commit worker output, then land it; both changes must remain and any whole-head merge path must be structurally unreachable. [asserted] |
+| **F-04 — snapshot merge reverts unseen work** | Serial commit-only landing. [measured] [asserted] | `test_f04_landing_takes_only_worker_commits`: branch a worker, land an unrelated main commit, commit worker output, then land it; both changes must remain and any whole-head merge path must be structurally unreachable. [asserted] |
 | **F-05 — duplicate dispatch and false retries** | Execution/contribution axes and typed failure accounting. [asserted] | `test_f05_active_and_built_unlanded_are_not_candidates`: replay one live attempt and one worker-owned unlanded commit; neither may dispatch, an infrastructure refusal must not increment work failures, and only a typed candidate/verifier failure may consume the retry allowance. [asserted] |
 | **F-06 — bookkeeping masquerades as build failure** | Separate verification and record-integrity axes. [asserted] | `test_f06_record_defect_does_not_reclassify_candidate`: remove a nominated EXP heading from an otherwise accepted candidate; the item remains artefact-accepted, repository release becomes `record_defective`, a repair item is named, and neither `build_failed` nor a green release is permitted. [asserted] |
-| **F-07 — under-declared claims** | Declared authority, EXP-130 warning and actual-diff subset enforcement. [cited: ADR-0091] | `test_f07_failure_branch_cannot_escape_claim`: exercise a failure branch that needs an undeclared file; it must stop with `claim_expansion_required` before write/stage/commit. A Python omitted-dependent fixture must also emit the warn-only coverage event without expanding authority. [asserted] |
+| **F-07 — under-declared claims** | Declared authority, EXP-130 warning, runtime write allowlist and actual-diff subset enforcement. [cited: ADR-0091] [asserted] | `test_f07_failure_branch_cannot_escape_claim`: exercise both a cooperative failure branch and a direct shell write to an undeclared path; the runtime must refuse each before mutation and emit `claim_expansion_required`. Inject a confinement defect and require the terminal manifest to quarantine it before stage/commit/landing, with no shared-tree effect. A Python omitted-dependent fixture must also emit the warn-only coverage event without expanding authority. [asserted] |
 | **F-08 — stale cache as truth** | Typed observation envelope consumed by reference. [asserted] | `test_f08_age_belongs_to_observation`: set an expired `observed_at`, then touch/rewrite the cache file; admission must still receive `unknown` and refuse. A fresh observation event, not file mtime, is the only recovery. [asserted] |
 | **F-09 — proxy verification** | Artefact-bound three-valued verifier receipt. [asserted] | `test_f09_checker_error_is_not_false_or_pass`: run an unsupported checker flag and a zero-exit output with no required summary; both must be `check_error`. A real artefact predicate false must separately be `failed`; neither can be `passed`. [asserted] |
-| **F-10 — user had to ask** | Consequential-transition outbox plus silence/noise ratchets. [asserted] | `test_f10_only_decision_change_interrupts_and_is_receipted`: replay quiet checkpoints plus one blocked queue, one failed adversarial review, one exhausted pool and one falsified assumption; require one deduplicated delivery per changed next action. Removing one receipt must raise avoidable silence by one; injecting a progress message must raise unearned interruption by one. [asserted] |
+| **F-10 — user had to ask** | Consequential-transition outbox plus silence/noise ratchets. [asserted] | `test_f10_only_decision_change_interrupts_and_is_receipted`: replay quiet checkpoints plus one blocked queue, one failed adversarial review, one exhausted pool, one falsified assumption and one already-missed commitment; require one deduplicated delivery per changed next action and a non-zero five-minute deadline. Removing the expected outbox row or its receipt, inserting a first-party request before delivery, or changing only the payload deadline must not shrink oracle-derived silence; a progress message raises noise. Replay silence windows `3,1,2` and noise windows `2,0,1`, each of size 30; require ceilings `1` and `0` plus a defect on each later rise. [asserted] |
 
-A source scan must also prove no second orchestration-state writer, landing path or principal-delivery
-path bypasses these three mechanisms. [asserted]
+A source scan must also prove no second orchestration-state writer, staging/commit/landing path or
+principal-delivery path bypasses these three mechanisms. [asserted]
 
 ## 7. Consilient-specific constraints
 
@@ -308,23 +336,28 @@ Candidate exposure uses ADR-0077's dependence-robust ceiling; role composition u
 Owner and distinct-anchor rule. [cited] Human-labelled beta is unavailable, so no automatic numeric
 relaxation or extra candidate is admitted by this specification. [measured]
 
-Verdicts, approvals, gate lifts and spend remain principal-authored under V0-18. [cited] An
+Verdicts, approvals, consent, gate lifts and spend remain principal-authored under V0-18. [cited] An
 `attention.required` record may propose or report; neither it nor a manager/Owner can author the
 principal's response. [asserted] The local authorship boundary remains incomplete until a trusted
 first-party ingress exists, so a caller-declared principal field is not authentication. [measured]
+The future principal-authorship fixture must cover all five classes, including consent. [asserted]
 
 ## 8. Validation and stopping rule
 
-EXP-138 is the prospective killing test. [measured] It pairs the pinned pre-decision supervisor with
-the treatment on a frozen fault bank derived from F-01 to F-10, then runs the treatment with the
-control in shadow on consecutive real local work. [asserted] It measures actionable-stall exposure,
-avoidable silence, unearned interruptions, false terminal states and introspection overhead under a
-fixed stopping rule; adverse and missing outcomes remain in their assigned arm. [asserted]
+EXP-138 is the prospective killing test. [measured] It pairs the joined design with the fixed
+byte-frozen `ready|running|blocked|done` alternative on a fault bank derived from F-01 to F-10,
+holding the independently retained F-02/F-03/F-04/F-07/F-08/F-09 guards identical, then runs a
+treatment-only safety window on consecutive real local work. [asserted] The shadow replay in that
+window is descriptive and supplies no causal effect. [asserted] The experiment measures
+actionable-stall duration, notification latency, avoidable silence, asked-first incidents, unearned
+interruptions, false terminal states and supervisor CPU share under a fixed stopping rule; adverse and
+missing treatment outcomes remain adverse. [asserted]
 
 The design loses if any fixture can project false `finished`/success, any dirty tracked output can
-close, any stale observation can become current through file mtime, any required interruption is
-silenced, or treatment introspection exceeds its pre-registered overhead ceiling. [asserted] A null
-or insufficient-data result cannot be upgraded into a benefit claim. [asserted]
+close, any stale observation can become current through file mtime, any expected interruption is
+omitted, late or preceded by a first-party request, or treatment supervisor CPU share exceeds its
+pre-registered ceiling. [asserted] Trajectory bytes remain descriptive; no storage-cost claim is made.
+[asserted] A null or insufficient-data result cannot be upgraded into a benefit claim. [asserted]
 
 ## 9. Evidence against — the simpler scheduler may be the honest answer
 
@@ -343,12 +376,14 @@ driver; they do not establish a population rate. [measured]
 
 The objection is conceded at the implementation boundary. [asserted] The six axes are pure fields in
 one replayed projection, not services or agents; one contribution manifest replaces ad hoc Git probes;
-one outbox record groups a causal incident; routine transitions stay pull-only; and no numeric tuning,
-database, daemon, workflow engine or alerting dependency is added. [asserted] If the same guarantees
+one outbox record groups a causal incident; routine transitions stay pull-only; and no adaptive
+numeric tuning, database, daemon, workflow engine or alerting dependency is added. [asserted] If the
+same guarantees
 fit a smaller internal representation, that representation wins. [asserted]
 
-EXP-138 gives the objection teeth: the treatment must reduce actionable-stall exposure and silence
-without false terminal states, unearned interruptions or more than the frozen overhead ceiling.
+EXP-138 gives the objection teeth: the treatment must reduce actionable-stall duration and silence
+without false terminal states, noise above the registered ceiling or more than the frozen
+supervisor-CPU ceiling.
 [asserted] Failure removes the joined projection/attention claim and retains only the independently
 necessary worktree, commit-only landing, dirty-exit and fresh-observation guards. [asserted]
 

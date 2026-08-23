@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `574dcda8e200337756e5b5f123e6dd2906681cf015498ce4ebfa7216b1856dad`
+> **Source SHA-256:** `88cbf9f2746bdbec2f11b85b11c024bdf56b392f8168b9b39f9ef95fe0b3dcd5`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |

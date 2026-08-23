@@ -35,8 +35,8 @@ items; `events.py` is the single append-only writer; and `scripts/run_loop.py` r
 without process-identity liveness. [measured] ADR-0034 owns artefact progress; ADR-0071 owns sealed
 checkpoint liveness and quiet delivery; ADR-0072 owns evidence-bound closure; ADR-0075 owns the closed
 principal escalation set and friction ratchet; ADR-0083 owns pull-only detailed state; and ADR-0091
-owns isolated write workspaces, commit-only landing, declared claims and EXP-130's warn-only coverage
-check. [cited]
+owns isolated write workspaces, declared claims and EXP-130's warn-only coverage check. [cited] F-04
+supplies the separate commit-only landing requirement consumed by this decision. [measured]
 
 The operational repairs in `.harness/build_driver.py` are evidence, not a product boundary.
 [measured] The full contract is
@@ -67,17 +67,19 @@ project independent execution, contribution, dependency, verification, record-in
 axes. [asserted] No worker may set a free-form status and no second state store becomes authoritative.
 [asserted]
 
-When no attempt is active, the projection exposes exactly one of: [asserted]
+At a settled boundary with no active or startable attempt, let `R` mean remaining work or contribution
+custody, `Q` mean dependency/authority-ready work, and `C` mean that every critical blocker has both a
+named resolver and a future re-evaluation boundary. The projection exposes exactly one of: [asserted]
 
-- `finished`: no remaining item or landing/verification/record-release obligation; [asserted]
-- `waiting_dependency`: work remains, none is ready, and every critical blocker has a named live,
-  ready or scheduled resolver; [asserted]
-- `blocked`: work remains and at least one critical blocker has no resolver under the current
-  contract and authority; [asserted]
-- `starved`: logically ready work exists but no eligible route has a fresh available resource.
-  [asserted]
+- `finished`: `not R`; [asserted]
+- `starved`: `R and Q`; at a settled boundary every otherwise eligible route is unavailable or
+  unknown; [asserted]
+- `waiting_dependency`: `R and not Q and C`; [asserted]
+- `blocked`: `R and not Q and not C`, including a resolver with no re-evaluation boundary. [asserted]
 
-A renderer may not collapse these states into `idle`, `working` or `nothing running`. [asserted]
+A fresh available route must dispatch or yield a typed failure before classification; the four rows
+are disjoint and exhaustive. [algebra] A renderer may not collapse them into `idle`, `working` or
+`nothing running`. [asserted]
 No artefact progress plus no startable work plus a non-empty backlog is a stall. [cited: ADR-0034]
 `blocked` records an adverse attention incident in the same supervision tick; it asks the principal
 only when the blocker independently matches ADR-0075's closed six-class set. [asserted]
@@ -97,23 +99,32 @@ inspection failure is unknown/incomplete, and any tracked uncommitted change mak
 outcome incomplete even after exit zero. [asserted] Claim release and output custody are separate:
 the claim may release while a durable landing obligation remains. [asserted]
 
+The attempt/root identity is durable before child start. [asserted] Restart or claim-expiry handling
+reconciles every non-terminal attempt root and appends its manifest and landing owner before the item
+can redispatch or close. [asserted] A controller crash after a dirty write therefore cannot turn
+absence of a terminal event into absence of output. [asserted]
+
 ADR-0091's isolated runtime-conformant worktree/index remains the write boundary. [cited] Landing is
 serial and cherry-picks only commits reachable from the worker head but not the current landing head;
 the worker snapshot is never merged. [asserted] Active and committed-unlanded attempts are not
 dispatch candidates. [asserted]
 
 Declared claims remain authoritative. [cited: ADR-0091] EXP-130's import closure remains a warning,
-not an automatic authority expansion. [measured] The actual contribution must be a subset of the
-claim; a newly required path stops the attempt before write/stage/commit and records
-`claim_expansion_required`. [asserted]
+not an automatic authority expansion. [measured] Each write-admitted route must enforce the declared
+repository-path set before mutation or be ineligible; both cooperative and direct shell/tool attempts
+outside it are refused with `claim_expansion_required`. [asserted] This mediates only repository
+writes, not reads, network or external effects, and therefore does not add the general hermetic
+sandbox rejected by ADR-0091. [cited] [asserted] The terminal actual-diff subset check quarantines a
+confinement defect before stage, commit or landing. [asserted]
 
 ### 3. Interrupt on a changed principal-next-action, not on activity
 
-Detailed state remains pull-only under ADR-0083. [cited] In the same single-writer transaction as a
-decision-changing adverse transition, Consilient appends one stable `attention.required` outbox
-incident before the supervisor sleeps or begins unrelated work. [asserted] A separate
-`attention.outcome` records at-least-once delivery; delivery never changes run state, acceptance,
-authority or a human verdict. [asserted]
+Detailed state remains pull-only under ADR-0083. [cited] A pure projection over causal transitions
+derives each expected incident and deadline independently of the outbox. [asserted] In the same
+single-writer transaction as a decision-changing adverse transition, Consilient appends the stable
+`attention.required` outbox incident before the supervisor sleeps or begins unrelated work.
+[asserted] A separate `attention.outcome` records at-least-once delivery; delivery never changes run
+state, acceptance, authority or a human verdict. [asserted]
 
 An interruption is earned only when evidence changes the principal's next action or invalidates the
 promised artefact/delivery window, remains unresolved, states what changed and what the system tried,
@@ -127,12 +138,16 @@ alternative and unchanged commitments stay quiet. [asserted] The minimal excepti
 pull surface for detail, resolving the apparent tension with ADR-0083: pull governs state exposure;
 the outbox governs an exception that earns interruption. [asserted]
 
-From replay, `avoidable_silence_count` is the count of required incidents without a delivery receipt
-by their deadline; zero required incidents is unavailable. [algebra] `unearned_interruption_count`
-counts delivered exceptions with no matching required incident. [algebra] Consecutive non-overlapping
-windows of 30 required incidents ratchet silence down to the lowest completed-window count; windows
-of 30 exception deliveries apply the same ratchet to noise. [asserted] A later rise is a harness
-defect and never a request for the principal to diagnose it. [asserted]
+The deadline is projected from the causal event, not chosen by the outbox: the production default is
+five minutes after acceptance. [asserted] Existing and already-missed commitments remain breach
+evidence but do not create a retroactive transport deadline. [asserted] From
+replay, `avoidable_silence_count` left-joins expected incidents to outbox rows and receipts; an omitted
+row, a late/missing receipt or a first-party status request before receipt each counts as silence.
+[algebra] Zero expected incidents is unavailable. [asserted] `unearned_interruption_count` counts
+delivered exceptions with no expected causal incident. [algebra] Consecutive non-overlapping windows
+of 30 expected incidents ratchet silence down to the lowest completed-window count; windows of 30
+exception deliveries apply the same ratchet to noise. [asserted] A later rise is a harness defect and
+never a request for the principal to diagnose it. [asserted]
 
 ## Evidence
 
@@ -152,8 +167,9 @@ defect and never a request for the principal to diagnose it. [asserted]
 - `[algebra]` Keeping verification and record integrity as independent axes prevents either predicate
   from changing the truth value of the other; closure is their conjunction with contribution and
   dependency acceptance.
-- `[algebra]` `avoidable_silence_count = sum(1 - D_i)` for required incidents, where `D_i` is on-time
-  delivery; the count is exactly replayable without mutable state.
+- `[algebra]` `avoidable_silence_count = sum(1 - D_i)` over causally expected incidents, where `D_i`
+  requires both the materialised incident and delivery before its deadline and any first-party status
+  request; omission cannot shrink the denominator.
 - `[asserted]` One evidence projection, one contribution protocol and one outbox will prevent the
   measured recurrences with less complexity than ten independent fixes. EXP-138 tests that claim.
 
@@ -177,15 +193,15 @@ and pages should be reserved for urgent actionable symptoms. [cited] The ten inc
 repository over two days; their rate and transfer are unknown. [measured]
 
 The objection is conceded unless the mechanism stays a projection and wins EXP-138. [asserted] The
-decision adds no monitor agent, daemon, database, dependency, numeric tuning policy or raw progress
-notification. [asserted] The six axes are fields of one replay, the contribution manifest replaces
+decision adds no monitor agent, daemon, database, dependency, adaptive numeric tuning policy or raw
+progress notification. [asserted] The six axes are fields of one replay, the contribution manifest replaces
 ad hoc Git probes, one incident groups causal transitions, and routine state remains pull-only.
 [asserted] A smaller internal representation which passes all ten fixtures is compliant and should
 replace this vocabulary. [asserted]
 
-EXP-138 removes the joined lifecycle/attention claim if it fails to reduce actionable-stall exposure
-and avoidable silence, emits false terminal success or unearned interruptions, or exceeds its frozen
-introspection-overhead ceiling. [asserted] The independently necessary worktree, commit-only landing,
+EXP-138 removes the joined lifecycle/attention claim if it fails to reduce actionable-stall duration
+and avoidable silence, emits false terminal success, exceeds its registered noise ceiling, or exceeds
+its frozen supervisor-CPU ceiling. [asserted] The independently necessary worktree, commit-only landing,
 dirty-exit and fresh-observation guards survive because their correctness does not depend on an
 aggregate benefit claim. [asserted]
 
@@ -204,21 +220,23 @@ and the projection itself becomes a tested product boundary. [asserted]
 command, second orchestrator, dependency, gate change or routing enablement is introduced. [asserted]
 
 One Owner remains the default. [cited: ADR-0067] Every added role must name a different class of
-facts; same-evidence review is echo. [cited: `CONSILIENCE.md`] Verdicts, approvals, gate lifts and
-spend remain principal-authored, and an informational block notice does not manufacture a new
+facts; same-evidence review is echo. [cited: `CONSILIENCE.md`] Verdicts, approvals, consent, gate lifts
+and spend remain principal-authored, and an informational block notice does not manufacture a new
 authority class. [cited] [asserted]
 
 ## Enforcement
 
 This specification-only commit adds no product implementation. [measured] Future implementation is
 incomplete until the ten named fixtures in the companion specification all fail on regression and a
-source scan proves no second state writer, landing path or principal-delivery path bypasses them.
+source scan proves no second state writer, staging/commit/landing path or principal-delivery path
+bypasses them.
 [asserted]
 
-- **F-01 check:** four zero-active prefixes project exactly finished/waiting/blocked/starved;
-  process presence is irrelevant and blocked appends attention before the next tick. [asserted]
-- **F-02 check:** exit zero with tracked dirt is incomplete, fully manifested and still owned after
-  claim release. [asserted]
+- **F-01 check:** the complete `R/Q/C` truth table projects exactly
+  finished/waiting/blocked/starved; a startable item dispatches, process presence is irrelevant and
+  blocked appends attention before the next tick. [asserted]
+- **F-02 check:** crash after tracked writes but before accounting is reconciled on restart/expiry as
+  incomplete, fully manifested and still owned before redispatch. [asserted]
 - **F-03 check:** concurrent writers have different real indexes; shared-main staging refuses.
   [asserted]
 - **F-04 check:** landing a stale-base worker takes only its commits and preserves newer main work.
@@ -227,14 +245,17 @@ source scan proves no second state writer, landing path or principal-delivery pa
   consume work retries. [asserted]
 - **F-06 check:** a missing register entry marks record integrity defective without calling an
   accepted candidate failed or allowing repository release. [asserted]
-- **F-07 check:** an undeclared failure-branch path stops before mutation; EXP-130 coverage stays
-  warn-only. [asserted]
+- **F-07 check:** cooperative and direct shell writes outside the declared set are refused before
+  mutation; an injected confinement defect is quarantined before stage/commit/landing; EXP-130
+  coverage stays warn-only. [asserted]
 - **F-08 check:** touching an expired cache does not refresh its observation; admission sees unknown.
   [asserted]
 - **F-09 check:** checker usage error and absent summary are `check_error`, never false or pass.
   [asserted]
-- **F-10 check:** decision changes deliver one deduplicated exception; missing receipts raise silence
-  and progress messages raise noise. [asserted]
+- **F-10 check:** decision changes deliver one deduplicated exception; an omitted outbox row, missing
+  receipt or asked-first request raises silence, a payload deadline cannot defer the projected one,
+  a past commitment still gets a non-zero transport bound, and successive 30-event windows ratchet
+  silence/noise ceilings and flag a later rise. [asserted]
 - **Check:** `python .github/scripts/check_record_numbers.py`, direct exactly-one searches for
   ADR-0095 and EXP-138, the generated ADR-index check and the provisional-ADR experiment invariant.
   [asserted]
@@ -245,17 +266,20 @@ source scan proves no second state writer, landing path or principal-delivery pa
 
 ## What would overturn this
 
-EXP-138 is the killing experiment. [measured] The joined projection/outbox survives only if, under
-its fixed paired fault bank and prospective local window, treatment reduces actionable-stall exposure
-and avoidable silence by the pre-registered margins, produces no false terminal success or dirty
-closure, stays inside the unearned-interruption and introspection-overhead ceilings, and retains every
-adverse outcome. [asserted]
-
-Any false `finished` result, dirty-output success, stale-observation admission, verifier-error pass or
-missed required interruption kills the corresponding invariant immediately; aggregate improvement
-cannot average a correctness failure away. [asserted] A null, expired or insufficient-data result
-withholds the benefit claim and defaults to the simpler scheduler plus the independent guards.
+EXP-138 is the killing experiment. [measured] The joined projection/outbox survives only if it beats
+the fixed byte-frozen `ready|running|blocked|done` alternative across F-01/F-05/F-06/F-10 while
+the six independently retained guards stay identical, and the treatment-only prospective window
+meets the silence, asked-first, noise and supervisor-CPU ceilings with no false terminal success or
+dirty closure. [asserted] Shadow prospective output is descriptive and supplies no causal effect.
 [asserted]
+
+The disposition is exhaustive and loss-first: any false `finished` result, dirty-output success,
+stale-observation admission, verifier-error pass, omitted/late/asked-first expected interruption,
+authority/privacy violation, missing treatment outcome or failed quantitative threshold is `loss`;
+aggregate improvement cannot average it away. [asserted] With no loss, an incomplete horizon,
+comparison, common instrument or minimum incident/CPU denominator is `insufficient_evidence`; the ADR
+remains provisional and the operational default is the simpler scheduler plus independent guards.
+[asserted] Only complete evidence satisfying every registered condition is `confirmed`. [asserted]
 
 ## Publication candidate?
 
