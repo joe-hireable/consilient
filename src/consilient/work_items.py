@@ -18,6 +18,7 @@ OPENED = "work_item.opened"
 COMMENT = "work_item.comment"
 COMPLETED = "work_item.completed"
 COMMITTED = "work_item.committed"
+PLAN_FROZEN = "organisation.plan.frozen"
 TURN = "conversation.turn"
 DISPATCH_CLAIM_SCHEMA = "dispatch-claim.v1"
 NATIVE_SCHEMA = "native.v1"
@@ -27,6 +28,16 @@ _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _NATIVE_CLOSURE_FIELDS = frozenset(
     {"plan_digest", "artefacts", "verifier_receipts", "predecessor_bindings"}
 )
+_FORBIDDEN_PLAN_DEPENDENCY_FIELDS = frozenset(
+    {
+        "artefact_digest",
+        "artefact_sha256",
+        "verifier_receipt_digest",
+        "observed_outcome",
+        "actual_digest",
+    }
+)
+_THEATRE_ONLY_FIELDS = frozenset({"title", "model", "specialism"})
 
 
 def _text(value: object, field: str) -> str:
@@ -91,6 +102,276 @@ def source_turn_digest(
 def commitment_digest(contract: Mapping[str, object]) -> str:
     frozen = {key: value for key, value in contract.items() if key != "commitment_digest"}
     return _canonical_digest(frozen)
+
+
+def handoff_contract_digest(schema: str, allowed_locators: Sequence[str]) -> str:
+    return _canonical_digest(
+        {"schema": schema, "allowed_locators": list(allowed_locators)}
+    )
+
+
+def plan_digest(plan: Mapping[str, object]) -> str:
+    frozen = {key: value for key, value in plan.items() if key != "plan_digest"}
+    return _canonical_digest(frozen)
+
+
+def _check_handoff_contract(value: object, field: str) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise events.EventError(f"{field} must be an object")
+    return {
+        "schema": _text(value.get("schema"), f"{field}.schema"),
+        "digest": _digest(value.get("digest"), f"{field}.digest"),
+    }
+
+
+def _check_plan_dependency(value: object, index: int) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise events.EventError(f"dependencies[{index}] must be an object")
+    forbidden = _FORBIDDEN_PLAN_DEPENDENCY_FIELDS & set(value)
+    if forbidden:
+        joined = ", ".join(sorted(forbidden))
+        raise events.EventError(
+            f"dependencies[{index}] forbids future-bound fields: {joined}"
+        )
+    return {
+        "stream_id": _text(value.get("stream_id"), f"dependencies[{index}].stream_id"),
+        "revision": _positive_int(value.get("revision"), f"dependencies[{index}].revision"),
+        "handoff_contract_digest": _digest(
+            value.get("handoff_contract_digest"),
+            f"dependencies[{index}].handoff_contract_digest",
+        ),
+    }
+
+
+def _stream_identity(stream: Mapping[str, object]) -> dict[str, object]:
+    return {
+        key: stream[key]
+        for key in stream
+        if key not in _THEATRE_ONLY_FIELDS and key != "stream_id"
+    }
+
+
+def _streams_are_theatre_only_split(
+    left: Mapping[str, object], right: Mapping[str, object]
+) -> bool:
+    if _stream_identity(left) != _stream_identity(right):
+        return False
+    if left.get("stream_id") == right.get("stream_id"):
+        return False
+    return any(field in left or field in right for field in _THEATRE_ONLY_FIELDS)
+
+
+def _check_plan_stream(value: object, index: int) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise events.EventError(f"streams[{index}] must be an object")
+    stream_id = _text(value.get("stream_id"), f"streams[{index}].stream_id")
+    deliverable = _text(value.get("deliverable"), f"streams[{index}].deliverable")
+    accountable = _text(value.get("accountable"), f"streams[{index}].accountable")
+    owned_paths = value.get("owned_paths")
+    if not isinstance(owned_paths, list):
+        raise events.EventError(f"streams[{index}].owned_paths must be an array")
+    paths = [
+        _text(item, f"streams[{index}].owned_paths[{path_index}]")
+        for path_index, item in enumerate(owned_paths)
+    ]
+    integration = value.get("integration")
+    if not isinstance(integration, bool):
+        raise events.EventError(f"streams[{index}].integration must be a boolean")
+    if not integration and not paths:
+        raise events.EventError(
+            f"streams[{index}] requires non-empty owned_paths for a mutable stream"
+        )
+    dependencies = value.get("dependencies")
+    if not isinstance(dependencies, list):
+        raise events.EventError(f"streams[{index}].dependencies must be an array")
+    parsed_dependencies = [
+        _check_plan_dependency(item, dep_index)
+        for dep_index, item in enumerate(dependencies)
+    ]
+    _check_deliverable_contract(value.get("deliverable_contract"))
+    handoff_contract = _check_handoff_contract(
+        value.get("handoff_contract"), f"streams[{index}].handoff_contract"
+    )
+    verifier_contracts = _check_verifier_contracts(value.get("verifier_contracts"))
+    composition = value.get("composition")
+    if not isinstance(composition, dict) or not composition:
+        raise events.EventError(f"streams[{index}].composition must be a non-empty object")
+    checkpoint_required = value.get("checkpoint_required")
+    if not isinstance(checkpoint_required, bool):
+        raise events.EventError(
+            f"streams[{index}].checkpoint_required must be a boolean"
+        )
+    parsed: dict[str, object] = {
+        "stream_id": stream_id,
+        "deliverable": deliverable,
+        "accountable": accountable,
+        "owned_paths": paths,
+        "dependencies": parsed_dependencies,
+        "deliverable_contract": value.get("deliverable_contract"),
+        "handoff_contract": handoff_contract,
+        "verifier_contracts": verifier_contracts,
+        "composition": composition,
+        "checkpoint_required": checkpoint_required,
+        "integration": integration,
+    }
+    for field in _THEATRE_ONLY_FIELDS:
+        if field in value:
+            parsed[field] = _text(value.get(field), f"streams[{index}].{field}")
+    return parsed
+
+
+def _validate_plan_graph(
+    streams: Sequence[Mapping[str, object]],
+    *,
+    integration_owner: str | None,
+) -> None:
+    if not streams:
+        raise events.EventError("plan must contain at least one stream")
+    stream_ids = [cast(str, stream["stream_id"]) for stream in streams]
+    if len(stream_ids) != len(set(stream_ids)):
+        raise events.EventError("stream_id values must be unique")
+    integration_streams = [
+        stream for stream in streams if cast(bool, stream["integration"])
+    ]
+    if len(integration_streams) != 1:
+        raise events.EventError("plan must contain exactly one integration stream")
+
+    by_id = {cast(str, stream["stream_id"]): stream for stream in streams}
+    for left_index, left in enumerate(streams):
+        for right in streams[left_index + 1 :]:
+            if _streams_are_theatre_only_split(left, right):
+                raise events.EventError(
+                    "title, model or specialism alone cannot split organisation.plan.frozen streams"
+                )
+    for index, stream in enumerate(streams):
+        dependencies = cast(list[dict[str, object]], stream["dependencies"])
+        for dep_index, dependency in enumerate(dependencies):
+            predecessor_id = cast(str, dependency["stream_id"])
+            if predecessor_id not in by_id:
+                raise events.EventError(
+                    f"streams[{index}] has missing predecessor {predecessor_id!r}"
+                )
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(stream_id: str) -> None:
+        if stream_id in visited:
+            return
+        if stream_id in visiting:
+            raise events.EventError("plan stream graph contains a cycle")
+        visiting.add(stream_id)
+        stream = by_id[stream_id]
+        for dependency in cast(list[dict[str, object]], stream["dependencies"]):
+            visit(cast(str, dependency["stream_id"]))
+        visiting.remove(stream_id)
+        visited.add(stream_id)
+
+    for stream_id in stream_ids:
+        visit(stream_id)
+
+    mutable_paths: dict[str, str] = {}
+    seen_paths: dict[str, str] = {}
+    for stream in streams:
+        stream_id = cast(str, stream["stream_id"])
+        for path in cast(list[str], stream["owned_paths"]):
+            prior = seen_paths.get(path)
+            if prior is not None and prior != stream_id:
+                if integration_owner is None:
+                    raise events.EventError(
+                        "overlapping owned_paths require integration_owner"
+                    )
+            seen_paths[path] = stream_id
+        if cast(bool, stream["integration"]):
+            continue
+        for path in cast(list[str], stream["owned_paths"]):
+            owner = mutable_paths.get(path)
+            if owner is not None and owner != cast(str, stream["accountable"]):
+                if integration_owner is None:
+                    raise events.EventError(
+                        "overlapping owned_paths require integration_owner"
+                    )
+            mutable_paths[path] = cast(str, stream["accountable"])
+
+
+def _check_estimate_inputs(value: object) -> None:
+    if not isinstance(value, dict):
+        raise events.EventError("estimate_inputs must be an object")
+    lower = value.get("duration_lower_s")
+    upper = value.get("duration_upper_s")
+    if not isinstance(lower, int) or isinstance(lower, bool) or lower < 0:
+        raise events.EventError("estimate_inputs.duration_lower_s must be a non-negative integer")
+    if not isinstance(upper, int) or isinstance(upper, bool) or upper < lower:
+        raise events.EventError(
+            "estimate_inputs.duration_upper_s must be an integer >= duration_lower_s"
+        )
+    _text(value.get("derivation"), "estimate_inputs.derivation")
+    _text(value.get("evidence_class"), "estimate_inputs.evidence_class")
+
+
+def _check_prefix_anchor(value: object) -> None:
+    if not isinstance(value, dict):
+        raise events.EventError("prefix_anchor must be an object")
+    line_count = value.get("line_count")
+    if not isinstance(line_count, int) or isinstance(line_count, bool) or line_count < 0:
+        raise events.EventError("prefix_anchor.line_count must be a non-negative integer")
+    _digest(value.get("prefix_digest"), "prefix_anchor.prefix_digest")
+
+
+def _check_plan_contract(data: dict[str, Any]) -> None:
+    _text(data.get("plan_id"), "plan_id")
+    revision = _positive_int(data.get("revision"), "revision")
+    _text(data.get("commitment_id"), "commitment_id")
+    _digest(data.get("commitment_digest"), "commitment_digest")
+    _check_prefix_anchor(data.get("prefix_anchor"))
+    streams_value = data.get("streams")
+    if not isinstance(streams_value, list):
+        raise events.EventError("streams must be an array")
+    streams = [_check_plan_stream(item, index) for index, item in enumerate(streams_value)]
+    integration_owner = data.get("integration_owner")
+    if integration_owner is not None:
+        _text(integration_owner, "integration_owner")
+    _validate_plan_graph(
+        streams,
+        integration_owner=cast(str | None, integration_owner),
+    )
+    _check_estimate_inputs(data.get("estimate_inputs"))
+    _text(data.get("budget_ref"), "budget_ref")
+    _text(data.get("expires_at"), "expires_at")
+    supersedes = data.get("supersedes_plan_digest")
+    if revision == 1:
+        if supersedes is not None:
+            raise events.EventError("revision 1 must not carry supersedes_plan_digest")
+    elif supersedes is None:
+        raise events.EventError("revisions after 1 must carry supersedes_plan_digest")
+    else:
+        _digest(supersedes, "supersedes_plan_digest")
+    digest = data.get("plan_digest")
+    if digest is None:
+        raise events.EventError("plan_digest is required")
+    computed = plan_digest(data)
+    if digest != computed:
+        raise events.EventError("plan_digest does not match the frozen plan")
+
+
+def _plan_is_outcome_aware_edit(
+    prior: Mapping[str, object], successor: Mapping[str, object]
+) -> bool:
+    prior_streams = {
+        cast(str, stream["stream_id"]): stream
+        for stream in cast(list[dict[str, Any]], prior["streams"])
+    }
+    successor_streams = cast(list[dict[str, Any]], successor["streams"])
+    for stream in successor_streams:
+        stream_id = cast(str, stream["stream_id"])
+        previous = prior_streams.get(stream_id)
+        if previous is None:
+            continue
+        if stream.get("verifier_contracts") != previous.get("verifier_contracts"):
+            return True
+        if stream.get("handoff_contract") != previous.get("handoff_contract"):
+            return True
+    return False
 
 
 def _check_transport(value: object) -> dict[str, Any]:
@@ -315,6 +596,9 @@ def check_event_contract(event: events.EventPayload) -> None:
     if kind == COMMITTED:
         _check_commitment_contract(data)
         return
+    if kind == PLAN_FROZEN:
+        _check_plan_contract(data)
+        return
     if kind not in KINDS:
         return
     ticket = data.get("ticket")
@@ -433,6 +717,19 @@ def commit_request(
     return _append(log, COMMITTED, actor, data, ts=ts)
 
 
+def freeze_plan(
+    log: Path,
+    plan: Mapping[str, object],
+    *,
+    actor: str = DEFAULT_ACTOR,
+    ts: str | None = None,
+) -> events.EventPayload:
+    data = dict(plan)
+    if "plan_digest" not in data:
+        data["plan_digest"] = plan_digest(data)
+    return _append(log, PLAN_FROZEN, actor, data, ts=ts)
+
+
 def open_item(
     log: Path,
     *,
@@ -529,6 +826,8 @@ def validate_transition(
     seen_turns: set[tuple[str, str]] = set()
     commitment_seen: set[tuple[str, int]] = set()
     commitment_tips: dict[str, dict[str, Any]] = {}
+    plan_seen: set[tuple[str, int]] = set()
+    plan_tips: dict[str, dict[str, Any]] = {}
     opened_by_ticket: dict[str, dict[str, Any]] = {}
 
     for item in prefix:
@@ -547,6 +846,11 @@ def validate_transition(
             revision = cast(int, data["revision"])
             commitment_seen.add((commitment_id, revision))
             commitment_tips[commitment_id] = data
+        elif kind == PLAN_FROZEN:
+            plan_id = cast(str, data["plan_id"])
+            revision = cast(int, data["revision"])
+            plan_seen.add((plan_id, revision))
+            plan_tips[plan_id] = data
         elif kind == OPENED:
             ticket = cast(str, data["ticket"])
             opened_by_ticket[ticket] = data
@@ -597,6 +901,38 @@ def validate_transition(
                     "protected commitments require authenticated source turns"
                 )
             commitment_tips[commitment_id] = data
+        elif kind == PLAN_FROZEN:
+            plan_id = cast(str, data["plan_id"])
+            revision = cast(int, data["revision"])
+            if (plan_id, revision) in plan_seen:
+                raise events.EventError(
+                    f"plan {plan_id!r} revision {revision} already exists"
+                )
+            commitment_id = cast(str, data["commitment_id"])
+            commitment_digest_value = cast(str, data["commitment_digest"])
+            commitment = commitment_tips.get(commitment_id)
+            if commitment is None or commitment.get("commitment_digest") != commitment_digest_value:
+                raise events.EventError(
+                    "organisation.plan.frozen must follow a matching commitment in the prefix"
+                )
+            tip = plan_tips.get(plan_id)
+            if revision == 1:
+                if tip is not None:
+                    raise events.EventError(f"plan {plan_id!r} already has a live revision")
+            else:
+                if tip is None:
+                    raise events.EventError(
+                        f"plan {plan_id!r} has no prior revision to supersede"
+                    )
+                expected = tip.get("plan_digest")
+                actual = data.get("supersedes_plan_digest")
+                if actual != expected:
+                    raise events.EventError("supersedes_plan_digest is stale")
+                if _plan_is_outcome_aware_edit(tip, data):
+                    raise events.EventError(
+                        "outcome-aware plan edits are refused at the central writer"
+                    )
+            plan_tips[plan_id] = data
         elif kind == COMPLETED:
             ticket = cast(str, data["ticket"])
             opened = opened_by_ticket.get(ticket)
@@ -617,7 +953,7 @@ def validate_transition(
 
 def _register_transition_validator() -> None:
     events.register_transition_validator(
-        (TURN, COMMITTED, OPENED, COMPLETED),
+        (TURN, COMMITTED, PLAN_FROZEN, OPENED, COMPLETED),
         validate_transition,
     )
 
