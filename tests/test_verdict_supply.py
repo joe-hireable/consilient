@@ -222,6 +222,35 @@ def test_legacy_declared_principal_row_projects_but_not_counts_as_authenticated(
     conn.close()
 
 
+def test_declared_principal_verdicts_are_counted_and_rendered_but_not_admitted(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    log_dir = tmp_path / "log"
+    db = tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    _write_log(
+        path,
+        _outcome("attempt-reject", "task-reject", True),
+        _verdict("attempt-reject", "reject", via="cli"),
+        _outcome("attempt-accept", "task-accept", True),
+        _verdict("attempt-accept", "accept", via=" CLI "),
+    )
+
+    argv = ["--log", str(log_dir), "--db", str(db), "beta", "--json"]
+    assert main(argv) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["declared_principal_verdict_count"] == 2
+    assert payload["n_rejected"] == 0
+    assert payload["relational_quarantine_count"] == 0
+
+    assert main(["--log", str(log_dir), "--db", str(db), "beta"]) == 0
+    human = capsys.readouterr().out
+    disclosure = "declared-principal verdicts recorded and excluded from beta: 2"
+    assert human.count(disclosure) == 1
+    assert "not machine-authenticated" in human
+
+
 def test_authenticated_human_beta_row_enters_compute(tmp_path: Path) -> None:
     log_dir = tmp_path / "log"
     db = tmp_path / "state.db"

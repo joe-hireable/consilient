@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 import sqlite3
 from collections.abc import Iterable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Literal, assert_never, cast
 
 # Below this many human rejections there is no interval worth showing. ADR-0002 puts verifier
@@ -70,6 +70,7 @@ class Beta:
         default="beta is conditional on a human verdict that is itself fallible, "
         "not independent of the checks, and possibly non-stationary (Q30)"
     )
+    declared_principal_verdict_count: int = 0
 
     def __post_init__(self) -> None:
         """A measured beta must carry its point and interval; insufficient_data must not.
@@ -287,11 +288,27 @@ def from_connection(
             " estimand_kind, auth_status FROM outcomes ORDER BY position"
         )
     ]
-    eligible = [row for row in rows if admits_human_beta_row(row)]
-    return compute(
-        eligible,
+    declared_principal_verdict_count = sum(
+        1
+        for row in rows
+        if row["auth_status"] == "declared_principal"
+        and (task_family is None or row["task_family"] == task_family)
+        and (verifier_version is None or row["verifier_version"] == verifier_version)
+    )
+    result = compute(
+        [row for row in rows if admits_human_beta_row(row)],
         task_family,
         verifier_version,
         min_rejections,
         sampling,
+    )
+    if not declared_principal_verdict_count:
+        return result
+    return replace(
+        result,
+        caveat=(
+            f"{result.caveat}; declared-principal verdicts recorded and excluded from "
+            f"beta: {declared_principal_verdict_count} (not machine-authenticated)"
+        ),
+        declared_principal_verdict_count=declared_principal_verdict_count,
     )

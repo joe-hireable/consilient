@@ -599,9 +599,10 @@ def _quarantine_relational(
 def _verdict_auth_status(data: dict[str, object]) -> str:
     via = data.get("via")
     principal = data.get("principal")
-    if via == "phone_webauthn":
+    normalized_via = via.strip().casefold() if isinstance(via, str) else None
+    if normalized_via == "phone_webauthn":
         return "authenticated"
-    if via == "cli" and isinstance(principal, str) and principal.strip():
+    if normalized_via == "cli" and isinstance(principal, str) and principal.strip():
         return "declared_principal"
     return "unauthenticated"
 
