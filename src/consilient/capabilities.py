@@ -25,6 +25,37 @@ GRANT_KINDS: tuple[GrantKind, ...] = (
     "controller_baseline.local_restorable.v1",
 )
 
+# Rewind classes from Claude Code's documented limits: 1 tool-mediated and
+# snapshotted; 2 shell; 3 subagent-delegated; 4 external. Shell that can reach
+# the network or a credential is class 4; only proven default-deny egress
+# downgrades to 2. Unknown tools are class 4.
+ReversibilityClass = Literal[1, 2, 3, 4]
+ToolFamily = Literal["file", "shell", "subagent", "external"]
+REGISTERED_TOOLS: dict[tuple[str, str], ToolFamily] = {
+    ("tool", "read"): "file",
+    ("tool", "write"): "file",
+    ("tool", "edit"): "file",
+    ("tool", "glob"): "file",
+    ("tool", "grep"): "file",
+    ("tool", "bash"): "shell",
+    ("tool", "shell"): "shell",
+    ("tool", "task"): "subagent",
+    ("tool", "webfetch"): "external",
+    ("tool", "websearch"): "external",
+    ("mcp", "filesystem"): "file",
+    ("connection", "github"): "external",
+}
+_OUTWARD_EFFECTS = frozenset(
+    {
+        "network.call",
+        "message.send",
+        "content.publish",
+        "external.change",
+        "money.commit",
+        "authority.change",
+    }
+)
+
 _KINDS = frozenset(CAPABILITY_KINDS)
 _KIND_ORDER: dict[CapabilityKind, int] = {
     "tool": 0,
@@ -400,3 +431,32 @@ def select_capabilities(inventory: object, task_request: object) -> dict[str, ob
             }
         )
     return {"schema_version": SCHEMA_VERSION, "capabilities": selected}
+
+
+def classify_reversibility(
+    kind: str,
+    name: str,
+    *,
+    effect_classes: tuple[str, ...] = (),
+    default_deny_egress_proven: bool = False,
+    credential_reach: bool = False,
+) -> ReversibilityClass:
+    """Return rewind class 1–4; unknown or egress-capable shell is 4."""
+
+    family = REGISTERED_TOOLS.get((kind, name))
+    if family is None:
+        return 4
+    declared = frozenset(effect_classes)
+    if declared & _OUTWARD_EFFECTS:
+        return 4
+    if family == "shell":
+        if credential_reach or not default_deny_egress_proven:
+            return 4
+        return 2
+    if family == "subagent":
+        return 3
+    if family == "file":
+        if "process.run" in declared:
+            return 4
+        return 1
+    return 4
