@@ -241,6 +241,9 @@ VISIBILITY_DEFAULT = "milestones"
 VISIBILITY_CHANGE_KIND = "visibility.change"
 
 DELIVERY_ESTIMATE_KIND = "delivery.estimate"
+MEASUREMENT_REGISTERED_KIND = "measurement.registered"
+MEASUREMENT_RESULT_KIND = "measurement.result"
+MEASUREMENT_ACTOR = "consilient.measurement"
 DELIVERY_ACTOR = "consilient.delivery"
 DELIVERY_OUTCOME_KINDS = frozenset(
     {"delivery.outcome", "dispatch.outcome", OUTCOME_KIND}
@@ -399,6 +402,7 @@ def validate(event: object) -> EventPayload:
     _check_evidence_class(event)
     _check_dispatch_contract(event)
     _check_delivery_estimate_contract(event)
+    _check_measurement_contract(event)
     try:
         effects.validate_effect_event(event)
     except effects.EffectError as exc:
@@ -905,6 +909,36 @@ def _check_dispatch_contract(event: EventPayload) -> None:
         event["data"].get("supervised"), bool
     ):
         raise EventError("dispatch events must record supervised as a boolean (ADR-0039)")
+
+
+def _check_measurement_contract(event: EventPayload) -> None:
+    """BU1: pre-run registration and result rows join on run_id at replay."""
+    kind = event["event"]
+    if kind not in (MEASUREMENT_REGISTERED_KIND, MEASUREMENT_RESULT_KIND):
+        return
+    if event["actor"] != MEASUREMENT_ACTOR:
+        raise EventError(
+            f"{kind} must be attributed to declared writer {MEASUREMENT_ACTOR!r}"
+        )
+    data = event["data"]
+    run_id = data.get("run_id")
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise EventError(f"{kind} must carry a non-empty string run_id")
+    if kind == MEASUREMENT_REGISTERED_KIND:
+        config_hash = data.get("config_hash")
+        if not isinstance(config_hash, str) or DIGEST_RE.fullmatch(config_hash) is None:
+            raise EventError(
+                f"{MEASUREMENT_REGISTERED_KIND} config_hash must be 64 lower-case hex characters"
+            )
+        hardware_id = data.get("hardware_id")
+        if not isinstance(hardware_id, str) or not hardware_id.strip():
+            raise EventError(
+                f"{MEASUREMENT_REGISTERED_KIND} must carry a non-empty string hardware_id"
+            )
+        return
+    fixture = data.get("fixture")
+    if not isinstance(fixture, str) or not fixture.strip():
+        raise EventError(f"{MEASUREMENT_RESULT_KIND} must carry a non-empty string fixture")
 
 
 def _check_promote_contract(event: EventPayload) -> None:

@@ -24,6 +24,8 @@ from typing import cast
 from .events import (
     CANDIDATE_EXPOSED_KIND,
     DELIVERY_ESTIMATE_KIND,
+    MEASUREMENT_REGISTERED_KIND,
+    MEASUREMENT_RESULT_KIND,
     OUTCOME_KIND,
     RECORD_CAPTURED_KIND,
     REVIEW_QUEUE_OPENED_KIND,
@@ -187,6 +189,21 @@ CREATE TABLE IF NOT EXISTS candidate_exposures (
 );
 CREATE INDEX IF NOT EXISTS candidate_exposures_queue
     ON candidate_exposures (queue_id, position);
+CREATE TABLE IF NOT EXISTS measurement_registrations (
+    position     INTEGER PRIMARY KEY,
+    run_id       TEXT NOT NULL UNIQUE,
+    config_hash  TEXT NOT NULL,
+    hardware_id  TEXT NOT NULL,
+    payload      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS measurement_results (
+    position     INTEGER PRIMARY KEY,
+    run_id       TEXT NOT NULL,
+    fixture      TEXT NOT NULL,
+    payload      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS measurement_results_run
+    ON measurement_results (run_id, position);
 """
 
 class ProjectionError(RuntimeError):
@@ -491,6 +508,75 @@ def _apply_verification_outcome(
         )
 
 
+def _apply_measurement_registered(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
+    data = event.data
+    run_id = cast(str, data["run_id"])
+    if conn.execute(
+        "SELECT 1 FROM measurement_registrations WHERE run_id = ?", (run_id,)
+    ).fetchone():
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"duplicate run_id {run_id!r} at position {position}",
+        )
+        return
+    conn.execute(
+        "INSERT INTO measurement_registrations (position, run_id, config_hash,"
+        " hardware_id, payload) VALUES (?, ?, ?, ?, ?)",
+        (
+            position,
+            run_id,
+            data["config_hash"],
+            data["hardware_id"],
+            json.dumps(
+                event.raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+        ),
+    )
+
+
+def _apply_measurement_result(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
+    data = event.data
+    run_id = cast(str, data["run_id"])
+    registration = conn.execute(
+        "SELECT position FROM measurement_registrations WHERE run_id = ?",
+        (run_id,),
+    ).fetchone()
+    if registration is None:
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"missing measurement.registered before measurement.result for {run_id!r}",
+        )
+        return
+    if position <= cast(int, registration[0]):
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"measurement.result for {run_id!r} precedes its measurement.registered event",
+        )
+        return
+    conn.execute(
+        "INSERT INTO measurement_results (position, run_id, fixture, payload)"
+        " VALUES (?, ?, ?, ?)",
+        (
+            position,
+            run_id,
+            data["fixture"],
+            json.dumps(
+                event.raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+        ),
+    )
+
+
 def _quarantine_relational(
     conn: sqlite3.Connection,
     position: int,
@@ -571,6 +657,10 @@ def _apply(
                 event,
                 exposure_positions=exposure_positions,
             )
+        elif event.kind == MEASUREMENT_REGISTERED_KIND:
+            _apply_measurement_registered(conn, position, event)
+        elif event.kind == MEASUREMENT_RESULT_KIND:
+            _apply_measurement_result(conn, position, event)
 
 
 def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:
