@@ -6293,3 +6293,112 @@ runtime, notification transport or workload; a causal prospective treatment effe
 fatigue; storage or maintainer cost; whether the six internal axes are the smallest representation;
 whether a better untested smaller scheduler exists; whether a blocked notice changes human decisions
 for the better; or whether a future incumbent exceeds the retrieved bar. [asserted]
+
+---
+
+### EXP-139 · Do record-derived graphs let users answer causal “why” questions faster and more correctly than the raw trajectory? `BLOCKED: implemented projection, frozen question bank, consented operators and blinded answer keys`
+
+**Pre-registered 23 August 2026; no interface outcome, participant response or aggregate result was
+inspected.** Immediately before this heading was written, dispatch
+`20260823T134149-cff67cd3c7` found exactly one `0096-*.md` decision file and zero
+`^### EXP-139` register headings; it held claims over this register, ADR-0096 and the generated
+decision index. [measured]
+
+**Decides:** whether the record-derived graph treatment lets operators answer the fixed causal
+question more correctly and with lower capped response time than canonical raw JSONL, and whether
+the node-link layer itself adds value beyond the same record-derived list/filter/detail projection.
+[asserted] It can change the node-link default and every “graphs improve explainability” claim.
+[asserted]
+
+**Blocks implementation? No.** The principal authorised the five graph views; this experiment does
+not decide whether those views exist. [measured] It decides their default prominence and the benefit
+claim only. [asserted]
+
+**Precondition:** ADR-0096's read-only projection is implemented behind the existing `consil
+dashboard` surface with all acceptance checks in
+`docs/superpowers/specs/2026-08-23-observability-graphs.md`. [asserted] Before the first operator
+session, an instrument owner who did not implement the treatment freezes and digests 30 secret-free
+trajectory cases and exact event-linked answer keys: ten small (`<=15` visible nodes), ten medium
+(`16–50`) and ten large (`>50`). [asserted] Fifteen cases contain valid explicit decision chains;
+fifteen require refusal—five share a derivation root, five lack an antecedent decision link and five
+lack a required falsifier or reversal. [asserted]
+
+Each valid answer key names the exact decision, recorded reason, falsifier, reversal and relevant
+evidence-anchor IDs/hashes. [asserted] Each invalid key names the exact reason the record cannot
+support a causal answer or independent-evidence claim. [asserted] The bank also freezes question
+wording, arm files, source/content digests, renderer version, randomisation seed `1390096`, viewport,
+browser, raw-text viewer, hardware, per-trial clock and three practice cases excluded from analysis.
+[asserted]
+
+Ten consented operators and one answer-key adjudicator who did not implement the interface are
+required. [asserted] The adjudicator receives answer keys and responses with arm labels removed.
+[asserted] Until the interface, bank, consent and blinded adjudication exist, EXP-139 remains
+`BLOCKED`. [asserted]
+
+**Procedure:** use three arms over identical question wording and underlying case bytes. [asserted]
+
+- **A — raw:** canonical JSONL plus the frozen raw-text viewer's ordinary text find. [asserted]
+- **B — projection:** record-derived list/filter/detail only; no node-link diagram is present in the
+  DOM. [asserted]
+- **C — graph:** byte-identical B controls/details plus the focused node-link SVG. [asserted]
+
+The frozen seed assigns every case once to each arm across three different operators, for 90 assigned
+responses total and 30 per arm. [asserted] Each operator receives nine unique analysis cases—three
+per arm—and never sees the same case twice; arm order and trial position are counterbalanced to
+within one assignment. [asserted] Before analysis trials, each operator completes one frozen practice
+case per arm with no correctness feedback. [asserted]
+
+For each trial, reveal the fixed question and case together, start the monotonic clock, accept one
+final answer and stop at submission or 180 seconds. [asserted] No hint, retry, replacement case,
+post-submission edit or cross-arm output is allowed. [asserted] Preserve the presented bytes,
+interaction log, raw answer, elapsed time, timeout state and blinded adjudication. [asserted]
+
+**Measures:** `exact_correct` is one only when a valid answer identifies all five keyed elements—
+decision, reason, falsifier, reversal and relevant anchors—or an invalid answer refuses and names the
+keyed missing/shared-root defect. [asserted] Fluent paraphrase without the keyed record content is
+incorrect. [asserted] `false_endorsement` is one when an invalid case receives a causal answer or a
+shared root is presented as independent evidence. [asserted]
+
+`capped_time_s` is submission time for an exact-correct answer and 180 seconds for a wrong answer or
+timeout. [asserted] Report correctness and false endorsement separately, total capped time by arm,
+uncapped times for every correct response, raw numerator/denominator, and all results by small,
+medium and large node-count stratum. [asserted] Do not report outcome-only speed without the capped
+measure. [asserted] A-versus-C answers the dispatch question; B-versus-C isolates the diagram from
+the record projection/filtering. [asserted]
+
+**Stopping rule, fixed before the run:** stop after all 90 assigned responses are terminal and
+blindly adjudicated, or 14 calendar days after the first analysis trial begins, whichever comes
+first. [asserted] Inspect no aggregate arm result before stop. [asserted] At the deadline, an
+unanswered assigned cell is incorrect with `capped_time_s = 180`; do not replace an operator, case
+or cell. [asserted] Stop early only for private-data exposure, consent withdrawal, answer-key/arm
+leakage, principal-authority breach or defective timing/instrumentation; preserve completed cells and
+report `insufficient_evidence`. [asserted] Any repair requires a new EXP id; do not change the bank,
+assignment, cap, deadline, threshold, adjudicator contract or scoring after any analysis trial.
+[asserted]
+
+Confirm “graph treatment beats raw” only if C has at least 3 more exact-correct answers than A out of
+30, C's total capped time is at most 80% of A's, and C has no additional false endorsements.
+[asserted] The `3/30` and `80%` values are preference floors, not measured population effects.
+[asserted]
+
+Keep node-link SVG as the default only if C is no less exact-correct than B, has no additional false
+endorsement, has total capped time at most 90% of B's and has no exact-correct loss in the `>50`-node
+stratum. [asserted] If B matches or beats C on those rules, list/filter/detail becomes the default and
+graphs remain secondary. [asserted] Any C accuracy loss or additional false endorsement kills the
+node-link default regardless of speed. [asserted]
+
+Any other completed result is a loss for the corresponding benefit/default claim. [asserted] A
+safety stop, fewer than 90 adjudicated cells after a consent withdrawal, answer-key leakage or
+defective instrumentation is `insufficient_evidence`, never confirmation. [asserted] Do not extend
+the deadline or add participants after seeing results. [asserted]
+
+**Largest plausible effect (ADR-0050):** for either 30-response arm comparison, the bounded
+difference is ±30 exact-correct answers, ±5,400 capped seconds and ±15 false endorsements. [algebra]
+The result can change presentation and claim wording only; it cannot remove the authorised views,
+change a gate, establish beta or trust, authorise another candidate/role, delegate principal
+authority or generalise beyond the frozen bank and ten operators. [asserted]
+
+**What it cannot decide:** population-level usability; another repository, user population, graph
+layout, task wording or node-count distribution; whether unrecorded reasoning is true; whether an
+evidence anchor is substantively correct; long-run maintenance cost; or whether a future incumbent
+exceeds the retrieved bar. [asserted]

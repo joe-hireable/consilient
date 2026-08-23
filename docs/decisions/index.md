@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `88cbf9f2746bdbec2f11b85b11c024bdf56b392f8168b9b39f9ef95fe0b3dcd5`
+> **Source SHA-256:** `423de11c007dbf0d67c1887d592a101375cd660b2591ab6960fcb9ecb19f2dab`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -100,3 +100,4 @@
 | [0093](0093-compose-agent-roles-from-worker-method-and-subject-expertise.md) | Compose agent roles from worker method and subject expertise, and cut evidence-free specialists | PROVISIONAL | — |
 | [0094](0094-make-scientific-execution-a-pinned-evidence-producing-profile.md) | Make scientific execution a pinned evidence-producing profile, not a second laboratory platform | PROVISIONAL | — |
 | [0095](0095-project-orchestration-from-consumed-evidence-and-interrupt-on-decision-change.md) | Project orchestration from consumed evidence, isolate contributions, and interrupt on decision change | PROVISIONAL | — |
+| [0096](0096-render-record-derived-observability-graphs-without-generated-explanations.md) | Render record-derived observability graphs without generated explanations | PROVISIONAL | — |
