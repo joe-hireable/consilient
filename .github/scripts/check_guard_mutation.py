@@ -43,6 +43,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+GIT_ENV = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
 
 # git exports GIT_DIR and GIT_INDEX_FILE into every hook it runs, and GIT_DIR overrides cwd — so a
 # subprocess inheriting them works against a different repository than the one it was pointed at,
@@ -197,6 +198,7 @@ def _pytest(
             f"pythonpath={src.as_posix()}",
         ],
         cwd=cwd,
+        env=GIT_ENV,
         capture_output=True,
         text=True,
         encoding="utf-8",
