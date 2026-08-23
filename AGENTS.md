@@ -213,25 +213,39 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
   from here.
 
   What Joe actually said, 19 Aug 2026, was that they **"must not be published as part of this
-  repo"** — flat, with no carve-out. The narrower reading that their *names and aggregate
-  measured metrics* may appear is **the orchestrator's inference, not the principal's words**,
-  and was found signed in his name by an audit on 21 Aug 2026. It is recorded here as inference
-  because a loosening filed under the principal's signature is worse than an invented
-  tightening, and because this specific carve-out is what let 71 private commit identifiers
-  reach a results file. It stands provisionally until Joe adopts or rejects it. **Where the two
-  readings disagree, take his.**
+  repo"** — flat, with no carve-out. An orchestrator later narrowed that to permit their *names and
+  aggregate measured metrics*, and filed the narrowing under the principal's signature. An audit on
+  21 Aug 2026 found it, and it is what let 71 private commit identifiers reach a results file.
+
+  **Joe rejected that carve-out on 23 August 2026.** His flat words stand: nothing from those
+  repositories is published as part of this repo, including their names and including aggregate
+  metrics. Where any earlier document relies on the carve-out, the flat reading wins.
+
+  This paragraph is kept rather than deleted because the trail matters more than the tidiness: a
+  loosening filed under someone's signature is the failure worth remembering, and deleting the
+  record of it would be the second half of the same mistake.
+
+  **One boundary the rejection does not settle, flagged rather than inferred.** The two repository
+  names appear in this file and in others, because a prohibition cannot be stated without naming
+  what it prohibits. Reading the rejection to forbid the names outright would make the rule itself
+  unwritable. The orchestrator has therefore **not** scrubbed them, and is recording the question
+  instead of answering it: does the rejection forbid their *names* everywhere, or their *contents,
+  metrics and identifiers* while permitting the names where the prohibition itself is stated?
+  Until Joe answers, the names stay only where a rule or a boundary requires them, and nothing
+  else from those repositories appears anywhere. **Inferring the wider reading silently is the
+  exact failure this correction exists to undo.**
 - Commit secrets or `.env`. `.github/workflows/secret-scan.yml` enforces this against the
   tracked tree and repository history without printing a detected credential.
 - **Put a secret into a public repository, under any circumstances.** Joe's words, 20 Aug 2026,
-  were **"no secrets in public repo"**. Everything after this sentence is **the orchestrator's
-  reading of that instruction, not his words** — recorded as inference on 21 Aug 2026 after an
-  audit found the expansion signed in his name. It is almost certainly what he meant, and it is
-  kept because it is the safe direction; but it deleted a gate condition (B3), so he is owed the
-  chance to confirm or narrow it.
-  The reading: not merely "do not commit one", but do not place one
-  in repository settings, Actions secrets, or anywhere the public repository can reach. A
-  capability that needs a credential there is not built — **it runs locally or it does not
-  run.** Gate B3 is the first thing this rule cost.
+  were **"no secrets in public repo"**. An orchestrator expanded that into a broader rule and filed
+  the expansion in his name; an audit on 21 Aug 2026 found it and relabelled it as inference.
+
+  **Joe adopted the expansion on 23 August 2026**, so it is now his instruction rather than a
+  reading of it: not merely "do not commit one", but do not place a secret in repository settings,
+  in Actions secrets, or anywhere the public repository can reach. A capability that needs a
+  credential there is not built — **it runs locally or it does not run.**
+
+  Gate B3 was the first thing this rule cost, and it stays deleted. That price was paid knowingly.
 - Present a simulated figure as an empirical result.
 - Add architecture with no falsifiable claim attached to it.
 - **Add a structure that cannot be traced back to `CONSILIENCE.md`.** If a proposal does not

@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `e8de616ee6db6a715991b0ab2ec52cdcb09e029e80aeaf2718070c74a10ee602`
+> **Source SHA-256:** `0f6237f7652a81f330aaeefdb1d306ff9231647737d723ec9097ad057fab7059`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -102,3 +102,8 @@
 | [0095](0095-project-orchestration-from-consumed-evidence-and-interrupt-on-decision-change.md) | Project orchestration from consumed evidence, isolate contributions, and interrupt on decision change | PROVISIONAL | — |
 | [0096](0096-render-record-derived-observability-graphs-without-generated-explanations.md) | Render record-derived observability graphs without generated explanations | PROVISIONAL | — |
 | [0097](0097-keep-automatic-triggered-recall-inert-until-it-beats-pull.md) | Keep automatic triggered recall inert until it beats deliberate pull | PROVISIONAL | — |
+| [0098](0098-permit-one-authenticated-local-surface-and-supersede-the-blanket-prohibition.md) | Permit one authenticated local surface, superseding the blanket prohibition | ACCEPTED | — |
+| [0099](0099-fund-by-sponsorship-alone-and-stay-outside-trader-status.md) | Fund by sponsorship alone, and stay outside trader status | ACCEPTED | — |
+| [0100](0100-measure-beta-prospectively-from-live-dispatch-and-retire-history-mining.md) | Measure β prospectively from live dispatch, and retire history mining | PROVISIONAL | — |
+| [0101](0101-widen-the-scope-to-any-domain-and-keep-coding-as-v0.md) | Widen the scope to any domain, and keep coding as v0 | ACCEPTED | — |
+| [0102](0102-keep-telephony-out-of-the-open-source-tree-at-launch.md) | Keep telephony out of the open-source tree at launch | ACCEPTED | — |

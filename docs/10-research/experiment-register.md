@@ -6406,6 +6406,85 @@ layout, task wording or node-count distribution; whether unrecorded reasoning is
 evidence anchor is substantively correct; long-run maintenance cost; or whether a future incumbent
 exceeds the retrieved bar. [asserted]
 
+### EXP-141 - Can beta be measured prospectively from live dispatch to an interval narrower than the one history mining could not reach? `BLOCKED: prospective accept/reject join recorded at dispatch time`
+
+**Decides:** whether ADR-0100's replacement route for Gate A1 confirms, or is killed exactly as
+EXP-01 was. [asserted] It does not decide the value of beta, does not open Gate A, and does not
+generalise beyond the repositories measured.
+
+**Why this exists.** EXP-01 tried to estimate beta by mining git history, treating a later revert or
+fix as evidence that a check had accepted bad work. Its stopping rule fired: the interval would not
+narrow below +/-0.05 and the method was retired without a usable measurement. [measured] The most
+likely cause is confounding - a revert has many causes that are not a verifier false-accept, and the
+commit graph cannot separate them. Prospective capture removes that confound by construction, which
+is the claim under test here.
+
+**Precondition:** before any arm runs, fix the join. A dispatch produces an artefact and a verdict
+from the checks; a human either accepts or rejects that artefact. The false-accept event is
+`checks accepted AND human rejected`, recorded at the moment of rejection, never inferred later.
+[asserted] Fix in advance: which verdict kinds count as an accept, what counts as a human rejection
+as distinct from a later change of mind, the reviewer population, and the two independently verified
+repositories required by Gate A1.
+
+**Primary quantity:** beta with a Wilson interval, reported per repository and never pooled across
+them. Pooling would hide the between-repository variation that Gate A1 exists to detect. [asserted]
+
+**Stopping rule, fixed in advance.** Stop and report BLOCKED if 200 reviewed dispatches accumulate
+across both repositories without the interval narrowing below +/-0.05. [asserted] That is the same
+threshold EXP-01 failed to reach, deliberately, so the two routes are comparable. **A second
+falsified route is evidence about the gate's design rather than about the instrument**, and must be
+reported as such rather than met with a third instrument.
+
+**The objection this experiment does not answer.** Beta measured this way requires a human rejection
+signal to exist. On work nobody reviews it is unmeasurable, so the measurement is best exactly where
+it is least needed and worst where autonomy matters most. [asserted] Recorded here because it is the
+strongest argument against ADR-0100 and it is unresolved.
+
+**Status:** BLOCKED - the accept/reject join is not yet recorded at dispatch time. Twenty units have
+retired with no recorded human rejection, so the current interval would be uselessly wide. [measured
+23 August 2026]
+
+### EXP-42 - Does a graded visibility dial earn its existence over a single quiet flag, without raising acceptance faster than discrimination? `BLOCKED: no visibility level is recorded on human decision events`
+
+**Decides:** whether ADR-0035's graded visibility mechanism is kept, reduced to a binary quiet flag,
+or killed. [asserted] It does not decide the interrupt policy, which is ADR-0033, and does not decide
+what is rendered, only how much.
+
+**Why this exists, and why it is not a preference question.** ADR-0035 states the constraint the
+experiment must respect: **every level above silence is an untested intervention on the human half of
+beta.** The human verdict is the ground truth our checks are measured against, so a surface that
+raises acceptance without raising discrimination does not improve the system - it corrupts the
+instrument that says whether the system is improving. That is a measurable claim, not a matter of
+taste, which is why the dial cannot be settled by asking people which they prefer.
+
+**The published pull, both directions.** Turning visibility down carries an out-of-the-loop decision
+cost after an automation failure [cited, Endsley & Kiris 1995, DOI 10.1518/001872095779064555].
+Turning it up carries a larger one for this project: explanations raised acceptance regardless of
+correctness with no complementary team gain [cited, Bansal et al. CHI 2021, arXiv:2006.14779],
+corroborated by relative AI reliance moving 29.59% to 38.87% (p=.05) while self-reliance did not move
+[cited, Schemmer et al. IUI 2023, arXiv:2302.02187]. The one manipulation that reduced over-reliance
+to zero was a salient display of the error itself, not an explanation [cited, Vasconcelos et al.
+CSCW 2023, arXiv:2212.06823].
+
+**Precondition:** record the visibility level on every human decision event before any arm runs.
+Without it, historical verdicts cannot be stratified by the condition that produced them and the
+experiment is unrunnable retrospectively. [asserted] This is the blocking item.
+
+**Primary quantities, reported as a pair and never separately.** Acceptance rate, and discrimination
+- the ability to distinguish a good artefact from a bad one - both per visibility level. **A level
+that raises acceptance without raising discrimination fails**, and reporting acceptance alone would
+make a failure look like a success.
+
+**Arms:** silence; a single quiet flag; the graded dial as specified in ADR-0035. Three arms, because
+the decision is whether the dial beats the flag, and the flag is the cheap incumbent.
+
+**Stopping rule, fixed in advance.** Stop and report inconclusive if 150 human verdicts per arm
+accumulate without a difference in discrimination exceeding the interval. [asserted] If the dial
+raises acceptance and not discrimination, it is killed rather than tuned: tuning a level that moves
+the wrong quantity is optimising the corruption.
+
+**Status:** BLOCKED on the precondition. [measured 23 August 2026]
+
 ### EXP-140 · Does triggered pre-reasoning recall improve accepted outcomes over no memory and deliberate pull retrieval without harmful false surfacing? `BLOCKED: inert surfacer, sealed memory/task bank, isolated runner, pre-run human usefulness labels and blinded outcome verdicts`
 
 **Decides:** whether v1 is eligible for a later principal-authored activation ADR on the frozen
