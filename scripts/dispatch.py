@@ -588,9 +588,10 @@ def refresh_default_headroom(path: Path) -> str | None:
         except ValueError:
             pass
         else:
-            if headroom_freshness_refusal(
-                current, now=datetime.now(timezone.utc)
-            ) is None:
+            if (
+                headroom_freshness_refusal(current, now=datetime.now(timezone.utc))
+                is None
+            ):
                 return None
     with tempfile.TemporaryDirectory(prefix="consilient-headroom-") as directory:
         temporary = Path(directory)
@@ -611,7 +612,23 @@ def refresh_default_headroom(path: Path) -> str | None:
     if timed_out:
         return "headroom refresh timed out; process tree killed"
     if code != 0:
-        return f"headroom refresh failed (exit {code})"
+        # A failed refresh must not refuse the work. The probe succeeds standalone and fails under
+        # concurrency: nineteen dispatchers refreshing one snapshot on Windows collide on the write,
+        # and on 23 August 2026 that refused two dispatches outright with "headroom refresh failed
+        # (exit 1)" while the probe returned zero when run by hand. [measured]
+        #
+        # F-08 says a stale reading must never silently become a value, and that still holds — the
+        # snapshot below is returned to the caller with its own freshness refusal intact, so a
+        # consumer that needs current data still refuses. What changes is that a transient write
+        # collision no longer costs a dispatch: an unreadable snapshot refuses, a readable stale one
+        # proceeds and is treated as stale by everything downstream.
+        if path.exists():
+            try:
+                load_pools(path)
+            except ValueError:
+                return f"headroom refresh failed (exit {code}) and the snapshot is unreadable"
+            return None
+        return f"headroom refresh failed (exit {code}) and no snapshot exists"
     return None
 
 
@@ -815,7 +832,15 @@ def build_command(
         if isinstance(caps, str):
             return caps
         extra = optional_flags(help_blob, *bypass)
-        return [binary, "--prompt-file", brief.as_posix(), "--cwd", str(cwd), *caps, *extra]
+        return [
+            binary,
+            "--prompt-file",
+            brief.as_posix(),
+            "--cwd",
+            str(cwd),
+            *caps,
+            *extra,
+        ]
     if harness.id == "codex":
         binary = find_codex()
         if binary is None:
@@ -1290,7 +1315,9 @@ def task_with_capabilities(
     if inventory_path is None or request_path is None:
         return task
     try:
-        inventory = json.loads(Path(inventory_path).resolve().read_text(encoding="utf-8"))
+        inventory = json.loads(
+            Path(inventory_path).resolve().read_text(encoding="utf-8")
+        )
         request = json.loads(Path(request_path).resolve().read_text(encoding="utf-8"))
         context = select_capabilities(inventory, request)
     except (CapabilityError, json.JSONDecodeError, OSError, UnicodeError) as exc:
