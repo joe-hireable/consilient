@@ -619,3 +619,57 @@ more expensive than keeping a false one: a unit built against absent output fail
 dispatch, and can commit something incoherent. So an ambiguous edge stays, **with its uncertainty
 stated** — not silently, and not as a habit. That is not conservatism; it is the only place where the
 cost is genuinely one-sided. [asserted]
+
+## Most of the intelligence goes into deciding, not doing
+
+> "Not every task needs a genius - either human or AI. So we need to figure out what would not be
+> different quality wise if sent to a frontier model for easy/simple tasks. Especially when
+> smaller/weaker/cheaper/free models are being instructed by the frontier models and having their
+> work reviewed and corrected autonomously. We also need to not spend paralellism or compute for the
+> sake of it. A website or app is a relatively small task when compared relative tocthe amount of
+> artificial intelligence that we will be orchestrating. Like The Machine in Person of Interest, the
+> bulk of the intelligence must be deciding what the right answers/approaches/responses/actions etc
+> are better than best befire doing them. Like the superpowers brainstorming and planning skills but
+> better and native and including discovery, research and experimentation and simulation and
+> deliberate, systematic innovation. In the case of an app or website 80+% of the compute and
+> intelligence will be deciding what to build, why and how and only ~20% on actual implementation and
+> deployment.
+> It needs to decide what needs to be fast and what needs to be better than best but defaulting to
+> better than best especially for the things that I'm using. The primary value of consilient wilm be
+> working across large, complex, important projects completely autonomously but should also provide a
+> facility for temporary/quick chats with users just with a single model. One that doesn't go
+> overboard on all the above scientific decision making stuff"
+
+**Half of this is already decided and must be consumed, not rebuilt.** ADR-0002 — one of the four
+load-bearing decisions — **is** the cascade: it carries the closed form `β* = (1−α)·e^(−kΔ)`, records
+that cascades work where outputs are **objectively assessable**, and already sets the refusal:
+*"Refuse to cascade below the measured β\* for the capability gap in play."* `inquiry-tier.md` already
+gates how much rigour a decision earns. **"Not every task needs a genius" is ADR-0002.** [measured]
+
+**What is genuinely new, and unspecified:**
+
+**1. The 80/20 inversion, as a budget rather than a sentiment.** For building an application, 80%+ of
+compute goes to deciding what to build and why, ~20% to implementing it. **This is the Machine
+analogy applied to effort**: the number was the last step of thousands. Nothing today allocates
+compute this way — dispatch sizes work by task, never by which *phase* deserves the spend.
+
+**2. Supervision, which is not the same as cascading.** ADR-0002 escalates when a weak model is
+likely to fail. The principal describes something else: a frontier model **instructing** a weaker one,
+then **reviewing and correcting its work autonomously**. That is a loop, not a fallback, and its
+economics differ — the frontier cost is paid on instruction and review rather than on generation.
+**Whether that is cheaper at equal quality is an empirical question nobody here has measured.**
+
+**3. Do not spend parallelism for its own sake.** This qualifies the 23 August instruction to maximise
+parallelism by default, and the two are consistent: **maximise concurrency where it buys something;
+never widen for the appearance of effort.** Idle width is not throughput, and a squad convened where
+one owner would do is the waste ADR-0067 already forbids. [asserted]
+
+**4. Two modes, and the light one is a product requirement, not a fallback.** The primary value is
+large, complex, autonomous work. But there must also be a **quick single-model chat that does not
+invoke the scientific machinery at all.** A user asking a simple question must not trigger discovery,
+experimentation and a squad. ADR-0087 already says answer directly when convergence adds no value;
+**this makes it a mode the user can rely on rather than an optimisation the system may apply.**
+
+**5. Deciding must include discovery, research, experimentation, simulation and deliberate
+innovation** — natively, and better than the brainstorming and planning skills it replaces. **That is
+the 80%.** [asserted]
