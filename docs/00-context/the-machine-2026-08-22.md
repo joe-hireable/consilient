@@ -673,3 +673,36 @@ experimentation and a squad. ADR-0087 already says answer directly when converge
 **5. Deciding must include discovery, research, experimentation, simulation and deliberate
 innovation** — natively, and better than the brainstorming and planning skills it replaces. **That is
 the 80%.** [asserted]
+
+### Correction: the ratio is illustrative, the direction is the instruction
+
+> "Correct that 80/20 should be tested and is just an example number I threw out there but that's
+> what it feels like for me working with you in this convo - we do 80% of the work deciding what to
+> build before we build anything. Yes test it though and for now just use the principle that much
+> more effort shoild go into decision making, research, experimentation, anything that is deciding
+> what, how, why etc. before actually doing the thing or writing the response"
+
+**The 80/20 is not a target and must not be implemented as one.** The instruction is directional:
+**much more effort into deciding than doing.** The ratio is a hypothesis to be measured, and any spec
+treating 80/20 as a configured constant has misread it.
+
+**Measured on the session he cited, which is the sample he offered** [measured, 23 Aug 2026]:
+
+| Measure | Deciding | Doing |
+|---|---:|---:|
+| Commits since 22 Aug (`docs/` only vs touching `src/`, `scripts/`, `tests/`) | **59 (78%)** | **17 (22%)** |
+| Lines changed | 427,400 (99%) | 3,662 (1%) |
+
+**By commit count his felt estimate was accurate to within two points.** The line count is not
+evidence and is recorded only to be dismissed: it is dominated by archived experiment data — a single
+preserved EXP-47 run is 5,436 lines — so it measures file size, not effort.
+
+**Neither measure is compute.** Dispatch count and token spend are the quantities that matter, and
+neither was instrumented for this session. **n = 1, one project, one collaborator, artefact-count
+proxy.** It is enough to say the direction is real and the ratio is plausible; it is not enough to
+configure anything. **The experiment pre-registered under ADR-0090 should measure dispatches and
+tokens by phase, not commits.** [asserted]
+
+**What to build on, then**: deciding gets materially more effort than doing, the split is recorded per
+request so it can be measured, and **the ratio is reported rather than enforced** until an experiment
+earns it a number.
