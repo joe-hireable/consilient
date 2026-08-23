@@ -1,6 +1,6 @@
 # 0087. Return one answer with decision-relevant checks and answer directly when convergence adds no value
 
-- **Status:** PROPOSED — EXP-128 is deliberately unwritten and the brief's ADR-0077 fusion owner is absent from the tracked tree
+- **Status:** PROPOSED — EXP-128 is deliberately unwritten; ADR-0077 is present, not accepted, and owns fusion/exposure
 - **Date:** 2026-08-22
 - **Deciders:** Codex dispatch `20260822T162045-1b18d15367` for the proposed mechanism; Joe Brown's
   quoted product direction in the dispatch brief is input, not authorship of this decision
@@ -20,10 +20,10 @@ delegation, durable coordination, cross-harness memory and self-evaluation. A vi
 win by displaying those mechanisms or by naming more models. [measured] [asserted]
 
 ADR-0067 already owns one-Owner composition and ADR-0081 owns high-consequence structural-anchor
-admission. The brief names ADR-0077 for evidence fusion and candidate exposure, but no tracked
-ADR-0077 exists in this commit. This ADR neither copies an uncommitted rule nor treats its ownership
-as accepted: implementation is blocked until ADR-0077 or an accepted equivalent assigns one owner.
-[measured] [asserted]
+admission. ADR-0077 is tracked and PROVISIONAL and owns candidate exposure, composite verification
+and evidence fusion. This ADR depends on that live contract and neither duplicates nor supersedes
+it; implementation remains blocked while the fusion dependency is PROVISIONAL and EXP-128 remains
+unwritten. [measured] [asserted]
 
 ## Decision
 

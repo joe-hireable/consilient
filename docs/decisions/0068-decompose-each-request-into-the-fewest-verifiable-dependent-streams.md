@@ -163,17 +163,19 @@ must calibrate this method before it is described as reliable. [measured] [asser
 
 ### 4. Sequence dependencies and survive restart
 
-Every stream records immutable predecessor identifiers and expected predecessor artefact digests.
-[asserted] A stream is ready only when every predecessor is terminally complete, its frozen verifier
-accepted, and its sealed digest matches the dependency. [asserted] Refused, expired, invalid or
-failed predecessors block consumers; changing the route requires a new plan version, not pretending
-the dependency was optional. [asserted] Cycles and missing predecessors are rejected before the first
-claim. [asserted]
+**PROPOSED alignment amendment (2026-08-23; principal acceptance required):** Every frozen plan
+records each predecessor's immutable identity, revision and hand-off-contract digest; it does not
+record a digest for content not yet created. [algebra] A stream is ready only when every predecessor
+is terminally complete, its frozen verifier accepted, and closure has sealed the actual artefact and
+verifier-receipt digests; the consumer's atomic claim binds those exact digests. [asserted] Refused,
+expired, invalid or failed predecessors block consumers; changing the route requires a new plan
+version, not pretending the dependency was optional. [asserted] Cycles and missing predecessors are
+rejected before the first claim. [asserted]
 
 `coordination.py` remains the claim chokepoint, extended so read-conflict-open is serialised under a
 kernel-released acquisition lock. [asserted] Mutable streams must claim explicit paths; a pathless
 claim cannot authorise parallel mutation. [asserted] Only ready streams may claim, and the claim binds
-the plan digest, stream identifier and predecessor digests. [asserted]
+the plan digest, stream identifier and actual predecessor artefact and verifier-receipt digests. [asserted]
 
 At the end of every bounded slice, the stream seals a checkpoint containing the plan digest, base
 tree, attributed Git tree or commit, owned paths, artefact digests, verifier receipts, terminal state

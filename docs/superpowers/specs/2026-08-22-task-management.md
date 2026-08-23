@@ -149,7 +149,7 @@ surface. [asserted] State is derived; no actor sets a free-form status string. [
 
 | state | meaning |
 |---|---|
-| `blocked` | The contract is valid, but at least one dependency is not evidence-closed, its sealed digest is not bound, or a material conflict affecting this item is unresolved. [asserted] |
+| `blocked` | The contract is valid, but at least one dependency is not evidence-closed, its sealed digest is not bound, a material conflict affecting this item is unresolved, or an accepted commitment correction carries typed cause `commitment_paused`. [asserted] |
 | `ready` | All dependency contracts and digests match, no affecting conflict blocks it, budget/expiry admit an attempt, and no live claim exists. [asserted] |
 | `active` | One non-expired atomic claim names the attempt, owner, route, paths and predecessor bindings. [asserted] |
 | `closed` | All deliverables are sealed and every required frozen verifier accepted; human verdict may still be absent. [asserted] |
@@ -167,7 +167,7 @@ surface. [asserted] State is derived; no actor sets a free-form status string. [
 | create -> `blocked` or `ready` | Valid frozen contract; acyclic existing predecessors; allowed authority; declared paths; verifier and plan digests. [asserted] | **No.** Schema and graph checks decide the initial state. [asserted] |
 | `blocked` -> `ready` | Each predecessor is `closed`; its required verifier receipt accepted; its actual artefact digest is bound; every affecting conflict has a non-blocking disposition. [asserted] | **No.** A producer's comment or status is ignored. [asserted] |
 | `ready` -> `active` | One serialised read-conflict-open operation proves readiness and no canonical path overlap, then records the assignment and lease. [asserted] | **No.** `coordination.py` is the chokepoint. [asserted] |
-| `ready` or `active` -> `blocked` | A bound predecessor is invalidated or a material affecting conflict is recorded; any live attempt ends adversely and releases its lease before the blocked state projects. [asserted] | **No.** The dependency/conflict record and terminal attempt evidence drive the transition. [asserted] |
+| `ready` or `active` -> `blocked` | A bound predecessor is invalidated, a material affecting conflict is recorded, or an accepted superseding commitment carries `commitment_paused`; any live attempt ends adversely and releases its lease before the blocked state projects. [asserted] | **No.** The dependency/conflict/correction record and terminal attempt evidence drive the transition. [asserted] |
 | `active` -> `ready` | Attempt timeout, stall or recoverable failure; no live lease; retry budget remains; any reused checkpoint and Git object verify. A retry after composite-verifier exposure also requires admission for candidate `n + 1`. [asserted] | **No.** Process identity, launcher exit code and the label `retry` are insufficient. [measured] (local failure record) [asserted] |
 | `active` -> `closed` | Artefact digests, accepted receipts from every frozen verifier, matching dependency bindings and terminal conflict dispositions. [asserted] | **Never.** "Done" in agent prose has no transition. [asserted] |
 | non-terminal -> `failed` / `refused` / `cancelled` / `expired` | Typed observed outcome, actor, reason, attempted repair and affected descendants; principal authorship where the reason is principal-only. [asserted] | **No.** The adverse evidence is retained even when zero bytes were produced. [asserted] |
@@ -200,15 +200,20 @@ Assignment is a policy around `dispatch.py`, not a new router. [asserted]
    A process restart or checkpoint retry before that boundary remains the same candidate; a revised
    artefact presented after verifier rejection is candidate `n + 1`, whatever its ticket, revision,
    harness or label. [asserted]
-8. Check the lineage exposure ledger before that boundary. [asserted] With authenticated human beta
-   unestimated, policy admits at most one candidate and refuses automatic exposure `2`; this is the
-   ADR-0067 default, not a measured beta result. [cited] [asserted]
+8. Check the lineage exposure ledger before that boundary. [asserted] Without a sufficient
+   authenticated, trajectory-derived `human_verdict_beta` projection bound to the same task family and
+   frozen composite-verifier protocol/version, automatic exposure is zero: candidate `1` refuses
+   before the frozen composite verifier. A proxy, mutation estimate or `Beta` with missing or
+   mismatched scope fields is ineligible. A non-zero ceiling may come only from `routing.py` over
+   that exact projection; ADR-0067's one-Owner default is not an exposure allowance. [cited: ADR-0077;
+   verdict-supply §§ 2, 4-5] [asserted]
 
 ADR-0077's dependence-robust ceiling is `n_max = floor(epsilon / beta_upper)`; the logarithmic
 formula applies only to a measured frozen iid candidate population. [algebra] `routing.py` implements
-the robust refusal but `dispatch.py` deliberately does not import it. [measured] This specification
-does not wire routing or change `routing_orchestration_enabled`; a future implementation must test
-the dispatch-path exposure boundary rather than citing the isolated routing unit. [asserted]
+the robust refusal but `dispatch.py` does not yet consume it. [measured] Until that boundary is
+wired, automatic verifier exposure remains frozen. This specification does not change
+`routing_orchestration_enabled`; a future implementation must test the dispatch-path refusal rather
+than citing the isolated routing unit. [asserted]
 
 Headroom decides which eligible prepaid route performs the work; it never changes priority, evidence
 requirements or authority. [asserted] Model family is allowed to break an otherwise equal routing tie
@@ -369,9 +374,12 @@ human-authority poisoning. [asserted]
 - Given an agent submits a field-perfect principal payload with `via="cli"` but no valid unused
   human-action receipt, when universal validation runs, then it refuses and authenticated beta is
   unchanged. [asserted]
-- Given candidate `1` reached the composite verifier, when a revised artefact, retry, new harness or
-  successor ticket reaches that verifier under the same exposure key, then it is candidate `2` and
-  admission refuses while authenticated beta is unmeasured. [asserted]
+- Given relevant beta is unmeasured or insufficient, when candidate `1` would reach the composite
+  verifier, admission refuses before verifier execution and no exposure is recorded. Given the
+  exact eligible projection admits ceiling `n`, candidate `n + 1` likewise refuses. [asserted]
+- Given a proxy or mutation beta, or a generic measured `Beta` whose task family or verifier version
+  is absent or mismatched, when candidate `1` would reach the composite verifier, admission refuses
+  and the value never enters candidate sizing. [cited: verdict-supply §§ 2, 4-5] [asserted]
 - Given a principal rejects a bound predecessor, when descendants are projected, then every consumer
   of that exact digest is invalidated and no unrelated item is changed. [asserted]
 - Given the runtime restarts, when the same trajectory is replayed, then state, readiness, owners,

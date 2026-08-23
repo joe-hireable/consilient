@@ -180,11 +180,13 @@ that state without an artefact canary and an independently enforced authority bo
 
 ### 5.4 Squad and authority boundary
 
-Human-labelled beta is unestimated, so the honest default is one independently acceptable
-candidate. Additional evidence roles may feed that candidate only when each introduces a
-decision-changing different class of facts; they do not each consume verifier exposure. A second
-independently acceptable candidate needs a measured candidate-exposure ceiling that admits it.
-Agreement over the same context has zero evidential weight. [cited: ADR-0067] [algebra] [asserted]
+Human-labelled beta is unestimated. [measured: `consil beta`, 2026-08-22] One Owner may prepare one
+candidate but automatic verifier exposure is zero. Additional evidence roles may feed that candidate
+only when each introduces a decision-changing different class of facts; they do not each consume
+verifier exposure. The first or any later independently acceptable candidate needs the exact
+authenticated human-labelled candidate-exposure projection required by ADR-0077. Agreement over the
+same context has zero evidential weight. [cited: ADR-0067, ADR-0077; verdict-supply §§ 2, 4-5]
+[asserted]
 
 V0-18 remains absolute: verdicts, approvals, gate lifts and spend are principal-authored. Current
 chat ingress is not authenticated strongly enough to carry those acts, so the proposed surface must

@@ -250,8 +250,11 @@ executing verifier decides its own check outcome. A deterministic projector mark
    `attempt.outcome`; [asserted]
 5. every refusal, timeout, quarantine and material dissent is attached and dispositioned rather
    than omitted; [asserted]
-6. candidate exposure is inside the ceiling returned by `routing.py`; an unmeasured relevant beta
-   refuses automatic acceptance rather than inventing a safe value; and [asserted]
+6. before verifier execution, `routing.py` admitted this candidate ordinal from a sufficient
+   authenticated, trajectory-derived `human_verdict_beta` projection bound to the same task family and
+   frozen composite-verifier protocol/version; missing, insufficient, proxy, mutation, unscoped or
+   mismatched beta is a routing refusal and therefore cannot reach `Done` automatically; and
+   [cited: ADR-0077; verdict-supply §§ 2, 4-5] [asserted]
 7. no unresolved principal-only decision remains. [asserted]
 
 The final `delivery.outcome` references the original and current estimate, actual elapsed time,
@@ -310,7 +313,8 @@ The minimum check set is: [asserted]
    higher epoch and never reruns a completed stream; [asserted]
 6. a timeout before sealing loses at most the current slice, not the previous checkpoint; [asserted]
 7. `Done` fails on a changed commitment, missing dependency, unexecuted verifier, omitted adverse
-   outcome, unresolved principal decision or exceeded candidate ceiling; [asserted]
+   outcome, unresolved principal decision, missing/insufficient/proxy/mismatched human beta, missing
+   prior exposure admission or exceeded candidate ceiling; [asserted]
 8. a verifier pass followed by human rejection remains the beta false-accept pair and cannot be
    overwritten; and [asserted]
 9. ordinary checkpoints emit no conversational message under the default delivery policy. [asserted]

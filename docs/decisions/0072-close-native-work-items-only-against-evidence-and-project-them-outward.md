@@ -108,17 +108,22 @@ accepted. [asserted] It does not mean a human accepted the result. [asserted]
 
 Only `ready` items can be assigned. [asserted] The scheduler orders them deterministically by
 critical-path blocking impact, then expiry, then trajectory position, and asks existing dispatch
-eligibility and headroom logic to select the route. [asserted] An item retains one Owner and, while
-authenticated beta is unmeasured, policy admits at most one verifier-exposed candidate. [cited]
-(ADR-0067) A pre-verifier process restart remains the same candidate; any revised artefact presented
-after verifier rejection is candidate `n + 1`, across attempts, harnesses and revisions. [asserted]
+eligibility and headroom logic to select the route. [asserted] An item retains one Owner. Without a
+sufficient authenticated, trajectory-derived `human_verdict_beta` projection bound to the same task
+family and frozen composite-verifier protocol/version, policy admits zero automatic verifier
+exposure: candidate `1` refuses before the verifier boundary. Proxy, mutation and unscoped generic
+`Beta` values are ineligible. [cited: ADR-0077; verdict-supply §§ 2, 4-5] A pre-verifier process
+restart remains the same candidate; any revised artefact presented after verifier rejection is
+candidate `n + 1`, across attempts, harnesses and revisions. [asserted]
 Another member is admitted only for a frozen, non-overlapping, decision-changing evidence anchor.
 [cited] (ADR-0067)
 
 ADR-0077 corrects the brief's logarithmic formula: the distribution-free ceiling is
 `floor(epsilon / beta_upper)`; the logarithmic form is only for a measured iid candidate population.
 [algebra] `routing.py` implements the robust refusal but is deliberately absent from the dispatch run
-path. [measured] This documentation decision does not wire it or change the routing flag. [asserted]
+path. [measured] Until that path consumes a ceiling derived from the exact eligible projection above,
+automatic verifier exposure remains frozen. This documentation decision does not wire it or change
+the routing flag. [asserted]
 
 `coordination.py` serialises readiness-check, canonical-path conflict-check and claim-open as one
 operation before harness invocation. [asserted] Claims bind the attempt, route, plan, paths, lease and

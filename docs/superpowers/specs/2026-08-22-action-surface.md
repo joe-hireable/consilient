@@ -156,7 +156,10 @@ separate fields: [asserted]
   "gate": {
     "state": "gated",
     "reason": "no_matching_grant",
+    "grant_kind": null,
     "authority_event": null,
+    "decision_id": null,
+    "recovery_proof_ref": null,
     "scope": [],
     "operations": [],
     "effect_classes": [],
@@ -173,8 +176,14 @@ change which admits it must extend that parser and its fail-closed tests in the 
   [asserted]
 - `available: true, gate.state: gated` means it exists but cannot be invoked live. This is the
   default for a present capability without an exact, current grant. [asserted]
-- `available: true, gate.state: admitted` requires an authenticated authority event, canonical
-  scope, exact operations and effects, and an expiry or explicit non-expiring basis. [asserted]
+- `available: true, gate.state: admitted` requires exactly one current `grant_kind`, canonical
+  scope, exact operations and effects, and an expiry. `principal_authority` resolves an authenticated
+  first-party V0-18 event. **PROPOSED pending principal acceptance:**
+  `controller_baseline.local_restorable.v1` resolves one earlier `decision.autonomous` plus a passing
+  ADR-0075 recovery proof, is single-use and is bounded to one local/restorable operation inside the
+  committed workspace/authority envelope; it grants no network, credential, spend, external
+  exposure or protected reach. The former uses `authority_event`; the latter uses `decision_id` and
+  `recovery_proof_ref`. Unused basis fields remain null. [cited: ADR-0075] [asserted]
 - Missing or malformed gate data is `gated`; absence from the inventory is unknown, never evidence
   of technical impossibility. [asserted]
 
@@ -200,6 +209,12 @@ references. It does not define another forward/inverse structure. [asserted]
 
 ## 5. One effect boundary and a complete record
 
+**ADR-0079 supersession:** ADR-0079 replaces every older clause that placed
+`decision.autonomous` after `effect.receipt`. The operative order is a durable earlier autonomous
+decision or protected proposal/first-party authority, `effect.intent`, reach, `effect.receipt`, then
+the existing outcome. Replay joins later receipt/outcome facts without embedding them in or
+rewriting the decision. [cited: ADR-0079]
+
 Every adapter invocation uses the following write-ahead sequence: [asserted]
 
 1. Resolve the capability in the existing inventory and recompute its ADR-0075 manifest from the
@@ -209,17 +224,20 @@ Every adapter invocation uses the following write-ahead sequence: [asserted]
    proof and returns the final autonomous, reshape, refusal or principal-escalation disposition
    **before live reach**. Proof activity has separately admitted local capabilities and linked child
    effect records; it cannot reach the live target. [asserted]
-3. Append, flush and fsync `effect.intent` with that final disposition **before** the live effect
+3. Append the durable `decision.autonomous`, or resolve the protected proposal plus exact
+   first-party authority, before intent or reach. The record contains only facts available before
+   actuation. [cited: ADR-0079]
+4. Append, flush and fsync `effect.intent` with that final disposition **before** the live effect
    becomes reachable. A malformed request is represented by protected input references plus a
    refusal reason. If the durable append cannot be proved, do not execute. [asserted]
-4. For a final live-authorised disposition only, expose the least-privilege handles named by the
+5. For a final live-authorised disposition only, expose the least-privilege handles named by the
    manifest and execute once through the admitted adapter, using a stable provider idempotency key
    where supported. A reshape starts a new local operation; a refusal or escalation exposes no live
    handle. [asserted]
-5. Append, flush and fsync an `effect.receipt` observation after refusal, success, failure or an
+6. Append, flush and fsync an `effect.receipt` observation after refusal, success, failure or an
    unresolved crash window. [asserted]
-6. Let ADR-0075 append its linked outcome. `decision.autonomous` references the current receipt head
-   as its live outcome and does not duplicate a potentially divergent payload. [asserted]
+7. Let ADR-0075 append its linked outcome after the receipt. Replay joins that outcome to the
+   earlier decision; neither earlier record embeds later result bytes or is rewritten. [cited: ADR-0079]
 
 `effect.intent` contains stable `operation_id`, `decision_id`, work-item and attempt ids; Owner and
 actor; the canonical secret-free ADR-0075 manifest once, either inline or by immutable artefact

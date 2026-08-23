@@ -12,7 +12,7 @@
 
 **Document class:** W. [cited: ADR-0073]
 
-**Review by:** 2026-09-22, or immediately after EXP-104 is registered/reported, A07 changes status, or the trusted-ingress backend/origin decision changes. [asserted]
+**Review by:** 2026-09-22, or immediately after EXP-104 changes status or produces a report, A07 changes status, or the trusted-ingress backend/origin decision changes. [asserted]
 
 **Falsifier:** Stop and amend this plan if one centrally consumed receipt cannot bind every listed protected action without exposing its issuer to a child harness, or if any transition can make candidate bytes active while registered EXP-104, trusted ingress, A07, the sealed instrument, promoter beta or downstream evidence is absent. [asserted]
 
@@ -24,7 +24,7 @@
 - No unit adds a seventh `consil` command. H01 is import-only; H02/H03 extend existing writers. [asserted]
 - Historical unauthenticated human rows remain historical/unmeasured. Replay never upgrades them. [cited: ADR-0072, ADR-0080]
 - S01-S03 may land as refusal, quarantine, sealed evaluation and owner-inspection machinery. S04-S06 remain unreachable until every conjunct is current; no unit changes Gate A, Gate B or `routing_orchestration_enabled=false`. [cited: ADR-0076]
-- EXP-104 has no register heading. Its separately authorised research amendment is outside these claim sets, and no other experiment may be aliased to it. [measured]
+- EXP-104 is registered but `BLOCKED` on the prerequisites in its live heading and has not run. No other experiment may be aliased to it. [measured]
 
 `human_action_receipt.v1` binds `receipt_id`, `principal_id`, `action`, `instance_id`, `workspace_root_sha256`, protocol version, canonical bindings, issuer/version, issue/expiry times, single-use nonce, challenge ID/digest, ceremony digest, expected origin/RP ID, credential-ID digest, signature-counter result and `user_verified=true`. No key, bearer credential, biometric, secret or hidden instrument item enters the repository or trajectory. [cited: verdict-supply section 4] [asserted]
 
@@ -159,7 +159,7 @@ python -m pytest tests/test_promotion_authority.py tests/test_human_action_recei
 
 1. Test missing/weakened/mutated contracts, generic-beta substitution, absent EXP-104 and every mechanical effect class. [asserted]
 2. Add immutable `ImpactContract`/`PromoterBetaReceipt` schemas and pure decision policy; no execution enters product code. [asserted]
-3. Preserve fail-closed defaults and make the current absent EXP-104 produce a recorded refusal. [asserted]
+3. Preserve fail-closed defaults and make the current blocked and unconfirmed EXP-104 produce a recorded refusal. [asserted]
 
 **Done:** The policy accepts only an exact immutable contract and specialised receipt; current activation always refuses. [asserted]
 
@@ -226,7 +226,7 @@ python -m pytest tests/test_promote_card.py tests/test_recall_receipts.py -q
 
 **Deliverable:** The existing commit gate admits one inactive tracked-skill commit only when staged parent/tree/paths and resulting commit/tree match S02/S03 plus one unused H03 receipt. [cited: ADR-0076]
 
-**Depends on:** S02, S03, H03, A07, registered and confirmed EXP-104, and every promoter/downstream beta/alpha/joint-outcome conjunct. It is currently blocked. [measured] [asserted]
+**Depends on:** S02, S03, H03, A07, principal acceptance of the PROPOSED S-07 cross-reference in ADR-0076, registered and confirmed EXP-104, and every promoter/downstream beta/alpha/joint-outcome conjunct. It is currently blocked. [measured] [asserted]
 
 **Claim exactly:**
 

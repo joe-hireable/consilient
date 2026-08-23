@@ -45,9 +45,12 @@ the transitive-dependents closure; a claim that omits a dependent is flagged
 rate. Derive lane ordering from the plans' declared `depends_on` edges and delete hand-maintained
 lane tables as a dependency copy. Fix the admission race and abandoned-claim reclamation as
 protocol work — compare-and-append at the trajectory's single writer with a monotonically
-increasing fencing epoch checked by the commit gate — and run write dispatches in per-run git
-worktrees so the index race is dissolved by construction. Do not build a general DAG scheduler,
-a hermetic sandbox, or a lock service. [asserted]
+increasing fencing epoch checked by the commit gate — and give every write dispatch an isolated
+workspace and index provisioned in a form its exact runtime/version has passed: linked worktree,
+isolated exported Git environment or full clone. A failing or unprobed form falls back or refuses,
+so the index race is dissolved without repeating R4's runtime failure. Do not build a general DAG
+scheduler, a hermetic sandbox, or a lock service. [cited:
+`../20-design/dispatch-layer-requirements-2026-08-20.md` R4] [asserted]
 
 ## Evidence
 
@@ -120,8 +123,8 @@ than policed. Every mechanism traces to a measured failure, and the one speculat
 
 **Negative** — D3's closure is conservative: a claim on either of the 2 hub files flags ≥ 30 %
 of the repository (on `events.py`, 58 %), and the false-positive rate is unmeasured until
-EXP-131 runs. Per-run worktrees
-add disk and setup cost to every write dispatch. Compare-and-append admission serialises claim
+EXP-131 runs. Runtime-conformant per-run workspaces add setup and disk cost to every write dispatch;
+a full-clone fallback costs more than a linked worktree. Compare-and-append admission serialises claim
 opening at the single writer — a throughput cost nobody has measured because peak admission rate
 today is far below any plausible limit. Deleting hand-written lanes removes a human-readable
 overview some planning sessions used.
@@ -144,9 +147,10 @@ implementation, not before.
 - Boundary: the coverage check warns and never refuses until EXP-131 promotes it. Check: the
   `claim.coverage_warning` event schema carries no refusal path; a refuse-mode flag does not
   exist to be flipped by accident. Fails CI: n/a — structural. Added in the same commit: yes.
-- The fencing-epoch and worktree checks are specified in
+- The fencing-epoch and runtime-workspace conformance checks are specified in
   `../superpowers/specs/2026-08-22-dependency-scheduling.md` § 6 and owed by their implementation
-  commits.
+  commits. The workspace check enumerates every write-admitted runtime/version and proves read,
+  write, stage, commit and index isolation; an `index.lock`-only check does not satisfy it.
 
 ## What would overturn this
 

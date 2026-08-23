@@ -131,7 +131,8 @@ This is the load-bearing negative result. An import graph is a graph of *who rea
 language. The day's coordination failures lived elsewhere. [measured: A4, A5]
 
 - **The git index.** Not a Python module; no import edge spans it. F1 is invisible to any
-  import-derived claim. The fix is isolation (worktrees), which needs no graph at all.
+  import-derived claim. The fix is a runtime-conformant isolated workspace and index, which needs no
+  graph at all.
 - **The trajectory log and the admission protocol.** F2's race is between two appends to
   `.harness/log/*.jsonl`; F3's abandonment is a missing append. Both are protocol properties.
   63 event-kind string literals are each shared by two or more files, and 104 file pairs are
@@ -154,12 +155,15 @@ graph cannot — and never a *source of* them.
 Three mechanisms, each traced to a measured failure, each with its check named. No mechanism is
 a new orchestrator, registry or CLI surface. [asserted]
 
-**D1 — Worktree-per-run for write work (answers F1).** A dispatch that will stage or commit runs
-in its own `git worktree`; the index race is dissolved by construction because the index is
-per-worktree. [cited: git-worktree(1), bibliography § 16] The commit gate already enumerates
-worktrees; the change is in where `scripts/dispatch.py` places the worker, not in the gate.
-Check: a conformance test that two concurrent dispatches staging disjoint paths in separate
-worktrees never contend on `index.lock`. [asserted]
+**D1 — Runtime-conformant isolated workspace for write work (answers F1 and R4).** A dispatch that
+may write, stage or commit receives a per-run workspace and Git index isolated from every other
+writer. `scripts/dispatch.py` owns provisioning and selects a linked worktree, an isolated worktree
+exposed through `GIT_DIR`/`GIT_WORK_TREE`, or a full clone only when the exact runtime/version has
+passed that form's read, write, stage and commit probe; an unprobed or failing form falls back or
+refuses. [cited: `docs/20-design/dispatch-layer-requirements-2026-08-20.md` R4;
+git-worktree(1), bibliography § 16] Check: exercise every write-admitted runtime/version through an
+actual read, write, stage and throwaway commit in its provisioned form, then retain the concurrent
+separate-index regression. An `index.lock`-only check is insufficient. [asserted]
 
 **D2 — Compare-and-append admission with a fencing epoch (answers F2, F3).** Claim admission
 becomes one atomic operation at the trajectory's single writer: conflict-check and append in the
@@ -195,7 +199,7 @@ with its code, in the same commit. [asserted]
 
 | Priority | Requirement | Acceptance check |
 |---|---|---|
-| P0 | Write dispatches run in per-run worktrees. [asserted] | Two concurrent staging dispatches in separate worktrees never touch the same `index.lock`; a dispatch attempting to stage in the main worktree's index is refused. [asserted] |
+| P0 | Write dispatches run in runtime-conformant isolated workspaces with independent indexes. [asserted] | For every admitted runtime/version, an actual workspace probe reads a tracked file, writes a file, stages it and creates a throwaway commit; failure excludes that runtime/workspace tuple or triggers a proved fallback. Two concurrent write dispatches use different indexes, and staging in the shared main workspace is refused. [asserted] |
 | P0 | Admission is compare-and-append at the single writer; claims carry a fencing epoch. [asserted] | Interleaving test: the loser of a 19-second-apart admission pair is refused; a stage from a superseded epoch is rejected by the commit gate. [asserted] |
 | P1 | Derived-coverage warning on Python claims. [asserted] | `run_exp130.py` stays green as the instrument; a declared claim omitting a transitive dependent produces a `claim.coverage_warning` event naming the omitted files. [asserted] |
 | P1 | Lane tables are derived, not hand-written. [asserted] | CI test: any hand-written lane ordering that disagrees with the declared-edge topological order fails. [asserted] |
@@ -233,8 +237,8 @@ above it was interchangeable. [asserted]
 
 ## 8. Plain answer and delta
 
-The plain answer is: use `git worktree` for isolation, make claim admission atomic with a fencing
-epoch, derive the lane order from the dependencies the plans already declare, and keep
+The plain answer is: use a runtime-conformant isolated workspace and index, make claim admission
+atomic with a fencing epoch, derive the lane order from the dependencies the plans already declare, and keep
 hand-written claims as the authority over everything the graph cannot see. All four are incumbent
 mechanisms with primary citations; none is novel. [cited: bibliography § 16]
 

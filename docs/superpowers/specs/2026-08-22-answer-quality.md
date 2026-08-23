@@ -13,10 +13,10 @@ why an answer could be better is false. [measured: `docs/superpowers/specs/`, 20
   Its proposed entry is written below but deliberately absent from
   `docs/10-research/experiment-register.md`; it is **not pre-registered** until the register owner
   writes it. [measured]
-- **Dependency state:** the brief names ADR-0077 as fusion owner, but no tracked ADR-0077 exists in
-  this commit. Fusion remains undefined here; this proposal cannot advance to ACCEPTED or
-  implementation until ADR-0077 or an accepted equivalent assigns one fusion/exposure owner.
-  [measured] [asserted]
+- **Dependency state:** ADR-0077 is tracked and PROVISIONAL and owns candidate exposure, composite
+  verification and evidence fusion. This proposal depends on that owner rather than recreating it;
+  it remains PROPOSED and unimplemented while EXP-128 is deliberately unwritten. [measured]
+  [asserted]
 - **Scope:** the one primary response a user reads, the checks that may justify it, when to answer
   directly, and the blind comparison that could support a visible-quality claim. [asserted]
 - **Non-goals:** another orchestrator, another fusion rule, another action boundary, a seventh CLI
@@ -67,7 +67,7 @@ therefore be against that strong single Owner, not against an untooled chat cari
 | The 17 pre-existing specifications | Evidence fusion, consilience gating, expertise acquisition, model qualification and delivery already constrain internal quality; none defines this final response or a preference test. [measured] |
 | ChatGPT Work product bar | Breadth and usability, not a public reliability result, make it the whole-product incumbent. [measured] |
 | Tracked product bar and Ruflo teardown | Delegation, durable coordination, shared memory and self-evaluation are incumbents, not differentiators. [measured] |
-| ADR-0067 and ADR-0081 | Composition and high-consequence anchor admission already have owners; the brief's ADR-0077 fusion owner is absent from the tracked tree, so fusion remains a prerequisite rather than material to copy here. [measured] [asserted] |
+| ADR-0067, ADR-0077 and ADR-0081 | Composition, fusion/exposure and high-consequence anchor admission already have owners; ADR-0077 is tracked and PROVISIONAL, so this specification depends on its contract rather than copying it. [measured] [asserted] |
 | Ao, Gao and Simchi-Levi; Kim et al.; Jwalapuram et al.; Kraidia et al.; Zhou | The strongest retrieved evidence places the burden on convergence and exposes judge gaming and debate degradation. All cited entries are `[FULL]` in the bibliography, read 2026-08-22. [cited] |
 
 No retrieved source established that a compact evidence-bearing response is preferred to the
@@ -164,9 +164,9 @@ commercial comparison is therefore empirical, not a novelty claim. [asserted]
 
 ADR-0067 already sets one Owner and the smallest evidence-grounded composition. ADR-0081 already
 requires a second structural anchor for full or protected conclusions and permits a valid minimal
-decision to proceed on one. The brief's named ADR-0077 fusion owner is absent from the tracked tree;
-this specification does not recreate it or pretend that its ownership has landed. [measured]
-[asserted]
+decision to proceed on one. ADR-0077 owns candidate exposure, composite verification and evidence
+fusion and remains PROVISIONAL. This specification consumes that live dependency and does not
+recreate or supersede it. [measured] [asserted]
 
 Before generation, the Owner freezes the material claim or acceptance contract, consequence tier,
 available anchors, hard budget and whether a possible new observation could change the answer. It
@@ -176,15 +176,15 @@ then records exactly one response mode: [asserted]
 |---|---|---|
 | `direct` | No high-consequence gate requires acquisition, and either the Owner already has the relevant sources/tools or no available different observation could change the scoped answer within budget. [asserted] | Answer directly; say no extra check was warranted. [asserted] |
 | `checked` | One available source or executable observation could change a material claim and its conservative value exceeds its acquisition cost. [asserted] | Acquire that one observation, bind its receipt, then answer. [asserted] |
-| `converged` | ADR-0081 requires another structural anchor, or a future accepted fusion owner admits one or more sealed readings. Optional convergence remains unavailable until that owner lands. [measured] [asserted] | Use the smallest admitted composition, one Owner and one candidate; show checks, not the organisation. [asserted] |
+| `converged` | ADR-0081 requires another structural anchor, or accepted ADR-0077 fusion admits one or more sealed readings. Optional convergence remains unavailable while ADR-0077 is PROVISIONAL. [measured] [asserted] | Use the smallest admitted composition, one Owner and one candidate; show checks, not the organisation. [asserted] |
 
 Difficulty, importance-sounding language, user enthusiasm, role availability and remaining prepaid
 quota do not admit another member. The mode is fixed before outcome inspection; it cannot be changed
 after a disappointing direct answer merely to manufacture evidence of effort. [asserted]
 
-The current human-labelled beta is unestimated, so the honest operational default remains one Owner
-and one candidate. `routing_orchestration_enabled` remains false, and this document changes no gate.
-[measured]
+The current human-labelled beta is unestimated, so the honest operational default is one Owner who
+may prepare one candidate and zero automatic verifier exposure. `routing_orchestration_enabled`
+remains false, and this document changes no gate. [cited: ADR-0077] [measured] [asserted]
 
 ## 6. Measuring perceived quality
 
@@ -348,11 +348,11 @@ headcount; and failure or ambiguity leaves the simpler product in place. [assert
 | `instructions.py` | Carries the response contract to the selected harness. [asserted] |
 | `events.py` | Remains the single append-only writer for source, execution, decision and delivery references. [measured] |
 
-ADR-0067 owns one-Owner composition, ADR-0081 owns the high-consequence anchor gate, and the existing
-chat/delivery specifications own conversation and completion. Fusion and exposure need one accepted
-owner; the brief's ADR-0077 owner is absent from the tracked tree. If implementation needs another
-field, extend the owning record and its validator in the same commit; do not add another coordinator,
-writer or response state store. [measured] [asserted]
+ADR-0067 owns one-Owner composition, ADR-0077 owns fusion/exposure and remains PROVISIONAL,
+ADR-0081 owns the high-consequence anchor gate, and the existing chat/delivery specifications own
+conversation and completion. This specification depends on those live contracts. If implementation
+needs another field, extend the owning record and its validator in the same commit; do not add
+another coordinator, writer or response state store. [measured] [asserted]
 
 ## 9. Checks required with implementation
 

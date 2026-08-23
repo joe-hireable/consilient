@@ -474,7 +474,8 @@ A loop which changes active behaviour faster than independent labels arrive expa
 making beta less identifiable. Owner cards do not fix a bad instrument, and an owner presented with
 cheap but misleading summaries can become a signature oracle. The honest conclusion today is not
 that recursive self-improvement works; it is that active recursive promotion stays disabled while
-the sealed instrument, authenticated owner ingress and EXP-104 are absent. [asserted]
+the sealed instrument and authenticated owner ingress are absent and EXP-104 remains `BLOCKED` and
+unreported. [asserted]
 
 This specification still records the dormant path because registration, quarantine, sensing and
 exact rollback are useful without granting activation authority. EXP-104 is allowed to kill the

@@ -14,6 +14,14 @@ today. [measured] [algebra]
 - **Executable model:** none — this decision defines exact admission and record invariants; the
   unknowns are crash and reversal error rates measured by the registered experiments
 
+**PROPOSED alignment amendment (2026-08-23; principal acceptance required):** an admitted gate
+carries exactly one `grant_kind`. `controller_baseline.local_restorable.v1` is mechanically
+verified by an earlier `decision.autonomous` bound to one passing ADR-0075 recovery proof and scoped
+to one single-use bounded local/restorable operation inside the committed workspace/authority
+envelope. It grants no network, credential, spend, external exposure or protected reach.
+`principal_authority` requires an exact authenticated first-party V0-18 event for scope widening or
+any protected class. [cited: ADR-0075] [asserted]
+
 ## Context
 
 The principal specified a general chief of staff whose output is unconstrained, with law as the
@@ -68,12 +76,13 @@ credential disclosure cannot be undone. The complete inverse and proof requireme
 invocation passes its executed recovery test. [asserted]
 
 ADR-0078 resolves reach and gate state, then emits the one manifest ADR-0075 consumes. The manifest
-also receives the existing inventory digest, authority-event reference, exact scope/operations/effect
-classes, expiry, gate snapshot and applicable legal-rule references. ADR-0075 runs any isolated
-recovery proof and returns autonomous execution, local reshaping, refusal or principal escalation
-before live reach; the durable intent binds that final disposition, and only a live-authorised
-disposition exposes the handle. Afterwards, `decision.autonomous` references the effect receipt as
-its live outcome rather than duplicating it. [asserted]
+also receives the existing inventory digest, grant kind, authority-event reference where applicable,
+exact scope/operations/effect classes, expiry, gate snapshot and applicable legal-rule references.
+ADR-0075 runs any isolated recovery proof and returns autonomous execution, local reshaping, refusal
+or principal escalation before live reach. **ADR-0079 supersedes the older post-receipt decision
+order:** durable decision or protected proposal/authority, intent, reach, receipt, then outcome.
+Only a live-authorised disposition exposes the handle, and replay joins later receipt/outcome facts
+without copying them backwards into the earlier decision. [cited: ADR-0079] [asserted]
 
 `effect.intent` contains stable operation/decision/work-item/attempt identity; Owner and actor; the
 canonical secret-free ADR-0075 manifest once, inline or by immutable artefact reference and digest;
@@ -103,8 +112,8 @@ floor, and clearly unlawful action is refused rather than laundered through appr
 Gate status never grants an action capability. Today Gate A and Gate B fail and routing remains
 disabled; this ADR authorises specification and construction only. Gate A may later permit use of
 its measured evidence inside the existing admitted surface. Gate B may make unattended/default
-dependence eligible for a principal-named instance root, but only capabilities with independent
-grants and passing boundaries open. Neither gate grants network, message, money, legal-obligation,
+dependence eligible for a principal-named instance root, but only capabilities with an accepted
+closed grant kind and passing boundaries open. Neither gate grants network, message, money, legal-obligation,
 publication, credential, external-system or physical reach. ADR-0063 remains supervised cwd admission, not a gate
 pass. [measured: `consil doctor`, 2026-08-22] [asserted]
 

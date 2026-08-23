@@ -283,7 +283,8 @@ From the moment the new revision is accepted: [asserted]
 4. a sealed result is reusable only when its consumed inputs, deliverable contract, verifier
    contract and relevant digests are byte-identical under the new revision; affected verification
    runs again; [asserted]
-5. `pause` leaves the new revision unclaimable, `cancel` makes it terminal, and `replan` invokes
+5. `pause` projects the new revision as task state `blocked` with typed cause
+   `commitment_paused` and leaves it unclaimable; `cancel` makes it terminal, and `replan` invokes
    ADR-0068 before delivery owns any estimate revision; and [asserted]
 6. the user receives one concise delta message with the new short digest, not another confirmation
    loop. [asserted]

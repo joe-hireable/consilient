@@ -84,10 +84,12 @@ native specialist surfaces whenever their working medium or authority boundary w
    not occur supplies no retirement evidence. Agents may propose but may not author verdict,
    consent, approval, gate lift or spend. [cited: ADR-0057] [asserted]
 8. **Keep the current safety state.** `routing_orchestration_enabled` remains `false`; Gate A and
-   Gate B do not change; the default is one independently acceptable candidate while human-labelled
-   beta is unestimated. Additional evidence roles require decision-changing different classes of
-   facts but do not each consume candidate exposure; another independently acceptable candidate
-   requires a measured candidate-exposure ceiling. [cited: ADR-0067] [measured] [algebra]
+   Gate B do not change. While human-labelled beta is unestimated, one Owner may prepare one
+   candidate but automatic verifier exposure is zero. Additional evidence roles require
+   decision-changing different classes of facts but do not each consume candidate exposure; the
+   first or any later independently acceptable candidate requires the exact authenticated
+   human-labelled candidate-exposure projection required by ADR-0077. [cited: ADR-0067, ADR-0077;
+   verdict-supply §§ 2, 4-5] [measured] [asserted]
 
 The complete retirement rows, loss ledger, policy, hand-off shape, search record and unwritten
 experiment candidate are fixed in

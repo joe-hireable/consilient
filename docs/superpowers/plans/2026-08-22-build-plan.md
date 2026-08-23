@@ -8,7 +8,7 @@
 
 **Tech stack:** Python 3.13 standard library, append-only UTF-8 JSONL, rebuildable SQLite projections, existing scripts and pytest/mypy/Ruff checks. No dependency is added by this plan. [measured: `pyproject.toml`; `AGENTS.md`] [asserted]
 
-**Specifications:** Every file present under `docs/superpowers/specs/` at 2026-08-22 15:08 BST, ADR-0067 and ADR-0070 through ADR-0081, ADR-0068 where those specifications make it a direct dependency, the experiment register, `AGENTS.md`, `CONSILIENCE.md`, and `docs/00-context/the-machine-2026-08-22.md`. [measured]
+**Specifications:** All 21 files present under `docs/superpowers/specs/` at the 2026-08-23T01:50:20Z census; ADRs `0067`, `0068`, `0070`-`0087`, `0089` and `0091`; the experiment register; `AGENTS.md`; `CONSILIENCE.md`; and `docs/00-context/the-machine-2026-08-22.md`. ADR-0077 is present and PROVISIONAL; ADR-0088 and ADR-0090 do not exist and are not dependencies. [measured: `docs/00-context/corpus-alignment-audit-2026-08-23.md`; directory census]
 
 **Document class:** W. [cited: ADR-0073]
 
@@ -18,9 +18,9 @@
 
 ## Inventory correction
 
-The dispatch brief is wrong in both counts. The directory contains **12** specifications, not 13; the requested ADR set contains **13** ADRs (`0067` plus `0070` through `0081`), not 12. [measured: directory census after the consilience-gate artefacts landed] ADR-0068 is an additional direct dependency of chat, task and delivery, so it is included in this plan but not in the requested-count arithmetic. [measured: chat-conversation section 1; task-management sections 3 and 6]
+The live directory contains **21** specifications. The 22-record ADR set introduced or consumed by this programme is `0067`, `0068`, `0070`-`0087`, `0089` and `0091`; the ranges must not be expanded through the nonexistent `0088` or `0090`. [measured: directory census, 2026-08-23T01:50:20Z]
 
-This count mismatch is not repaired by inventing a missing document. A future thirteenth specification must enter through the ordinary document/ADR trail and receive its own plan amendment. [asserted]
+This census is an exact launch input. A future twenty-second specification or another ADR dependency must enter through the ordinary document/ADR trail and receive a plan and Class-W inventory amendment before dispatch. [asserted]
 
 ## Global constraints
 
@@ -32,6 +32,7 @@ This count mismatch is not repaired by inventing a missing document. A future th
 - Every retry, refusal, timeout, quarantine, missing artefact and missing verdict remains in the record and in relevant denominators. [cited: ADR-0072, ADR-0077, ADR-0080]
 - One accountable Owner emits one candidate. Extra roles require a named, non-overlapping fact anchor; model agreement over shared inputs is echo. [cited: ADR-0067; `CONSILIENCE.md`]
 - Hard decision, action, consilience and self-change admission remain inactive until their registered activation evidence exists. Schema, projection, fake-sink and refusal-only work may land first. [cited: ADR-0076, ADR-0079, ADR-0081]
+- L01, L02, L04 and L05 are a launch gate: no product unit may treat the specifications as admitted build inputs until the exact 21-file Class-W tranche passes. L06 activates repository-wide CI later. [asserted]
 
 ## Launch gate: specification rulings before affected implementation
 
@@ -39,18 +40,18 @@ The separate specification audit may change wording, but the swarm needs one int
 
 | ID | Contradiction or gap | Ruling for this plan | Blocks |
 |---|---|---|---|
-| S-01 | Task management admits one candidate while authenticated human beta is unmeasured, but chat delivery refuses `Done` when relevant beta is unmeasured. [measured: task-management lines 199-205; chat-delivery lines 243-255] | Permit exactly one verifier-exposed candidate under the explicit cold-start policy and render it `closed / unreviewed`; refuse candidate two and never call machine closure human acceptance. This is an `[asserted]` policy, not a beta result. [asserted] | `D04` |
-| S-02 | ADR-0068 names an expected future artefact digest; task management correctly says future content has no digest. [measured: ADR-0068 decision 4; task-management lines 221-226] | Freeze the predecessor identity, revision and hand-off-contract digest; bind the actual artefact and verifier-receipt digests at the consumer claim. [algebra] | `T01`, `T02` |
+| S-01 | Task management admitted one candidate while authenticated human beta was unmeasured, but ADR-0077 and chat delivery refuse exposure/`Done` when relevant beta is unmeasured. [measured: task-management candidate-exposure clause; chat-delivery `done` predicate; ADR-0077] | Without a sufficient authenticated, trajectory-derived `human_verdict_beta` projection bound to the same task family and frozen composite-verifier protocol/version, policy admits **zero automatic verifier exposures**. A proxy, mutation estimate or unscoped generic `Beta` is not a sizing input. Only a separately principal-authorised cold-start protocol may supersede ADR-0077. Machine closure remains representable after an exposure admitted by that exact measured ceiling, but is never human acceptance. [cited: ADR-0077; verdict-supply §§ 2, 4-5] [asserted] | `T02`, `D04` |
+| S-02 | ADR-0068 names an expected future artefact digest; task management correctly says future content has no digest. [measured: ADR-0068 decision 4; task-management dependency clause] | **PROPOSED source amendment:** freeze predecessor identity, revision and hand-off-contract digest; bind actual artefact and verifier-receipt digests at consumer claim. T01/T02 remain blocked until the principal accepts this ADR amendment. [algebra] [asserted] | `T01`, `T02` |
 | S-03 | Chat correction defines `pause`, but the task state vocabulary has no `paused`. [measured: chat-conversation lines 268-289; task-management lines 150-161] | Project pause as `blocked` with typed cause `commitment_paused`; do not add a free-form state. [asserted] | `C03` |
 | S-04 | Chat migration would make legacy dispatch claims read-only before direct dispatch has a native commitment/plan/item. [measured: chat-conversation lines 347-353; current `scripts/dispatch.py`] | Preserve `item_schema: "dispatch-claim.v1"` for new outer-dispatch claims until the native intake path is end-to-end; only `native.v1` can become evidence-closed task state. Historical rows are never rewritten. [asserted] | `C01`, `T01`, `T02` |
-| S-05 | ADR-0078 requires authenticated authority for every present capability, while ADR-0075 permits recovery-proved local/restorable mutation without another approval. [measured: ADR-0075 decision; ADR-0078 decision] | The controller owns baseline authority only for bounded local/restorable operations already inside the committed workspace/authority envelope. Scope widening and every V0-18 class still require exact first-party authority. [asserted] | `A02`, `A04` |
-| S-06 | ADR-0078/action-surface place the autonomous decision after or against a receipt; ADR-0079 expressly moves it before intent and reach. [measured] | ADR-0079 governs: decision or protected proposal/authority -> durable intent -> single-use reach -> non-forking receipt -> outcome. No future result is copied backwards. [cited: ADR-0079] | `A01`, `P01`, `A04` |
-| S-07 | ADR-0075's closed six-class rule conflicts with ADR-0076's owner approval for every active-harness byte. [measured] | Treat active-harness activation as ADR-0076's narrower use of existing `principal_authority: approval`, not a seventh escalation class. [asserted] | `S04` |
-| S-08 | The self-improvement and verdict-supply records claim EXP-104 and EXP-105 are registered, but neither heading exists in the register. EXP-109 now exists and is the ADR-0081 killing test. [measured: exact-heading register search; register lines 4355-4455] | Do not run or activate the affected branches until authorised research-base amendments register EXP-104 and EXP-105. Do not alias them to another experiment. [asserted] | `Q01` research arm; `S01` activation path |
+| S-05 | ADR-0078 requires authenticated authority for every present capability, while ADR-0075 permits recovery-proved local/restorable mutation without another approval. [measured: ADR-0075 decision; ADR-0078 decision] | **PROPOSED source amendment:** define one closed `controller_baseline.local_restorable.v1` grant for a single recovery-proved operation inside the committed workspace/authority envelope. Scope widening and every V0-18 class still require exact first-party authority. A02/A04 remain blocked until the principal accepts it. [asserted] | `A02`, `A04` |
+| S-06 | The older ADR-0078/action-surface sequence placed the autonomous decision after a receipt; ADR-0079 expressly supersedes that order. [measured] | ADR-0079 governs: decision or protected proposal/authority -> durable intent -> single-use reach -> non-forking receipt -> outcome. The source clauses now carry that supersession; no future result is copied backwards. [cited: ADR-0079] | `A01`, `P01`, `A04` |
+| S-07 | ADR-0075's closed six-class rule appeared to conflict with ADR-0076's owner approval for every active-harness byte. [measured] | **PROPOSED source clarification:** map active-harness activation to the existing `principal_authority: approval` subtype, not a seventh escalation class. S04 remains blocked until the principal accepts the ADR-0076 cross-reference. [cited: ADR-0075] [asserted] | `S04` |
+| S-08 | EXP-104 and EXP-105 both have live `BLOCKED` register headings; the prior plan incorrectly called them absent. EXP-109 remains the ADR-0081 killing test. [measured: exact-heading register search, 2026-08-23] | Preserve their actual blocker lists and do not activate affected branches until their registered protocols report an admitting result. Do not alias them to another experiment. [asserted] | `Q01` research arm; `S01` activation path |
 | S-09 | The memory specification fixes fields but not canonical event kinds or capture API; verdict supply likewise leaves queue fields partly open. [measured] | The owning schema units freeze names once in `events.py`: `record.captured`, `capability.versioned`, `model.change`, `review.queue.opened`, `candidate.exposed`, `attempt.reviewed`. Later units consume those contracts and do not invent aliases. [asserted] | `M01`, `M04`, `M06`, `Q01` |
 | S-10 | ADR-0081 needs channel, anchor and complete derivation-root metadata beyond the current `verification.outcome` contract. [measured: ADR-0077 enforcement; ADR-0081 decision] | Extend the existing source-kind events; do not create a second evidence table or consilience event. Missing metadata remains `unmeasured`. [asserted] | `G01` |
-| S-11 | Class-W documents require falsifier and review-by date, but the living-documentation specification and several peer specifications lack the date. [measured: living-documentation lines 73-83 and its header] | Build the inventory/checker first, migrate admitted files in bounded batches, and enable CI only when the inventory is green. No silent grandfathering. [asserted] | `L04`, `L06` |
-| S-12 | Chat defines records but not the executable first-party compiler host; `dispatch.py` explicitly receives sealed work and does not parse chat. [measured: chat-conversation reuse table] | Use the existing local `transport.py`/`scripts/ingest_transport.py` boundary for unprotected intake; protected answers remain proposals until the shared trusted ingress exists. `dispatch.py` still receives only sealed work. [asserted] | `C04` |
+| S-11 | Class-W documents require falsifier and review-by date, but only one of the 21 specifications has a review date and none declares `Document class: W`. [measured: exact specification scan, 2026-08-23] | Build the inventory/checker first, migrate all 21 files through L04/L05, and enable CI only when the exact inventory is green. No product unit treats an unadmitted specification as a build input. [asserted] | `L04`, `L05`, `L06` |
+| S-12 | Chat defines records but not the executable first-party compiler host; ADR-0070 and one-surface authorise no construction or default product activation before separate principal decisions and the matched trial. [measured: chat-conversation reuse table; ADR-0070; one-surface] | After explicit construction authority, C04 may construct only an inactive experiment path at the existing transport boundary. Product activation is absent from the plan and requires the matched trial plus principal acceptance of ADR-0070 or a superseding decision. `dispatch.py` still receives only sealed work. [asserted] | `C04` |
 
 ## Dependency graph
 
@@ -80,11 +81,11 @@ F01 durable append -> F02 atomic transition -> F03 stable event identity
 F03 -> V01 estimand/quarantine -> Q01 frozen review queue -> Q02 local card
 F03 -> S01 promoter policy -> S02 sealed evaluator/card
 
-L01 ADR index -> L02 generated manifest -> L04 lints/migration -> L06 CI activation
+L01 ADR index -> L02 generated manifest -> L04 first tranche -> L05 exact 21-file tranche -> L06 CI activation
 L03 trail ratchet ----------------------------------------------^
 
 H01 trusted ingress -> authenticated consent, grants, verdicts and protected actions
-H01 + A07 + registered EXP-104 -> S03 commit binding -> S04 activation -> S05 rollback/drift
+H01 + A07 + confirmed EXP-104 -> S03 commit binding -> S04 activation -> S05 rollback/drift
 
 G02 + task/capability substrate -> G03 bounded missing-anchor acquisition
 EXP-106 decides hard decision-gate activation; EXP-109 decides hard consilience-gate activation.
@@ -94,13 +95,15 @@ Edges mean “must be accepted and committed before”, not merely “should be 
 
 ## Is trusted human ingress on the critical path?
 
-**No for useful ordinary local product value.** Durable events, native work items, one-candidate machine closure, truthful task/delivery views, bounded recall receipts, explicit/manual capability reuse, decision/consilience reporting, local recovery proofs and refusal-only effect admission do not need the principal to authenticate anything. [asserted]
+**No for useful ordinary local product value.** Durable events, native work-item preparation, truthful blocked/refusal task and delivery views, bounded recall receipts, explicit/manual capability reuse, decision/consilience reporting, local recovery proofs and refusal-only effect admission do not need the principal to authenticate anything. Automatic verifier exposure and machine closure do require a measured ADR-0077 ceiling or a separately principal-authorised replacement protocol. [cited: ADR-0077] [asserted]
 
 **Yes for five narrow outcomes:** authenticated consent/grants, authenticated human-verdict beta, protected V0-18 effects without existing standing authority, persistent self-change activation, and a phone/WebAuthn write surface. [asserted] A person is also required when the unresolved input is genuinely their preference or authority; they are not an epistemic tie-breaker. [cited: ADR-0075, ADR-0081]
 
 The nearer blocker for live autonomous child-harness actuation is host containment, not human ingress: current child processes can retain ambient filesystem/network/credential/provider reach outside a typed manifest. [measured: action-surface current-state audit; ADR-0079 context] Until `A07` proves real containment, action work stays fake-sink, local-draft or refusal-only. [asserted]
 
 ## Recommended build order
+
+**Launch precondition:** land L01, L02, L04 and L05 first. This is corpus admission, not optional late hygiene; the product order below starts only after all 21 specifications pass the Class-W contract. [asserted]
 
 1. **Make the record truthful and durable (`F01-F03`).** Every later promise depends on pre-action and closure records surviving concurrency/crash; building above the current writer would multiply races. [measured] [asserted]
 2. **Ship the native task/commitment spine (`C01`, `O01`, `T01-T04`, `C03`).** It turns work into checkable state and produces the earliest substantial surface without a human dependency. [asserted]
@@ -109,7 +112,7 @@ The nearer blocker for live autonomous child-harness actuation is host containme
 5. **Add evidence, decision and consilience reporting (`E01`, `V01`, `P01-P02`, `G01-G03`) without hard activation.** The Owner can obtain and expose different anchors before any provisional gate is trusted. [asserted]
 6. **Build effect containment and fake-sink admission (`A01-A07`).** Live reach follows only after the universal bypass/host test passes and the relevant experiment authorises activation. [asserted]
 7. **Build the shared human ingress and dormant self-improvement path last (`H01-H02`, `S01-S05`).** These are high-risk and do not unlock the ordinary product spine. [asserted]
-8. **Run global documentation activation only after bounded migration (`L01-L06`).** Its generator/index units may run earlier in parallel, but a failing global lint is not useful product state. [asserted]
+8. **Activate global documentation CI only after bounded migration (`L06`).** L01/L02/L04/L05 are already required by the launch precondition; a failing global lint is not useful product state. [asserted]
 
 Ingress-first loses because it makes the principal the boot dependency and still does not contain same-OS child capabilities. UI-first loses because it projects claims the kernel cannot yet prove. Action/self-improvement-first loses because both are intentionally dormant behind missing evidence. Dispatching all specifications at once loses because `events.py`, `projection.py`, `work_items.py` and `scripts/dispatch.py` are shared serial surfaces. [asserted]
 
@@ -126,6 +129,7 @@ The stream plans give exact paths per unit. The following lanes are globally ser
 | `scripts/dispatch.py` | `T02 -> M05 -> D02 -> A03 -> A04 -> G03 -> A07 -> S04` [asserted] |
 | `src/consilient/dashboard.py` | `T04 -> V01/Q02 -> A08 -> S02 -> D04` [asserted] |
 | `scripts/promote_loop.py` | `S02 -> S04 -> S05` [asserted] |
+| `src/consilient/harness.py` | `F04 -> F05` [asserted] |
 
 Safe early parallel work after `F03` is: task schema preparation on `work_items.py`, routing arithmetic on `routing.py`, object-store helper work on `records.py`, promoter policy on `promote.py`, and ADR-index generation under `scripts/build_decision_index.py`. [asserted] Workers still claim their full named path sets before starting. [asserted]
 
@@ -143,7 +147,7 @@ Safe early parallel work after `F03` is: task schema preparation on `work_items.
 - **Defer:** automatic capability reuse and semantic/vector/graph retrieval until EXP-101; explicit/manual active-head selection remains. [cited: ADR-0074]
 - **Defer:** hard decision-gate activation until EXP-106 and hard consilience-gate activation until EXP-109. Build only schema, reporting, acquisition and fake-sink refusal first. [cited: ADR-0079, ADR-0081]
 - **Defer:** protected sends, publication, spend, credentials and widened grants until shared trusted ingress and host containment pass. [asserted]
-- **Defer:** active self-promotion until EXP-104 is registered and confirms, promoter beta has its denominator, the instrument is sealed, ingress is trusted and rollback is proved. [cited: ADR-0076]
+- **Defer:** active self-promotion until registered EXP-104 clears its live `BLOCKED` prerequisites and reports an admitting result, promoter beta has its denominator, the instrument is sealed, ingress is trusted and rollback is proved. [cited: ADR-0076; EXP-104]
 - **Defer:** Tier-1 consequence labels as operational beta and any proxy as a routing input. They remain typed research/preparation signals. [cited: ADR-0080]
 - **Defer:** external GitHub Projects/Linear/ClickUp projection until explicit exposure authority and a synthetic/private-safe pilot. [cited: ADR-0072]
 - **Cut:** native Kanban, sprint/meeting machinery, generic workflow editor, notification centre, vector database, second memory service, second router, second orchestrator and seventh CLI command. The incumbents already provide the generic surfaces and none is required for the authoritative kernel. [cited: task-management; ADR-0072]
@@ -151,10 +155,13 @@ Safe early parallel work after `F03` is: task schema preparation on `work_items.
 
 ## Plan files
 
+- `2026-08-22-build-plan.md` — master census, rulings, launch gate and cross-stream order. [asserted]
 - `2026-08-22-foundation-task-delivery-plan.md` — `F`, `C`, `T` and `D` units. [asserted]
 - `2026-08-22-memory-documentation-plan.md` — `M` and `L` units. [asserted]
 - `2026-08-22-evidence-decision-action-plan.md` — `E`, `R`, `V`, `Q`, `P`, `G` and `A` units. [asserted]
 - `2026-08-22-human-self-improvement-plan.md` — `H` and `S` units, mostly dormant or deferred. [asserted]
+- `2026-08-22-portability-expertise-plan.md` — `PC`, `EX` and `ML` units. [asserted]
+- `2026-08-22-squads-observability-plan.md` — squad, observability and steering units. [asserted]
 
 ## Whole-program completion check
 

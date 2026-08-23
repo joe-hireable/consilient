@@ -164,8 +164,8 @@ to every ADR and every PR:
 - **0085** — PROVISIONAL pending EXP-111.
 - **0086** — PROVISIONAL pending EXP-126, which confirms or kills specialist assignment for its frozen
   expertise only; no universal activation follows.
-- **0087** — PROPOSED. **EXP-128 is deliberately unwritten**, and the ADR-0077 fusion owner its brief
-  assumed is absent from the tracked tree.
+- **0087** — PROPOSED. **EXP-128 is deliberately unwritten**; ADR-0077 is present and PROVISIONAL and
+  remains the live fusion/exposure owner.
 - **0089** — PROPOSED. The retirement behaviour is unmeasured and **EXP-129 is specified in the
   companion document but deliberately unwritten in the register.**
 - **0091** — PROVISIONAL pending EXP-131, which can delete the D3 coverage check; the

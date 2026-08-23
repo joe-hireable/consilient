@@ -177,6 +177,10 @@ The staged index and resolved installation manifest, not agent judgement, produc
 - `candidate_only` and `sensing_only` are autonomous while isolated and within existing authority;
   [asserted]
 - every `active_harness` byte requires exact principal approval before activation; [asserted]
+  **PROPOSED alignment clarification (2026-08-23; principal acceptance required):** this maps to
+  ADR-0075's existing top-level `principal_authority` class and V0-18 subtype `approval`; it is not a
+  seventh escalation class. The approval remains bound to the exact candidate bytes/tree and cannot
+  be agent-authored. [cited: ADR-0075] [asserted]
 - `instrument` is refused by ordinary promotion and requires principal approval plus a separate
   bridge/recertification experiment; [asserted]
 - `exact_rollback` to a previously owner-approved digest is autonomous after a registered trigger

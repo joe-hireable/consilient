@@ -204,7 +204,7 @@ python -m pytest tests/test_effect_contract.py -q
 
 **Why:** Technical availability is not authority, and neither a gate pass nor caller-supplied `actor: principal` may expose a live handle. [cited: action-surface section 4; ADR-0078]
 
-**Depends on:** `A01`. [asserted]
+**Depends on:** `A01` and principal acceptance of the PROPOSED S-05 source amendment to ADR-0078. This unit is non-dispatchable while that amendment remains proposed. [asserted]
 
 **Claim exactly:** [asserted]
 
@@ -435,7 +435,7 @@ python -m pytest tests/test_recovery_proof.py -q
 
 **Why:** Separate validation, append and handle issuance allow two callers or a crash window to reach the effect with missing or duplicated evidence. [cited: ADR-0079 section Enforcement]
 
-**Depends on:** `A03`, `P01`, `P02`, foundation `F02/F03`. [asserted]
+**Depends on:** `A03`, `P01`, `P02`, foundation `F02/F03`, and principal acceptance of the PROPOSED S-05 source amendment to ADR-0078. [asserted]
 
 **Claim exactly:** [asserted]
 
@@ -734,7 +734,7 @@ Action-first loses because the writer, evidence identity and containment are not
 - Live process, filesystem, network, message, publication, spend, credential, provider and physical actuation are deferred beyond this plan even if `A07` passes; activation also needs the applicable gate, beta, budget, law and exact authority conditions. [cited: ADR-0078; ADR-0081]
 - Authenticated phone/WebAuthn verdict writes, enrolment/recovery, HTTPS origin and an approved verifier dependency or OS broker are deferred to the trusted-human-ingress stream. `Q02` remains local/read-only. [cited: verdict-supply lines 231-283]
 - Tier-1 consequence labels and every proxy estimand remain research/preparation evidence; neither may enter human beta, routing or candidate sizing. [cited: ADR-0080]
-- Tier-1 collector execution and EXP-105 are deferred: no exact EXP-105 heading exists in the experiment register at this plan's review, and authenticated queue/verdict prerequisites are absent. `Q01/Q02` build preparation only and do not alias another experiment number. [measured: exact experiment-register heading search, 2026-08-22] [asserted]
+- Tier-1 collector execution and EXP-105 are deferred: EXP-105 is registered but `BLOCKED` on authenticated principal cards, a fixed queue, a causal-proof analyser and complete terminal telemetry. `Q01/Q02` build preparation only and do not alias another experiment number. [measured: exact experiment-register heading search, 2026-08-23] [asserted]
 - EXP-80 squad-specific manifests, isolation, disagreement UI and likelihood-fusion machinery are deferred; one Owner with all ordinary tools remains the control. [cited: ADR-0067; ADR-0077]
 - An iid candidate-exposure exception, automatic routing and any change to `routing_orchestration_enabled` are deferred; `R01` remains the unwired robust ceiling. [cited: ADR-0077]
 - Another queue, coordinator, router, decision kind, evidence/fusion table, effect/provider-state store, principal path or CLI command is explicitly not built. [cited: ADR-0077 through ADR-0081]

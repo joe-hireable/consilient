@@ -354,7 +354,7 @@ python .github/scripts/check_adr_trail.py --self-test
 5. Migrate only the eight named files. Add the metadata block and a dated `22 August 2026` contract-adoption note; point to an existing falsifier section where possible and do not rewrite existing claim prose or upgrade evidence tags. [asserted]
 6. Run the checker over exactly this tranche and inspect the diff for accidental content edits, duplicated falsifiers, private locators and principal wording attributed without a source. [asserted]
 
-**Done:** All eight named specifications pass; every missing/expired field, literal restatement and unlocated principal quote fixture fails; no ninth specification is silently represented as admitted. [asserted]
+**Done:** All eight named specifications pass; every missing/expired field, literal restatement and unlocated principal quote fixture fails; no specification outside this first tranche is represented as admitted before L05. [asserted]
 
 ```powershell
 python -m pytest tests/test_living_documents.py -q
@@ -376,17 +376,21 @@ python .github/scripts/check_living_documents.py --check $specs
 
 ## L05 — complete current Class-W specification tranche
 
-**Deliverable:** The remaining nine specifications join an exact seventeen-file Class-W inventory, leaving no current specification silently unclassified. [asserted]
+**Deliverable:** The remaining thirteen specifications join an exact twenty-one-file Class-W inventory, leaving no current specification silently unclassified. [asserted]
 
 **Depends on:** L04. [asserted]
 
 **Claim exactly:**
 
 - `tests/test_living_document_inventory.py` (new)
+- `docs/superpowers/specs/2026-08-22-answer-quality.md`
+- `docs/superpowers/specs/2026-08-22-autonomous-qa.md`
+- `docs/superpowers/specs/2026-08-22-dependency-scheduling.md`
 - `docs/superpowers/specs/2026-08-22-living-documentation.md`
 - `docs/superpowers/specs/2026-08-22-memory-and-capability.md`
 - `docs/superpowers/specs/2026-08-22-model-lifecycle.md`
 - `docs/superpowers/specs/2026-08-22-observability-and-steering.md`
+- `docs/superpowers/specs/2026-08-22-one-surface.md`
 - `docs/superpowers/specs/2026-08-22-portable-capability.md`
 - `docs/superpowers/specs/2026-08-22-self-improvement.md`
 - `docs/superpowers/specs/2026-08-22-squad-roles.md`
@@ -395,20 +399,20 @@ python .github/scripts/check_living_documents.py --check $specs
 
 **Steps:**
 
-1. Add an inventory test whose expected set is the exact seventeen specification paths from L04 and L05; a missing file, unlisted new file, duplicate/case alias or non-W class fails. [asserted]
-2. Add the Class-W metadata block and dated `22 August 2026` contract-adoption note to only the nine claimed specifications. Point at an existing falsifier where present; otherwise add one honest falsifier without upgrading evidence. [asserted]
+1. Add an inventory test whose expected set is the exact twenty-one specification paths from L04 and L05; a missing file, unlisted new file, duplicate/case alias or non-W class fails. [asserted]
+2. Add the Class-W metadata block and dated `22 August 2026` contract-adoption note to only the thirteen claimed specifications. Point at an existing falsifier where present; otherwise add one honest falsifier without upgrading evidence. [asserted]
 3. Give every claimed specification `Review by: 2026-09-22` unless it already names an earlier review date; preserve the earlier date rather than extending it. [asserted]
 4. Repair checker findings with pointers and source locators. Do not copy generated prose, weaken the checker, add a file-specific exception or silently alter the underlying design judgement. [asserted]
-5. Run the L04 checker across all seventeen paths and verify the inventory failure by temporarily adding an unlisted fixture under a temporary copied specs root, not the working tree. [asserted]
-6. Inspect the exact nine-document diff for the five newly landed specifications — `expertise-acquisition`, `model-lifecycle`, `observability-and-steering`, `portable-capability` and `squad-roles` — and prove each now has the same review-by contract. [measured] [asserted]
+5. Run the L04 checker across all twenty-one paths and verify the inventory failure by temporarily adding an unlisted fixture under a temporary copied specs root, not the working tree. [asserted]
+6. Inspect the exact thirteen-document diff for the nine specifications landed after the original twelve — `answer-quality`, `autonomous-qa`, `dependency-scheduling`, `expertise-acquisition`, `model-lifecycle`, `observability-and-steering`, `one-surface`, `portable-capability` and `squad-roles` — and prove every claimed specification now has the same review-by contract. [measured] [asserted]
 
-**Done:** The glob and explicit inventory are identical at seventeen files, all seventeen pass Class-W checks, and any eighteenth specification fails until deliberately classified. [asserted]
+**Done:** The glob and explicit inventory are identical at twenty-one files, all twenty-one pass Class-W checks, and any twenty-second specification fails until deliberately classified. [asserted]
 
 ```powershell
 python -m pytest tests/test_living_document_inventory.py tests/test_living_documents.py -q
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $specs = Get-ChildItem 'docs/superpowers/specs/2026-08-22-*.md' | Sort-Object FullName | ForEach-Object { $_.FullName }
-if ($specs.Count -ne 17) { Write-Error "Expected exactly 17 admitted specifications, found $($specs.Count)"; exit 1 }
+if ($specs.Count -ne 21) { Write-Error "Expected exactly 21 admitted specifications, found $($specs.Count)"; exit 1 }
 python .github/scripts/check_living_documents.py --check $specs
 ```
 
@@ -461,17 +465,17 @@ python .github/scripts/check_living_documents.py --check $specs
 ## Explicit deferrals
 
 - Semantic/vector/graph retrieval, a vector or graph database, learned ranking, automatic capability recommendation/reuse and duplicate auto-promotion remain deferred until EXP-101 supplies the frozen evaluation bank and activates the relevant threshold. [cited: ADR-0074]
-- Actual fitting, promotion, auto-revert, active-harness mutation and private-derived weight distribution remain outside M06. EXP-104 and EXP-105 must exist in the authorised research register before affected self-improvement branches can activate; this plan does not alias them to another experiment. [measured: build-plan ruling S-08] [asserted]
+- Actual fitting, promotion, auto-revert, active-harness mutation and private-derived weight distribution remain outside M06. EXP-104 and EXP-105 are registered but `BLOCKED`; affected branches remain inactive until their live blockers clear and their stopping rules permit activation. This plan does not alias them to another experiment. [measured: build-plan ruling S-08] [asserted]
 - No second scheduler, router, role system, orchestrator, state service, product CLI command, network client or third-party dependency is added. [asserted]
-- L04-L06 admit only the seventeen current `docs/superpowers/specs/2026-08-22-*.md` files. Repository-wide conversion of every historical document to G/W/S, automatic paraphrase-drift detection and the different-class semantic re-derivation required by EXP-99 remain explicit future work. [asserted]
+- L04-L06 admit only the twenty-one current `docs/superpowers/specs/2026-08-22-*.md` files. Repository-wide conversion of every historical document to G/W/S, automatic paraphrase-drift detection and the different-class semantic re-derivation required by EXP-99 remain explicit future work. [asserted]
 - Weekly CI surfaces an overdue adversarial review; it does not pretend a mechanical lint performed that review. External citation reachability that cannot be checked reliably without network access is reported `unknown`, not healthy. [asserted]
 
 ## Contradictions resolved for execution
 
 - ADR-0074 permits a manual P0 capability path while blocking automatic reuse on EXP-101. M04 therefore selects only an explicit request; the existence of an active head is insufficient to inject it. [cited: ADR-0074]
-- ADR-0075 permits recovery-proved local/restorable autonomy while ADR-0078 requires authenticated authority for present capabilities. Existing baseline authority covers only the bounded local envelope; missing or widened authority is a refusal, not inferred consent. [cited: ADR-0075, ADR-0078]
-- The action-surface draft places some autonomy reasoning after a receipt, while ADR-0079 makes the pre-action order authoritative. These units use decision/protected authority, then durable intent, then reach, then non-forking receipt/outcome; no future result is copied backwards. [cited: ADR-0079]
-- The living-documentation decision abolishes maintained prose, but the current specifications lack a complete review-by contract. L04 and L05 make that debt an exact, bounded migration instead of grandfathering it; L06 activates enforcement only when all seventeen are green. [measured] [asserted]
+- ADR-0075 permits recovery-proved local/restorable autonomy while ADR-0078 requires authenticated authority for present capabilities. The explicit controller-baseline grant is PROPOSED; A02/A04 remain blocked until the principal accepts it, and missing or widened authority remains a refusal. [cited: ADR-0075, ADR-0078] [asserted]
+- The action-surface source now carries ADR-0079's supersession: these units use decision/protected authority, then durable intent, reach, non-forking receipt and outcome; no future result is copied backwards. [cited: ADR-0079]
+- The living-documentation decision abolishes maintained prose, but the current specifications lack a complete review-by contract. L04 and L05 make that debt an exact, bounded migration instead of grandfathering it; L06 activates enforcement only when all twenty-one are green. [measured] [asserted]
 - A generated check can detect byte drift and literal restatement but cannot establish that a paraphrase remains true. CI therefore reports only its mechanical scope, and EXP-99's different-class audit stays separately required. [cited: ADR-0073]
 
 ## Whole-stream completion
@@ -495,4 +499,4 @@ $specs = Get-ChildItem 'docs/superpowers/specs/2026-08-22-*.md' | Sort-Object Fu
 python .github/scripts/check_living_documents.py --check $specs
 ```
 
-Acceptance is zero failures, zero generated drift, an exact seventeen-specification inventory, no hidden adverse outcome, and no activation of automatic reuse, training, live effects or a closed gate. [asserted]
+Acceptance is zero failures, zero generated drift, an exact twenty-one-specification inventory, no hidden adverse outcome, and no activation of automatic reuse, training, live effects or a closed gate. [asserted]

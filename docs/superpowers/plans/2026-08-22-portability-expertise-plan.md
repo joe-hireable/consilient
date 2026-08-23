@@ -19,39 +19,38 @@
 - Rulesync, Agent Skills and MCP are the incumbent baseline. Do not build a general format compiler; a version-pinned Rulesync adoption decision under ADR-0065 precedes any equivalent multi-format code. [cited: ADR-0084]
 - The first portable floor is credential-free Agent Skills plus one bounded recall pack. Tools/MCP/hooks bind only where the installed native surface preserves their exact semantics; required loss refuses. [cited: ADR-0084]
 - Automatic capability reuse remains inert until EXP-101. Manual selection and fake/inert conformance may ship first. [cited: ADR-0074]
-- EXP-110 and EXP-126 are claimed as preregistered by ADR-0084/0086 but have no register headings in the live tree. PC00/EX00 are authority prerequisites; no implementation or result may precede them. [measured: exact heading search, 2026-08-22]
-- `docs/10-research/` changes require explicit principal authorisation. PC00, EX00 and their experiment runners are non-dispatchable until that authority is recorded. [measured: `AGENTS.md`] [asserted]
+- EXP-110 and EXP-126 each have one live register heading and are `BLOCKED` on the prerequisites named there. PC00/EX00 verify those prerequisites read-only; no result may precede them. [measured: exact heading search, 2026-08-23]
+- `docs/10-research/` changes still require explicit principal authorisation. PC00/EX00 are read-only and dispatchable; experiment-runner units that would edit the research base remain non-dispatchable until that authority is recorded. [measured: `AGENTS.md`] [asserted]
 - Credentialed binding stays fake-canary only until H02 supplies exact authority and A07 proves host containment. No real secret enters this repository or a child harness. [asserted]
-- ADR-0085 and the model-lifecycle specification landed during planning, but EXP-111 still has no register heading. ML01-ML06 may build discovery, quarantine, projection and offline qualification; training/activation remain blocked on ML00, exact consent, a selected local trainer boundary, sealed isolation and principal approval. [measured] [asserted]
+- EXP-111 has one live register heading and is `BLOCKED` on fail-closed lifecycle projection, trusted consent/approval ingress, a sealed bank and instrument, an isolated runner, complete outcome/cost telemetry and blinded verdicts. ML01-ML06 may build discovery, quarantine, projection and offline qualification; training/activation remain blocked on ML00 and those live prerequisites. [measured] [asserted]
 
-## PC00 — authorised EXP-110 preregistration
+## PC00 — verify live EXP-110 preregistration
 
-**Deliverable:** One prospectively frozen EXP-110 heading records the credential-free Claude/Codex composite-package protocol before any adapter outcome is inspected. [asserted]
+**Deliverable:** Read-only verification that exactly one EXP-110 heading exists, is referenced by ADR-0084 and remains `BLOCKED` on portable adapters, a proved outer boundary, a frozen conformance package and independent fixtures. [measured]
 
-**Depends on:** explicit principal authorisation to modify the research base. [measured: `AGENTS.md`]
+**Depends on:** none. This unit does not modify `docs/10-research/`. [asserted]
 
-**Why:** ADR-0084 incorrectly claims the experiment is already preregistered; implementation otherwise has no valid activation test. [measured] [cited: ADR-0084]
+**Why:** The heading now exists; the launch gate must consume its live blocker state rather than recreate it. [measured] [cited: ADR-0084]
 
-**Claim exactly:**
-
-- `docs/10-research/experiment-register.md`
-- `tests/test_v0_invariants.py`
+**Claim exactly:** none (read-only). [asserted]
 
 **Steps:**
 
-1. Reconcile the reserved id and existing outcomes before editing; refuse if any EXP-110 result already exists. [asserted]
-2. Freeze package bytes/digests, harness/adapter versions, native/portable/absent arms, task bank, repetitions, semantic/effect oracles, secret canary, missingness, stopping rule and no-activation boundary. [cited: ADR-0084]
-3. Add the exact-heading/reference invariant without weakening older provisional-ADR checks. [asserted]
+1. Verify exactly one EXP-110 heading and its ADR-0084 reference. [measured]
+2. Compare the heading's exact blocker text with this gate. [measured]
+3. Run the existing provisional-ADR live-experiment invariant without editing it. [asserted]
 
-**Done:** The heading is unique, predates every result, is referenced by ADR-0084, and the provisional-ADR invariant passes. [asserted]
+**Done:** The unique blocked heading and ADR reference are present and the invariant passes. [measured]
 
 ```powershell
-rg -n "^### EXP-110\b" docs/10-research/experiment-register.md
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$heading = @(rg -n '^### EXP-110\b.*`BLOCKED: portable adapters, proved outer boundary, frozen conformance package and independent fixtures`$' docs/10-research/experiment-register.md)
+if ($heading.Count -ne 1) { throw "Expected one blocked EXP-110 heading" }
+$adr = @(rg -n '\bEXP-110\b' docs/decisions/0084-compile-portable-capabilities-per-harness-and-refuse-semantic-loss.md)
+if ($adr.Count -eq 0) { throw "ADR-0084 does not reference EXP-110" }
 python -m pytest tests/test_v0_invariants.py::test_provisional_adrs_name_a_live_experiment -q
 ```
 
-**Commit:** `docs(research): preregister EXP-110 portability test`. [asserted]
+**Commit:** none; read-only verification. [asserted]
 
 ## PC01 — canonical portable-manifest extension
 
@@ -338,33 +337,33 @@ python docs/10-research/experiments/exp110/run_exp110.py --fixture --out .harnes
 
 **Commit:** `research: add offline EXP-110 runner`. [asserted]
 
-## EX00 — authorised EXP-126 preregistration
+## EX00 — verify live EXP-126 preregistration
 
-**Deliverable:** One prospectively frozen EXP-126 heading defines the bundle-versus-unchanged-generalist comparison before acquisition work or hidden outcomes exist. [asserted]
+**Deliverable:** Read-only verification that exactly one EXP-126 heading exists, is referenced by ADR-0086 and remains `BLOCKED` on authenticated acquisition authority, a frozen bundle manifest, a one-use sealed bank, an isolated runner and blinded domain verdicts. [measured]
 
-**Depends on:** explicit principal authorisation to modify the research base. Serial after PC00 on the register path. [measured] [asserted]
+**Depends on:** PC00, for verification ordering only. This unit does not modify `docs/10-research/`. [asserted]
 
-**Why:** ADR-0086 claims a registration absent from the live register. [measured] [cited: ADR-0086]
+**Why:** The heading now exists; the launch gate must consume its live blocker state rather than recreate it. [measured] [cited: ADR-0086]
 
-**Claim exactly:**
-
-- `docs/10-research/experiment-register.md`
-- `tests/test_v0_invariants.py`
+**Claim exactly:** none (read-only). [asserted]
 
 **Steps:**
 
-1. Reconcile the id and refuse if acquisition outcome data already exists. [asserted]
-2. Freeze the 80-task paired strata, unchanged comparator, allowed tools/budget, hidden split/overlap rule, human/oracle results, harmful retrieval, critical errors, missingness, quarantine and stopping rule. [cited: ADR-0086]
-3. Add exact-heading/reference integrity and explicitly exclude tuning, automatic library selection, squad size, device control and gates. [asserted]
+1. Verify exactly one EXP-126 heading and its ADR-0086 reference. [measured]
+2. Compare the heading's exact blocker text with this gate. [measured]
+3. Run the existing provisional-ADR live-experiment invariant without editing it. [asserted]
 
-**Done:** One EXP-126 heading predates every candidate/outcome and the provisional-ADR invariant passes. [asserted]
+**Done:** The unique blocked heading and ADR reference are present and the invariant passes. [measured]
 
 ```powershell
-rg -n "^### EXP-126\b" docs/10-research/experiment-register.md
+$heading = @(rg -n '^### EXP-126\b.*`BLOCKED: authenticated acquisition authority, frozen bundle manifest, one-use sealed bank, isolated runner and blinded domain verdicts`$' docs/10-research/experiment-register.md)
+if ($heading.Count -ne 1) { throw "Expected one blocked EXP-126 heading" }
+$adr = @(rg -n '\bEXP-126\b' docs/decisions/0086-acquire-expertise-as-a-proven-capability-bundle-and-tune-only-after-retrieval-loses.md)
+if ($adr.Count -eq 0) { throw "ADR-0086 does not reference EXP-126" }
 python -m pytest tests/test_v0_invariants.py::test_provisional_adrs_name_a_live_experiment -q
 ```
 
-**Commit:** `docs(research): preregister EXP-126 expertise test`. [asserted]
+**Commit:** none; read-only verification. [asserted]
 
 ## EX01 — deterministic inferred-expertise proposal
 
@@ -570,35 +569,36 @@ python docs/10-research/experiments/exp126/run_exp126.py --fixture --out .harnes
 
 **Commit:** `research: add offline EXP-126 runner`. [asserted]
 
-## ML00 — authorised EXP-111 preregistration
+## ML00 — verify live EXP-111 preregistration
 
-**Deliverable:** One prospectively frozen EXP-111 heading defines the unmodified-release and consented-local-adapter contrasts before any candidate qualification or training outcome is inspected. [asserted]
+**Deliverable:** Read-only verification that exactly one EXP-111 heading exists, is referenced by ADR-0085 and remains `BLOCKED` on fail-closed lifecycle projection, trusted consent/approval ingress, a sealed bank and instrument, an isolated runner, complete outcome/cost telemetry and blinded verdicts. [measured]
 
-**Depends on:** explicit principal authorisation to modify the research base. Serial after PC00/EX00 on the register path. [measured] [asserted]
+**Depends on:** PC00 and EX00, for verification ordering only. This unit does not modify `docs/10-research/`. [asserted]
 
-**Why:** ADR-0085 and the model-lifecycle specification claim a full preregistration that is absent from the live register. [measured] [cited: ADR-0085]
+**Why:** The heading now exists; the launch gate must consume its live blocker state rather than recreate it. [measured] [cited: ADR-0085]
 
-**Claim exactly:**
-
-- `docs/10-research/experiment-register.md`
-- `tests/test_v0_invariants.py`
+**Claim exactly:** none (read-only). [asserted]
 
 **Steps:**
 
-1. Reconcile the reserved id and refuse if any candidate selection, bank reveal or EXP-111 outcome already exists. [asserted]
-2. Freeze the 80-task bank, strata, exact candidate/comparator revisions, isolated arms, outcome/safety/cost vector, human review, consent, missingness, stopping rule, deadline/no-eligible result and no-activation boundary. [cited: ADR-0085]
-3. Correct the specification's stale logarithmic exposure statement in the authorised research/spec audit path; EXP-111 uses R01's dependence-robust candidate ceiling and cannot change it. [cited: ADR-0077]
-4. Add exact-heading/reference integrity without weakening any existing provisional-ADR check. [asserted]
+1. Verify exactly one EXP-111 heading and its ADR-0085 reference. [measured]
+2. Compare the heading's exact blocker text with this gate. [measured]
+3. Verify the model-lifecycle specification uses ADR-0077's dependence-robust candidate ceiling; a stale logarithmic statement blocks later ML units and is corrected only in a specification amendment, never by changing this heading. [cited: ADR-0077]
+4. Run the existing provisional-ADR live-experiment invariant without editing it. [asserted]
 
-**Done:** One heading predates every result, both contrasts retain adverse/missing rows, and the provisional-ADR invariant passes. [asserted]
+**Done:** The unique blocked heading and ADR reference are present, the exposure contract is consistent, and the invariant passes. [measured] [asserted]
 
 ```powershell
-rg -n "^### EXP-111\b" docs/10-research/experiment-register.md
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$heading = @(rg -n '^### EXP-111\b.*`BLOCKED: fail-closed lifecycle projection, trusted consent/approval ingress, sealed bank and instrument, isolated runner, complete outcome/cost telemetry and blinded verdicts`$' docs/10-research/experiment-register.md)
+if ($heading.Count -ne 1) { throw "Expected one blocked EXP-111 heading" }
+$adr = @(rg -n '\bEXP-111\b' docs/decisions/0085-qualify-model-revisions-before-routing-and-seal-fine-tune-evaluation.md)
+if ($adr.Count -eq 0) { throw "ADR-0085 does not reference EXP-111" }
+$robust = @(rg -n '^ceiling is `floor\(e / beta_upper\)`' docs/superpowers/specs/2026-08-22-model-lifecycle.md)
+if ($robust.Count -ne 1) { throw "Model lifecycle does not name the robust exposure ceiling exactly once" }
 python -m pytest tests/test_v0_invariants.py::test_provisional_adrs_name_a_live_experiment -q
 ```
 
-**Commit:** `docs(research): preregister EXP-111 model lifecycle test`. [asserted]
+**Commit:** none; read-only verification. [asserted]
 
 ## ML01 — automatic discovery into quarantine only
 
