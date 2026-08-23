@@ -161,11 +161,12 @@ EXP-139 is the registered killing experiment. [measured] It compares raw canonic
 find (A), record-derived list/filter/detail without node-link diagrams (B), and the identical
 projection with node-link diagrams (C). [asserted]
 
-If C fails the fixed correctness/time/no-false-endorsement thresholds against A, remove every claim
-that graph treatment improves causal explanation. [asserted] If B matches or beats C, make
-list/filter/detail the default and retain graphs only as secondary views; any accuracy loss or extra
-false endorsement kills the node-link default regardless of speed. [asserted] The experiment cannot
-remove the five principal-authorised graph views, alter a gate or establish general trust or beta.
+If C misses the absolute 24/30 overall, 8/10 per-stratum or zero-false-endorsement floors, or fails
+the fixed relative correctness/time thresholds against A, remove every claim that graph treatment
+improves causal explanation. [asserted] If C misses an absolute floor or B matches or beats C, make
+list/filter/detail the default and retain graphs only as secondary views; any accuracy loss or false
+endorsement kills the node-link default regardless of speed. [asserted] The experiment cannot remove
+the five principal-authorised graph views, alter a gate or establish general trust or beta.
 [asserted]
 
 ## Publication candidate?

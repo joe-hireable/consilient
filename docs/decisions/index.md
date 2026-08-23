@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `423de11c007dbf0d67c1887d592a101375cd660b2591ab6960fcb9ecb19f2dab`
+> **Source SHA-256:** `ffebfee2c0ec74a9d5f17845a1e29a98735a28fe0aeca6faccaa6e400f5e3fc4`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -101,3 +101,4 @@
 | [0094](0094-make-scientific-execution-a-pinned-evidence-producing-profile.md) | Make scientific execution a pinned evidence-producing profile, not a second laboratory platform | PROVISIONAL | — |
 | [0095](0095-project-orchestration-from-consumed-evidence-and-interrupt-on-decision-change.md) | Project orchestration from consumed evidence, isolate contributions, and interrupt on decision change | PROVISIONAL | — |
 | [0096](0096-render-record-derived-observability-graphs-without-generated-explanations.md) | Render record-derived observability graphs without generated explanations | PROVISIONAL | — |
+| [0097](0097-keep-automatic-triggered-recall-inert-until-it-beats-pull.md) | Keep automatic triggered recall inert until it beats deliberate pull | PROVISIONAL | — |

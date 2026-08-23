@@ -6354,10 +6354,12 @@ post-submission edit or cross-arm output is allowed. [asserted] Preserve the pre
 interaction log, raw answer, elapsed time, timeout state and blinded adjudication. [asserted]
 
 **Measures:** `exact_correct` is one only when a valid answer identifies all five keyed elements—
-decision, reason, falsifier, reversal and relevant anchors—or an invalid answer refuses and names the
-keyed missing/shared-root defect. [asserted] Fluent paraphrase without the keyed record content is
-incorrect. [asserted] `false_endorsement` is one when an invalid case receives a causal answer or a
-shared root is presented as independent evidence. [asserted]
+decision, reason, falsifier, reversal and relevant anchors—and makes no unsupported causal or
+independence assertion, or when an invalid answer refuses and names the keyed missing/shared-root
+defect without making such an assertion. [asserted] Fluent paraphrase without the keyed record
+content is incorrect. [asserted] `false_endorsement` is one for any response that asserts a causal
+link or evidence independence not supported by the keyed records, whether the case is valid or
+invalid. [asserted]
 
 `capped_time_s` is submission time for an exact-correct answer and 180 seconds for a wrong answer or
 timeout. [asserted] Report correctness and false endorsement separately, total capped time by arm,
@@ -6376,16 +6378,17 @@ report `insufficient_evidence`. [asserted] Any repair requires a new EXP id; do 
 assignment, cap, deadline, threshold, adjudicator contract or scoring after any analysis trial.
 [asserted]
 
-Confirm “graph treatment beats raw” only if C has at least 3 more exact-correct answers than A out of
-30, C's total capped time is at most 80% of A's, and C has no additional false endorsements.
-[asserted] The `3/30` and `80%` values are preference floors, not measured population effects.
-[asserted]
+Confirm “graph treatment beats raw” only if C has at least 24/30 exact-correct answers and at least
+8/10 in every node-count stratum, has at least 3 more exact-correct answers than A out of 30, has
+total capped time at most 80% of A's, and has zero false endorsements. [asserted] The `24/30`, `8/10`,
+`3/30` and `80%` values are preference floors, not measured population effects. [asserted]
 
-Keep node-link SVG as the default only if C is no less exact-correct than B, has no additional false
-endorsement, has total capped time at most 90% of B's and has no exact-correct loss in the `>50`-node
-stratum. [asserted] If B matches or beats C on those rules, list/filter/detail becomes the default and
-graphs remain secondary. [asserted] Any C accuracy loss or additional false endorsement kills the
-node-link default regardless of speed. [asserted]
+Keep node-link SVG as the default only if C meets the same `24/30`, per-stratum `8/10` and zero-false-
+endorsement absolute floors, is no less exact-correct than B, has total capped time at most 90% of B's
+and has no exact-correct loss in the `>50`-node stratum. [asserted] If C misses any absolute floor or B
+matches or beats C on the remaining rules, list/filter/detail becomes the default and graphs remain
+secondary. [asserted] Any C accuracy loss or false endorsement kills the node-link default regardless
+of speed. [asserted]
 
 Any other completed result is a loss for the corresponding benefit/default claim. [asserted] A
 safety stop, fewer than 90 adjudicated cells after a consent withdrawal, answer-key leakage or
@@ -6393,7 +6396,7 @@ defective instrumentation is `insufficient_evidence`, never confirmation. [asser
 the deadline or add participants after seeing results. [asserted]
 
 **Largest plausible effect (ADR-0050):** for either 30-response arm comparison, the bounded
-difference is ±30 exact-correct answers, ±5,400 capped seconds and ±15 false endorsements. [algebra]
+difference is ±30 exact-correct answers, ±5,400 capped seconds and ±30 false endorsements. [algebra]
 The result can change presentation and claim wording only; it cannot remove the authorised views,
 change a gate, establish beta or trust, authorise another candidate/role, delegate principal
 authority or generalise beyond the frozen bank and ten operators. [asserted]

@@ -329,7 +329,9 @@ EXP-139 is registered before implementation or outcome inspection. [measured] It
 list/filter/detail arm and list/filter/detail-plus-graph arm distinguish an improvement from record
 projection from an improvement caused by the node-link diagram itself. [asserted] Wrong and timed-out
 answers receive the fixed time cap and correctness is also reported separately, preventing a fast
-wrong answer from looking efficient. [asserted]
+wrong answer from looking efficient. [asserted] Neither relative comparison can pass unless the graph
+arm is at least 24/30 exact-correct and 8/10 in every size stratum, with zero unsupported causal or
+independence assertions across all cases. [asserted]
 
 The experiment may change the node-link default and every “improves explainability” claim. [asserted]
 It cannot remove the five required views, change a gate, establish trust or beta, or generalise beyond
@@ -340,9 +342,11 @@ the preregistered task and operators. [asserted]
 The strongest case against this design is that graph visualisation is decoration. [asserted]
 Node-link diagrams become hairballs, lists and filters answer operational questions more directly,
 and a hand-rolled SVG layout lacks the edge routing, zoom, clustering and accessibility maintenance
-of a mature graph library. [asserted] A 57-unit graph is already large enough for measured
-shortest-path difficulty in high-density node-link tasks, and every custom layout rule becomes code
-that can rot while adding no causal information to the record. [cited]
+of a mature graph library. [asserted] Yoghourdjian et al. found shortest-path difficulty above 50
+nodes in their tested density-6 condition. [cited] The historical fixture's density is 2.23, so the
+paper does not place it in that adverse condition. [algebra] Applicability to this graph and
+causal-answer task is unmeasured. [asserted] Every custom layout rule is nevertheless maintenance
+risk, while the SVG can add no causal fact absent from the authoritative projection. [asserted]
 
 That objection wins against a graph-first dashboard. [asserted] The accepted design concedes the
 full-canvas default: lists/filter/detail are authoritative, node-link views are focused projections,
