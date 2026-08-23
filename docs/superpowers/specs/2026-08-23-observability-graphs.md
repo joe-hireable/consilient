@@ -82,6 +82,9 @@ field or declared relation that created it. [asserted]
 | `work_items.py` | Recorded open/comment/complete lifecycle and explicit work-item identity. [measured] | Missing contribution, verifier, dissent, resolver or release fields remain `unknown`. [asserted] |
 | `dispatch.py` | Recorded dispatch identity, harness/family, outcome and artefact manifest where present. [measured] | Dispatch start is not authority, completion or proof that an artefact exists. [asserted] |
 | Capability records and `capabilities.py` | Declared capability identity and metadata supplied to a task. [measured] | The present flat capability list is not displayed as an applied holding or effect. [measured] |
+| `recall.py` | Bounded verbatim lookup around an explicitly selected event or source reference. [measured] | Recall text supplies detail, not a new causal or evidential edge. [asserted] |
+| `instructions.py` | Recorded assembly identity, exact source-prefix digest, selected skills and bounded recall inputs where present. [measured] | A shared prefix can expose common context only when an explicit run/decision reference joins it; otherwise the dependence is `unknown`. [asserted] |
+| `routing.py` and `budget.py` | Recorded beta ceiling, route or fresh resource observation where a trajectory event explicitly carries it. [asserted] | The dashboard never reruns route/spend admission, and the existence of unwired routing code is not route availability. [measured] |
 | `docs/superpowers/plans/*.md` | Unit identity, deliverable, declared `Depends on`, steps and done criteria parsed from the plan source. [measured] | A cache row without the matching plan-set digest is stale, not a second plan. [asserted] |
 | ADR-0079 decision protocol when emitted | Verbatim decision, reasoning, alternatives, falsifier, reversal and exact record references. [measured] | There are presently zero live `decision.autonomous` events, so current decision-chain panels must say so. [measured] |
 | ADR-0081 evidence protocol when emitted | Anchor identity, channel/class, derivation roots and exact event/digest references. [measured] | ADR-0081 is presently a specification, so absent independence fields are `unmeasured`, not “shared” or “independent”. [measured] |
@@ -94,6 +97,23 @@ declared work prerequisites. [asserted] Ordering-only edges are rendered separat
 claim/path exclusion or declared landing order and are excluded from semantic critical-path
 calculation. [asserted] An `UNJUSTIFIED` edge is a red data defect and refusal, not an ordinary
 schedule edge. [asserted]
+
+### Consilient constraints on the projection
+
+The view does not turn role count into evidence count. [asserted] A role earns a distinct evidential
+slot only when its recorded anchor adds a different class and disjoint derivation root; shared inputs
+remain echo regardless of model, persona or job title. [asserted]
+
+The dashboard displays the recorded squad and admission inputs but never recommends or changes squad
+size. [asserted] Candidate exposure remains bounded by
+`n_max = floor(ln(1-e) / ln(1-beta))`; at the last measured beta it gives one candidate for every
+exposure ceiling at or below 0.40. [algebra] At dispatch, human-labelled beta was unestimated, so the
+corresponding display is `UNKNOWN`, not a numeric relaxation, until a fresh record says otherwise.
+[measured]
+
+Verdicts, approvals, consent, gate lifts and spend remain principal-authored. [measured] The graph
+may display a provenance-verified principal record or an agent proposal, but never relabel the latter
+as the former; a caller-declared author string is not authentication. [asserted]
 
 ## The five views
 
@@ -246,12 +266,12 @@ an adjacent semantic table containing the same nodes and relationships. [asserte
 in detail panels rather than expanding every node. [asserted] Print and reduced-motion modes contain
 no animation. [asserted]
 
-The scale objection is real. Yoghourdjian et al.'s controlled shortest-path study found significant
-difficulty above 50 nodes for high-density diagrams and above 100 for low-density diagrams; those
-are task/layout-specific findings, not a universal cutoff. [cited] The current corpus has 57 units,
-so a full graph is already inside the paper's adverse high-density range. [measured] The design
-therefore makes filter/list/detail and focused subgraphs primary until EXP-139 supports a broader
-node-link default. [asserted]
+The scale objection is real. [Yoghourdjian et al.](https://arxiv.org/abs/2008.07944)'s controlled
+shortest-path study found significant difficulty above 50 nodes for high-density diagrams and above
+100 for low-density diagrams; those are task/layout-specific findings, not a universal cutoff.
+[cited] The current corpus has 57 units, so a full graph is already inside the paper's adverse
+high-density range. [measured] The design therefore makes filter/list/detail and focused subgraphs
+primary until EXP-139 supports a broader node-link default. [asserted]
 
 ## Acceptance checks owed by implementation
 
