@@ -6,8 +6,10 @@ import hashlib
 import json
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, cast
+from datetime import datetime, timezone
+from typing import Any, Literal, cast
+
+from .capabilities import CapabilityEntry, Gate
 
 
 EFFECT_CLASSES = frozenset(
@@ -30,6 +32,57 @@ EFFECT_INTENT = "effect.intent"
 EFFECT_RECEIPT = "effect.receipt"
 _RECEIPT_STATUSES = frozenset({"succeeded", "failed", "refused", "unknown"})
 _FINAL_RECEIPT_STATUSES = _RECEIPT_STATUSES - {"unknown"}
+
+AdmissionClass = Literal[
+    "observation",
+    "contained_execution",
+    "proof_operation",
+    "material_choice",
+    "recoverable_mutation",
+    "protected_covered",
+    "protected_uncovered",
+    "capability_gap",
+]
+ADMISSION_CLASSES = frozenset(
+    {
+        "observation",
+        "contained_execution",
+        "proof_operation",
+        "material_choice",
+        "recoverable_mutation",
+        "protected_covered",
+        "protected_uncovered",
+        "capability_gap",
+    }
+)
+
+Disposition = Literal["execute", "reshape", "refuse", "escalate"]
+ADMISSION_DISPOSITIONS = frozenset({"execute", "reshape", "refuse", "escalate"})
+
+READ_ONLY_EFFECTS = frozenset({"data.read", "network.call"})
+READ_ONLY_OPERATIONS = frozenset({"read", "fetch", "get", "head", "list"})
+PLANNING_OPERATIONS = frozenset({"plan", "choose", "decide"})
+PROTECTED_ESCALATION_EFFECTS = frozenset(
+    {
+        "money.commit",
+        "message.send",
+        "content.publish",
+        "external.change",
+        "obligation.commit",
+        "authority.change",
+        "physical.actuate",
+    }
+)
+MUTATION_EFFECTS = frozenset(
+    {
+        "file.change",
+        "system.change",
+        "external.change",
+        "data.read",
+        "process.run",
+        "network.call",
+    }
+)
 
 
 class EffectError(ValueError):
@@ -277,6 +330,155 @@ class EffectManifest:
         return {"kind": "inline", "value": self.to_record(), "digest": self.digest}
 
 
+@dataclass(frozen=True)
+class AdmissionFacts:
+    """Exogenous facts for pure admission derivation; never caller-supplied authority."""
+
+    contained: bool = False
+    is_proof_operation: bool = False
+    is_material_choice: bool = False
+    recovery_proof_passed: bool | None = None
+    authority_standing: bool | None = None
+    broker_confirms_observation: bool = False
+    project_gates_open: bool = False
+    caller_metadata: Mapping[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class AdmissionResult:
+    admission: AdmissionClass
+    disposition: Disposition
+    reason: str
+
+
+def _manifest_effects(manifest: EffectManifest) -> frozenset[str]:
+    return frozenset(_strings(manifest.effects, "manifest.effects"))
+
+
+def _manifest_operations(manifest: EffectManifest) -> frozenset[str]:
+    return frozenset(_strings(manifest.operations, "manifest.operations"))
+
+
+def _gate_expired(gate: Gate) -> bool:
+    if gate.expires_at is None:
+        return False
+    parsed = datetime.fromisoformat(gate.expires_at)
+    return parsed <= datetime.now(timezone.utc)
+
+
+def _gate_matches_manifest(gate: Gate, manifest: EffectManifest) -> tuple[bool, str]:
+    manifest_effects = _manifest_effects(manifest)
+    manifest_operations = _manifest_operations(manifest)
+    gate_effects = frozenset(gate.effect_classes)
+    gate_operations = frozenset(gate.operations)
+    if manifest_effects and not manifest_effects <= gate_effects:
+        return False, "effect_class_mismatch"
+    if manifest_operations and not manifest_operations <= gate_operations:
+        return False, "operation_mismatch"
+    return True, "exact_grant"
+
+
+def _observation_predicate(manifest: EffectManifest) -> bool:
+    effects = _manifest_effects(manifest)
+    operations = _manifest_operations(manifest)
+    if not effects:
+        return False
+    if not effects <= READ_ONLY_EFFECTS:
+        return False
+    if not operations <= READ_ONLY_OPERATIONS:
+        return False
+    return True
+
+
+def _has_protected_effects(manifest: EffectManifest) -> bool:
+    return bool(_manifest_effects(manifest) & PROTECTED_ESCALATION_EFFECTS)
+
+
+def _has_mutation_effects(manifest: EffectManifest) -> bool:
+    effects = _manifest_effects(manifest)
+    return bool(effects & MUTATION_EFFECTS) and not effects <= READ_ONLY_EFFECTS
+
+
+def _classify_admission(
+    manifest: EffectManifest,
+    facts: AdmissionFacts,
+) -> AdmissionClass:
+    if facts.is_proof_operation:
+        return "proof_operation"
+    if facts.is_material_choice:
+        return "material_choice"
+    if _observation_predicate(manifest) and facts.broker_confirms_observation:
+        return "observation"
+    effects = _manifest_effects(manifest)
+    if "process.run" in effects:
+        return "contained_execution" if facts.contained else "capability_gap"
+    if _has_protected_effects(manifest):
+        if facts.authority_standing:
+            return "protected_covered"
+        return "protected_uncovered"
+    if _has_mutation_effects(manifest):
+        return "recoverable_mutation"
+    return "capability_gap"
+
+
+def _disposition_for(
+    admission: AdmissionClass,
+    gate_reason: str,
+    facts: AdmissionFacts,
+) -> tuple[Disposition, str]:
+    if admission == "capability_gap":
+        return "refuse", gate_reason
+    if admission == "protected_uncovered":
+        return "escalate", "protected_class_without_standing_authority"
+    if admission == "recoverable_mutation":
+        if facts.recovery_proof_passed is True:
+            return "execute", gate_reason
+        if facts.recovery_proof_passed is False:
+            return "reshape", "recovery_proof_failed"
+        return "refuse", "recovery_proof_missing"
+    if admission == "contained_execution" and not facts.contained:
+        return "refuse", "process_not_contained"
+    return "execute", gate_reason
+
+
+def derive_admission(
+    manifest: EffectManifest,
+    capability: CapabilityEntry,
+    facts: AdmissionFacts = AdmissionFacts(),
+) -> AdmissionResult:
+    """Derive one fail-closed admission class and disposition from manifest and gate facts."""
+
+    if facts.caller_metadata is not None:
+        # Caller-supplied principal metadata is recorded, not authenticated admission.
+        pass
+
+    if not capability.available:
+        return AdmissionResult("capability_gap", "refuse", "capability_unavailable")
+
+    gate = capability.gate
+    if gate.state != "admitted":
+        return AdmissionResult("capability_gap", "refuse", gate.reason)
+
+    if _gate_expired(gate):
+        return AdmissionResult("capability_gap", "refuse", "grant_expired")
+
+    matches, match_reason = _gate_matches_manifest(gate, manifest)
+    if not matches:
+        return AdmissionResult("capability_gap", "refuse", match_reason)
+
+    admission = _classify_admission(manifest, facts)
+    if admission == "observation" and not facts.broker_confirms_observation:
+        return AdmissionResult("capability_gap", "refuse", "observation_not_confirmed")
+    if admission == "capability_gap":
+        effects = _manifest_effects(manifest)
+        if "process.run" in effects and not facts.contained:
+            return AdmissionResult("capability_gap", "refuse", "process_not_contained")
+        return AdmissionResult("capability_gap", "refuse", match_reason)
+
+    disposition, reason = _disposition_for(admission, match_reason, facts)
+    return AdmissionResult(admission, disposition, reason)
+
+
 def _binding(value: object) -> EffectManifest | None:
     binding = _mapping(value, "manifest")
     kind = binding.get("kind")
@@ -309,7 +511,11 @@ def _intent(data: Mapping[str, object]) -> None:
     _exact_keys(data, "effect.intent.data", {"intent_id", "manifest", "disposition", "decision_id", "admission"})
     _text(data["intent_id"], "effect.intent.intent_id")
     manifest = _binding(data["manifest"])
-    _text(data["disposition"], "effect.intent.disposition")
+    disposition = _text(data["disposition"], "effect.intent.disposition")
+    if disposition not in ADMISSION_DISPOSITIONS and disposition != "refused":
+        raise EffectError(
+            f"effect.intent.disposition must be one of {sorted(ADMISSION_DISPOSITIONS)} or refused"
+        )
     admission = _mapping(data["admission"], "effect.intent.admission")
     kind = admission.get("kind")
     if kind == "observation":

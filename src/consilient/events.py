@@ -1195,6 +1195,8 @@ def _check_human_authority(event: EventPayload) -> None:
             "only local CLI is accepted because this build has no signature verifier "
             "(V0-28)"
         )
+    # ADR-0078: caller-supplied actor/via metadata does not admit a capability gate.
+    # Gate admission is derived only from inventory gate facts via effects.derive_admission().
 
 
 def canonical(event: EventPayload) -> str:

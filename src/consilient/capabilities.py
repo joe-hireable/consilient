@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 CapabilityKind = Literal["tool", "mcp", "skill", "plugin", "connection"]
@@ -14,6 +15,15 @@ CAPABILITY_KINDS: tuple[CapabilityKind, ...] = (
     "connection",
 )
 SCHEMA_VERSION = 1
+
+GateState = Literal["gated", "admitted"]
+GrantKind = Literal["principal_authority", "controller_baseline.local_restorable.v1"]
+
+GATE_STATES: tuple[GateState, ...] = ("gated", "admitted")
+GRANT_KINDS: tuple[GrantKind, ...] = (
+    "principal_authority",
+    "controller_baseline.local_restorable.v1",
+)
 
 _KINDS = frozenset(CAPABILITY_KINDS)
 _KIND_ORDER: dict[CapabilityKind, int] = {
@@ -30,11 +40,39 @@ class CapabilityError(ValueError):
 
 
 @dataclass(frozen=True)
+class Gate:
+    """Technical reach and current admission are separate from availability."""
+
+    state: GateState
+    reason: str
+    grant_kind: str | None
+    authority_event: object | None
+    decision_id: str | None
+    recovery_proof_ref: object | None
+    scope: tuple[str, ...]
+    operations: tuple[str, ...]
+    effect_classes: tuple[str, ...]
+    expires_at: str | None
+
+
+@dataclass(frozen=True)
+class CapabilityEntry:
+    """One inventory row with explicit gate state."""
+
+    kind: CapabilityKind
+    name: str
+    available: bool
+    provenance: tuple[str, ...]
+    gate: Gate
+
+
+@dataclass(frozen=True)
 class _InventoryItem:
     kind: CapabilityKind
     name: str
     available: bool
     provenance: tuple[str, ...]
+    gate: Gate
 
 
 @dataclass(frozen=True)
@@ -42,6 +80,22 @@ class _RequestedItem:
     kind: CapabilityKind
     name: str
     reason: str
+
+
+def default_gate() -> Gate:
+    """Present capability without an exact grant stays visibly gated."""
+    return Gate(
+        state="gated",
+        reason="no_matching_grant",
+        grant_kind=None,
+        authority_event=None,
+        decision_id=None,
+        recovery_proof_ref=None,
+        scope=(),
+        operations=(),
+        effect_classes=(),
+        expires_at=None,
+    )
 
 
 def _object(value: object, label: str) -> dict[str, object]:
@@ -98,6 +152,12 @@ def _text(value: object, label: str) -> str:
     return value
 
 
+def _nullable_text(value: object, label: str) -> str | None:
+    if value is None:
+        return None
+    return _text(value, label)
+
+
 def _provenance(value: object, label: str) -> tuple[str, ...]:
     values = _array(value, label)
     if not values:
@@ -108,6 +168,144 @@ def _provenance(value: object, label: str) -> tuple[str, ...]:
     return tuple(sorted(records))
 
 
+def _nullable_reference(value: object, label: str) -> object | None:
+    if value is None:
+        return None
+    record = _object(value, label)
+    _keys(record, frozenset({"event_id", "event_kind", "event_sha256"}), label)
+    _text(record["event_id"], f"{label}.event_id")
+    _text(record["event_kind"], f"{label}.event_kind")
+    digest = _text(record["event_sha256"], f"{label}.event_sha256")
+    if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+        raise CapabilityError(f"{label}.event_sha256 must be 64 lowercase hexadecimal characters")
+    return record
+
+
+def _string_list(value: object, label: str) -> tuple[str, ...]:
+    items = _array(value, label)
+    records = tuple(_text(item, f"{label}[{index}]") for index, item in enumerate(items))
+    if len(records) != len(set(records)):
+        raise CapabilityError(f"{label} contains duplicate entries")
+    return records
+
+
+def _gate_state(value: object, label: str) -> GateState:
+    if not isinstance(value, str) or value not in GATE_STATES:
+        raise CapabilityError(f"{label} must be one of {list(GATE_STATES)!r}")
+    return value
+
+
+def _grant_kind(value: object, label: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or value not in GRANT_KINDS:
+        raise CapabilityError(f"{label} must be one of {list(GRANT_KINDS)!r}")
+    return value
+
+
+def _timestamp(value: object, label: str) -> str:
+    value = _text(value, label)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise CapabilityError(f"{label} must be an RFC3339 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise CapabilityError(f"{label} must carry an explicit offset")
+    return value
+
+
+def _nullable_timestamp(value: object, label: str) -> str | None:
+    if value is None:
+        return None
+    return _timestamp(value, label)
+
+
+def _parse_gate(value: object, label: str) -> Gate:
+    record = _object(value, label)
+    _keys(
+        record,
+        frozenset(
+            {
+                "state",
+                "reason",
+                "grant_kind",
+                "authority_event",
+                "decision_id",
+                "recovery_proof_ref",
+                "scope",
+                "operations",
+                "effect_classes",
+                "expires_at",
+            }
+        ),
+        label,
+    )
+    state = _gate_state(record["state"], f"{label}.state")
+    reason = _text(record["reason"], f"{label}.reason")
+    grant_kind = _grant_kind(record["grant_kind"], f"{label}.grant_kind")
+    authority_event = _nullable_reference(record["authority_event"], f"{label}.authority_event")
+    decision_id = _nullable_text(record["decision_id"], f"{label}.decision_id")
+    recovery_proof_ref = _nullable_reference(
+        record["recovery_proof_ref"], f"{label}.recovery_proof_ref"
+    )
+    scope = _string_list(record["scope"], f"{label}.scope")
+    operations = _string_list(record["operations"], f"{label}.operations")
+    effect_classes = _string_list(record["effect_classes"], f"{label}.effect_classes")
+    expires_at = _nullable_timestamp(record["expires_at"], f"{label}.expires_at")
+    if state == "admitted":
+        if grant_kind is None:
+            raise CapabilityError(f"{label} admitted gate requires grant_kind")
+        if grant_kind == "principal_authority" and authority_event is None:
+            raise CapabilityError(
+                f"{label} principal_authority grant requires authority_event"
+            )
+        if grant_kind == "controller_baseline.local_restorable.v1":
+            if decision_id is None or recovery_proof_ref is None:
+                raise CapabilityError(
+                    f"{label} controller_baseline grant requires decision_id and recovery_proof_ref"
+                )
+    if state == "gated" and grant_kind is not None:
+        raise CapabilityError(f"{label} gated gate must not carry grant_kind")
+    return Gate(
+        state=state,
+        reason=reason,
+        grant_kind=grant_kind,
+        authority_event=authority_event,
+        decision_id=decision_id,
+        recovery_proof_ref=recovery_proof_ref,
+        scope=scope,
+        operations=operations,
+        effect_classes=effect_classes,
+        expires_at=expires_at,
+    )
+
+
+def parse_inventory_entry(value: object) -> CapabilityEntry:
+    """Parse one inventory allowlist row, synthesising a gated default when gate is absent."""
+    label = "inventory allowlist entry"
+    record = _object(value, label)
+    allowed_keys = frozenset({"kind", "name", "available", "provenance", "gate"})
+    actual = frozenset(record)
+    if not actual <= allowed_keys or "kind" not in actual or "name" not in actual:
+        raise CapabilityError(f"{label} keys must be a subset of {sorted(allowed_keys)!r}")
+    if "available" not in actual or "provenance" not in actual:
+        raise CapabilityError(f"{label} requires available and provenance")
+    kind = _kind(record["kind"], label)
+    name = _name(record["name"], label)
+    available = record["available"]
+    if not isinstance(available, bool):
+        raise CapabilityError(f"{label} available must be a boolean")
+    provenance = _provenance(record["provenance"], f"{label} provenance")
+    gate = _parse_gate(record["gate"], f"{label} gate") if "gate" in record else default_gate()
+    return CapabilityEntry(
+        kind=kind,
+        name=name,
+        available=available,
+        provenance=provenance,
+        gate=gate,
+    )
+
+
 def _inventory(value: object) -> tuple[_InventoryItem, ...]:
     document = _object(value, "inventory")
     _keys(document, frozenset({"allowlist"}), "inventory")
@@ -116,27 +314,20 @@ def _inventory(value: object) -> tuple[_InventoryItem, ...]:
     seen: set[tuple[CapabilityKind, str]] = set()
     for index, value_item in enumerate(records):
         label = f"inventory allowlist[{index}]"
-        record = _object(value_item, label)
-        _keys(
-            record,
-            frozenset({"kind", "name", "available", "provenance"}),
-            label,
-        )
-        kind = _kind(record["kind"], label)
-        name = _name(record["name"], label)
-        available = record["available"]
-        if not isinstance(available, bool):
-            raise CapabilityError(f"{label} available must be a boolean")
-        identity = (kind, name.casefold())
+        entry = parse_inventory_entry(value_item)
+        identity = (entry.kind, entry.name.casefold())
         if identity in seen:
-            raise CapabilityError(f"duplicate or ambiguous inventory capability: {kind}:{name}")
+            raise CapabilityError(
+                f"duplicate or ambiguous inventory capability: {entry.kind}:{entry.name}"
+            )
         seen.add(identity)
         items.append(
             _InventoryItem(
-                kind=kind,
-                name=name,
-                available=available,
-                provenance=_provenance(record["provenance"], f"{label} provenance"),
+                kind=entry.kind,
+                name=entry.name,
+                available=entry.available,
+                provenance=entry.provenance,
+                gate=entry.gate,
             )
         )
     return tuple(items)
@@ -168,6 +359,22 @@ def _task_request(value: object) -> tuple[_RequestedItem, ...]:
     return tuple(items)
 
 
+def _gate_record(gate: Gate) -> dict[str, object]:
+    record: dict[str, object] = {
+        "state": gate.state,
+        "reason": gate.reason,
+        "grant_kind": gate.grant_kind,
+        "authority_event": gate.authority_event,
+        "decision_id": gate.decision_id,
+        "recovery_proof_ref": gate.recovery_proof_ref,
+        "scope": list(gate.scope),
+        "operations": list(gate.operations),
+        "effect_classes": list(gate.effect_classes),
+        "expires_at": gate.expires_at,
+    }
+    return record
+
+
 def select_capabilities(inventory: object, task_request: object) -> dict[str, object]:
     """Select only requested, available allowlist entries and explain every choice."""
 
@@ -189,6 +396,7 @@ def select_capabilities(inventory: object, task_request: object) -> dict[str, ob
                 "name": item.name,
                 "provenance": list(item.provenance),
                 "reason": wanted.reason,
+                "gate": _gate_record(item.gate),
             }
         )
     return {"schema_version": SCHEMA_VERSION, "capabilities": selected}

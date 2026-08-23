@@ -17,12 +17,29 @@ sys.path.insert(0, str(ROOT / "src"))
 from consilient.capabilities import (  # noqa: E402
     CAPABILITY_KINDS,
     CapabilityError,
+    default_gate,
     select_capabilities,
 )
 
 
 def _inventory(*items: dict[str, object]) -> dict[str, object]:
     return {"allowlist": list(items)}
+
+
+def _gate_payload() -> dict[str, object]:
+    gate = default_gate()
+    return {
+        "state": gate.state,
+        "reason": gate.reason,
+        "grant_kind": gate.grant_kind,
+        "authority_event": gate.authority_event,
+        "decision_id": gate.decision_id,
+        "recovery_proof_ref": gate.recovery_proof_ref,
+        "scope": list(gate.scope),
+        "operations": list(gate.operations),
+        "effect_classes": list(gate.effect_classes),
+        "expires_at": gate.expires_at,
+    }
 
 
 def _available(
@@ -36,6 +53,22 @@ def _available(
         "name": name,
         "available": True,
         "provenance": provenance or [f"probe:{kind}:{name}"],
+    }
+
+
+def _selected(
+    kind: str,
+    name: str,
+    *,
+    provenance: list[str],
+    reason: str,
+) -> dict[str, object]:
+    return {
+        "kind": kind,
+        "name": name,
+        "provenance": provenance,
+        "reason": reason,
+        "gate": _gate_payload(),
     }
 
 
@@ -69,36 +102,36 @@ def test_selects_exactly_the_five_capability_kinds_with_explanations() -> None:
     assert result == {
         "schema_version": 1,
         "capabilities": [
-            {
-                "kind": "tool",
-                "name": "pytest",
-                "provenance": ["probe:tool:pytest"],
-                "reason": "run the verifier",
-            },
-            {
-                "kind": "mcp",
-                "name": "filesystem",
-                "provenance": ["probe:mcp:filesystem"],
-                "reason": "read task files",
-            },
-            {
-                "kind": "skill",
-                "name": "citing-sources",
-                "provenance": ["probe:skill:citing-sources"],
-                "reason": "attribute claims",
-            },
-            {
-                "kind": "plugin",
-                "name": "obsidian",
-                "provenance": ["probe:plugin:obsidian"],
-                "reason": "use the requested note format",
-            },
-            {
-                "kind": "connection",
-                "name": "github",
-                "provenance": ["probe:connection:github"],
-                "reason": "read the named repository",
-            },
+            _selected(
+                "tool",
+                "pytest",
+                provenance=["probe:tool:pytest"],
+                reason="run the verifier",
+            ),
+            _selected(
+                "mcp",
+                "filesystem",
+                provenance=["probe:mcp:filesystem"],
+                reason="read task files",
+            ),
+            _selected(
+                "skill",
+                "citing-sources",
+                provenance=["probe:skill:citing-sources"],
+                reason="attribute claims",
+            ),
+            _selected(
+                "plugin",
+                "obsidian",
+                provenance=["probe:plugin:obsidian"],
+                reason="use the requested note format",
+            ),
+            _selected(
+                "connection",
+                "github",
+                provenance=["probe:connection:github"],
+                reason="read the named repository",
+            ),
         ],
     }
 
@@ -228,6 +261,31 @@ def test_script_emits_the_same_portable_json_without_network(tmp_path: Path) -> 
     assert set(json.loads(completed.stdout)) == {"schema_version", "capabilities"}
 
 
+def test_inventory_accepts_explicit_gate_object() -> None:
+    inventory = _inventory(
+        {
+            "kind": "tool",
+            "name": "pytest",
+            "available": True,
+            "provenance": ["probe:tool:pytest"],
+            "gate": {
+                "state": "gated",
+                "reason": "no_matching_grant",
+                "grant_kind": None,
+                "authority_event": None,
+                "decision_id": None,
+                "recovery_proof_ref": None,
+                "scope": [],
+                "operations": [],
+                "effect_classes": [],
+                "expires_at": None,
+            },
+        }
+    )
+    result = select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+    assert result["capabilities"][0]["gate"]["state"] == "gated"
+
+
 def test_policy_module_is_pure_stdlib_policy() -> None:
     tree = ast.parse(CORE.read_text(encoding="utf-8"))
     imported: set[str] = set()
@@ -236,7 +294,7 @@ def test_policy_module_is_pure_stdlib_policy() -> None:
             imported.update(alias.name.split(".", 1)[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             imported.add((node.module or "").split(".", 1)[0])
-    assert imported <= {"__future__", "dataclasses", "re", "typing"}
+    assert imported <= {"__future__", "dataclasses", "datetime", "re", "typing"}
 
     forbidden_calls = {
         "connect",
