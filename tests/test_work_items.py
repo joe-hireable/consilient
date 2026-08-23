@@ -5,7 +5,15 @@ from pathlib import Path
 import pytest
 
 from consilient.events import SCHEMA_VERSION, EventError, bypassed, read_all
-from consilient.work_items import comment, complete_item, open_item, validate
+from consilient.work_items import (
+    COMMITTED,
+    DISPATCH_CLAIM_SCHEMA,
+    comment,
+    complete_item,
+    open_item,
+    success_digest,
+    validate,
+)
 
 
 def work_event(kind, data, actor="agent-one"):
@@ -116,6 +124,77 @@ def test_every_work_item_event_requires_a_ticket(kind, data):
 def test_open_requires_one_accountable_actor():
     with pytest.raises(EventError, match="accountable"):
         validate(work_event("work_item.opened", {"ticket": "PM-1"}))
+
+
+def test_dispatch_claim_schema_is_recognised_on_append(tmp_path):
+    log = tmp_path / "log"
+    open_item(
+        log,
+        ticket="dispatch:schema-run",
+        accountable="consilient.dispatch",
+        extra={
+            "item_schema": DISPATCH_CLAIM_SCHEMA,
+            "run_id": "schema-run",
+            "paths": ["src/"],
+            "cwd": str(tmp_path),
+            "opened_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": "2026-09-22T12:00:00+00:00",
+        },
+    )
+    recorded, rejected = read_all(log)
+    assert rejected == []
+    assert recorded[0].data["item_schema"] == DISPATCH_CLAIM_SCHEMA
+
+
+def test_committed_event_requires_a_matching_digest():
+    contract = {
+        "commitment_id": "c-1",
+        "revision": 1,
+        "conversation_id": "conv",
+        "source_turn_ids": ["t-1"],
+        "source_turn_digest": "d" * 64,
+        "request_text": "do work",
+        "goal_text": "do work",
+        "success_criteria": ["done"],
+        "non_goals": [],
+            "success_digest": success_digest(["done"], []),
+        "incumbent": {
+            "name": "bar",
+            "source": "asserted",
+            "retrieval_date": "2026-08-22",
+            "search_digest": "0" * 64,
+            "evidence_tag": "asserted",
+            "delta": "n/a",
+            "killing_check": "n/a",
+        },
+        "deliverable_contract": {
+            "kind": "code",
+            "handoff_schema": "git-diff",
+            "allowed_locators": ["repository"],
+        },
+        "accountable": "owner",
+        "composition": {"owner": "owner"},
+        "assumptions": [],
+        "autonomous_decision_refs": [],
+        "reserved_decisions": [],
+        "authority_ref": {"kind": "unprotected"},
+        "verifier_contracts": [
+            {
+                "id": "pytest",
+                "digest": "a" * 64,
+                "task_family": "code",
+                "required_outcome": "pass",
+            }
+        ],
+        "mutation_scope": {"paths": ["src/"]},
+        "budget_ref": "none",
+        "expires_at": "2026-09-22T12:00:00+00:00",
+        "question_count": 0,
+        "commitment_digest": "0" * 64,
+    }
+    event = work_event(COMMITTED, contract)
+    with pytest.raises(EventError, match="commitment_digest"):
+        validate(event)
 
 
 def test_work_script_writes_each_operation_to_the_selected_log(tmp_path):

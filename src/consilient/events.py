@@ -303,6 +303,10 @@ def validate(event: object) -> EventPayload:
         effects.validate_effect_event(event)
     except effects.EffectError as exc:
         raise EventError(str(exc)) from exc
+    if event["event"].startswith(("conversation.", "work_item.")):
+        from . import work_items
+
+        work_items.check_event_contract(event)
     return event
 
 
