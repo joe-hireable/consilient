@@ -1,5 +1,11 @@
 # Expertise acquisition: propose, prove, assign, retire
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-126 (bundle-versus-generalist); § 12 records the current narrow claims.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** the dispatch brief overstates current enforcement: ADR-0074 and ADR-0076 specify
 capability manifests and sealed instruments but do not implement them; a different model family is
 not a different class of facts by itself; the distribution-free exposure ceiling can be zero rather

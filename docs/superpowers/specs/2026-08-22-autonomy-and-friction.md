@@ -1,5 +1,11 @@
 # Autonomy and friction: the machine decides; protected one-way effects reach the principal
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 11 (EXP-103 and the cheaper adapter-escape case named there).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** R30 is **PARTIAL**, not absent: `events.py` already validates
 `decision.autonomous` records and typed reversal shapes under V0-22/V0-23/V0-24, while
 `tests/test_decisions.py` exercises that schema; no producer executes or verifies the reversal,

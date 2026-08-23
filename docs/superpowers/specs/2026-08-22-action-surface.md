@@ -1,5 +1,11 @@
 # Action surface: unconstrained output, constrained actuation
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 11 (EXP-59, EXP-35, and the boundary-escape cases named there).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Corrections:** `events.py` is the intended append path for cooperating product code, not an
 enforced or durable single writer, and today's non-file adapters can perform an effect before their
 event is appended. The brief's claim that the exposure formula gives one candidate for every

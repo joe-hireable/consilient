@@ -1,5 +1,11 @@
 # Consilience gate: refuse high-consequence conclusions that rest on echo
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 10 (EXP-109's frozen stopping rule, and the "refuses everything" objection in § 9).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** ADR-0079 specifies but does not implement the single action-and-decision boundary;
 this document extends that future boundary and claims no running gate. [measured]
 

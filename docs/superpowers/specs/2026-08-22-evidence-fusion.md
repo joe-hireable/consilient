@@ -1,5 +1,11 @@
 # Evidence fusion: independent readings, measured dependence, one decision
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 10 (EXP-81, EXP-80, and the echo/schema-incomplete cases named there).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **The dispatch brief is wrong about the dangerous direction: it conflates the union of several
 candidate attempts with the intersection of several verifier passes.** Positive dependence can make
 an independence product dangerously understate a composite verifier's false-accept rate; it does not

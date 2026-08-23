@@ -1,5 +1,11 @@
 # Chat delivery: promise once, prove liveness, return the finished artefact
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 8 (EXP-98 and the same-commit check set named there).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** `scripts/run_loop.py` resumes accounting, not work: after a restart it marks an
 unsettled tick `abandoned` and advances. This design retains that honest outcome and resumes the
 deliverable from its last sealed checkpoint. [measured]

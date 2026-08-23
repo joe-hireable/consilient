@@ -1,5 +1,11 @@
 # Structural decision protocol: persist the choice before consequence
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-106 (equivalent outcomes with greater overhead, worse outcomes, one boundary escape or one protected-authority violation).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** no dedicated or automatic producer emits `decision.autonomous`, and the valid
 trajectory contains zero such events, but the generic `consil record --event` command can manually
 append any caller-supplied valid event; “nothing can emit it” would therefore be false. [measured]

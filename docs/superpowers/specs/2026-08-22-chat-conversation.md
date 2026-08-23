@@ -1,5 +1,11 @@
 # Chat conversation: turn one sentence into committed work
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 10 (the implementation checks fail if the commitment compiler can be bypassed).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** the brief's three zero-byte attempts were not three scope-caused timeouts: one timed
 out and two were refused before launch for unknown Cursor headroom; EXP-45 measured 59.29% loss of
 mechanically extracted surface entities, not loss of “what mattered”, while its consequential-loss
