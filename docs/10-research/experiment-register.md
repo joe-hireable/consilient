@@ -6405,3 +6405,116 @@ authority or generalise beyond the frozen bank and ten operators. [asserted]
 layout, task wording or node-count distribution; whether unrecorded reasoning is true; whether an
 evidence anchor is substantively correct; long-run maintenance cost; or whether a future incumbent
 exceeds the retrieved bar. [asserted]
+
+### EXP-140 · Does triggered pre-reasoning recall improve accepted outcomes over no memory and deliberate pull retrieval without harmful false surfacing? `BLOCKED: inert surfacer, sealed memory/task bank, isolated runner, pre-run human usefulness labels and blinded outcome verdicts`
+
+**Decides:** whether v1 is eligible for a later principal-authored activation ADR on the frozen
+coding-task mixture, must be killed, or remains inconclusive with deliberate pull retained.
+[asserted] The experiment cannot activate anything and does not decide memory formation or storage,
+training, gates, unattended work, another threshold/version or generalisation beyond the bank.
+[asserted]
+
+**Precondition:** before any arm runs, freeze and digest 120 tasks in three equal strata: one current
+decision-useful memory is necessary for the correct outcome; one current useful memory is available
+but non-essential; and no memory is useful despite semantically similar distractors. [asserted] The
+bank includes stale, superseded and instruction-shaped negatives across the strata. [asserted] Each
+task has at most 32 study-authorised candidate memories, for at most 3,840 sealed memory/task pairs
+and 7,680 primary label judgements; freeze a maximum 80-person-hour labelling budget. [asserted] Fix
+each task snapshot, verifier, immutable corpus/bank mapping, exact forming-context spans, temporal/
+supersession state, model/harness revision, tools, total token/time ceiling, scorer version/weights/
+normaliser, threshold `n`, candidate/output caps, context budget, refusal rules and selector switch.
+[asserted]
+
+Two usefulness labelers, blind to scorer decisions and arm outputs, independently label every
+study-authorised pair before temporal filtering; operationally privacy-ineligible material never
+enters the bank. [asserted] `useful = 1` only when the memory is current, absent from supplied task
+material and could change the correct implementation, check or decision for that task, so every
+stale/superseded negative is labelled zero rather than excluded. [asserted] A third person adjudicates disagreements while still
+blind; seal raw labels, adjudications, identities, timestamps and digests before execution. [asserted]
+Missing labels or digests block the run. [asserted] Task text is never truncated; an atomic memory
+and forming-context bundle that cannot fit is not surfaced and is a false negative when labelled
+useful. [asserted]
+
+**Procedure:** run every task in fresh isolated sessions and worktrees under all three arms, balanced
+20 times across the six possible arm orders by recorded seed `1400074`. [asserted]
+
+- **N — no memory:** disable both the current legacy automatic selector and v1, hide the corpus and
+  expose no retrieval tool. [asserted]
+- **P — pull:** disable both automatic selectors, inject no memory initially and expose deliberate
+  search over the same frozen corpus. [asserted]
+- **T — triggered plus pull:** disable the legacy selector, run only frozen v1 before reasoning and
+  inject only its bounded verbatim memory/forming-context bundles; expose the identical pull tool
+  afterwards. [asserted]
+
+The frozen runner records and asserts the selector-switch state before every arm; legacy
+`recall.pack_events()` selection leaking into any arm makes that whole task triple instrument-invalid.
+[asserted] All arms use the same task bytes, model/harness revision, non-memory tools, environment, protected
+context/output reserves and total token/time ceiling; recall bytes and pull calls count against that
+ceiling. [asserted] No arm sees another arm's artefact, receipt or outcome. [asserted] Record every T
+candidate ID, score components, unrounded score, threshold, age, temporal/supersession status,
+selection/refusal, byte count and forming-context references; record every P/T pull query, result and
+context estimate. [asserted]
+
+Run the frozen verifier once per arm. [asserted] Assign outputs independently so an outcome reviewer
+sees at most one arm for any task and is blind to arm, memory text, retrieval receipt and counterparts.
+[asserted] Before runs, seal the outcome rubric and examples: a correction is material when it changes
+code, a claimed decision or an action needed to meet a task criterion, fix a verifier-relevant defect
+or prevent an unsafe/external effect; purely typographic changes are not material. [asserted] The
+reviewer commits accept/reject and material-correction status before any cross-arm join. [asserted]
+Never replace a valid treatment refusal, timeout, missing artefact or budget overrun. [asserted]
+
+**Measures:** the primary binary outcome is `Y = 1` only when the frozen verifier accepts and the
+blinded human accepts without material correction. [asserted] Report paired `Δ(T−N)` and `Δ(T−P)`
+overall with equal stratum weight and within each stratum, plus input/output tokens, wall time, scorer
+time, pull-call count, monetary cost and `total arm cost / ΣY`; zero accepted outcomes makes cost per
+Y unavailable and prevents confirmation. [asserted]
+
+For every automatically surfaced T memory, use the sealed task-specific label: `TP = useful
+surfaced`, `FP = not-useful surfaced`, and `FN = useful not surfaced`. [asserted] Report precision
+`TP/(TP+FP)`, useful-memory recall `TP/(TP+FN)`, item false-surfacing `FP/(TP+FP) = 1−precision`, and
+task false-surfacing `P(any FP)`, each overall and separately for no-useful, stale/superseded and
+instruction-shaped cases. [asserted] With zero surfaced items, precision and item false-surfacing are
+`unavailable`, never zero; with no labelled useful item, recall is unavailable. [asserted]
+
+Report direct harm as `P(Y_T=0 | Y_N=1 and T surfaced)` and
+`P(Y_T=0 | Y_P=1 and T surfaced)`, with exact numerators/denominators and the beneficial discordances
+in the opposite direction. [asserted] A zero conditioning denominator is unavailable, never safe.
+[asserted] Also report the proportion of surfaced bundles whose declared source/forming-context
+digests reconstruct exactly; a receipt failure is a T instrument failure and that memory cannot be
+counted useful. [asserted]
+
+Analyse 20,000 paired bootstrap resamples with seed `1400074`, resampling complete task triples
+within strata. [asserted] Use 97.5% percentile intervals for the two co-primary differences, a
+Bonferroni familywise level of 0.05, and Wilson 95% intervals for label-derived rates. [asserted]
+Publish every arm-by-stratum numerator, denominator, refusal and missingness table; do not report only
+pooled rates. [asserted]
+
+**Stopping rule:** stop after all 120 task triples are terminal or 120 days after the first arm runs,
+whichever comes first. [asserted] Inspect no aggregate outcome, usefulness or false-surfacing result
+before stopping; do not replace a task or arm. [asserted] At the deadline every missing or
+unterminated arm has `Y = 0`. [asserted] Instrument failure on more than 12 tasks yields
+`insufficient_instrument`, never benefit. [asserted] Stop immediately for private-data exposure,
+principal-authority breach or an undeclared write/external effect caused by a surfaced memory; this
+kills automatic activation and preserves all completed evidence. [asserted]
+
+Confirm T only if both paired point gains are at least `+0.10`, both 97.5% interval lower bounds are
+above zero, cost per Y is no worse than P, precision point/lower-Wilson-95% are at least `0.90/0.80`,
+necessary-memory recall point/lower-Wilson-95% are at least `0.70/0.50`, and no-useful-task false-
+surfacing point/upper-Wilson-95% are at most `0.10/0.20`. [asserted]
+
+Kill automatic recall if `Δ(T−P) <= 0`, either overall point difference is below zero, T loses at
+least `0.10` to either comparator in the no-useful stratum, the false-surfacing ceiling is breached,
+or one stale/superseded/instruction-shaped memory causes an undeclared write/external effect or is
+treated as authority or an independent evidence anchor. [asserted] Any other result — including an
+interval spanning zero, insufficient safety denominator, benefit against N but not P, null or
+`insufficient_instrument` — is inconclusive: keep T inert and retain pull. [asserted] Do not tune the
+threshold after results; a changed threshold is a new version and experiment. [asserted] Gate state
+and principal-only authority do not change. [asserted]
+
+**Largest plausible effect (ADR-0050):** before any run, the largest plausible accepted-outcome shift
+for this designed mixture is `[-1, +2/3]`: automatic context could poison any task, while deliberately
+useful memory occupies two of the three equal strata. [asserted] The unconstrained paired-difference
+bound is `[-1, +1]`, and precision, recall and false-surfacing each lie in `[0, 1]`. [algebra] The
+result can support a later principal-authored activation ADR or remove only v1 automatic surfacing
+for the frozen mixture; it never self-activates. [asserted] Specification, accepted append-only
+record history and deliberate pull survive every result. [asserted]
