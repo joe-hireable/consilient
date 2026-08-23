@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `329989b803cb1cbc19fd837dea84ab828582d5d1944ae4b81fba6ab77ed5ee1f`
+> **Source SHA-256:** `0cf5251beb97937fbb777117e811e9531e150eccb840f8a5711509ee07a86da6`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -92,5 +92,10 @@
 | [0085](0085-qualify-model-revisions-before-routing-and-seal-fine-tune-evaluation.md) | Qualify model revisions before routing, defer matrix factorisation, and seal fine-tune evaluation | PROVISIONAL | — |
 | [0086](0086-acquire-expertise-as-a-proven-capability-bundle-and-tune-only-after-retrieval-loses.md) | Acquire expertise as a proven capability bundle and tune only after retrieval loses | PROVISIONAL | — |
 | [0087](0087-return-one-answer-with-decision-relevant-checks.md) | Return one answer with decision-relevant checks and answer directly when convergence adds no value | PROPOSED | — |
+| [0088](0088-make-zero-cost-a-native-fail-closed-routing-ladder.md) | Make zero-cost a native, fail-closed routing ladder | PROVISIONAL | — |
 | [0089](0089-use-one-front-door-and-preserve-native-specialist-surfaces.md) | Use one front door and preserve native specialist surfaces | PROPOSED | — |
+| [0090](0090-allocate-full-mode-effort-before-execution-and-make-light-mode-explicit.md) | Allocate full-mode effort before execution and make light mode explicit | PROVISIONAL | — |
 | [0091](0091-check-declared-claims-against-the-import-graph-and-keep-declared-claims-authoritative.md) | Check declared claims against the import graph, and keep declared claims authoritative | PROVISIONAL | — |
+| [0092](0092-classify-durable-work-and-stop-deliberation-at-an-external-threshold.md) | Classify durable work and stop deliberation at an external threshold | PROVISIONAL | supersedes 0090 |
+| [0093](0093-compose-agent-roles-from-worker-method-and-subject-expertise.md) | Compose agent roles from worker method and subject expertise, and cut evidence-free specialists | PROVISIONAL | — |
+| [0094](0094-make-scientific-execution-a-pinned-evidence-producing-profile.md) | Make scientific execution a pinned evidence-producing profile, not a second laboratory platform | PROVISIONAL | — |
