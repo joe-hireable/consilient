@@ -709,6 +709,12 @@ def _check_verification_outcome_contract(event: EventPayload) -> None:
                 f"{VERIFICATION_OUTCOME_KIND} must carry a non-empty string {field}"
             )
 
+    version = data["verifier_version"]
+    if version != version.strip() or not version.isprintable():
+        raise EventError(
+            f"{VERIFICATION_OUTCOME_KIND} verifier_version must be canonical printable text"
+        )
+
     digest = data.get("artefact_sha256")
     if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise EventError(
@@ -730,6 +736,12 @@ def _check_verification_outcome_contract(event: EventPayload) -> None:
     elif "verifier_accept" in data:
         raise EventError(
             f"{VERIFICATION_OUTCOME_KIND} verifier_accept is valid only when completed"
+        )
+
+    if "human_decision" in data:
+        raise EventError(
+            f"{VERIFICATION_OUTCOME_KIND} cannot carry human_decision; append a separate "
+            f"{VERDICT_KIND} event"
         )
 
 

@@ -518,21 +518,23 @@ def verification_outcome(
     artefact_sha256,
     verifier_id,
     verifier_accept,
+    *,
+    status="completed",
+    verifier_version="v1",
 ):
-    return ev(
-        event="verification.outcome",
-        data={
-            "verification_id": verification_id,
-            "attempt_id": attempt_id,
-            "protocol_id": "EXP-81/v1",
-            "artefact_sha256": artefact_sha256,
-            "verifier_id": verifier_id,
-            "verifier_version": "v1",
-            "evidence_class": "execution",
-            "status": "completed",
-            "verifier_accept": verifier_accept,
-        },
-    )
+    data = {
+        "verification_id": verification_id,
+        "attempt_id": attempt_id,
+        "protocol_id": "EXP-81/v1",
+        "artefact_sha256": artefact_sha256,
+        "verifier_id": verifier_id,
+        "verifier_version": verifier_version,
+        "evidence_class": "execution",
+        "status": status,
+    }
+    if verifier_accept is not None:
+        data["verifier_accept"] = verifier_accept
+    return ev(event="verification.outcome", data=data)
 
 
 def test_verification_outcome_rejects_an_incomplete_or_ambiguous_record():
@@ -554,6 +556,10 @@ def test_verification_outcome_rejects_an_incomplete_or_ambiguous_record():
 
     for field, value in (
         ("artefact_sha256", "A" * 64),
+        ("artefact_sha256", "0" * 63),
+        ("artefact_sha256", "g" * 64),
+        ("verifier_version", " v1"),
+        ("verifier_version", "v1\nbeta"),
         ("status", "passed"),
         ("verifier_accept", "yes"),
     ):
@@ -563,11 +569,29 @@ def test_verification_outcome_rejects_an_incomplete_or_ambiguous_record():
     completed_without_result = {**valid, "data": dict(valid["data"])}
     completed_without_result["data"].pop("verifier_accept")
     cases.append((completed_without_result, "verifier_accept"))
-    timeout_with_result = {
+    for status in events_mod.VERIFICATION_STATUSES - {"completed"}:
+        non_completion_with_result = {
+            **valid,
+            "data": {**valid["data"], "status": status},
+        }
+        cases.append((non_completion_with_result, "verifier_accept"))
+
+    smuggled_verdict = {
         **valid,
-        "data": {**valid["data"], "status": "timeout"},
+        "data": {**valid["data"], "human_verdict": "accept"},
     }
-    cases.append((timeout_with_result, "verifier_accept"))
+    cases.append((smuggled_verdict, "human_verdict"))
+    smuggled_decision = {
+        **valid,
+        "actor": HUMAN,
+        "data": {
+            **valid["data"],
+            "human_decision": "verdict",
+            "principal": HUMAN,
+            "via": "cli",
+        },
+    }
+    cases.append((smuggled_decision, "human_decision"))
 
     for candidate, field in cases:
         with pytest.raises(EventError, match=field):
@@ -578,19 +602,44 @@ def test_paired_verification_outcomes_survive_append_and_replay(tmp_path):
     log_dir = tmp_path / "log"
     path = log_dir / "events.jsonl"
     expected_cells = ((False, False), (False, True), (True, False), (True, True))
+    expected_payloads = []
     for index, (first, second) in enumerate(expected_cells, start=1):
         digest = "0" * 64  # byte-identical artefacts may still be distinct attempts
         attempt_id = f"attempt-{index}"
-        append(
-            path,
-            verification_outcome(f"v-{index}-a", attempt_id, digest, "pytest", first),
+        expected_payloads.append(
+            append(
+                path,
+                verification_outcome(
+                    f"v-{index}-a", attempt_id, digest, "pytest", first
+                ),
+            )
         )
-        append(
-            path,
-            verification_outcome(f"v-{index}-b", attempt_id, digest, "mypy", second),
+        expected_payloads.append(
+            append(
+                path,
+                verification_outcome(
+                    f"v-{index}-b", attempt_id, digest, "mypy", second
+                ),
+            )
         )
 
-    _, rejected = read_all(log_dir)
+    non_completions = events_mod.VERIFICATION_STATUSES - {"completed"}
+    for index, status in enumerate(sorted(non_completions), start=1):
+        expected_payloads.append(
+            append(
+                path,
+                verification_outcome(
+                    f"v-terminal-{index}",
+                    f"terminal-attempt-{index}",
+                    "1" * 64,
+                    f"planned-verifier-{index}",
+                    None,
+                    status=status,
+                ),
+            )
+        )
+
+    accepted, rejected = read_all(log_dir)
     conn = projection.build(log_dir, tmp_path / "state.db")
     payloads = [
         json.loads(row[0])
@@ -599,8 +648,23 @@ def test_paired_verification_outcomes_survive_append_and_replay(tmp_path):
         )
     ]
     conn.close()
+    assert [event.raw for event in accepted] == expected_payloads
+    assert payloads == expected_payloads
+    assert {
+        payload["data"]["status"]
+        for payload in payloads
+        if payload["data"]["status"] != "completed"
+    } == non_completions
+    assert all(
+        "verifier_accept" not in payload["data"]
+        for payload in payloads
+        if payload["data"]["status"] != "completed"
+    )
+    assert [payload["data"]["evidence_class"] for payload in payloads] == [
+        "execution"
+    ] * len(payloads)
     paired = {}
-    for payload in payloads:
+    for payload in payloads[: len(expected_cells) * 2]:
         data = payload["data"]
         attempt_id = data["attempt_id"]
         paired.setdefault(attempt_id, {})[data["verifier_id"]] = data["verifier_accept"]
