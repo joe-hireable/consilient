@@ -6,6 +6,15 @@ on:
   push:
     branches: [main]
 
+# Every invariant step below carries `if: ${{ !cancelled() }}`. GitHub Actions skips a
+# step once an earlier one has failed, so a single red gate disabled the other nine:
+# at the commit that shipped the first cross-family verification, `mypy --strict` was
+# red and `ruff check .` was red too, and one CI run could only ever have reported the
+# first of them [measured, 23 August 2026 -- 12 mypy errors and 17 ruff errors, both
+# present at the same commit]. An invariant suite that stops at the first failure
+# reports one defect per push; pytest does not work that way and neither should this.
+# The job still fails: a failed step fails the job, `continue-on-error` is not set.
+
 jobs:
   invariants:
     runs-on: ubuntu-latest
@@ -21,12 +30,15 @@ jobs:
           python-version: '3.13'
       - run: pip install pytest mypy ruff
       - name: Static checks
+        if: ${{ !cancelled() }}
         # Added after mypy found a reachable crash in beta.render() that 24 passing tests
         # missed. A stronger check is a lower beta; this is the ratchet applied to us.
         run: python -m mypy --strict src/consilient
       - name: Repository-wide Ruff
+        if: ${{ !cancelled() }}
         run: python -m ruff check .
       - name: Invariant checks
+        if: ${{ !cancelled() }}
         run: python -m pytest tests -q
       # The producer for every generated document is re-run and its output compared to what is
       # committed. This check existed, worked, and was wired into nothing: on 23 August 2026 it
@@ -45,19 +57,24 @@ jobs:
         # check that cannot fail -- which is the defect it exists to find.
         run: python .github/scripts/check_guard_mutation.py --self-test
       - name: Generated document drift check
+        if: ${{ !cancelled() }}
         run: python .github/scripts/check_generated_documents.py --check
       - name: Rename safety invariant check
+        if: ${{ !cancelled() }}
         run: python .github/scripts/check_rename_safety.py --check
       - name: Spend escalation invariant check
+        if: ${{ !cancelled() }}
         # V0-39 / ADR-0056 D5. On-Demand Spending is the one control that spends real money and
         # only the principal may change it. Ships before EXP-94, which must call the same Cursor
         # service read-only -- the spend-escalation methods sit on it.
         run: python .github/scripts/check_no_spend_escalation.py --check
       - name: Design token contract invariant check
+        if: ${{ !cancelled() }}
         # ADR-0060 / using-open-design. Asserts that all governed UI/CSS files
         # strictly adhere to the declared DESIGN.md color palette without undeclared inventions.
         run: python .github/scripts/check_design_tokens.py --check
       - name: Foreign identifier invariant check
+        if: ${{ !cancelled() }}
         # A path-matcher cannot see a commit identifier. `check_foreign_identifiers.py` was
         # written on 21 Aug 2026 after an audit found 71 forty-character SHAs from a private
         # commercial repository in a tracked results file, and it then had no CI step at all —
@@ -68,11 +85,13 @@ jobs:
         # than no gate. That omission is pinned by a test.
         run: python .github/scripts/check_foreign_identifiers.py --self-test
       - name: Adopted component licence invariant check
+        if: ${{ !cancelled() }}
         # The curated markdown table is not an adoption gate. This self-test proves each
         # required failure mode detects even while the tracked tree has no MCP config or
         # runtime dependency, then the same invocation binds adopted names to the record.
         run: python .github/scripts/check_component_licences.py --self-test
       - name: Replay invariant on a committed fixture trajectory, with a drift control
+        if: ${{ !cancelled() }}
         # Until 21 Aug 2026 this step ran `beta` first, "so that `replay` has a subject to
         # compare against", then required `compared && identical`. The subject `beta` leaves
         # behind is itself a rebuild from the same log — `cmd_beta` calls `projection.build`,

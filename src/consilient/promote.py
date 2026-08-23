@@ -29,7 +29,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from . import beta as beta_mod
 from .events import SCHEMA_VERSION, append, read_all
@@ -214,15 +214,20 @@ class SealedManifest:
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, object]) -> SealedManifest:
+        # A sealed manifest arrives as `Mapping[str, object]`, so every field is `object`
+        # until something narrows it. Three `type: ignore`s stood here naming error codes
+        # that were never raised, which silenced nothing and left the real `attr-defined`
+        # errors red under `--strict`; `cast` is the module's existing idiom for the same
+        # JSON-shaped narrowing (`events.py` narrows payload fields the same way).
         development = tuple(
             (str(row["prompt"]), str(row["expected"]))
-            for row in data["development_tasks"]  # type: ignore[index]
+            for row in cast(Sequence[Mapping[str, object]], data["development_tasks"])
         )
         hidden = tuple(
             (str(row["prompt"]), str(row["expected"]))
-            for row in data["hidden_items"]  # type: ignore[index]
+            for row in cast(Sequence[Mapping[str, object]], data["hidden_items"])
         )
-        allowed = data.get("allowed_imports", [])
+        allowed = cast(Sequence[object], data.get("allowed_imports", []))
         return cls(
             instrument_digest=str(data["instrument_digest"]),
             lineage_id=str(data["lineage_id"]),
@@ -231,7 +236,7 @@ class SealedManifest:
             hidden_items=hidden,
             predecessor_digest=str(data["predecessor_digest"]),
             epoch_anchor_digest=str(data["epoch_anchor_digest"]),
-            allowed_imports=frozenset(str(item) for item in allowed),  # type: ignore[arg-type]
+            allowed_imports=frozenset(str(item) for item in allowed),
             acceptance_threshold=float(data["acceptance_threshold"]),  # type: ignore[arg-type]
             seed=str(data["seed"]),
         )

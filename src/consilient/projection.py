@@ -326,8 +326,8 @@ def selected_exposure_rows(conn: sqlite3.Connection) -> list[dict[str, object]]:
     payloads = [
         cast(dict[str, object], json.loads(cast(str, row[0]))["data"]) for row in rows
     ]
-    start = int(queue["start_position"])
-    cap = int(queue["stream_cap"])
+    start = cast(int, queue["start_position"])
+    cap = cast(int, queue["stream_cap"])
     return payloads[start : start + cap]
 
 
@@ -1285,25 +1285,30 @@ def memory_record_rows(conn: sqlite3.Connection) -> list[tuple[str, tuple[object
         ):
             rows.append((table, tuple(row)))
     for view in record_temporal_views(conn):
+        # `record_temporal_views` returns `dict[str, object]`, so each field is `object`
+        # here and neither `.get` nor iteration type-checks. Narrowing once per view is
+        # the same `cast` idiom the rest of this module uses on projected payloads.
+        current = cast("dict[str, object] | None", view["current"])
+        history = cast("list[dict[str, object]]", view["history"])
+        contested_heads = cast("list[dict[str, object]]", view["contested_heads"])
+        invalidated = cast("list[dict[str, object]]", view["invalidated"])
         rows.append(
             (
                 "record_temporal",
                 (
                     view["source"],
                     view["status"],
-                    (view["current"] or {}).get("record_id")
-                    if view["current"]
-                    else None,
+                    current.get("record_id") if current else None,
                     json.dumps(
-                        [fact["record_id"] for fact in view["history"]],
+                        [fact["record_id"] for fact in history],
                         separators=(",", ":"),
                     ),
                     json.dumps(
-                        [fact["record_id"] for fact in view["contested_heads"]],
+                        [fact["record_id"] for fact in contested_heads],
                         separators=(",", ":"),
                     ),
                     json.dumps(
-                        [fact["record_id"] for fact in view["invalidated"]],
+                        [fact["record_id"] for fact in invalidated],
                         separators=(",", ":"),
                     ),
                     json.dumps(view["defects"], sort_keys=True, separators=(",", ":")),
