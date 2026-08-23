@@ -198,7 +198,6 @@ def _pytest(
             f"pythonpath={src.as_posix()}",
         ],
         cwd=cwd,
-        env=GIT_ENV,
         capture_output=True,
         text=True,
         encoding="utf-8",
