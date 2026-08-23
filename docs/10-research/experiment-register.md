@@ -5542,6 +5542,102 @@ the one real overlap was a protocol race, invisible to claim content); anything 
 surfaces. [asserted]
 
 ---
+
+### EXP-132 · Can the zero-cost ladder complete representative work without hidden spend or verifier-risk regression? `BLOCKED`
+
+**Pre-registered 23 Aug 2026; no model outcome or authenticated provider catalogue was inspected.**
+Dispatch `20260823T094246-92012d7dd9` allocated EXP-132 after a fresh search of tracked files,
+untracked dispatch state, `.harness` logs and reservation artefacts found no existing allocation of
+the identifier. Public provider documentation was read to design the instrument; no inference or
+metered call was made. [measured]
+
+**Decides:** two claims separately. First, whether the frozen zero-configuration local route and the
+automatic one-key free-cloud route each deliver useful **supervised** work at zero cash cost on a
+representative, licence-safe task bank. Second, whether any exact
+`(domain, harness, provider, model revision, verifier contract, task stratum)` composition has enough
+human-labelled adverse outcomes to permit automatic acceptance under ADR-0077's robust candidate-
+exposure ceiling. Passing the first claim never implies passing the second. [asserted]
+
+**Precondition:** ADR-0088's ladder is implemented behind the existing dispatch boundary; the route
+records exact composition and rung, proves zero-price eligibility immediately before admission,
+reserves every provider-native quota dimension, types rate exhaustion as adverse, and cannot cross
+from a free rung to a metered rung. The local arm must run on the frozen reference machine below; the
+cloud arm needs separately supplied free-plan credentials whose secrets remain outside the repository.
+A bank owner who did not build the routes seals 40 public, permissively licensed tasks before any arm
+runs: ten bounded text transformations, ten structured extraction/classification tasks, ten small code
+repairs with frozen tests, and ten repository-investigation tasks with sealed answer keys. Each task has
+a task-native verifier, a material-correction rubric and a 20-minute deadline. Until the route, bank,
+credential isolation and authenticated human-verdict ingress exist, the experiment remains `BLOCKED`.
+[asserted]
+
+**Procedure:** freeze the task bank, verifier revisions, route catalogue snapshot, prompt/context,
+deadlines and arm order before inspecting any outcome. Run each task once in each available arm from
+an isolated identical starting state: `Z0`, the automatic local route on a 16 GB RAM Windows laptop
+with no discrete GPU and no cached model; `Z1`, the one-key free-cloud ladder using only providers and
+models freshly proved free for that account; and `S`, one existing subscription composition selected
+and frozen before outcomes as the comparator. The same tools and task information are available in
+all arms. `Z0` includes model download and fit in its deadline; `Z1` includes discovery and quota
+admission. No retry, replacement, best-of-N, manual rescue, catalogue cherry-picking or paid fallback
+is allowed. [asserted]
+
+Seal every terminal artefact before its task-native verifier runs once. An authenticated reviewer,
+blinded to arm and exact composition, independently labels it accept/reject and whether material
+correction was required. Joint success requires both verifier and reviewer acceptance without material
+correction. Refusal, timeout, rate limit, quarantine, partial, invalid or missing artefact/verdict and
+instrument failure remain in the assigned arm and count as joint success `0`; all elapsed time and
+quota consumption remain. Any artefact-producing attempt counts conservatively as one candidate
+exposure. [asserted]
+
+**Measures:** report the 120 assigned task outcomes and raw denominators by arm, stratum and exact
+composition; joint, verifier-only and human-only acceptance; refusal, timeout, rate-limit, quarantine,
+partial and missing counts; wall time; download bytes; provider-native request/token/day/concurrency
+quota before and after; catalogue identity and freshness; and `actual_metered_usd`. Missing resource
+state is unavailable, never zero. Report the complete verifier-by-human contingency table and
+`q = P(bad and verifier-accepted)` for each exact composition. Report conditional
+`beta = P(verifier accepts | human rejects)` with a one-sided 95% Clopper-Pearson upper bound only
+where that composition has at least 30 authenticated human rejections; otherwise report
+`insufficient_safety_evidence`. Never pool models, revisions, rungs, task strata or verifier contracts
+to manufacture the denominator. [asserted] [algebra]
+
+A zero-cost arm confirms **useful supervised work** only if it records zero metered spend, no immediate-
+kill event, at least 24/40 joint successes, at least 4/10 joint successes in every stratum, and at least
+36/40 non-missing terminal outcomes. It confirms **automatic acceptance** for an exact composition only
+if useful supervised work is already confirmed for its arm, at least 30 human rejections exist for
+that composition, and the one-sided 95% upper bound on `q` is at most the frozen exposure budget used
+by routing. In the absence of a directly measured `q` bound, ADR-0077's conservative substitution
+`q_upper := beta_upper` applies. An unmeasured composition therefore gets zero automatic candidate
+exposures even when its supervised work is useful. [asserted] [algebra]
+
+**Stopping rule, fixed before the run:** stop when all 120 assigned arm-task outcomes are terminal or
+30 calendar days after the first attempt, whichever comes first. At day 30 every missing outcome is
+adverse. Inspect no pooled efficacy result before stopping; replace no task, model, provider or arm.
+Stop immediately and kill the affected zero-cost claim if any non-zero charge or paid endpoint is
+used; a secret enters the repository, brief, log or child environment; model/provider identity is
+unknown or differs from admission; a free route crosses to a subscription or metered route; a partial
+artefact is accepted; an unauthenticated reviewer verdict enters the beta denominator; private or
+licence-incompatible data leaves its boundary; or an exact rollback fails. There is no efficacy or
+futility stop. [asserted]
+
+**Pre-declared loss condition:** the free-tier-trap case wins for an arm if useful supervised work is
+not confirmed, if rate limits or catalogue unavailability affect more than 4/40 assignments, or if
+zero-price eligibility cannot be proved for more than 4/40 admissions. The subscription comparator is
+reported, not used to rescue either arm. Opposing confirm and loss conditions resolve to loss. Any
+other shape is inconclusive and leaves that route supervised-only or unavailable. [asserted]
+
+**Largest plausible effect (ADR-0050):** success can justify advertising the exact tested arm as a
+supervised zero-cost path and can qualify only exact compositions with sufficient safety evidence for
+ADR-0077 routing. Failure removes or narrows the zero-cost claim and makes the interface say that the
+task requires a subscription or is unavailable. No outcome changes Gate A, Gate B,
+`routing_orchestration_enabled`, the six-command CLI, spend authority, provider allowlists or the
+principal's exclusive approval authority. [asserted]
+
+**What it cannot decide:** quality on larger machines, private repositories, other task distributions,
+later provider catalogues or model revisions; long-run free-tier stability; whether a weaker model has
+higher conditional beta; whether model-family diversity is a different class of facts; total cost when
+human time, electricity or hardware depreciation is unpriced; unattended use in another repository;
+or permission to spend, publish, approve or lift a gate. [asserted]
+
+---
 ## Not experiments
 
 **Q4** (what v0 optimises for), **Q14** (does the Inquiry tier belong in v0), **Q15/Q23**
