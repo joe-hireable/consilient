@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import cast
 
 from .events import (
+    DELIVERY_ESTIMATE_KIND,
     OUTCOME_KIND,
     RECORD_CAPTURED_KIND,
     USAGE_KIND,
@@ -114,6 +115,27 @@ CREATE TABLE IF NOT EXISTS record_defects (
     defect_kind TEXT NOT NULL,
     detail      TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS delivery_estimates (
+    position                 INTEGER PRIMARY KEY,
+    delivery_id              TEXT NOT NULL,
+    estimate_id              TEXT NOT NULL UNIQUE,
+    revision                 INTEGER NOT NULL,
+    predecessor_estimate_id  TEXT,
+    original_estimate_id     TEXT NOT NULL,
+    commitment_digest        TEXT NOT NULL,
+    plan_digest              TEXT NOT NULL,
+    earliest_at              TEXT NOT NULL,
+    latest_at                TEXT NOT NULL,
+    issued_at                TEXT NOT NULL,
+    evidence_class           TEXT NOT NULL,
+    method                   TEXT NOT NULL,
+    sample_size              INTEGER NOT NULL,
+    cause                    TEXT,
+    notice_preceded_upper_bound INTEGER NOT NULL,
+    payload                  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS delivery_estimates_delivery
+    ON delivery_estimates (delivery_id, revision);
 """
 
 class ProjectionError(RuntimeError):
@@ -199,6 +221,8 @@ def _apply(
             _apply_usage(conn, position, event)
         elif event.kind == RECORD_CAPTURED_KIND:
             _apply_record_captured(conn, position, event, workspace, event_index)
+        elif event.kind == DELIVERY_ESTIMATE_KIND:
+            _apply_delivery_estimate(conn, position, event)
 
 
 def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:
@@ -314,6 +338,72 @@ def _apply_verdict(conn: sqlite3.Connection, position: int, event: Event) -> Non
         "UPDATE outcomes SET human_verdict = ? WHERE attempt_id = ?",
         (verdict, attempt_id),
     )
+
+
+def _apply_delivery_estimate(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
+    data = event.data
+    estimate_id = cast(str, data["estimate_id"])
+    if conn.execute(
+        "SELECT 1 FROM delivery_estimates WHERE estimate_id = ?", (estimate_id,)
+    ).fetchone():
+        raise ProjectionError(
+            f"duplicate estimate_id {estimate_id!r} at position {position}"
+        )
+    delivery_id = cast(str, data["delivery_id"])
+    revision = cast(int, data["revision"])
+    existing = conn.execute(
+        "SELECT revision FROM delivery_estimates WHERE delivery_id = ? ORDER BY revision DESC LIMIT 1",
+        (delivery_id,),
+    ).fetchone()
+    if revision == 0:
+        if existing is not None:
+            raise ProjectionError(
+                f"delivery.estimate revision zero already exists for {delivery_id!r}"
+            )
+    elif existing is None or revision != cast(int, existing[0]) + 1:
+        raise ProjectionError(
+            f"delivery.estimate revision {revision} is out of sequence for {delivery_id!r}"
+        )
+    conn.execute(
+        "INSERT INTO delivery_estimates (position, delivery_id, estimate_id, revision,"
+        " predecessor_estimate_id, original_estimate_id, commitment_digest, plan_digest,"
+        " earliest_at, latest_at, issued_at, evidence_class, method, sample_size, cause,"
+        " notice_preceded_upper_bound, payload)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            position,
+            delivery_id,
+            estimate_id,
+            revision,
+            data.get("predecessor_estimate_id"),
+            data["original_estimate_id"],
+            data["commitment_digest"],
+            data["plan_digest"],
+            data["earliest_at"],
+            data["latest_at"],
+            data["issued_at"],
+            data["evidence_class"],
+            data["method"],
+            data["sample_size"],
+            data.get("cause"),
+            int(bool(data["notice_preceded_upper_bound"])),
+            json.dumps(
+                event.raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+        ),
+    )
+
+
+def delivery_estimate_chain(
+    conn: sqlite3.Connection, delivery_id: str
+) -> list[dict[str, object]]:
+    rows = conn.execute(
+        "SELECT payload FROM delivery_estimates WHERE delivery_id = ? ORDER BY revision",
+        (delivery_id,),
+    ).fetchall()
+    return [cast(dict[str, object], json.loads(cast(str, row[0]))["data"]) for row in rows]
 
 
 def _apply_verdict_correction(

@@ -24,11 +24,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import sys
 import time
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -196,6 +197,49 @@ VISIBILITY_LEVELS = ("silent", "milestones", "decisions", "firehose")
 VISIBILITY_DEFAULT = "milestones"
 VISIBILITY_CHANGE_KIND = "visibility.change"
 
+DELIVERY_ESTIMATE_KIND = "delivery.estimate"
+DELIVERY_ACTOR = "consilient.delivery"
+DELIVERY_OUTCOME_KINDS = frozenset(
+    {"delivery.outcome", "dispatch.outcome", OUTCOME_KIND}
+)
+ESTIMATE_CAUSES = frozenset(
+    {
+        "scope_change",
+        "route_change",
+        "checkpoint_miss",
+        "dependency_failure",
+        "estimate_error",
+    }
+)
+_ESTIMATE_REQUIRED_FIELDS = frozenset(
+    {
+        "delivery_id",
+        "commitment_id",
+        "commitment_digest",
+        "plan_digest",
+        "estimate_id",
+        "revision",
+        "predecessor_estimate_id",
+        "original_estimate_id",
+        "earliest_at",
+        "latest_at",
+        "issued_at",
+        "evidence_class",
+        "analogue_ids",
+        "sample_size",
+        "method",
+        "stream_bounds",
+        "resource_snapshot_digest",
+        "checkpoint_interval_s",
+        "recovery_allowance_s",
+        "not_included",
+        "cohort_key",
+        "estimate_digest",
+        "cause",
+        "notice_preceded_upper_bound",
+    }
+)
+
 
 class EventError(ValueError):
     """An event was rejected before it reached the log."""
@@ -310,6 +354,7 @@ def validate(event: object) -> EventPayload:
     _check_human_authority(event)
     _check_evidence_class(event)
     _check_dispatch_contract(event)
+    _check_delivery_estimate_contract(event)
     try:
         effects.validate_effect_event(event)
     except effects.EffectError as exc:
@@ -1615,6 +1660,7 @@ def _transaction(
                 registered = _TRANSITION_VALIDATORS.get(candidate["event"])
                 if registered is not None:
                     registered(prefix, rejections, batch)
+            _validate_delivery_claim_ordering(prefix, rejections, batch)
             offset = os.lseek(fd, 0, os.SEEK_END)
             try:
                 for candidate in batch:
@@ -1930,3 +1976,472 @@ def prefix_digest(path: Path, count: int) -> str:
             f"{path} has {len(lines)} lines, cannot digest a prefix of {count}"
         )
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def _estimate_text(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise EventError(f"{field} must be a non-empty string")
+    return value
+
+
+def _estimate_digest_field(value: object, field: str) -> str:
+    text = _estimate_text(value, field)
+    if DIGEST_RE.fullmatch(text) is None:
+        raise EventError(f"{field} must be a lowercase SHA-256 digest")
+    return text
+
+
+def _estimate_timestamp(value: object, field: str) -> str:
+    text = _estimate_text(value, field)
+    if not TS.match(text):
+        raise EventError(f"{field} must be RFC3339 with an explicit offset")
+    try:
+        datetime.fromisoformat(text).astimezone(timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise EventError(f"{field} is not a valid calendar timestamp") from exc
+    return text
+
+
+def _estimate_non_negative_int(value: object, field: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise EventError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _check_estimate_cohort(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise EventError("cohort_key must be an object")
+    parsed: dict[str, str] = {}
+    for field in (
+        "artefact_kind",
+        "verifier_contract_digest",
+        "size_band",
+        "route_capability_class",
+    ):
+        parsed[field] = _estimate_text(value.get(field), f"cohort_key.{field}")
+        if field.endswith("_digest"):
+            _estimate_digest_field(parsed[field], f"cohort_key.{field}")
+    return parsed
+
+
+def _check_estimate_analogue(value: object) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        raise EventError("analogue_ids must be an array")
+    parsed: list[dict[str, str]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise EventError(f"analogue_ids[{index}] must be an object")
+        event_id = _estimate_text(item.get("event_id"), f"analogue_ids[{index}].event_id")
+        _check_uuid4(event_id, f"analogue_ids[{index}].event_id")
+        event_kind = _estimate_text(item.get("event_kind"), f"analogue_ids[{index}].event_kind")
+        event_digest = _estimate_digest_field(
+            item.get("event_sha256"), f"analogue_ids[{index}].event_sha256"
+        )
+        parsed.append(
+            {
+                "event_id": event_id,
+                "event_kind": event_kind,
+                "event_sha256": event_digest,
+            }
+        )
+    return parsed
+
+
+def _check_stream_bounds(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list) or not value:
+        raise EventError("stream_bounds must be a non-empty array")
+    parsed: list[dict[str, object]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise EventError(f"stream_bounds[{index}] must be an object")
+        stream_id = _estimate_text(item.get("stream_id"), f"stream_bounds[{index}].stream_id")
+        earliest_s = _estimate_non_negative_int(
+            item.get("earliest_s"), f"stream_bounds[{index}].earliest_s"
+        )
+        latest_s = _estimate_non_negative_int(
+            item.get("latest_s"), f"stream_bounds[{index}].latest_s"
+        )
+        if latest_s < earliest_s:
+            raise EventError(
+                f"stream_bounds[{index}].latest_s must be >= stream_bounds[{index}].earliest_s"
+            )
+        parsed.append(
+            {"stream_id": stream_id, "earliest_s": earliest_s, "latest_s": latest_s}
+        )
+    return parsed
+
+
+def estimate_digest(data: Mapping[str, object]) -> str:
+    payload = {
+        key: value
+        for key, value in data.items()
+        if key != "estimate_digest"
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _check_delivery_estimate_contract(event: EventPayload) -> None:
+    if event["event"] != DELIVERY_ESTIMATE_KIND:
+        return
+    if event["actor"] != DELIVERY_ACTOR:
+        raise EventError(
+            f"{DELIVERY_ESTIMATE_KIND} must be attributed to declared writer {DELIVERY_ACTOR!r}"
+        )
+    data = event["data"]
+    actual = set(data)
+    if actual != _ESTIMATE_REQUIRED_FIELDS:
+        missing = sorted(_ESTIMATE_REQUIRED_FIELDS - actual)
+        unexpected = sorted(actual - _ESTIMATE_REQUIRED_FIELDS)
+        detail = []
+        if missing:
+            detail.append(f"missing {missing}")
+        if unexpected:
+            detail.append(f"unexpected {unexpected}")
+        raise EventError(
+            f"{DELIVERY_ESTIMATE_KIND} body fields are fixed: {'; '.join(detail)}"
+        )
+    _estimate_text(data["delivery_id"], "delivery_id")
+    _estimate_text(data["commitment_id"], "commitment_id")
+    _estimate_digest_field(data["commitment_digest"], "commitment_digest")
+    _estimate_digest_field(data["plan_digest"], "plan_digest")
+    _check_uuid4(data["estimate_id"], "estimate_id")
+    revision = data["revision"]
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+        raise EventError("revision must be a non-negative integer")
+    predecessor = data["predecessor_estimate_id"]
+    original = data["original_estimate_id"]
+    if revision == 0:
+        if predecessor is not None:
+            raise EventError("revision zero must not carry predecessor_estimate_id")
+        if original != data["estimate_id"]:
+            raise EventError("revision zero original_estimate_id must equal estimate_id")
+        if data.get("cause") is not None:
+            raise EventError("revision zero must not carry cause")
+        if data["notice_preceded_upper_bound"] is not False:
+            raise EventError("revision zero notice_preceded_upper_bound must be false")
+    else:
+        if not isinstance(predecessor, str):
+            raise EventError("revisions after zero must carry predecessor_estimate_id")
+        _check_uuid4(predecessor, "predecessor_estimate_id")
+        _check_uuid4(original, "original_estimate_id")
+        cause = data.get("cause")
+        if cause not in ESTIMATE_CAUSES:
+            raise EventError(
+                f"revisions after zero must carry cause in {sorted(ESTIMATE_CAUSES)}"
+            )
+        notice = data["notice_preceded_upper_bound"]
+        if not isinstance(notice, bool):
+            raise EventError("notice_preceded_upper_bound must be a boolean")
+    earliest = _estimate_timestamp(data["earliest_at"], "earliest_at")
+    latest = _estimate_timestamp(data["latest_at"], "latest_at")
+    if datetime.fromisoformat(latest) < datetime.fromisoformat(earliest):
+        raise EventError("latest_at must be on or after earliest_at")
+    _estimate_timestamp(data["issued_at"], "issued_at")
+    _estimate_text(data["evidence_class"], "evidence_class")
+    _check_estimate_analogue(data["analogue_ids"])
+    sample_size = data["sample_size"]
+    if not isinstance(sample_size, int) or isinstance(sample_size, bool) or sample_size < 0:
+        raise EventError("sample_size must be a non-negative integer")
+    _estimate_text(data["method"], "method")
+    _check_stream_bounds(data["stream_bounds"])
+    _estimate_digest_field(data["resource_snapshot_digest"], "resource_snapshot_digest")
+    _estimate_non_negative_int(data["checkpoint_interval_s"], "checkpoint_interval_s")
+    _estimate_non_negative_int(data["recovery_allowance_s"], "recovery_allowance_s")
+    not_included = data["not_included"]
+    if not isinstance(not_included, list):
+        raise EventError("not_included must be an array")
+    for index, item in enumerate(not_included):
+        _estimate_text(item, f"not_included[{index}]")
+    _check_estimate_cohort(data["cohort_key"])
+    digest = data["estimate_digest"]
+    if digest != estimate_digest(data):
+        raise EventError("estimate_digest does not match the frozen estimate")
+
+
+def _cohort_matches(candidate: Mapping[str, object], cohort_key: Mapping[str, str]) -> bool:
+    cohort = candidate.get("estimate_cohort")
+    if not isinstance(cohort, dict):
+        return False
+    for field, expected in cohort_key.items():
+        value = cohort.get(field)
+        if value != expected:
+            return False
+    return True
+
+
+def _outcome_reference(event: Event) -> dict[str, str]:
+    return {
+        "event_id": cast(str, event.raw["event_id"]),
+        "event_kind": event.kind,
+        "event_sha256": event_sha256(event.raw),
+    }
+
+
+def _outcome_duration_s(data: Mapping[str, object]) -> float | None:
+    duration = data.get("duration_s")
+    if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+        return float(duration)
+    elapsed = data.get("elapsed_s")
+    if isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool):
+        return float(elapsed)
+    return None
+
+
+def _outcome_is_censored(data: Mapping[str, object]) -> bool:
+    if data.get("timed_out") is True:
+        return True
+    status = data.get("status")
+    return status in {"error", "refused", "timeout"}
+
+
+def _outcome_is_completed(data: Mapping[str, object]) -> bool:
+    if _outcome_is_censored(data):
+        return False
+    if data.get("verifier_accept") is False:
+        return False
+    status = data.get("status")
+    if status is None:
+        return True
+    return status == "ok"
+
+
+def _nearest_rank_percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        raise EventError("percentile requires at least one value")
+    ordered = sorted(values)
+    index = max(0, min(len(ordered) - 1, math.ceil(percentile * len(ordered)) - 1))
+    return ordered[index]
+
+
+def _schedule_stream_bounds(
+  plan: Mapping[str, object],
+  *,
+  lower_s: int,
+  upper_s: int,
+) -> list[dict[str, object]]:
+    streams = cast(list[dict[str, object]], plan["streams"])
+    return [
+        {
+            "stream_id": cast(str, stream["stream_id"]),
+            "earliest_s": lower_s,
+            "latest_s": upper_s,
+        }
+        for stream in streams
+    ]
+
+
+def derive_delivery_estimate(
+    prefix: Sequence[Event],
+    *,
+    plan: Mapping[str, object],
+    delivery_id: str,
+    issued_at: datetime,
+    cohort_key: Mapping[str, str],
+    resource_snapshot_digest: str,
+    checkpoint_interval_s: int,
+    recovery_allowance_s: int,
+    not_included: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Derive one revision-zero delivery estimate from plan inputs and prior outcomes."""
+    matching: list[Event] = []
+    completed_durations: list[float] = []
+    censored_floors: list[float] = []
+    for event in prefix:
+        if event.kind not in DELIVERY_OUTCOME_KINDS:
+            continue
+        if not _cohort_matches(event.data, cohort_key):
+            continue
+        matching.append(event)
+        duration = _outcome_duration_s(event.data)
+        if duration is None:
+            continue
+        if _outcome_is_completed(event.data):
+            completed_durations.append(duration)
+        elif _outcome_is_censored(event.data):
+            censored_floors.append(duration + recovery_allowance_s)
+
+    analogue_ids = [_outcome_reference(event) for event in matching]
+    estimate_inputs = cast(dict[str, object], plan["estimate_inputs"])
+    cold_lower = cast(int, estimate_inputs["duration_lower_s"])
+    cold_upper = cast(int, estimate_inputs["duration_upper_s"])
+
+    if len(completed_durations) >= 5:
+        lower_s = int(_nearest_rank_percentile(completed_durations, 0.10))
+        upper_s = int(_nearest_rank_percentile(completed_durations, 0.90))
+        evidence_class = "measured"
+        method = "comparable_deliveries_percentile"
+    else:
+        lower_s = cold_lower
+        upper_s = cold_upper
+        evidence_class = "asserted: low evidence"
+        method = "cold_start_slice_schedule"
+
+    for floor in censored_floors:
+        upper_s = max(upper_s, int(math.ceil(floor)))
+
+    earliest_at = issued_at + timedelta(seconds=lower_s)
+    latest_at = issued_at + timedelta(seconds=upper_s)
+    estimate_id = new_event_id()
+    payload: dict[str, object] = {
+        "delivery_id": delivery_id,
+        "commitment_id": cast(str, plan["commitment_id"]),
+        "commitment_digest": cast(str, plan["commitment_digest"]),
+        "plan_digest": cast(str, plan["plan_digest"]),
+        "estimate_id": estimate_id,
+        "revision": 0,
+        "predecessor_estimate_id": None,
+        "original_estimate_id": estimate_id,
+        "earliest_at": earliest_at.isoformat(),
+        "latest_at": latest_at.isoformat(),
+        "issued_at": issued_at.isoformat(),
+        "evidence_class": evidence_class,
+        "analogue_ids": analogue_ids,
+        "sample_size": len(completed_durations),
+        "method": method,
+        "stream_bounds": _schedule_stream_bounds(plan, lower_s=lower_s, upper_s=upper_s),
+        "resource_snapshot_digest": resource_snapshot_digest,
+        "checkpoint_interval_s": checkpoint_interval_s,
+        "recovery_allowance_s": recovery_allowance_s,
+        "not_included": list(not_included or []),
+        "cohort_key": dict(cohort_key),
+        "cause": None,
+        "notice_preceded_upper_bound": False,
+    }
+    payload["estimate_digest"] = estimate_digest(payload)
+    return payload
+
+
+def _delivery_estimates_by_id(prefix: Sequence[object]) -> dict[str, dict[str, object]]:
+    tips: dict[str, dict[str, object]] = {}
+    for item in prefix:
+        if not isinstance(item, Event):
+            if not isinstance(item, dict):
+                continue
+            kind = item.get("event")
+            data = item.get("data")
+        else:
+            kind = item.kind
+            data = item.data
+        if kind != DELIVERY_ESTIMATE_KIND or not isinstance(data, dict):
+            continue
+        delivery_id = data.get("delivery_id")
+        estimate_id = data.get("estimate_id")
+        if isinstance(delivery_id, str) and isinstance(estimate_id, str):
+            tips[delivery_id] = data
+    return tips
+
+
+def _plan_for_estimate(
+    prefix: Sequence[Event], plan_digest: str
+) -> Mapping[str, object] | None:
+    for event in prefix:
+        if event.kind != "organisation.plan.frozen":
+            continue
+        if event.data.get("plan_digest") == plan_digest:
+            return event.data
+    return None
+
+
+def _validate_delivery_estimate_transition(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    tips = _delivery_estimates_by_id(prefix)
+    rev0: dict[str, dict[str, object]] = {}
+    for item in prefix:
+        if item.kind != DELIVERY_ESTIMATE_KIND:
+            continue
+        data = item.data
+        if data.get("revision") == 0:
+            rev0[cast(str, data["delivery_id"])] = data
+
+    for candidate in candidates:
+        if candidate["event"] != DELIVERY_ESTIMATE_KIND:
+            continue
+        data = candidate["data"]
+        delivery_id = cast(str, data["delivery_id"])
+        revision = cast(int, data["revision"])
+        plan_digest = cast(str, data["plan_digest"])
+        plan = _plan_for_estimate(prefix, plan_digest)
+        if plan is None:
+            raise EventError(
+                "delivery.estimate must reference a matching organisation.plan.frozen digest"
+            )
+
+        if revision == 0:
+            if delivery_id in rev0:
+                raise EventError("delivery.estimate revision zero is append-only")
+            derived = derive_delivery_estimate(
+                prefix,
+                plan=plan,
+                delivery_id=delivery_id,
+                issued_at=datetime.fromisoformat(cast(str, data["issued_at"])),
+                cohort_key=cast(dict[str, str], data["cohort_key"]),
+                resource_snapshot_digest=cast(str, data["resource_snapshot_digest"]),
+                checkpoint_interval_s=cast(int, data["checkpoint_interval_s"]),
+                recovery_allowance_s=cast(int, data["recovery_allowance_s"]),
+                not_included=cast(list[str], data["not_included"]),
+            )
+            if data["analogue_ids"] != derived["analogue_ids"]:
+                raise EventError(
+                    "outcome-aware cohort selection is refused; analogue_ids must list every "
+                    "cohort-matching outcome"
+                )
+            continue
+
+        predecessor_id = cast(str, data["predecessor_estimate_id"])
+        tip = tips.get(delivery_id)
+        original = rev0.get(delivery_id)
+        if tip is None or original is None:
+            raise EventError("delivery.estimate revision zero must exist before reforecast")
+        if tip.get("estimate_id") != predecessor_id:
+            raise EventError("predecessor_estimate_id must reference the latest estimate")
+        if data.get("original_estimate_id") != original.get("estimate_id"):
+            raise EventError("original_estimate_id must reference revision zero")
+
+        prior_latest = datetime.fromisoformat(cast(str, tip["latest_at"]))
+        issued = datetime.fromisoformat(cast(str, data["issued_at"]))
+        if issued > prior_latest:
+            raise EventError(
+                "delivery.estimate reforecast must be pre-breach; issued_at exceeds prior latest_at"
+            )
+        new_latest = datetime.fromisoformat(cast(str, data["latest_at"]))
+        if new_latest <= prior_latest:
+            raise EventError("reforecast must widen or move the delivery window upward")
+        tips[delivery_id] = data
+
+
+def _validate_delivery_claim_ordering(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    rev0 = {
+        cast(str, event.data["delivery_id"]): event.data
+        for event in prefix
+        if event.kind == DELIVERY_ESTIMATE_KIND and event.data.get("revision") == 0
+    }
+    for candidate in candidates:
+        if candidate["event"] != "work_item.opened":
+            continue
+        data = candidate["data"]
+        delivery_id = data.get("delivery_id")
+        if not isinstance(delivery_id, str):
+            continue
+        estimate = rev0.get(delivery_id)
+        if estimate is None:
+            raise EventError(
+                "delivery.estimate revision zero must be durable before a delivery claim"
+            )
+        for field in ("commitment_digest", "plan_digest"):
+            if data.get(field) != estimate.get(field):
+                raise EventError(
+                    f"delivery claim {field} must match delivery.estimate revision zero"
+                )
+
+
+register_transition_validator(
+    (DELIVERY_ESTIMATE_KIND,), _validate_delivery_estimate_transition
+)
