@@ -5551,91 +5551,468 @@ untracked dispatch state, `.harness` logs and reservation artefacts found no exi
 the identifier. Public provider documentation was read to design the instrument; no inference or
 metered call was made. [measured]
 
-**Decides:** two claims separately. First, whether the frozen zero-configuration local route and the
-automatic one-key free-cloud route each deliver useful **supervised** work at zero cash cost on a
-representative, licence-safe task bank. Second, whether any exact
-`(domain, harness, provider, model revision, verifier contract, task stratum)` composition has enough
-human-labelled adverse outcomes to permit automatic acceptance under ADR-0077's robust candidate-
-exposure ceiling. Passing the first claim never implies passing the second. [asserted]
+**Decides:** two frozen-bank claims separately. First, whether the zero-configuration local route and
+one-key free-cloud route each deliver useful **supervised** work at zero cash cost. Second, whether
+their exact compositions produce enough human-rejected artefacts for the frozen verifier's conditional
+beta and bad-and-accepted risk `q` to remain below the fixed diagnostic ceiling `epsilon = 0.40` on the
+sealed bank. Passing either claim does **not** permit automatic acceptance: this experiment has no
+coverage-valid sampling frame for future user tasks, so a separate preregistered population experiment
+would still be required by ADR-0077. [asserted]
 
 **Precondition:** ADR-0088's ladder is implemented behind the existing dispatch boundary; the route
-records exact composition and rung, proves zero-price eligibility immediately before admission,
-reserves every provider-native quota dimension, types rate exhaustion as adverse, and cannot cross
-from a free rung to a metered rung. The local arm must run on the frozen reference machine below; the
-cloud arm needs separately supplied free-plan credentials whose secrets remain outside the repository.
-A bank owner who did not build the routes seals 40 public, permissively licensed tasks before any arm
-runs: ten bounded text transformations, ten structured extraction/classification tasks, ten small code
-repairs with frozen tests, and ten repository-investigation tasks with sealed answer keys. Each task has
-a task-native verifier, a material-correction rubric and a 20-minute deadline. Until the route, bank,
-credential isolation and authenticated human-verdict ingress exist, the experiment remains `BLOCKED`.
+records front-door provider, upstream endpoint, model revision/system fingerprint and rung; proves
+zero-price eligibility immediately before admission; grants only a local quota lease or the bounded
+unbillable one-request bootstrap; types rate exhaustion as adverse; and cannot cross from a free or
+subscription rung to a metered rung. Z0 supplies its approved pinned inference runtime through the
+Consilient installation path; no separately installed Ollama/`llama.cpp` is allowed. Every
+subscription comparator outcome is bound to authenticated account/plan/headroom evidence, a
+provider-side hard zero-marginal-charge boundary with overage/automatic top-up disabled or proved
+impossible, and ambient metered credentials removed. Neither the keyed nor subscription arm can run
+until ADR-0084's hostile same-user process/file/network/IPC conformance lets the authenticated adapter
+or harness operate behind an outer boundary while denying the child access to broker and subscription
+credentials. [asserted]
+
+Before any route or outcome is visible, a bank owner who did not build the routes seals two public,
+permissively licensed panels with source/licence manifests, inclusion rules, immutable ordering and
+digests, plus one cold-install smoke task. Panel `U` has 40 tasks: ten bounded text transformations, ten structured
+extraction/classification tasks, ten small code repairs with frozen tests and ten repository-
+investigation tasks with sealed answer keys. Panel `B` has 120 additional tasks in each of those four
+strata (480 total). Every task has a task-native verifier, material-correction rubric and 20-minute
+deadline. The panels are constructed rather than sampled from a declared future-task population;
+therefore every interval and decision is explicitly limited to these sealed tasks. Until the route,
+panels, outer credential isolation and authenticated human-verdict ingress exist, the experiment
+remains `BLOCKED`. [asserted]
+
+**Procedure:** freeze verifier revisions, route catalogue snapshot, prompt/context, deadlines and arm
+order before inspecting any outcome. Apply the normal frozen ladder ranking once at day 0 to select
+all three arm identities and digest them. First run `C0` once on the clean 16 GB/no-GPU Windows
+reference with no cached model or preinstalled inference runtime; its 20-minute deadline includes
+approved runtime/model acquisition and the frozen smoke task. Seal its result, then freeze the acquired
+runtime, model digest and fit receipt for every later Z0 attempt. If `C0` does not acquire them, every
+Z0 panel outcome remains assigned and adverse; no manual install or repeated download is permitted.
 [asserted]
 
-**Procedure:** freeze the task bank, verifier revisions, route catalogue snapshot, prompt/context,
-deadlines and arm order before inspecting any outcome. Run each task once in each available arm from
-an isolated identical starting state: `Z0`, the automatic local route on a 16 GB RAM Windows laptop
-with no discrete GPU and no cached model; `Z1`, the one-key free-cloud ladder using only providers and
-models freshly proved free for that account; and `S`, one existing subscription composition selected
-and frozen before outcomes as the comparator. The same tools and task information are available in
-all arms. `Z0` includes model download and fit in its deadline; `Z1` includes discovery and quota
-admission. No retry, replacement, best-of-N, manual rescue, catalogue cherry-picking or paid fallback
+Run every `U` task once in each arm from an otherwise isolated identical starting state: `Z0`, using
+the warm runtime/model frozen by `C0`; `Z1`, exactly one key, one front-door provider, one frozen
+upstream endpoint and one explicit model revision freshly proved unbillable for that account; and `S`,
+one authenticated subscription composition. Later unavailability is adverse, not permission to replace them.
+Every `Z1` task is one bounded provider request and includes discovery, local quota admission and
+endpoint-policy enforcement. Before the first `S` outcome, an exhaustion plus concurrent-headroom
+race fixture must prove that the provider refuses rather than debits overage or top-up; failure makes
+the comparator unavailable. [asserted]
+
+For every `C0`, `U` and `B` artefact, an independent presentation process strips route metadata, normalises
+container metadata and line endings, and uses an order/seed frozen before outcomes. The authenticated
+reviewer sees the task and one artefact at a time, blinded to arm, rung, front-door/upstream provider,
+model identity, verifier result and paired counterpart. Record any identity cue intrinsic to the
+artefact as unavoidable blindness leakage; never remove or replace that outcome. [asserted]
+
+Then run `B` separately for `Z0` and `Z1`, in its presealed order, within every task stratum. Continue
+a composition/stratum cell until its first 30 authenticated human rejections are sealed or all 120
+tasks in that cell are terminal. The reviewer labels each artefact before the verifier result is
+revealed, so stopping cannot depend on verifier acceptance. Run the frozen verifier once on every
+sealed artefact; retain only the first 30 human rejections as that cell's conditional-beta panel while
+reporting all attempts and `q` outcomes. No retry,
+replacement, best-of-N, manual rescue, catalogue cherry-picking, cross-cell pooling or paid fallback
 is allowed. [asserted]
 
-Seal every terminal artefact before its task-native verifier runs once. An authenticated reviewer,
-blinded to arm and exact composition, independently labels it accept/reject and whether material
-correction was required. Joint success requires both verifier and reviewer acceptance without material
+Joint success requires task-native verifier and authenticated reviewer acceptance without material
 correction. Refusal, timeout, rate limit, quarantine, partial, invalid or missing artefact/verdict and
-instrument failure remain in the assigned arm and count as joint success `0`; all elapsed time and
-quota consumption remain. Any artefact-producing attempt counts conservatively as one candidate
-exposure. [asserted]
+instrument failure stay in the assigned arm and count as joint success `0`; all elapsed time and quota
+consumption remain. Any artefact-producing attempt counts conservatively as one candidate exposure.
+[asserted]
 
-**Measures:** report the 120 assigned task outcomes and raw denominators by arm, stratum and exact
-composition; joint, verifier-only and human-only acceptance; refusal, timeout, rate-limit, quarantine,
-partial and missing counts; wall time; download bytes; provider-native request/token/day/concurrency
-quota before and after; catalogue identity and freshness; and `actual_metered_usd`. Missing resource
-state is unavailable, never zero. Report the complete verifier-by-human contingency table and
-`q = P(bad and verifier-accepted)` for each exact composition. Report conditional
-`beta = P(verifier accepts | human rejects)` with a one-sided 95% Clopper-Pearson upper bound only
-where that composition has at least 30 authenticated human rejections; otherwise report
-`insufficient_safety_evidence`. Never pool models, revisions, rungs, task strata or verifier contracts
-to manufacture the denominator. [asserted] [algebra]
+**Measures:** report `C0`, all 120 assigned `U` outcomes and every attempted `B` outcome (maximum 960)
+by arm, stratum and exact composition; joint, verifier-only and human-only acceptance; refusal, timeout,
+rate-limit, quarantine, partial, missing and blindness-leakage counts; wall time; download bytes; every observable
+provider-native quota dimension before/after; catalogue/endpoint identity and freshness; and
+`actual_metered_usd`. Missing resource state is unavailable, never zero. [asserted]
 
-A zero-cost arm confirms **useful supervised work** only if it records zero metered spend, no immediate-
-kill event, at least 24/40 joint successes, at least 4/10 joint successes in every stratum, and at least
-36/40 non-missing terminal outcomes. It confirms **automatic acceptance** for an exact composition only
-if useful supervised work is already confirmed for its arm, at least 30 human rejections exist for
-that composition, and the one-sided 95% upper bound on `q` is at most the frozen exposure budget used
-by routing. In the absence of a directly measured `q` bound, ADR-0077's conservative substitution
-`q_upper := beta_upper` applies. An unmeasured composition therefore gets zero automatic candidate
-exposures even when its supervised work is useful. [asserted] [algebra]
+For each `Z0`/`Z1` composition-stratum cell, report the full verifier-by-human table,
+`q = P(bad and verifier-accepted)` over all attempted `B` artefacts, and
+`beta = P(verifier accepts | human rejects)` over the first 30 human rejections. Report one-sided 95%
+Clopper-Pearson upper bounds as **sealed-panel diagnostics only**; if a cell has fewer than 30 human
+rejections, label its beta `insufficient_safety_evidence`. Never pool front-door providers, upstream
+endpoints, model revisions/fingerprints, rungs, task strata or verifier contracts to manufacture a
+denominator. [asserted] [algebra]
 
-**Stopping rule, fixed before the run:** stop when all 120 assigned arm-task outcomes are terminal or
-30 calendar days after the first attempt, whichever comes first. At day 30 every missing outcome is
-adverse. Inspect no pooled efficacy result before stopping; replace no task, model, provider or arm.
-Stop immediately and kill the affected zero-cost claim if any non-zero charge or paid endpoint is
-used; a secret enters the repository, brief, log or child environment; model/provider identity is
-unknown or differs from admission; a free route crosses to a subscription or metered route; a partial
-artefact is accepted; an unauthenticated reviewer verdict enters the beta denominator; private or
-licence-incompatible data leaves its boundary; or an exact rollback fails. There is no efficacy or
-futility stop. [asserted]
+A zero-cost arm confirms **useful supervised work** only if `actual_metered_usd = 0`, no immediate-kill
+event fires, at least 24/40 `U` tasks are joint successes, every stratum has at least 4/10, and at least
+36/40 outcomes are non-missing. Z0 additionally requires `C0` joint success; a warm-panel pass cannot
+hide a failed clean install. It confirms **acceptable frozen-panel verifier risk** only if useful
+supervised work is confirmed and every one of its four `B` cells reaches 30 human rejections with both
+`beta_upper <= 0.40` and `q_upper <= 0.40`. An insufficient cell leaves the safety claim unestimated;
+an upper bound above `0.40` kills it. Regardless of result, automatic candidate exposure remains zero
+until a separately preregistered, coverage-valid future-task experiment supports that exact scope.
+[asserted] [algebra]
+
+**Stopping rule, fixed before the run:** stop when `C0`, all 120 `U` outcomes and every `B`
+cell has either sealed 30 human rejections or exhausted its 120 tasks, or 30 calendar days after the
+first attempt, whichever comes first. At day 30 every missing assigned `U` outcome is adverse and each
+unfinished `B` cell is `insufficient_safety_evidence`. Inspect no pooled efficacy result before
+stopping; replace no task, endpoint, model, provider or arm. Stop immediately and kill the affected
+zero-cost claim if any non-zero charge or paid endpoint is used; ambient metered authentication reaches
+a purported subscription arm; a secret reaches the repository or child boundary; model/upstream
+endpoint identity differs from admission; a free route crosses rung; a partial artefact is accepted;
+an unauthenticated reviewer verdict enters beta; disallowed data leaves its boundary; or exact rollback
+fails. There is no efficacy or futility stop. [asserted]
 
 **Pre-declared loss condition:** the free-tier-trap case wins for an arm if useful supervised work is
-not confirmed, if rate limits or catalogue unavailability affect more than 4/40 assignments, or if
-zero-price eligibility cannot be proved for more than 4/40 admissions. The subscription comparator is
-reported, not used to rescue either arm. Opposing confirm and loss conditions resolve to loss. Any
-other shape is inconclusive and leaves that route supervised-only or unavailable. [asserted]
+not confirmed, if rate limits or catalogue unavailability affect more than 4/40 `U` assignments, or if
+zero-price eligibility cannot be proved for more than 4/40 admissions. The frozen-panel safety claim
+loses on any `beta_upper > 0.40` or `q_upper > 0.40`; fewer than 30 human rejections is insufficient,
+not a pass. The subscription comparator is reported, not used to rescue either zero-cost arm. Opposing
+confirm and loss conditions resolve to loss. [asserted]
 
-**Largest plausible effect (ADR-0050):** success can justify advertising the exact tested arm as a
-supervised zero-cost path and can qualify only exact compositions with sufficient safety evidence for
-ADR-0077 routing. Failure removes or narrows the zero-cost claim and makes the interface say that the
-task requires a subscription or is unavailable. No outcome changes Gate A, Gate B,
-`routing_orchestration_enabled`, the six-command CLI, spend authority, provider allowlists or the
-principal's exclusive approval authority. [asserted]
+**Largest plausible effect (ADR-0050):** success can justify advertising only the exact tested arm and
+task envelope as a supervised zero-cost path, and acceptable frozen-panel safety can justify designing
+a coverage-valid follow-up. Failure removes or narrows the claim and makes the interface say that the
+task requires a proven subscription or is unavailable. No outcome activates automatic acceptance or
+changes Gate A, Gate B, `routing_orchestration_enabled`, the six-command CLI, spend authority, provider
+allowlists or the principal's exclusive approval authority. [asserted]
 
-**What it cannot decide:** quality on larger machines, private repositories, other task distributions,
-later provider catalogues or model revisions; long-run free-tier stability; whether a weaker model has
-higher conditional beta; whether model-family diversity is a different class of facts; total cost when
-human time, electricity or hardware depreciation is unpriced; unattended use in another repository;
-or permission to spend, publish, approve or lift a gate. [asserted]
+**What it cannot decide:** verifier risk on future tasks or any automatic-routing scope; quality on
+larger machines, private repositories, other task distributions, later provider catalogues/endpoints or
+model revisions; long-run free-tier stability; whether a weaker model has higher conditional beta;
+whether model-family diversity is a different class of facts; total cost when human time, electricity
+or hardware depreciation is unpriced; unattended use elsewhere; or permission to spend, publish,
+approve or lift a gate. [asserted]
+
+---
+
+### EXP-135 · Does threshold-gated deliberation improve accepted outcomes over fixed-budget deliberation at the same total budget? `BLOCKED`
+
+**Pre-registered 23 Aug 2026; no task, candidate or outcome inspected.** Dispatch
+`20260823T102440-daf985aa65` allocated EXP-135 after a whole-tree and dispatch-state search found
+EXP-133 and EXP-134 already reserved by the in-flight ADR-0090 work and no other use of EXP-135.
+ADR-0092 and its specification now carry the same intended reference. [measured]
+
+**Decides:** whether ADR-0092's externally discharged `bar_beaten` stop produces at least three more
+jointly accepted outcomes than continuing deliberation to the same fixed `exceed_cap`, at equal total
+request budget, or whether the threshold is ceremony that should be removed as a quality claim. It
+does not choose a phase ratio: EXP-133 owns the comparison among threshold-triggered allocation,
+80/20, 20/80 and the pinned Superpowers workflow. EXP-135 is the narrower within-protocol ablation of
+obeying versus merely recording the threshold receipt. [asserted]
+
+**Precondition:** ADR-0090's `effort.plan`, `effort.charge`, `exceed_cap`,
+`realisation_reserve` and complete resource accounting, ADR-0092's closed work taxonomy and
+threshold contract, and ADR-0093's worker-profile/expertise composition, ADR-0084 compilation and
+semantic-loss refusal are implemented behind the existing disabled orchestration boundary with
+their invariant checks. A bank owner who did not implement either arm seals 24 public, permissively licensed
+application-building tasks, their source/licence manifest, exact starting states and task-native
+acceptance verifiers.
+Twelve tasks are prospectively threshold-testable; twelve have a citable incumbent but a candidate
+comparison valid only after realisation. That classification, every material margin and every
+critical-fault rule is sealed before any run. [asserted]
+
+For each task freeze one `agent_composition_manifest`: the ordered ADR-0093 `worker_profile`,
+immutable ADR-0082 `assignment_ref` resolving the existing ADR-0067 role and RACI rights, and
+`expertise_refs`, harness/model identities, assembled instruction and
+capability-binding receipt digests, required open-data references, one total
+reservation `B = (turns, output_tokens)`, one wall-clock ceiling, one `exceed_cap`, one
+`realisation_reserve`, one ordered menu of permitted acquisition/assessment actions and one held-out
+acceptance verifier. The two arms receive byte-identical manifests, cited bar packages, authority,
+context and isolated starting states. Pair order is counterbalanced from a committed seed. No secret,
+metered fallback, task replacement, cross-arm artefact, retry after held-out acceptance or principal
+authority delegation is allowed. Until the implementation, bank and authenticated blinded verdict
+path exist, the experiment remains `BLOCKED`. [asserted]
+
+**Procedure:** run each of the 24 tasks once in each arm. [asserted]
+
+1. **T — threshold-obeying.** Run the frozen Phase 2 action policy. After each terminal assessment,
+   the mechanical transition evaluator sees only the frozen bar/candidate contract and immutable
+   receipts. It moves to realisation immediately on a valid `bar_beaten`; otherwise it stops on the
+   same `exceed_cap`/give-up rule with `bar_not_beaten`. Unused authorised capacity remains available
+   to realisation. [asserted]
+2. **F — fixed-cap control.** Run the same Phase 2 policy but hide any would-be `bar_beaten` receipt
+   from the Owner and continue until the same fixed `exceed_cap`; then realise under the same minimum
+   reserve and total `B`. The evaluator records retrospectively when the frozen threshold would have
+   fired, but that record cannot change the control run. [asserted]
+3. Freeze the first realised candidate from each arm. A blinded authenticated principal labels goal
+   achievement and material correction without arm, phase-use or verifier information. Run the
+   held-out task-native verifier once and reveal its result only after the human label is sealed.
+   Configuration refusal, required semantic loss, unavailable expertise, timeout, missing
+   artefact/verdict, invalid transition, instrument failure and exhausted total budget stay in the
+   assigned arm as adverse outcomes. [asserted]
+
+**Measures:** for every paired task and separately for the prospectively testable and build-dependent
+strata, record joint acceptance (held-out verifier pass and authenticated principal acceptance with
+no material correction), verifier-only and human-only acceptance, material corrections, critical
+faults, refusals, timeouts, missing outcomes, `bar_beaten|bar_not_beaten`, numeric gap or
+`unavailable`, whether T reached `exceed_cap`, and every phase/category dispatch, reservation,
+worker-profile/assignment and expertise references, compilation/capability receipt,
+open-data reference, refusal or semantic loss, reported actual token value or `unavailable`, and
+wall-clock duration. Report the paired joint-
+acceptance count difference `accepted_T - accepted_F`; no result is generalised beyond the sealed
+bank. [asserted] [algebra]
+
+**Stopping rule, fixed before the run:** stop after all 48 assigned runs and their 48 blinded verdicts
+are terminal, or 30 calendar days after the first run, whichever comes first. At day 30 every missing
+run or verdict is adverse for its assigned arm. Inspect no aggregate arm result before stopping; do
+not replace a task, model, threshold, margin, action menu, verifier or failed run. Any follow-up is a
+new experiment. [asserted]
+
+T confirms the accepted-outcome claim only if it achieves at least three more joint acceptances than
+F over the 24 pairs, has no more critical faults, is not lower on joint acceptance in either sealed
+stratum, and fewer than 18/24 T runs reach `exceed_cap`. F wins if it achieves at least three more
+joint acceptances or T has more critical faults. A difference from -2 through +2 is
+`no_material_difference`; if T also uses at most 80% of F's Phase 2 reserved output tokens it is
+reported separately as `efficiency_only`, never as better accepted outcomes. Opposing conditions
+resolve against T. [asserted]
+
+**Pre-declared loss condition:** ADR-0092's threshold-quality claim loses if T does not meet every
+confirmation condition, or if at least 18/24 T runs reach `exceed_cap`. In that result a successor
+ADR retains the closed taxonomy, cited bar, handovers and explicit `bar_not_beaten` record but removes
+threshold stopping as an asserted quality advantage; ordinary fixed ceilings remain. [asserted]
+
+**Largest plausible effect (ADR-0050):** the paired joint-acceptance count difference is bounded by
+`[-24, +24]`; T can stop at the first eligible assessment or use its entire `exceed_cap`. A T win can
+support threshold stopping only for the frozen composition, contracts and two task strata. A loss
+removes that stop as a quality claim. No outcome changes ADR-0090's total-budget mechanism, chooses a
+numeric phase ratio, validates ADR-0081's two-anchor sufficiency, activates routing, changes a gate or
+CLI command, raises candidate exposure, or grants spend/publication/principal authority. [algebra]
+[asserted]
+
+**What it cannot decide:** threshold value on other tasks, models, tools, users or environments;
+whether a different fixed cap would win; population-level effect size; long-run drift; whether
+execution itself is novel; whether structural anchor difference is statistical independence;
+whether ADR-0093 worker profiles, expertise bundles, portable compilation or training improve outcomes;
+human-labelled beta; or permission to operate unattended, spend, publish, approve or lift a gate.
+[asserted]
+
+---
+
+### EXP-136 · Does a worker-method profile beat the same capable generalist with the same starting evidence, access, tools and budget? `BLOCKED`
+
+**Pre-registered 23 Aug 2026; no task, candidate or outcome inspected.** Dispatch
+`20260823T104841-d6abd2f50d` allocated EXP-136 after an exact register-heading and current-dispatch
+search found EXP-135 occupied, EXP-133/134 reserved by another live stream and no EXP-136 heading or
+foreign reservation. ADR-0093 and its companion specification carry the same intended reference.
+[measured]
+
+**Decides:** whether supplying the correctly pre-assigned ADR-0093 category profile improves jointly
+accepted outcomes over the same capable generalist without the profile, when both arms start with
+identical evidence/access, subject expertise, capabilities, model/runtime, state and total budget.
+Realised observations may diverge after treatment; that is part of the profile effect. The result is
+conditional on the frozen correct category and existing ADR-0067/0082 role/RACI assignment. It does
+not validate a category classifier, automatic selector, extra agents, model-family diversity,
+subject-expertise acquisition or squad organisation. [asserted]
+
+**Precondition:** ADR-0093's immutable category profiles, assignment references, fact contracts and
+`applied|degraded|refused` binding receipts are implemented behind the disabled orchestration
+boundary. An independent bank owner seals 104 public, permissively licensed paired tasks: eight per
+each of the thirteen category profiles, with two tasks from each of the same four subject domains in
+every profile stratum. Every task has a source/licence manifest, isolated starting state, one
+preselected category profile and ADR-0067/0082 assignment, task-native oracle, critical-error rubric
+and authenticated domain-review contract. Neither implementer nor either arm sees held-out answers.
+[asserted]
+
+A frozen experiment runner must precompute the common invariant-core, selected-skill, bounded-recall,
+adapted-context and task bytes from one pinned trajectory prefix; seal every digest; give the arms
+separate logs and workspaces; append only the profile block to W; and re-read the exact bytes before
+each launch. Live dynamic skill/recall assembly is forbidden because an earlier arm outcome could
+otherwise change the later arm's context. Until the bank, runner, receipts and blinded-verdict ingress
+exist, the experiment remains `BLOCKED`. [asserted]
+
+**Procedure:** freeze all task, arm, adapter, model/harness/runtime, common-instruction, profile,
+assignment, expertise-bundle, capability, oracle, reviewer, budget and timeout digests before the
+first outcome. Arm `G` is the capable generalist; arm `W` is the identical runtime plus the task's
+profile bytes. Both arms receive the same existing role/RACI rights, byte-identical common instruction
+layers, task-native context, source/access manifest, subject bundle, tools, capability envelope,
+acceptance/output contract, starting state, maximum tokens, tool calls, active minutes, wall-clock
+and one held-out verifier exposure. Profile bytes are the only intended treatment. [asserted]
+
+Run each of the 104 tasks once per arm in isolated copies. Counterbalance arm order with seed
+`1360093`; do not retry, replace, rescue or reveal one arm to the other. Freeze the first terminal
+candidate. A blinded authenticated domain reviewer records acceptance and material correction before
+the frozen task-native oracle is run once. Refusal, timeout, missing/partial output, invalid receipt,
+required semantic loss and instrument failure stay in the assigned arm and count as joint success
+`0`. A missing blinded verdict is reviewer rejection `1`; a missing oracle result is oracle pass `0`.
+Retain raw execution/source receipts and adverse results. [asserted]
+
+**Measures:** report the full human-by-oracle table overall, by each of the thirteen profile strata
+and by subject domain; paired joint success (`human accept without material correction` and `oracle
+pass`), human-only and oracle-only acceptance; the paired `W - G` joint-success difference; required
+executed/source receipt; critical, authority and privacy errors; refusals, timeouts, missing/partial
+results and invalid bindings; reported tokens or `unavailable`, tool calls, active minutes,
+wall-clock and reviewer minutes. [asserted]
+
+The analysis uses 20,000 bootstrap draws from `random.Random(1360093)`. Each draw samples eight paired
+tasks with replacement inside each of the thirteen profile strata, computes each stratum's `W - G`
+difference, then takes their equal-weight mean. The two-sided paired 95% lower endpoint is nearest-rank
+2.5th percentile (sorted draw 500); the one-sided human-rejection-increase upper bound is nearest-rank
+95th percentile (sorted draw 19,000) from the same procedure applied to paired reviewer rejection.
+Report every profile point difference without a separate interval. [asserted]
+
+For arm `a`, let `C_a` be total measured active plus reviewer minutes and `S_a` its joint successes.
+The `1.25x` cost rule is evaluated without division as `C_W * S_G <= 1.25 * C_G * S_W`. If any active
+or reviewer minutes are unavailable, the cost condition is unavailable and cannot confirm. If
+`S_W = 0 < S_G` it fails; if `S_G = 0 < S_W` it passes; if both are zero the efficacy conditions
+already fail. Missing non-resource telemetry is unknown rather than zero. [algebra] [asserted]
+
+**Stopping rule, fixed before the run:** stop after 104 terminal pairs and 208 blinded verdicts, or
+120 calendar days after the first arm starts, whichever comes first. At day 120 every missing arm or
+verdict is adverse for its assignment. Inspect no aggregate arm result before stopping; replace no
+task, profile, assignment, subject bundle, runtime, verifier or reviewer and permit no retry. There is
+no efficacy or futility stop. [asserted]
+
+Confirm profile efficacy conditional on the frozen assignments only if every condition holds:
+overall equal-profile-weighted paired joint-success `W - G >= +0.10`; its paired 95% lower endpoint is
+greater than `0`; no profile stratum has a negative joint-success point difference; the one-sided 95%
+upper bound on human-rejection increase is at most `0.05`; the cross-multiplied cost rule passes; and
+W has zero treatment-only critical errors. A negative profile stratum cuts default use of that
+profile. If `W <= G` overall or any W-only critical error occurs, remove profile-defaulting entirely
+and retain the generalist default. Any other result is `inconclusive` and also defaults to the
+generalist; it cannot be called confirmation. Even confirmation does not validate the upstream
+classifier or selector. [asserted]
+
+**Pre-declared loss condition:** category-profile defaulting loses if `W <= G` overall or any W-only
+critical error occurs; a profile-specific default loses when its stratum point difference is negative.
+A harm/cost/interval failure with `W > G` and no W-only critical error is inconclusive, not a loss or
+confirmation. The successor retains the taxonomy, existing role contracts, explicit fact/capability
+receipts and optional manual use of a profile as a procedure. [asserted]
+
+**Largest plausible effect (ADR-0050):** the paired joint-success difference is bounded by `[-1,+1]`:
+the worker profile could poison every generalist success or repair every generalist failure. A win
+supports only the frozen profiles, assignments, domains, task bank, runtime and budgets. A loss
+supports the simpler one-generalist policy. No outcome validates the selector, subject expertise,
+tuning, portability, multi-agent fact independence, future-task beta, gates, automatic routing,
+spend, publication or principal authority. [algebra] [asserted]
+
+**What it cannot decide:** category-classification or selector error; population-level effect outside
+the constructed bank; a different model, harness, profile wording, capability set, domain, budget or
+task distribution; whether a second runtime adds an exogenous fact; whether tuned parameters beat
+retrieval; role portability; long-run drift; human-labelled beta; or permission to operate
+unattended, spend, publish, approve or lift a gate. [asserted]
+
+---
+
+### EXP-137 · Does executable analysis rescue wrong decisions, and does a scientific profile add value beyond generic tools? `BLOCKED`
+
+**Pre-registered 23 Aug 2026; no evaluated task, candidate or outcome inspected.** Dispatch
+`20260823T104916-1ac395a993` allocated EXP-137 after an exact register-heading, dispatch-reservation
+and current-plan search found EXP-136 occupied and no foreign use or reservation of EXP-137.
+ADR-0094 and its companion specification carry the same intended reference. [measured]
+
+**Decides:** two nested claims for one frozen model/harness and task mixture. First, whether local
+executable analysis materially increases oracle-correct decisions over reasoning alone. Second,
+whether ADR-0094's scientific profile — hypothesis, provenance, sensitivity and refusal contracts —
+adds material decision-grade value over the same Owner already holding the same executable tools. A
+positive scientific-profile-versus-reasoning result alone cannot establish the second claim because
+it confounds execution with the profile. [asserted]
+
+The first comparison decides only whether the matched task classes merit an executable-analysis
+option. The second decides whether that option needs the proposed profile or should remain a capable
+Owner with ordinary tools and retained scripts. Neither comparison opens routing, changes a gate,
+authorises another repository or delegates principal authority. [asserted]
+
+**Precondition:** before any evaluated-model outcome is visible, an independent bank owner freezes and
+digests 60 finite-decision tasks: ten each in statistical testing, numerical methods, symbolic
+mathematics, optimisation, simulation and dirty-data analysis. Each stratum contains eight tasks with
+a solvable decision and two whose premises require a refusal. Every task has one hidden task-native
+oracle, a predeclared acceptable-answer set or numerical tolerance, and either an analytic cross-check
+or a second independently written oracle. No task is admitted, rejected or rewritten using an outcome
+from the evaluated model. [asserted]
+
+Every empirical task carries a locally retained redistribution-compatible snapshot plus canonical
+source identity, licence, retrieval date, content digest, transformation code and missingness record.
+The snapshot is sealed before the evaluated Owner sees it; metadata fixes the hypothesis before the
+body is retrieved or an existing cache is opened. Seeded post-retrieval transformations make the exact
+question new without changing provenance. If the permitted snapshot, licence evidence or oracle cannot
+be reproduced byte-for-byte, the bank is invalid; remote availability is never inferred from an HTTP
+success code. [asserted]
+
+Freeze one named, zero-marginal-charge frontier composition before the bank is unsealed: reported
+model identifier, harness and CLI versions, system-prompt digest, reasoning setting, generation
+settings or `unavailable`, run window, token/time ceilings and tool policy. Vendor weight revision may
+be recorded `unavailable`; a product name is not represented as an immutable weight hash. No credential
+enters the task packet, scientific runner, result or repository. All arms receive identical task bytes,
+context, model, budget and local library environment. [asserted]
+
+The hidden oracle, counterpart artefacts and aggregate outcomes are unreachable from every arm. Fresh
+isolated workspaces and sessions are mandatory. The reasoning arm permits only bounded reads over the
+frozen packet; its event record must prove no calculator, interpreter, shell, network or executable
+tool ran. Generic and scientific arms have the same exact pinned local libraries and no network. The
+environment must import and pass a frozen smoke calculation from its approved location; the `%TEMP%`
+footprint measurement in ADR-0094 is not that proof. Any inability to enforce these boundaries leaves
+the experiment `BLOCKED`. [asserted]
+
+**Procedure:** use committed seed `1370094` to randomise task order and counterbalance arm order within
+task. Run all `60 × 3 = 180` assigned attempts once. [asserted] [algebra]
+
+1. **R — reasoning only.** The frozen Owner answers from the supplied packet without executable
+   computation.
+2. **G — generic execution.** The same Owner receives the same packet plus the ordinary local
+   shell/Python and the exact scientific libraries available to S, but no scientific-agent profile or
+   prescribed workflow.
+3. **S — scientific profile.** The same Owner and tools receive the frozen hypothesis, provenance,
+   source-anchored structural inventory, parameter-sensitivity and assumption-determined-refusal
+   contract. S is a profile of the Responsible worker under the same Owner, not another model or vote.
+
+Each attempt emits one schema-constrained decision. G and S additionally retain code, environment and
+execution receipts sufficient to reproduce the stated result. Seal all three outputs for a task before
+running its oracle. For G and S, an isolated verifier agent receives the sealed task, artefact and
+environment but neither the first write-up nor the arm identity; it executes the artefact and emits an
+independently derived decision before the oracle is revealed. Use the same frozen verifier contract in
+both arms. Do not reveal any oracle or aggregate result until all 180 attempts are terminal.
+A refusal on a solvable task, non-refusal on a refusal-required task, timeout, malformed decision,
+unavailable artefact, tool-policy breach or missing receipt remains in its assigned arm as adverse;
+never replace a task or retry after its outcome is known. [asserted]
+
+**Measures:** report primary raw oracle correctness and decision-grade success per arm, overall and by
+the six frozen strata. Decision-grade success requires an oracle-correct decision, a saved analysis
+that the blinded verifier executes and independently re-derives for G/S, a complete
+source/licence/digest record, and the required refusal whenever the premises do not identify a
+decision. A `false_safe` is a non-refusal action on a task whose oracle requires refusal. [asserted]
+
+For each `X in {G, S}`, record `rescue_X = count(R wrong, X correct)`,
+`harm_X = count(R correct, X wrong)`, paired raw-correctness difference
+`(rescue_X - harm_X) / 60`, changed-correct-to-wrong, changed-wrong-to-other-wrong and unchanged-wrong
+cells, and an exact two-sided McNemar test on discordant pairs. For S versus G, report the equivalent
+paired decision-grade table and exact test. Also report provenance failures, false-safe decisions,
+execution/tool failures, reported tokens or `unavailable`, wall time and executed-command count.
+Self-reported confidence is excluded. [algebra] [asserted]
+
+**Stopping rule, fixed before the run:** stop when all 180 assigned attempts are terminal or 30
+calendar days after the first attempt, whichever comes first. At the deadline, every missing or
+unterminated attempt is incorrect and non-decision-grade. Inspect no aggregate outcome before stopping.
+Stop early only for bank/oracle leakage, an unsafe write, model-identity drift or a defective
+instrument; preserve every completed cell and report `insufficient_evidence`. Repair requires a new
+experiment, not an amendment after outcomes. There is no efficacy or futility stop. [asserted]
+
+Test the two claims by closed hierarchical gatekeeping, so the S-versus-G claim is confirmatory only
+if G-versus-R passes: [asserted]
+
+1. Generic execution materially beats reasoning only if `correct_G - correct_R >= 6/60`, the exact
+   paired test rejects equality at two-sided `p <= 0.05`, and G does not increase `false_safe`. If
+   `correct_G <= correct_R` or false-safe errors increase, the execution-advantage claim loses. Any
+   other result is `no_material_difference`.
+2. The scientific profile earns existence beyond generic execution only if
+   `decision_grade_S - decision_grade_G >= 6/60`, the exact paired test reaches two-sided
+   `p <= 0.05`, raw correctness is not lower and false-safe errors do not increase. Otherwise retain
+   generic execution and delete the profile's claimed outcome advantage. Per-stratum results are
+   descriptive; no ten-task stratum independently promotes anything.
+
+**Pre-declared loss condition:** ADR-0094's full profile loses if generic execution does not meet every
+G-versus-R confirmation condition or if S does not meet every S-versus-G confirmation condition. A
+G-over-R win with an S-versus-G loss retains the locked tools and task-local receipts but removes the
+bespoke scientific profile as a claimed outcome improvement. A G-versus-R loss keeps T0/T1 reasoning
+and retrieval as default and ordinary execution only as an explicit task-local tool. Opposing
+conditions resolve to loss. [asserted]
+
+**Largest plausible effect (ADR-0050):** each paired correctness or decision-grade difference is
+bounded by `[-1,+1]`; execution or the profile could repair every control failure or poison every
+control success. A G-over-R win supports executable-analysis eligibility only for the exact frozen
+composition and task mixture. An S-over-G loss removes the need for a bespoke scientific profile while
+retaining ordinary tool execution. No result validates live data acquisition, arbitrary scientific
+truth, causal inference, wet-lab work, other models or users, unattended operation, a gate,
+publication, spend or principal authority. [algebra] [asserted]
+
+**What it cannot decide:** population effect outside the constructed bank; another model, harness,
+profile wording, library lock, data source, budget or task distribution; whether executable rescues
+concentrate only in arithmetic tasks; long-run data/licence/environment maintenance cost; whether a
+different structural inventory is complete; human-labelled beta; or permission to operate elsewhere,
+spend, publish, approve or lift a gate. [asserted]
 
 ---
 ## Not experiments
@@ -5662,3 +6039,54 @@ worth running as one.
 4. Update the ADR it decides — supersede, do not silently edit (see
    `../decisions/README.md`).
 5. Move the entry to `DONE` with a link to the result.
+
+### EXP-133 · Does threshold-triggered effort allocation beat a fixed phase budget? `BLOCKED: phase-labelled dispatch accounting, frozen task bank`
+
+**Registered 23 August 2026 by the orchestrator**, because ADR-0090 nominated it and did not write it;
+`tests/test_v0_invariants.py::test_provisional_adrs_name_a_live_experiment` caught the omission and
+blocked every unit retirement until it was repaired. [measured] **The ADR is the specification for
+this entry; nothing here extends its scope.**
+
+**Decides:** whether stopping deliberation at a better-than-best threshold produces more accepted
+artefacts per unit of compute than a fixed phase split. Arms: threshold-triggered (ADR-0090's
+default), a fixed 80/20 deciding/doing split, its 20/80 inverse, and the pinned Superpowers
+brainstorming-plus-writing-plans workflow at equal budget as the incumbent. [asserted]
+
+**Measured on:** dispatches and tokens **by phase label**, never commits. The taxonomy from
+`docs/superpowers/specs/2026-08-23-work-taxonomy.md` supplies the labels; **without them the split
+cannot be measured at all, so that unit is a hard precondition.** Outcome is human-accepted artefacts
+and adverse terminal outcomes, with refusals, timeouts and quarantines in the denominator.
+
+**Precondition:** phase-labelled accounting in the trajectory, and a frozen task bank fixed before any
+arm runs.
+
+**Stopping rule, fixed in advance:** stop at 40 paired tasks, or earlier if any arm records 3
+consecutive adverse terminal outcomes. If the 95% interval on the paired difference still spans zero
+at 40, **report no effect and retire the numeric-default question** rather than extending the run —
+extending until a result appears is the outcome-aware tampering EXP-07 refused.
+
+**What would kill it:** threshold-triggered allocation showing no advantage, or the interval spanning
+zero at the stopping point. **A null result is a valid outcome and retires the 80/20 framing
+entirely.** The principal has already said the ratio is illustrative, not a target.
+
+### EXP-134 · Is frontier-supervised weak execution cheaper at equal quality than frontier generation? `BLOCKED: supervision loop, matched task bank`
+
+**Registered 23 August 2026 by the orchestrator** for the same reason as EXP-133. ADR-0090 calls this
+**the killing check** for its supervision clause.
+
+**Decides:** whether a frontier model instructing a weaker one and then reviewing and correcting its
+work is cheaper, at non-inferior quality, than the frontier model generating directly. **This is not
+the ADR-0002 cascade** — that escalates when a weak model is likely to fail; this is a loop whose
+frontier cost is paid on instruction and review rather than generation.
+
+**Measured on:** total frontier tokens per accepted artefact, correction-round count, and blinded
+human acceptance. **The named failure mode is the primary quantity**: a reviewer that must correct
+three times has spent more frontier tokens than generating directly would have, so
+**correction-rounds-to-acceptance is recorded per task, not averaged away.**
+
+**Stopping rule, fixed in advance:** stop at 30 matched pairs, or earlier if mean corrections to
+acceptance exceeds 2.0 across 10 consecutive tasks — at which point supervision is removed, because
+the loop has already lost on its own terms.
+
+**What would kill it:** quality inferior to direct frontier generation, or frontier cost not lower.
+**Both must hold for supervision to be retained**; either failing removes it. [asserted]
