@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import ast
 from datetime import datetime, timezone
+from math import inf, nan
 from pathlib import Path
 
 import pytest
 
 from consilient import effects as effects_mod
+from consilient import events as events_mod
 from consilient.effects import (
     EFFECT_CLASSES,
     MUTATION_EFFECTS,
@@ -16,14 +18,24 @@ from consilient.effects import (
     READ_ONLY_EFFECTS,
     EffectError,
     EffectManifest,
+    receipt_chain_validator,
 )
-from consilient.events import EventError, SCHEMA_VERSION, append, append_transaction, validate
+from consilient.events import (
+    EventError,
+    Rejection,
+    SCHEMA_VERSION,
+    append,
+    append_transaction,
+    validate,
+)
 
 
-def event(kind: str, data: dict[str, object]) -> dict[str, object]:
+def event(
+    kind: str, data: dict[str, object], *, ts: str | None = None
+) -> dict[str, object]:
     return {
         "v": SCHEMA_VERSION,
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": ts or datetime.now(timezone.utc).isoformat(),
         "event": kind,
         "actor": "effect-contract-test",
         "data": data,
@@ -41,7 +53,8 @@ def commitment(domain: str) -> dict[str, str]:
 
 
 def broker_reference(name: str) -> dict[str, str]:
-    return {"kind": "broker_reference", "reference": f"broker://effects/{name}"}
+    del name
+    return {"kind": "broker_reference", "reference": f"broker://effects/{'a' * 64}"}
 
 
 def manifest() -> EffectManifest:
@@ -54,7 +67,7 @@ def manifest() -> EffectManifest:
             "version": "v1",
             "implementation_digest": "b" * 64,
         },
-        forward=commitment("effect.forward"),
+        forward=commitment("effect.manifest.forward"),
         scope=broker_reference("scope"),
         operations=("read",),
         effects=("data.read",),
@@ -62,9 +75,9 @@ def manifest() -> EffectManifest:
         gate_snapshot={"digest": "d" * 64},
         authority_snapshot=broker_reference("authority"),
         law_snapshot={"digest": "e" * 64},
-        start_state=commitment("effect.start-state"),
+        start_state=commitment("effect.manifest.start_state"),
         observer={"id": "observer-1", "policy_digest": "f" * 64},
-        expected_state=commitment("effect.expected-state"),
+        expected_state=commitment("effect.manifest.expected_state"),
         reversal={"kind": "named_inverse", "name": "restore"},
         declared_residuals=("elapsed_time",),
         ceilings={"wall_time_s": 1, "writes": 0},
@@ -95,16 +108,17 @@ def receipt_data(*, receipt_id: str, status: str, supersedes: str | None = None)
     data: dict[str, object] = {
         "receipt_id": receipt_id,
         "intent_id": "intent-1",
+        "manifest_digest": manifest().digest,
         "status": status,
         "started_at": "2026-08-23T10:00:00+00:00",
         "ended_at": "2026-08-23T10:00:01+00:00",
         "provider_request": broker_reference("provider-request"),
         "provider_receipt": broker_reference("provider-receipt"),
-        "request_commitment": commitment("effect.request"),
-        "response_commitment": commitment("effect.response"),
-        "content_commitment": commitment("effect.content"),
+        "request_commitment": commitment("effect.receipt.request"),
+        "response_commitment": commitment("effect.receipt.response"),
+        "content_commitment": commitment("effect.receipt.content"),
         "observed_consumption": {"cpu_seconds": 1},
-        "post_state": commitment("effect.post-state"),
+        "post_state": commitment("effect.receipt.post_state"),
         "observed_residuals": ("elapsed_time",),
         "child_operation_ids": (),
     }
@@ -132,8 +146,11 @@ def outbound_record(
     return record
 
 
-def test_effect_classes_are_exact_and_manifest_digest_is_canonical() -> None:
-    """Production break caught: a padded/case-varied effect could enter the manifest."""
+def test_effect_classes_are_exact_and_manifest_digest_is_set_canonical() -> None:
+    """Production break caught: a padded/case-varied effect could enter the manifest.
+
+    Production break caught: malformed classes or their order change a composite manifest.
+    """
     assert EFFECT_CLASSES == frozenset(
         {
             "file.change",
@@ -150,18 +167,62 @@ def test_effect_classes_are_exact_and_manifest_digest_is_canonical() -> None:
             "physical.actuate",
         }
     )
-    value = manifest()
-    assert value.digest == EffectManifest.from_record(value.to_record()).digest
-    with pytest.raises(EffectError, match="exact"):
-        EffectManifest.from_record({**value.to_record(), "effects": ["Data.Read"]})
+    composite = manifest().to_record()
+    composite["effects"] = ["data.read", "network.call"]
+    composite["operations"] = ["inspect", "read"]
+    composite["declared_residuals"] = ["elapsed_time", "logs"]
+    reversed_composite = {
+        **composite,
+        "effects": ["network.call", "data.read"],
+        "operations": ["read", "inspect"],
+        "declared_residuals": ["logs", "elapsed_time"],
+    }
+    assert EffectManifest.from_record(composite).digest == EffectManifest.from_record(
+        reversed_composite
+    ).digest
+
+    for malformed in ([], ["Data.Read"], [" data.read"], ["unknown.effect"], ["data.read", "data.read"], [1]):
+        with pytest.raises(EffectError, match="effect|empty|duplicate"):
+            EffectManifest.from_record({**manifest().to_record(), "effects": malformed})
+    missing = manifest().to_record()
+    del missing["effects"]
+    with pytest.raises(EffectError, match="missing"):
+        EffectManifest.from_record(missing)
+
+
+def test_manifest_rejects_non_finite_ceilings() -> None:
+    """Production break caught: NaN/Infinity survives canonical JSON and changes its digest."""
+    for ceiling in (nan, inf, -inf):
+        value = manifest().to_record()
+        value["ceilings"] = {"wall_time_s": ceiling}
+        with pytest.raises(EffectError, match="finite"):
+            EffectManifest.from_record(value)
+    value = manifest().to_record()
+    value["ceilings"] = {"wall_time_s": 10**1000}
+    assert EffectManifest.from_record(value).to_record()["ceilings"] == {
+        "wall_time_s": 10**1000
+    }
 
 
 def test_manifest_rejects_raw_private_values_and_credentials() -> None:
-    """Production break caught: a secret or low-entropy recipient reaches the trajectory."""
-    value = manifest().to_record()
-    value["forward"] = {"credential": "hunter2"}
+    """Production break caught: caller labels permit secrets or an unkeyed shared commitment."""
+    raw = manifest().to_record()
+    raw["forward"] = {"credential": "hunter2"}
     with pytest.raises(EffectError, match="broker reference|commitment"):
-        EffectManifest.from_record(value)
+        EffectManifest.from_record(raw)
+    opaque = manifest().to_record()
+    opaque["scope"] = {"kind": "broker_reference", "reference": "hunter2"}
+    with pytest.raises(EffectError, match="opaque"):
+        EffectManifest.from_record(opaque)
+    unkeyed = manifest().to_record()
+    unkeyed["forward"] = commitment("effect.manifest.forward")
+    unkeyed["forward"]["algorithm"] = "sha256"
+    with pytest.raises(EffectError, match="hmac-sha256"):
+        EffectManifest.from_record(unkeyed)
+    shared_domain = manifest().to_record()
+    shared_domain["start_state"] = commitment("effect.manifest.forward")
+    with pytest.raises(EffectError, match="domain"):
+        EffectManifest.from_record(shared_domain)
 
 
 def test_effect_events_validate_the_observation_and_material_discriminants() -> None:
@@ -180,6 +241,14 @@ def test_effect_events_validate_the_observation_and_material_discriminants() -> 
     with pytest.raises(EventError, match="authority chain"):
         validate(event("effect.intent", invalid))
 
+    reference = intent_data(value)
+    reference["manifest"] = {
+        "kind": "reference",
+        "reference": broker_reference("manifest"),
+        "digest": value.digest,
+    }
+    validate(event("effect.intent", reference))
+
 
 def test_receipt_fields_reject_raw_provider_payloads() -> None:
     """Production break caught: a provider response/content payload is persisted verbatim."""
@@ -187,6 +256,29 @@ def test_receipt_fields_reject_raw_provider_payloads() -> None:
     payload["provider_receipt"] = {"response": "private reply"}
     with pytest.raises(EventError, match="broker reference|commitment"):
         validate(event("effect.receipt", payload))
+    for amount in (nan, inf, -inf):
+        payload = receipt_data(receipt_id="receipt-unknown", status="unknown")
+        payload["observed_consumption"] = {"cpu_seconds": amount}
+        with pytest.raises(EventError, match="finite"):
+            validate(event("effect.receipt", payload))
+    payload = receipt_data(receipt_id="receipt-unknown", status="unknown")
+    payload["observed_consumption"] = {"cpu_seconds": 10**1000}
+    validate(event("effect.receipt", payload))
+
+
+def test_receipt_binds_the_manifest_digest_of_its_intent(tmp_path) -> None:
+    """Production break caught: a receipt can be filed against a different manifest."""
+    value = manifest()
+    path = tmp_path / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl"
+    append_transaction(
+        tmp_path,
+        [event("effect.intent", intent_data(value))],
+        lambda prefix, rejections, candidates: None,
+    )
+    mismatch = receipt_data(receipt_id="receipt-mismatch", status="failed")
+    mismatch["manifest_digest"] = "0" * 64
+    with pytest.raises(EventError, match="manifest digest"):
+        append(path, event("effect.receipt", mismatch))
 
 
 def test_receipt_chain_allows_one_unknown_resolution_and_refuses_a_fork(tmp_path) -> None:
@@ -302,3 +394,49 @@ def test_intent_calls_observation_predicate() -> None:
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "_observation_predicate" in names
+
+
+def test_receipt_chain_resolves_an_unknown_across_daily_logs(tmp_path, monkeypatch) -> None:
+    """Production break caught: midnight turns one operation into two receipt chains."""
+    monkeypatch.setattr(events_mod, "_check_clock", lambda event: None)
+    value = manifest()
+    first_day = "2026-08-23T10:00:00+00:00"
+    second_day = "2026-08-24T10:00:00+00:00"
+    append_transaction(
+        tmp_path,
+        [
+            event("effect.intent", intent_data(value), ts=first_day),
+            event(
+                "effect.receipt",
+                receipt_data(receipt_id="receipt-unknown", status="unknown"),
+                ts=first_day,
+            ),
+        ],
+        lambda prefix, rejections, candidates: None,
+    )
+    append(
+        tmp_path / "2026-08-24.jsonl",
+        event(
+            "effect.receipt",
+            receipt_data(
+                receipt_id="receipt-final",
+                status="failed",
+                supersedes="receipt-unknown",
+            ),
+            ts=second_day,
+        ),
+    )
+
+
+def test_receipt_chain_refuses_a_rejected_history_line() -> None:
+    """Production break caught: a corrupt earlier record is ignored while a new chain is admitted."""
+    with pytest.raises(EffectError, match="rejected"):
+        receipt_chain_validator((), (Rejection("effect.jsonl", 1, "malformed"),), ())
+
+
+def test_effect_records_require_a_jsonl_authority_path(tmp_path) -> None:
+    """Production break caught: a non-JSONL append escapes the replayed chain history."""
+    path = tmp_path / "effects.log"
+    with pytest.raises(EventError, match="JSONL"):
+        append(path, event("effect.intent", intent_data(manifest())))
+    assert not path.exists()

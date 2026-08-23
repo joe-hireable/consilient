@@ -23,6 +23,7 @@ R1 (model-level injection). [cited]
 from __future__ import annotations
 
 import ast
+import hashlib
 import inspect
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -90,7 +91,7 @@ def _commitment(domain: str) -> dict[str, str]:
 
 
 def _broker(name: str) -> dict[str, str]:
-    return {"kind": "broker_reference", "reference": f"broker://effects/{name}"}
+    return {"kind": "broker_reference", "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}"}
 
 
 def _manifest(
@@ -115,7 +116,7 @@ def _manifest(
             "version": "v1",
             "implementation_digest": "e" * 64,
         },
-        forward=_commitment("effect.forward"),
+        forward=_commitment("effect.manifest.forward"),
         scope=_broker("scope"),
         operations=operations,
         effects=effects,
@@ -123,9 +124,9 @@ def _manifest(
         gate_snapshot={"digest": "d" * 64},
         authority_snapshot=_broker("authority"),
         law_snapshot={"digest": "0" * 64},
-        start_state=_commitment("effect.start-state"),
+        start_state=_commitment("effect.manifest.start_state"),
         observer={"id": "observer-1", "policy_digest": "1" * 64},
-        expected_state=_commitment("effect.expected-state"),
+        expected_state=_commitment("effect.manifest.expected_state"),
         reversal={"kind": "named_inverse", "name": "restore"},
         declared_residuals=("elapsed_time",),
         ceilings={"wall_time_s": 1, "writes": 0},

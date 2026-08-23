@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def commitment(domain: str) -> dict[str, str]:
 
 
 def broker_reference(name: str) -> dict[str, str]:
-    return {"kind": "broker_reference", "reference": f"broker://effects/{name}"}
+    return {"kind": "broker_reference", "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}"}
 
 
 def authority_event(event_id: str = "evt-authority-1") -> dict[str, object]:
@@ -70,7 +71,7 @@ def manifest(
             "version": "v1",
             "implementation_digest": "e" * 64,
         },
-        forward=commitment("effect.forward"),
+        forward=commitment("effect.manifest.forward"),
         scope=broker_reference("scope"),
         operations=operations,
         effects=effects,
@@ -78,9 +79,9 @@ def manifest(
         gate_snapshot={"digest": gate_digest},
         authority_snapshot=broker_reference("authority"),
         law_snapshot={"digest": "0" * 64},
-        start_state=commitment("effect.start-state"),
+        start_state=commitment("effect.manifest.start_state"),
         observer={"id": "observer-1", "policy_digest": "1" * 64},
-        expected_state=commitment("effect.expected-state"),
+        expected_state=commitment("effect.manifest.expected_state"),
         reversal={"kind": "named_inverse", "name": "restore"},
         declared_residuals=("elapsed_time",),
         ceilings={"wall_time_s": 1, "writes": 0},

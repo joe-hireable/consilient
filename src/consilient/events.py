@@ -3371,6 +3371,30 @@ def _validate_decision_relations(
 register_transition_validator((RECORD_CAPTURED_KIND,), _validate_record_relations)
 register_transition_validator((CAPABILITY_VERSIONED_KIND,), _validate_capability_versioned_links)
 register_transition_validator((MODEL_CHANGE_KIND,), _validate_model_change_links)
+
+
+def _effect_replay_history(
+    path: Path, accepted: tuple[Event, ...], rejected: tuple[Rejection, ...]
+) -> tuple[tuple[Event, ...], tuple[Rejection, ...]]:
+    """Assemble effect-chain replay state across daily files.
+
+    The caller holds the kernel-backed effect-chain lock, then the current
+    file's F01 lock. This keeps a cross-date replay and its append serialised;
+    it is still only a record contract and does not expose an effect handle.
+    """
+    events: list[Event] = []
+    rejections: list[Rejection] = []
+    for other in sorted(path.parent.glob("*.jsonl")):
+        if other == path:
+            events.extend(accepted)
+            rejections.extend(rejected)
+        else:
+            prior_events, prior_rejections = read(other)
+            events.extend(prior_events)
+            rejections.extend(prior_rejections)
+    return tuple(events), tuple(rejections)
+
+
 register_transition_validator(
     (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT), _validate_effect_receipt_chain
 )
@@ -3380,6 +3404,35 @@ register_transition_validator(
 
 
 def _transaction(
+    path: Path,
+    candidates: list[EventPayload],
+    validator: TransitionValidator | None,
+) -> list[EventPayload]:
+    """Serialise every effect-chain replay before its daily-file transaction.
+
+    A daily F01 lock alone cannot prevent two writers on different dates from
+    accepting competing heads. This is a kernel-backed directory lock, not a
+    touch-lock: process death releases it. It introduces no effect store.
+    """
+    effect_kinds = {candidate["event"] for candidate in candidates} & {
+        effects.EFFECT_INTENT,
+        effects.EFFECT_RECEIPT,
+    }
+    if not effect_kinds:
+        return _transaction_one_log(path, candidates, validator)
+    if path.suffix != ".jsonl":
+        raise EventError("effect records require a JSONL authority path")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = os.open(path.parent / ".effects.chain.lock", _TRANSACTION_OPEN_FLAGS)
+    try:
+        _lock_file(lock_fd)
+        return _transaction_one_log(path, candidates, validator)
+    finally:
+        _unlock_file(lock_fd)
+        os.close(lock_fd)
+
+
+def _transaction_one_log(
     path: Path,
     candidates: list[EventPayload],
     validator: TransitionValidator | None,
@@ -3413,10 +3466,19 @@ def _transaction(
             _reject_duplicate_event_ids(prefix, batch)
             if validator is not None:
                 validator(prefix, rejections, batch)
+            effect_prefix: tuple[Event, ...] | None = None
+            effect_rejections: tuple[Rejection, ...] | None = None
             for candidate in batch:
                 registered = _TRANSITION_VALIDATORS.get(candidate["event"])
                 if registered is not None:
-                    registered(prefix, rejections, batch)
+                    if registered is _validate_effect_receipt_chain:
+                        if effect_prefix is None or effect_rejections is None:
+                            effect_prefix, effect_rejections = _effect_replay_history(
+                                path, prefix, rejections
+                            )
+                        registered(effect_prefix, effect_rejections, batch)
+                    else:
+                        registered(prefix, rejections, batch)
             _validate_delivery_claim_ordering(prefix, rejections, batch)
             offset = os.lseek(fd, 0, os.SEEK_END)
             try:

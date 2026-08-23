@@ -9,6 +9,7 @@ effect yields a digest bound to a later live operation.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import inspect
 import sys
@@ -56,7 +57,7 @@ def commitment(domain: str, digest: str) -> dict[str, str]:
 
 
 def broker_reference(name: str) -> dict[str, str]:
-    return {"kind": "broker_reference", "reference": f"broker://effects/{name}"}
+    return {"kind": "broker_reference", "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}"}
 
 
 def proof_ids(**overrides: str) -> dict[str, str]:
@@ -87,7 +88,7 @@ def mutation_manifest(
             "version": "v1",
             "implementation_digest": ADAPTER_DIGEST,
         },
-        forward=commitment("effect.forward", "a" * 64),
+        forward=commitment("effect.manifest.forward", "a" * 64),
         scope=broker_reference("scope"),
         operations=operations,
         effects=effects,
@@ -95,9 +96,9 @@ def mutation_manifest(
         gate_snapshot={"digest": "d" * 64},
         authority_snapshot=broker_reference("authority"),
         law_snapshot={"digest": "0" * 64},
-        start_state=commitment("effect.start-state", start),
+        start_state=commitment("effect.manifest.start_state", start),
         observer={"id": "observer-1", "policy_digest": POLICY},
-        expected_state=commitment("effect.expected-state", expected),
+        expected_state=commitment("effect.manifest.expected_state", expected),
         reversal={"kind": "named_inverse", "name": "restore"},
         declared_residuals=residuals,
         ceilings={"wall_time_s": 1, "writes": 2},

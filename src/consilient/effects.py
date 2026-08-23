@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -32,6 +34,7 @@ EFFECT_INTENT = "effect.intent"
 EFFECT_RECEIPT = "effect.receipt"
 _RECEIPT_STATUSES = frozenset({"succeeded", "failed", "refused", "unknown"})
 _FINAL_RECEIPT_STATUSES = _RECEIPT_STATUSES - {"unknown"}
+_OPAQUE_REFERENCE = re.compile(r"^broker://effects/[0-9a-f]{64}$")
 
 AdmissionClass = Literal[
     "observation",
@@ -141,28 +144,34 @@ def _broker_reference(value: object, field: str) -> None:
     _exact_keys(item, field, {"kind", "reference"})
     if item["kind"] != "broker_reference":
         raise EffectError(f"{field} must be an opaque broker reference")
-    _text(item["reference"], f"{field}.reference")
+    reference = _text(item["reference"], f"{field}.reference")
+    if _OPAQUE_REFERENCE.fullmatch(reference) is None:
+        raise EffectError(f"{field} must be an opaque broker reference")
 
 
-def _keyed_commitment(value: object, field: str) -> None:
+def _keyed_commitment(value: object, field: str, domain: str) -> None:
     item = _mapping(value, field)
     _exact_keys(item, field, {"kind", "algorithm", "domain", "key_version", "commitment"})
     if item["kind"] != "keyed_commitment":
         raise EffectError(f"{field} must be a domain-separated keyed commitment")
-    _text(item["algorithm"], f"{field}.algorithm")
-    _text(item["domain"], f"{field}.domain")
+    if item["algorithm"] != "hmac-sha256":
+        raise EffectError(f"{field}.algorithm must be hmac-sha256")
+    if item["domain"] != domain:
+        raise EffectError(f"{field}.domain must be {domain!r}")
     _text(item["key_version"], f"{field}.key_version")
     _digest(item["commitment"], f"{field}.commitment")
 
 
-def _protected(value: object, field: str, *, credential: bool = False) -> None:
+def _protected(
+    value: object, field: str, domain: str, *, credential: bool = False
+) -> None:
     item = _mapping(value, field)
     kind = item.get("kind")
     if kind == "broker_reference":
         _broker_reference(item, field)
         return
     if not credential and kind == "keyed_commitment":
-        _keyed_commitment(item, field)
+        _keyed_commitment(item, field, domain)
         return
     if credential:
         raise EffectError(f"{field} must be an opaque broker reference")
@@ -275,10 +284,10 @@ class EffectManifest:
         _text(adapter["id"], "adapter.id")
         _text(adapter["version"], "adapter.version")
         _digest(adapter["implementation_digest"], "adapter.implementation_digest")
-        _protected(self.forward, "forward")
-        _protected(self.scope, "scope")
-        _strings(self.operations, "operations")
-        effects = _strings(self.effects, "effects")
+        _protected(self.forward, "forward", "effect.manifest.forward")
+        _protected(self.scope, "scope", "effect.manifest.scope")
+        operations = tuple(sorted(_strings(self.operations, "operations")))
+        effects = tuple(sorted(_strings(self.effects, "effects")))
         unknown = sorted(set(effects) - EFFECT_CLASSES)
         if unknown:
             raise EffectError(f"effects must use exact effect classes, got {unknown}")
@@ -298,31 +307,46 @@ class EffectManifest:
             snapshot = _mapping(value, field)
             _exact_keys(snapshot, field, {"digest"})
             _digest(snapshot["digest"], f"{field}.digest")
-        _protected(self.authority_snapshot, "authority_snapshot")
-        _protected(self.start_state, "start_state")
+        _protected(
+            self.authority_snapshot,
+            "authority_snapshot",
+            "effect.manifest.authority_snapshot",
+        )
+        _protected(self.start_state, "start_state", "effect.manifest.start_state")
         observer = _mapping(self.observer, "observer")
         _exact_keys(observer, "observer", {"id", "policy_digest"})
         _text(observer["id"], "observer.id")
         _digest(observer["policy_digest"], "observer.policy_digest")
-        _protected(self.expected_state, "expected_state")
+        _protected(
+            self.expected_state,
+            "expected_state",
+            "effect.manifest.expected_state",
+        )
         reversal = _mapping(self.reversal, "reversal")
         _exact_keys(reversal, "reversal", {"kind", "name"})
         _text(reversal["kind"], "reversal.kind")
         _text(reversal["name"], "reversal.name")
-        _strings(self.declared_residuals, "declared_residuals", allow_empty=True)
+        declared_residuals = tuple(
+            sorted(_strings(self.declared_residuals, "declared_residuals", allow_empty=True))
+        )
         ceilings = _mapping(self.ceilings, "ceilings")
         if not ceilings:
             raise EffectError("ceilings must not be empty")
         for name, ceiling in ceilings.items():
             _text(name, "ceilings key")
-            if not isinstance(ceiling, int | float) or isinstance(ceiling, bool) or ceiling < 0:
-                raise EffectError(f"ceilings.{name} must be a non-negative number")
+            if (
+                not isinstance(ceiling, int | float)
+                or isinstance(ceiling, bool)
+                or (isinstance(ceiling, float) and not math.isfinite(ceiling))
+                or ceiling < 0
+            ):
+                raise EffectError(f"ceilings.{name} must be a finite non-negative number")
 
         object.__setattr__(self, "adapter", _freeze(self.adapter))
         object.__setattr__(self, "forward", _freeze(self.forward))
         object.__setattr__(self, "scope", _freeze(self.scope))
-        object.__setattr__(self, "operations", _freeze(self.operations))
-        object.__setattr__(self, "effects", _freeze(self.effects))
+        object.__setattr__(self, "operations", _freeze(operations))
+        object.__setattr__(self, "effects", _freeze(effects))
         object.__setattr__(self, "inventory_snapshot", _freeze(self.inventory_snapshot))
         object.__setattr__(self, "gate_snapshot", _freeze(self.gate_snapshot))
         object.__setattr__(self, "authority_snapshot", _freeze(self.authority_snapshot))
@@ -331,7 +355,7 @@ class EffectManifest:
         object.__setattr__(self, "observer", _freeze(self.observer))
         object.__setattr__(self, "expected_state", _freeze(self.expected_state))
         object.__setattr__(self, "reversal", _freeze(self.reversal))
-        object.__setattr__(self, "declared_residuals", _freeze(self.declared_residuals))
+        object.__setattr__(self, "declared_residuals", _freeze(declared_residuals))
         object.__setattr__(self, "ceilings", _freeze(self.ceilings))
 
     def to_record(self) -> dict[str, object]:
@@ -377,7 +401,13 @@ class EffectManifest:
         return cls(**cast(Any, dict(record)))
 
     def canonical(self) -> str:
-        return json.dumps(self.to_record(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return json.dumps(
+            self.to_record(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
 
     @property
     def digest(self) -> str:
@@ -827,7 +857,7 @@ def _intent(data: Mapping[str, object]) -> None:
 
 def _receipt(data: Mapping[str, object]) -> None:
     expected = {
-        "receipt_id", "intent_id", "status", "started_at", "ended_at",
+        "receipt_id", "intent_id", "manifest_digest", "status", "started_at", "ended_at",
         "provider_request", "provider_receipt", "request_commitment",
         "response_commitment", "content_commitment", "observed_consumption",
         "post_state", "observed_residuals", "child_operation_ids",
@@ -837,21 +867,39 @@ def _receipt(data: Mapping[str, object]) -> None:
     _exact_keys(data, "effect.receipt.data", expected)
     _text(data["receipt_id"], "effect.receipt.receipt_id")
     _text(data["intent_id"], "effect.receipt.intent_id")
+    _digest(data["manifest_digest"], "effect.receipt.manifest_digest")
     if data["status"] not in _RECEIPT_STATUSES:
         raise EffectError(f"effect.receipt.status must be one of {sorted(_RECEIPT_STATUSES)}")
     if _timestamp(data["ended_at"], "effect.receipt.ended_at") < _timestamp(data["started_at"], "effect.receipt.started_at"):
         raise EffectError("effect.receipt.ended_at must not precede started_at")
-    _protected(data["provider_request"], "effect.receipt.provider_request")
-    _protected(data["provider_receipt"], "effect.receipt.provider_receipt")
-    _keyed_commitment(data["request_commitment"], "effect.receipt.request_commitment")
-    _keyed_commitment(data["response_commitment"], "effect.receipt.response_commitment")
-    _keyed_commitment(data["content_commitment"], "effect.receipt.content_commitment")
+    _protected(
+        data["provider_request"], "effect.receipt.provider_request", "effect.receipt.provider_request"
+    )
+    _protected(
+        data["provider_receipt"], "effect.receipt.provider_receipt", "effect.receipt.provider_receipt"
+    )
+    _keyed_commitment(
+        data["request_commitment"], "effect.receipt.request_commitment", "effect.receipt.request"
+    )
+    _keyed_commitment(
+        data["response_commitment"], "effect.receipt.response_commitment", "effect.receipt.response"
+    )
+    _keyed_commitment(
+        data["content_commitment"], "effect.receipt.content_commitment", "effect.receipt.content"
+    )
     consumption = _mapping(data["observed_consumption"], "effect.receipt.observed_consumption")
     for name, amount in consumption.items():
         _text(name, "effect.receipt.observed_consumption key")
-        if not isinstance(amount, int | float) or isinstance(amount, bool) or amount < 0:
-            raise EffectError(f"effect.receipt.observed_consumption.{name} must be non-negative")
-    _protected(data["post_state"], "effect.receipt.post_state")
+        if (
+            not isinstance(amount, int | float)
+            or isinstance(amount, bool)
+            or (isinstance(amount, float) and not math.isfinite(amount))
+            or amount < 0
+        ):
+            raise EffectError(
+                f"effect.receipt.observed_consumption.{name} must be finite and non-negative"
+            )
+    _protected(data["post_state"], "effect.receipt.post_state", "effect.receipt.post_state")
     _strings(data["observed_residuals"], "effect.receipt.observed_residuals", allow_empty=True)
     _strings(data["child_operation_ids"], "effect.receipt.child_operation_ids", allow_empty=True)
     if "supersedes" in data:
@@ -870,10 +918,13 @@ def validate_effect_event(event: Mapping[str, object]) -> None:
         _receipt(data)
 
 
-def receipt_chain_validator(prefix: tuple[Any, ...], rejections: tuple[Any, ...], candidates: tuple[dict[str, Any], ...]) -> None:
-    """Purely refuse duplicate intents and forked receipt heads in one log replay."""
-    del rejections
-    intents: set[str] = set()
+def receipt_chain_validator(
+    prefix: tuple[Any, ...], rejections: tuple[Any, ...], candidates: tuple[dict[str, Any], ...]
+) -> None:
+    """Purely refuse unreconstructable, unordered, duplicate, and forked effect chains."""
+    if rejections:
+        raise EffectError("receipt chain cannot be reconstructed with rejected history lines")
+    intents: dict[str, str] = {}
     receipt_ids: set[str] = set()
     heads: dict[str, tuple[str, str]] = {}
     for item in (*prefix, *candidates):
@@ -882,7 +933,7 @@ def receipt_chain_validator(prefix: tuple[Any, ...], rejections: tuple[Any, ...]
             intent_id = raw["data"]["intent_id"]
             if intent_id in intents:
                 raise EffectError(f"receipt chain has duplicate intent_id {intent_id!r}")
-            intents.add(intent_id)
+            intents[intent_id] = raw["data"]["manifest"]["digest"]
             continue
         if raw.get("event") != EFFECT_RECEIPT:
             continue
@@ -894,6 +945,8 @@ def receipt_chain_validator(prefix: tuple[Any, ...], rejections: tuple[Any, ...]
         receipt_ids.add(receipt_id)
         if intent_id not in intents:
             raise EffectError(f"receipt chain receipt {receipt_id!r} precedes its intent")
+        if data["manifest_digest"] != intents[intent_id]:
+            raise EffectError("receipt manifest digest does not match its intent")
         supersedes = data.get("supersedes")
         current = heads.get(intent_id)
         if supersedes is None:
