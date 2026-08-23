@@ -706,3 +706,52 @@ tokens by phase, not commits.** [asserted]
 **What to build on, then**: deciding gets materially more effort than doing, the split is recorded per
 request so it can be measured, and **the ratio is reported rather than enforced** until an experiment
 earns it a number.
+
+### The phase transition is a threshold, not a ratio
+
+> "Sometimes that number will change though. Decision making should stop and implementation/doing
+> should begin once a better than best threshold has been achieved. Some tasks this may be a
+> different split between tokens spent on research/scientific/experkmentation blablabla (we need
+> categories with clear labels to specify categories of work and what is pre-doing/responding and
+> what is actually responding - frontier LLMs have reasoning and then output. Our reasoning needs to
+> be much better. Running research, discovery, experiments, simulations, code etc.
+> Find the "best" bar (research, discovery) --> figure out what markedly better would look like
+> (debate, experimentation, simulation, innovative thinking, assessing against the "best" bar --> get
+> there by any means necessary (output/do the thing/report to user)"
+
+**This supersedes the ratio entirely.** Deciding does not stop at a budget fraction; it stops when a
+**better-than-best threshold has been achieved**. The observed split becomes a *measurement*, varying
+by task, and any spec that configures it has misread the instruction. [measured: his words]
+
+**The three phases, in his order:**
+
+1. **Locate the bar** — discovery and research. What is the best existing answer, and what does it
+   achieve? Working principle 9 already requires this; here it becomes a phase with an exit condition.
+2. **Exceed it** — debate, experimentation, simulation, innovative thinking, and assessment *against
+   the located bar*. **This is where the intelligence goes**, and it is the phase frontier models do
+   not have: their reasoning is internal token generation, while this phase **runs things** —
+   experiments, simulations, code, retrieval.
+3. **Realise it** — implement, do, deliver, report.
+
+**The analogy he draws is exact and worth keeping.** A frontier model reasons, then outputs. Consilient
+must do the same shape with a categorically better middle: **reasoning that executes rather than
+merely deliberates.** A model's reasoning cannot run an experiment; this phase can. That is the
+difference being sold.
+
+**The taxonomy he asked for is a requirement.** Work must carry a clear category label so pre-doing is
+distinguishable from doing, and so the split can be measured rather than estimated. At minimum:
+`discovery`, `research`, `experiment`, `simulation`, `debate`, `synthesis`, `assessment` for phases 1
+and 2; `implementation`, `verification`, `delivery` for phase 3. **Without labels the ratio cannot be
+measured at all, which is why this comes before any experiment about it.** [asserted]
+
+**The danger this design carries, and it must be specified against.** A threshold with no ceiling can
+never be reached: a system told to exceed the bar before acting can deliberate forever, and "we are
+still researching" is indistinguishable from failure. **Phase 2 needs a give-up condition** — a budget
+ceiling, a diminishing-returns test, or a rule that ships the best candidate found so far and says so.
+Working principle 11 already settles the general case: decide at the best available estimate, name the
+experiment that would improve it, and carry on. **Applied here: when the threshold is not reached,
+proceed with the best candidate and record that the bar was not beaten.** [asserted]
+
+**And the threshold cannot be self-assessed.** "We have exceeded the bar" claimed by whatever proposed
+the approach is echo. ADR-0081's consilience gate already governs this: a high-consequence conclusion
+needs anchors of genuinely different classes. **Exceeding the bar is exactly such a conclusion.**
