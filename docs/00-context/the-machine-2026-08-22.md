@@ -581,3 +581,41 @@ may appear" reading is what let **71 private commit identifiers reach a results 
 is already recorded in `AGENTS.md` as the orchestrator's inference rather than the principal's words.
 **For B4 the permitted return is: how many tickets completed, how many the harness intervened in, and
 timing. Not which files, not which commits, not what the work was.** [asserted]
+
+## Maximum parallelism is the default, and serialisation carries the burden of proof
+
+> "It should always maximise paralellism by default unless deliberstely constrained by the user and I
+> will never want it constrained."
+
+**This inverts where the burden sits.** The orchestrator had been treating parallelism as something to
+justify and serialisation as free. The principal's instruction is the reverse: **a serial edge must
+earn its place; a parallel one needs no defence.** [measured: his words, 23 Aug 2026]
+
+**The method is already proven in his own repositories and was adopted rather than invented.** His
+plans group work into **waves**, not levels. Everything in a wave runs together, and the justification
+given is a fact about files — *"no shared files"* — while the few serial edges carry a named reason,
+such as a destructive cutover needing a signing substrate live first. Units that police everything
+else are ordered **last**, not first, because a constraint applied early blocks work that did not need
+blocking. [cited: his plan corpus, method only]
+
+**His repository layout is the other half of it.** Around a hundred trees — one per workstream —
+so a shared git index never arises. **He did not coordinate around the collision; he removed the
+sharing.** That is the cheaper fix and it generalises: where two workers contend for one resource,
+ask first whether they need to share it at all. [measured: directory census, 23 Aug 2026]
+
+**What this requires of Consilient, not just of the build driver.** The harness must schedule for
+maximum concurrency by default and treat every serial edge as a claim requiring evidence:
+
+- **A dependency is real only when the dependent work genuinely cannot be done without the other's
+  output.** Shared subject matter, narrative order in a plan, or an author's writing sequence are not
+  dependencies. An edge with no justifying text is a habit, not a constraint.
+- **Isolation beats coordination.** Give each worker its own tree rather than arbitrating a shared
+  one. Claims then guard genuine file contention only.
+- **The user is never asked to opt into parallelism.** He has said he will never want it constrained,
+  so the constraint must come from measured contention or a stated dependency — never from caution.
+
+**The honest asymmetry, which is the one thing that does not bend.** Removing a real dependency is
+more expensive than keeping a false one: a unit built against absent output fails, wastes its
+dispatch, and can commit something incoherent. So an ambiguous edge stays, **with its uncertainty
+stated** — not silently, and not as a habit. That is not conservatism; it is the only place where the
+cost is genuinely one-sided. [asserted]
