@@ -502,7 +502,9 @@ def test_dispatch_one_refuses_a_second_claim_on_an_overlapping_path(
 
     monkeypatch.setattr(script, "run_harness", forbidden)
     payload, code = script.dispatch_one(
-        decision=select(probes=_probes_installed(), pools=DEFAULT_POOLS, requested="grok"),
+        decision=select(
+            probes=_probes_installed(), pools=DEFAULT_POOLS, requested="grok"
+        ),
         task="pong",
         cwd=tmp_path,
         log_dir=log,
@@ -553,7 +555,9 @@ def test_dispatch_one_opens_and_releases_its_claim_around_the_run(
 
     monkeypatch.setattr(script, "run_harness", fake_run)
     payload, code = script.dispatch_one(
-        decision=select(probes=_probes_installed(), pools=DEFAULT_POOLS, requested="grok"),
+        decision=select(
+            probes=_probes_installed(), pools=DEFAULT_POOLS, requested="grok"
+        ),
         task="pong",
         cwd=tmp_path,
         log_dir=log,
@@ -588,7 +592,9 @@ def test_dry_run_reports_a_claim_conflict_without_writing_one(tmp_path):
     )
     before, _ = read_all(log)
     payload, code = script.dispatch_one(
-        decision=select(probes=_probes_installed(), pools=DEFAULT_POOLS, requested="grok"),
+        decision=select(
+            probes=_probes_installed(), pools=DEFAULT_POOLS, requested="grok"
+        ),
         task="pong",
         cwd=tmp_path,
         log_dir=log,
@@ -663,5 +669,18 @@ def test_build_command_cursor_family_selection_picks_the_family(tmp_path, monkey
         family="kimi",
         pools=DEFAULT_POOLS,
     )
-    assert isinstance(built, list)
-    assert any("kimi-k3-max" in str(part) for part in built)
+    # Superseded by F04 on 23 Aug 2026. This asserted that naming a family automatically
+    # selects a model from it. The kimi rows are now `pool_verified=False`: Cursor's own
+    # billing page lists Cursor Models as "Cursor Grok and Composer" and names neither kimi
+    # nor glm, while Other Models rose 58% -> 81% across a day of heavy kimi dispatch.
+    # Automatic selection must therefore REFUSE an unverified pool rather than spend what it
+    # cannot account for. This is a strengthening, not a relaxation: the assertion below is
+    # harder to satisfy than the one it replaces.
+    #
+    # The attended override is unaffected and is covered separately —
+    # `tests/test_model_pools.py::test_explicit_model_keeps_the_attended_override_for_an_unverified_pool`
+    # proves an explicitly named kimi model still dispatches.
+    assert isinstance(built, str), (
+        "automatic family selection must refuse an unverified pool, not build a command"
+    )
+    assert "unverified" in built.casefold()
