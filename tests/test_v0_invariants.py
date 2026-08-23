@@ -891,7 +891,10 @@ def test_the_projection_has_no_inline_human_verdict_path():
     )
 
     with pytest.raises(projection.ProjectionError, match="separate attempt.verdict"):
-        projection._apply_outcome(conn, 0, combined)
+        # V01 gave _apply_outcome a fourth parameter when it added verdict quarantining.
+        # The set is empty because this test asserts the refusal of a combined
+        # outcome-and-verdict event, which is decided before any attempt lookup.
+        projection._apply_outcome(conn, 0, combined, set())
     conn.close()
 
 
