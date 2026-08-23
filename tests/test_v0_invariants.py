@@ -684,9 +684,13 @@ def test_a_deferred_human_verdict_amends_one_attempt_for_beta(tmp_path):
 
     conn = projection.build(log_dir, db)
     assert conn.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 1
+    assert conn.execute("SELECT estimand_kind, auth_status FROM outcomes").fetchone() == (
+        beta_mod.HUMAN_VERDICT_BETA, "declared_principal"
+    )
     result = beta_mod.from_connection(conn)
-    assert result.n_rejected == 1
-    assert result.n_false_accept == 1
+    assert result.verdict == beta_mod.INSUFFICIENT
+    assert result.n_rejected == 0
+    assert result.n_false_accept == 0
     conn.close()
 
 
@@ -709,33 +713,46 @@ def test_an_attempt_outcome_without_identity_is_quarantined(tmp_path):
     assert "attempt_id" in rejected[0].reason
 
 
-def test_a_verdict_for_an_unknown_attempt_fails_closed(tmp_path):
+def test_a_verdict_for_an_unknown_attempt_is_quarantined_and_replay_continues(tmp_path):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
-    append(log_dir / "2026-08-20.jsonl", verdict("missing-attempt", "reject"))
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "valid-before", True))
+    append(path, verdict("missing-attempt", "reject"))
+    append(path, outcome("attempt-002", "valid-after", False))
+    append(path, verdict("attempt-002", "accept"))
 
-    with pytest.raises(projection.ProjectionError, match="unknown attempt"):
-        projection.build(log_dir, db)
+    conn = projection.build(log_dir, db)
+    assert conn.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 2
+    reasons = projection.relational_quarantines(conn)
+    assert len(reasons) == 1 and "unknown attempt" in reasons[0]["reason"]
+    conn.close()
 
 
-def test_two_verdicts_for_one_attempt_fail_closed(tmp_path):
+def test_two_verdicts_for_one_attempt_quarantine_the_duplicate(tmp_path):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
     append(path, outcome("attempt-001", "t", True))
     for human_verdict in ("accept", "reject"):
         append(path, verdict("attempt-001", human_verdict))
 
-    with pytest.raises(projection.ProjectionError, match="already has a verdict"):
-        projection.build(log_dir, db)
+    conn = projection.build(log_dir, db)
+    assert conn.execute("SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] == "accept"
+    reasons = projection.relational_quarantines(conn)
+    assert len(reasons) == 1 and "already has a verdict" in reasons[0]["reason"]
+    conn.close()
 
 
-def test_duplicate_attempt_identity_fails_closed(tmp_path):
+def test_duplicate_attempt_identity_quarantines_the_later_row(tmp_path):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
     for task in ("first-task", "second-task"):
         append(path, outcome("attempt-001", task, True))
 
-    with pytest.raises(projection.ProjectionError, match="duplicate attempt_id"):
-        projection.build(log_dir, db)
+    conn = projection.build(log_dir, db)
+    assert conn.execute("SELECT task FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] == "first-task"
+    reasons = projection.relational_quarantines(conn)
+    assert len(reasons) == 1 and "duplicate attempt_id" in reasons[0]["reason"]
+    conn.close()
 
 
 def test_attempt_identity_not_task_selects_the_deferred_verdict(tmp_path):
@@ -750,8 +767,10 @@ def test_attempt_identity_not_task_selects_the_deferred_verdict(tmp_path):
         conn.execute("SELECT attempt_id, human_verdict FROM outcomes ORDER BY position")
     )
     assert rows == [("attempt-001", None), ("attempt-002", "reject")]
+    assert conn.execute("SELECT estimand_kind, auth_status FROM outcomes WHERE attempt_id = 'attempt-002'").fetchone() == (beta_mod.HUMAN_VERDICT_BETA, "declared_principal")
     result = beta_mod.from_connection(conn)
-    assert result.n_rejected == 1 and result.n_false_accept == 1
+    assert result.verdict == beta_mod.INSUFFICIENT
+    assert result.n_rejected == 0 and result.n_false_accept == 0
     conn.close()
 
 
@@ -821,13 +840,17 @@ def test_a_human_changes_their_mind_with_an_explicit_correction(tmp_path):
         ).fetchone()[0]
         == "reject"
     )
+    assert conn.execute(
+        "SELECT estimand_kind, auth_status FROM outcomes WHERE attempt_id = 'attempt-001'"
+    ).fetchone() == (beta_mod.HUMAN_VERDICT_BETA, "declared_principal")
     result = beta_mod.from_connection(conn)
-    assert result.n_rejected == 1
-    assert result.n_false_accept == 1
+    assert result.verdict == beta_mod.INSUFFICIENT
+    assert result.n_rejected == 0
+    assert result.n_false_accept == 0
     conn.close()
 
 
-def test_a_correction_against_the_wrong_prior_verdict_fails_closed(tmp_path):
+def test_a_correction_against_the_wrong_prior_verdict_is_quarantined(tmp_path):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
     append(path, outcome("attempt-001", "t", True))
@@ -837,11 +860,14 @@ def test_a_correction_against_the_wrong_prior_verdict_fails_closed(tmp_path):
         verdict_correction("attempt-001", "reject", "accept", "mistyped prior state"),
     )
 
-    with pytest.raises(projection.ProjectionError, match="expected prior verdict"):
-        projection.build(log_dir, db)
+    conn = projection.build(log_dir, db)
+    assert conn.execute("SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] == "accept"
+    reasons = projection.relational_quarantines(conn)
+    assert len(reasons) == 1 and "expected prior verdict" in reasons[0]["reason"]
+    conn.close()
 
 
-def test_a_correction_without_an_existing_verdict_fails_closed(tmp_path):
+def test_a_correction_without_an_existing_verdict_is_quarantined(tmp_path):
     log_dir, db = tmp_path / "log", tmp_path / "state.db"
     path = log_dir / "2026-08-20.jsonl"
     append(path, outcome("attempt-001", "t", True))
@@ -852,8 +878,11 @@ def test_a_correction_without_an_existing_verdict_fails_closed(tmp_path):
         ),
     )
 
-    with pytest.raises(projection.ProjectionError, match="no verdict to correct"):
-        projection.build(log_dir, db)
+    conn = projection.build(log_dir, db)
+    assert conn.execute("SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] is None
+    reasons = projection.relational_quarantines(conn)
+    assert len(reasons) == 1 and "no verdict to correct" in reasons[0]["reason"]
+    conn.close()
 
 
 def test_a_verdict_correction_requires_a_reason():
@@ -4991,18 +5020,13 @@ def _verdict_module():
     return module
 
 
-def test_verdict_script_cannot_orphan_a_verdict_and_counts_only_rejections(tmp_path):
-    """One reviewed attempt, one command, and no way to brick the trajectory with it.
+def test_verdict_script_preserves_order_checks_and_declared_principal_beta_exclusion(
+    tmp_path,
+):
+    """The script writes valid joins in outcome-before-verdict order.
 
-    `attempt.verdict` naming an attempt with no recorded outcome passes `validate()` and
-    appends with exit 0, after which `beta`, `replay` and `doctor` all raise
-    ProjectionError forever — the log is append-only, so appending the missing outcome
-    afterwards does not repair it, because position order still puts the verdict first.
-    Thirty hand-written pairs is thirty chances at that. The script writes both events
-    itself, outcome first, sharing one generated identity, so the orphan is unreachable.
-
-    The second property is beta's denominator: rejections only. The accepted attempt here
-    must move `window` and nothing else, or the meter is counting the wrong thing.
+    Relationally invalid rows quarantine so replay can continue. The caller-supplied
+    principal is declared, not authenticated, and neither CLI row enters beta.
     """
     module = _verdict_module()
     log = tmp_path / "log"
@@ -5020,7 +5044,7 @@ def test_verdict_script_cannot_orphan_a_verdict_and_counts_only_rejections(tmp_p
         else:
             assert attempt_id in recorded, (
                 f"verdict for {attempt_id!r} precedes its outcome; the trajectory is "
-                "unrecoverable from here"
+                "outside the current quarantine-safe contract"
             )
 
     checks = [
@@ -5034,11 +5058,14 @@ def test_verdict_script_cannot_orphan_a_verdict_and_counts_only_rejections(tmp_p
 
     conn = projection.build(log, tmp_path / "state.db")
     result = beta_mod.from_connection(conn, None, None)
+    assert conn.execute(
+        "SELECT auth_status FROM outcomes ORDER BY position"
+    ).fetchall() == [("declared_principal",), ("declared_principal",)]
+    assert result.verdict == beta_mod.INSUFFICIENT
+    assert result.window is None
+    assert result.n_rejected == 0
+    assert result.n_false_accept == 0
     conn.close()
-    assert result.n_rejected == 1, (
-        "an accepted attempt is not part of beta's denominator"
-    )
-    assert result.n_false_accept == 1, "the checks accepted what the reviewer rejected"
 
 
 def test_verdict_script_refuses_to_guess_what_the_checks_said(tmp_path):

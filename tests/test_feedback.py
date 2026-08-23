@@ -150,7 +150,7 @@ def _project_feedback_variant(
     try:
         derived = {
             table: connection.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
-            for table in ("outcomes", "usage", "rejections")
+            for table in ("outcomes", "usage", "rejections", "relational_quarantines")
         }
         measured = beta.from_connection(connection).as_dict()
         feedback_kinds = [
@@ -187,9 +187,9 @@ def test_answering_or_declining_has_no_projection_or_beta_consequence(
 
     assert answer_projection == decline_projection
     assert answer_beta == decline_beta
-    assert answer_beta["verdict"] == beta.MEASURED
-    assert answer_beta["n_rejected"] == 30
-    assert answer_beta["n_false_accept"] == 10
+    assert answer_beta["verdict"] == beta.INSUFFICIENT
+    assert answer_beta["n_rejected"] == 0
+    assert answer_beta["n_false_accept"] == 0
     assert answer_kinds == [
         events.FEEDBACK_ASKED_KIND,
         events.FEEDBACK_ANSWERED_KIND,
