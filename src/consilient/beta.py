@@ -265,8 +265,13 @@ def from_connection(
 ) -> Beta:
     from . import projection as projection_mod
 
-    if sampling_unconditioned is None:
-        sampling_unconditioned = projection_mod.sampling_unconditioned(conn)
+    derived = projection_mod.sampling_unconditioned(conn)
+    if projection_mod.review_queue_row(conn) is not None:
+        sampling = derived
+    elif sampling_unconditioned is None:
+        sampling = derived
+    else:
+        sampling = sampling_unconditioned
     rows = [
         {
             "ts": ts,
@@ -288,5 +293,5 @@ def from_connection(
         task_family,
         verifier_version,
         min_rejections,
-        sampling_unconditioned,
+        sampling,
     )

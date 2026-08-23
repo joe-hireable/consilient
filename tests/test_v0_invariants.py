@@ -5349,3 +5349,36 @@ def test_provisional_adrs_name_a_live_experiment():
         "a PROVISIONAL decision must name the experiment that would settle it, and that "
         "experiment must exist in the register:\n  " + "\n  ".join(offenders)
     )
+
+
+def test_verification_start_source_scan_blocks_component_outcome_bypass() -> None:
+    from consilient import verification as verification_mod
+
+    assert verification_mod.coverage_gate_passed()
+    assert verification_mod.scan_component_outcome_producers() == []
+
+
+def test_review_queue_opened_freezes_candidate_exposure_contract() -> None:
+    queue = {
+        "v": events_mod.SCHEMA_VERSION,
+        "ts": now_ts(),
+        "event": events_mod.REVIEW_QUEUE_OPENED_KIND,
+        "actor": "consilient.verification",
+        "data": {
+            "queue_id": "queue-test",
+            "stream_cap": 90,
+            "exp105_prefix_n": 30,
+            "rejection_target": 30,
+            "population": "default-branch",
+            "task_family": "repair",
+            "protocol_id": "proto-1",
+            "verifier_version": "v1",
+            "verifier_contract_digest": "a" * 64,
+            "start_position": 0,
+            "eligible_universe_digest": "b" * 64,
+            "selector": "first_matching_trajectory_order",
+            "order_rule": "trajectory_position_ascending",
+        },
+    }
+    with pytest.raises(EventError, match="eligible_universe_digest"):
+        validate(queue)

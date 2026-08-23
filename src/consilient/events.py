@@ -51,6 +51,10 @@ REQUIRED = ("v", "ts", "event", "actor", "data")
 
 OUTCOME_KIND = "attempt.outcome"
 VERIFICATION_OUTCOME_KIND = "verification.outcome"
+REVIEW_QUEUE_OPENED_KIND = "review.queue.opened"
+CANDIDATE_EXPOSED_KIND = "candidate.exposed"
+ATTEMPT_REVIEWED_KIND = "attempt.reviewed"
+REVIEW_PRESENTATION_FROZEN_KIND = "review.presentation.frozen"
 VERDICT_KIND = "attempt.verdict"
 VERDICT_CORRECTION_KIND = "attempt.verdict.correction"
 DECISION_KIND = "decision.autonomous"
@@ -385,6 +389,7 @@ def validate(event: object) -> EventPayload:
     _check_attempt_identity(event)
     _check_attempt_contract(event)
     _check_verification_outcome_contract(event)
+    _check_review_queue_contract(event)
     _check_consent_contract(event)
     _check_decision_contract(event)
     _check_response_rating_ban(event)
@@ -1066,6 +1071,159 @@ def _check_verification_outcome_contract(event: EventPayload) -> None:
             f"{VERIFICATION_OUTCOME_KIND} cannot carry human_decision; append a separate "
             f"{VERDICT_KIND} event"
         )
+
+    token = data.get("start_token")
+    if token is not None:
+        if not isinstance(token, str) or re.fullmatch(r"[0-9a-f]{64}", token) is None:
+            raise EventError(
+                f"{VERIFICATION_OUTCOME_KIND} start_token must be 64 lowercase hex characters"
+            )
+
+
+def _check_review_queue_contract(event: EventPayload) -> None:
+    kind = event["event"]
+    if kind == REVIEW_QUEUE_OPENED_KIND:
+        data = event["data"]
+        required = {
+            "queue_id",
+            "stream_cap",
+            "exp105_prefix_n",
+            "rejection_target",
+            "population",
+            "task_family",
+            "protocol_id",
+            "verifier_version",
+            "verifier_contract_digest",
+            "start_position",
+            "eligible_universe_digest",
+            "selector",
+            "order_rule",
+        }
+        actual = set(data)
+        if actual != required:
+            missing = sorted(required - actual)
+            unexpected = sorted(actual - required)
+            detail = []
+            if missing:
+                detail.append(f"missing {missing}")
+            if unexpected:
+                detail.append(f"unexpected {unexpected}")
+            raise EventError(
+                f"{REVIEW_QUEUE_OPENED_KIND} body fields are fixed: {'; '.join(detail)}"
+            )
+        if int(data["stream_cap"]) != 90:
+            raise EventError(f"{REVIEW_QUEUE_OPENED_KIND} stream_cap is fixed at 90")
+        if int(data["exp105_prefix_n"]) != 30:
+            raise EventError(f"{REVIEW_QUEUE_OPENED_KIND} exp105_prefix_n is fixed at 30")
+        if data["selector"] != "first_matching_trajectory_order":
+            raise EventError(
+                f"{REVIEW_QUEUE_OPENED_KIND} selector must be "
+                "'first_matching_trajectory_order'"
+            )
+        for field in ("verifier_contract_digest", "eligible_universe_digest"):
+            digest = data[field]
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise EventError(
+                    f"{REVIEW_QUEUE_OPENED_KIND} {field} must be 64 lowercase hex characters"
+                )
+        for field in ("rejection_target", "start_position"):
+            value = data[field]
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise EventError(
+                    f"{REVIEW_QUEUE_OPENED_KIND} {field} must be a non-negative integer"
+                )
+        from . import verification as verification_mod
+
+        recomputed = verification_mod.eligible_universe_digest(
+            task_family=cast(str, data["task_family"]),
+            population=cast(str, data["population"]),
+            protocol_id=cast(str, data["protocol_id"]),
+            verifier_version=cast(str, data["verifier_version"]),
+            verifier_contract_digest=cast(str, data["verifier_contract_digest"]),
+            order_rule=cast(str, data["order_rule"]),
+        )
+        if data["eligible_universe_digest"] != recomputed:
+            raise EventError(
+                f"{REVIEW_QUEUE_OPENED_KIND} eligible_universe_digest does not match the "
+                "frozen manifest"
+            )
+        return
+
+    if kind == CANDIDATE_EXPOSED_KIND:
+        data = event["data"]
+        required = {
+            "queue_id",
+            "exposure_id",
+            "attempt_id",
+            "exposure_ordinal",
+            "start_token",
+            "artefact_sha256",
+            "task_family",
+            "protocol_id",
+            "verifier_version",
+            "verifier_contract_digest",
+        }
+        actual = set(data)
+        if actual != required:
+            missing = sorted(required - actual)
+            unexpected = sorted(actual - required)
+            detail = []
+            if missing:
+                detail.append(f"missing {missing}")
+            if unexpected:
+                detail.append(f"unexpected {unexpected}")
+            raise EventError(
+                f"{CANDIDATE_EXPOSED_KIND} body fields are fixed: {'; '.join(detail)}"
+            )
+        ordinal = data["exposure_ordinal"]
+        if not isinstance(ordinal, int) or isinstance(ordinal, bool) or ordinal <= 0:
+            raise EventError(
+                f"{CANDIDATE_EXPOSED_KIND} exposure_ordinal must be a positive integer"
+            )
+        for field in ("start_token", "artefact_sha256", "verifier_contract_digest"):
+            digest = data[field]
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise EventError(
+                    f"{CANDIDATE_EXPOSED_KIND} {field} must be 64 lowercase hex characters"
+                )
+        return
+
+    if kind == ATTEMPT_REVIEWED_KIND:
+        data = event["data"]
+        required = {"queue_id", "exposure_id", "attempt_id", "disposition"}
+        if set(data) != required:
+            raise EventError(f"{ATTEMPT_REVIEWED_KIND} body fields are fixed")
+        if data["disposition"] not in ("unclear",):
+            raise EventError(
+                f"{ATTEMPT_REVIEWED_KIND} disposition must be 'unclear' until Q02 ingress"
+            )
+        return
+
+    if kind == REVIEW_PRESENTATION_FROZEN_KIND:
+        data = event["data"]
+        required = {
+            "queue_id",
+            "exposure_id",
+            "attempt_id",
+            "contract_digest",
+            "artefact_digest",
+            "component_rollup_digest",
+            "presentation_digest",
+        }
+        if set(data) != required:
+            raise EventError(f"{REVIEW_PRESENTATION_FROZEN_KIND} body fields are fixed")
+        for field in (
+            "contract_digest",
+            "artefact_digest",
+            "component_rollup_digest",
+            "presentation_digest",
+        ):
+            digest = data[field]
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise EventError(
+                    f"{REVIEW_PRESENTATION_FROZEN_KIND} {field} must be 64 lowercase hex "
+                    "characters"
+                )
 
 
 def _check_consent_contract(event: EventPayload) -> None:
@@ -2888,4 +3046,104 @@ def _validate_delivery_claim_ordering(
 
 register_transition_validator(
     (DELIVERY_ESTIMATE_KIND,), _validate_delivery_estimate_transition
+)
+
+
+def _queue_opened(prefix: tuple[Event, ...]) -> Event | None:
+    opened = [event for event in prefix if event.kind == REVIEW_QUEUE_OPENED_KIND]
+    if not opened:
+        return None
+    if len(opened) > 1:
+        raise EventError("only one review.queue.opened event is permitted per trajectory")
+    return opened[0]
+
+
+def _validate_candidate_exposed_transition(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    queue = _queue_opened(prefix)
+    if queue is None:
+        raise EventError(
+            f"{CANDIDATE_EXPOSED_KIND} requires a prior {REVIEW_QUEUE_OPENED_KIND} event"
+        )
+    queue_data = queue.data
+    queue_id = cast(str, queue_data["queue_id"])
+    prior = [
+        event
+        for event in prefix
+        if event.kind == CANDIDATE_EXPOSED_KIND and event.data.get("queue_id") == queue_id
+    ]
+    next_ordinal = len(prior) + 1
+    for candidate in candidates:
+        if candidate["event"] != CANDIDATE_EXPOSED_KIND:
+            continue
+        data = candidate["data"]
+        if data["queue_id"] != queue_id:
+            raise EventError(
+                f"{CANDIDATE_EXPOSED_KIND} queue_id must match the opened review queue"
+            )
+        if int(data["exposure_ordinal"]) != next_ordinal:
+            raise EventError(
+                f"{CANDIDATE_EXPOSED_KIND} exposure_ordinal must be sequential; "
+                f"expected {next_ordinal}, got {data['exposure_ordinal']!r}"
+            )
+        if int(data["exposure_ordinal"]) > int(queue_data["stream_cap"]):
+            raise EventError(
+                f"{CANDIDATE_EXPOSED_KIND} exposure exceeds stream_cap "
+                f"{queue_data['stream_cap']}"
+            )
+        for field in (
+            "task_family",
+            "protocol_id",
+            "verifier_version",
+            "verifier_contract_digest",
+        ):
+            if data[field] != queue_data[field]:
+                raise EventError(
+                    f"{CANDIDATE_EXPOSED_KIND} {field} must match the frozen review queue"
+                )
+        next_ordinal += 1
+
+
+def _validate_verification_outcome_exposure_transition(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    queue = _queue_opened(prefix)
+    if queue is None:
+        return
+    exposures_by_token = {
+        cast(str, event.data["start_token"]): event
+        for event in prefix
+        if event.kind == CANDIDATE_EXPOSED_KIND
+    }
+    for candidate in candidates:
+        if candidate["event"] != VERIFICATION_OUTCOME_KIND:
+            continue
+        data = candidate["data"]
+        token = data.get("start_token")
+        if not isinstance(token, str):
+            raise EventError(
+                f"{VERIFICATION_OUTCOME_KIND} requires start_token when a review queue is open"
+            )
+        exposure = exposures_by_token.get(token)
+        if exposure is None:
+            raise EventError(
+                f"{VERIFICATION_OUTCOME_KIND} start_token must reference a prior "
+                f"{CANDIDATE_EXPOSED_KIND} event"
+            )
+        if exposure.data["attempt_id"] != data["attempt_id"]:
+            raise EventError(
+                f"{VERIFICATION_OUTCOME_KIND} attempt_id must match the referenced exposure"
+            )
+
+
+register_transition_validator(
+    (CANDIDATE_EXPOSED_KIND,), _validate_candidate_exposed_transition
+)
+register_transition_validator(
+    (VERIFICATION_OUTCOME_KIND,), _validate_verification_outcome_exposure_transition
 )

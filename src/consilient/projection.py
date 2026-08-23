@@ -22,9 +22,11 @@ from pathlib import Path
 from typing import cast
 
 from .events import (
+    CANDIDATE_EXPOSED_KIND,
     DELIVERY_ESTIMATE_KIND,
     OUTCOME_KIND,
     RECORD_CAPTURED_KIND,
+    REVIEW_QUEUE_OPENED_KIND,
     USAGE_KIND,
     VERDICT_CORRECTION_KIND,
     VERDICT_KIND,
@@ -152,6 +154,39 @@ CREATE TABLE IF NOT EXISTS projection_meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS review_queues (
+    position                 INTEGER PRIMARY KEY,
+    queue_id                 TEXT NOT NULL UNIQUE,
+    stream_cap               INTEGER NOT NULL,
+    exp105_prefix_n          INTEGER NOT NULL,
+    rejection_target         INTEGER NOT NULL,
+    population               TEXT NOT NULL,
+    task_family              TEXT NOT NULL,
+    protocol_id              TEXT NOT NULL,
+    verifier_version         TEXT NOT NULL,
+    verifier_contract_digest TEXT NOT NULL,
+    start_position           INTEGER NOT NULL,
+    eligible_universe_digest TEXT NOT NULL,
+    selector                 TEXT NOT NULL,
+    order_rule               TEXT NOT NULL,
+    payload                  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS candidate_exposures (
+    position                 INTEGER PRIMARY KEY,
+    queue_id                 TEXT NOT NULL,
+    exposure_id              TEXT NOT NULL UNIQUE,
+    attempt_id               TEXT NOT NULL,
+    exposure_ordinal         INTEGER NOT NULL,
+    start_token              TEXT NOT NULL UNIQUE,
+    artefact_sha256          TEXT NOT NULL,
+    task_family              TEXT NOT NULL,
+    protocol_id              TEXT NOT NULL,
+    verifier_version         TEXT NOT NULL,
+    verifier_contract_digest TEXT NOT NULL,
+    payload                  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS candidate_exposures_queue
+    ON candidate_exposures (queue_id, position);
 """
 
 class ProjectionError(RuntimeError):
@@ -176,7 +211,12 @@ def build(
     events, rejected = read_all(log_dir)
     resolved_workspace = workspace if workspace is not None else _infer_workspace(log_dir)
     verification_attempts: set[str] = set()
-    for event in events:
+    exposure_positions: dict[str, int] = {}
+    for position, event in enumerate(events):
+        if event.kind == CANDIDATE_EXPOSED_KIND:
+            attempt_id = event.data.get("attempt_id")
+            if isinstance(attempt_id, str):
+                exposure_positions[attempt_id] = position
         if event.kind != VERIFICATION_OUTCOME_KIND:
             continue
         attempt_id = event.data.get("attempt_id")
@@ -186,13 +226,11 @@ def build(
         conn,
         events,
         verification_attempts,
+        exposure_positions=exposure_positions,
         workspace=resolved_workspace,
     )
     _apply_rejections(conn, rejected)
-    conn.execute(
-        "INSERT INTO projection_meta (key, value) VALUES (?, ?)",
-        ("sampling_unconditioned", "false"),
-    )
+    _derive_review_queue_state(conn, events)
     conn.commit()
     return conn
 
@@ -251,6 +289,208 @@ def set_sampling_unconditioned(conn: sqlite3.Connection, value: bool) -> None:
     )
 
 
+def review_queue_row(conn: sqlite3.Connection) -> dict[str, object] | None:
+    row = conn.execute(
+        "SELECT payload FROM review_queues ORDER BY position LIMIT 1"
+    ).fetchone()
+    if row is None:
+        return None
+    return cast(dict[str, object], json.loads(cast(str, row[0]))["data"])
+
+
+def selected_exposure_rows(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    queue = review_queue_row(conn)
+    if queue is None:
+        return []
+    rows = conn.execute(
+        "SELECT payload FROM candidate_exposures WHERE queue_id = ? ORDER BY position",
+        (queue["queue_id"],),
+    ).fetchall()
+    payloads = [
+        cast(dict[str, object], json.loads(cast(str, row[0]))["data"]) for row in rows
+    ]
+    start = int(queue["start_position"])
+    cap = int(queue["stream_cap"])
+    return payloads[start : start + cap]
+
+
+def _derive_review_queue_state(conn: sqlite3.Connection, events: list[Event]) -> None:
+    from . import verification as verification_mod
+
+    set_sampling_unconditioned(conn, False)
+    conn.execute(
+        "INSERT OR REPLACE INTO projection_meta (key, value) VALUES (?, ?)",
+        ("review_queue_replay_ok", "false"),
+    )
+    queue = review_queue_row(conn)
+    if queue is None:
+        return
+    recomputed = verification_mod.eligible_universe_digest(
+        task_family=cast(str, queue["task_family"]),
+        population=cast(str, queue["population"]),
+        protocol_id=cast(str, queue["protocol_id"]),
+        verifier_version=cast(str, queue["verifier_version"]),
+        verifier_contract_digest=cast(str, queue["verifier_contract_digest"]),
+        order_rule=cast(str, queue["order_rule"]),
+    )
+    if recomputed != queue["eligible_universe_digest"]:
+        return
+    selected = selected_exposure_rows(conn)
+    if not selected:
+        return
+    exposure_by_attempt = {
+        cast(str, event.data["attempt_id"]): (index, event)
+        for index, event in enumerate(events)
+        if event.kind == CANDIDATE_EXPOSED_KIND
+    }
+    verification_by_attempt: dict[str, list[tuple[int, Event]]] = {}
+    for index, event in enumerate(events):
+        if event.kind != VERIFICATION_OUTCOME_KIND:
+            continue
+        attempt_id = cast(str, event.data["attempt_id"])
+        verification_by_attempt.setdefault(attempt_id, []).append((index, event))
+    for exposure in selected:
+        attempt_id = cast(str, exposure["attempt_id"])
+        located = exposure_by_attempt.get(attempt_id)
+        if located is None:
+            return
+        exposure_pos, exposure_event = located
+        components = verification_by_attempt.get(attempt_id, [])
+        if not components:
+            return
+        for component_pos, component in components:
+            if component_pos <= exposure_pos:
+                return
+            if component.data.get("start_token") != exposure_event.data.get("start_token"):
+                return
+    if not verification_mod.coverage_gate_passed():
+        return
+    set_sampling_unconditioned(conn, True)
+    conn.execute(
+        "INSERT OR REPLACE INTO projection_meta (key, value) VALUES (?, ?)",
+        ("review_queue_replay_ok", "true"),
+    )
+
+
+def _apply_review_queue_opened(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
+    data = event.data
+    queue_id = cast(str, data["queue_id"])
+    if conn.execute(
+        "SELECT 1 FROM review_queues WHERE queue_id = ?", (queue_id,)
+    ).fetchone():
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"duplicate review queue {queue_id!r} at position {position}",
+        )
+        return
+    if conn.execute("SELECT COUNT(*) FROM review_queues").fetchone()[0]:
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            "only one review.queue.opened event is permitted per trajectory",
+        )
+        return
+    conn.execute(
+        "INSERT INTO review_queues (position, queue_id, stream_cap, exp105_prefix_n,"
+        " rejection_target, population, task_family, protocol_id, verifier_version,"
+        " verifier_contract_digest, start_position, eligible_universe_digest, selector,"
+        " order_rule, payload)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            position,
+            queue_id,
+            data["stream_cap"],
+            data["exp105_prefix_n"],
+            data["rejection_target"],
+            data["population"],
+            data["task_family"],
+            data["protocol_id"],
+            data["verifier_version"],
+            data["verifier_contract_digest"],
+            data["start_position"],
+            data["eligible_universe_digest"],
+            data["selector"],
+            data["order_rule"],
+            json.dumps(
+                event.raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+        ),
+    )
+
+
+def _apply_candidate_exposed(conn: sqlite3.Connection, position: int, event: Event) -> None:
+    data = event.data
+    exposure_id = cast(str, data["exposure_id"])
+    if conn.execute(
+        "SELECT 1 FROM candidate_exposures WHERE exposure_id = ?", (exposure_id,)
+    ).fetchone():
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"duplicate exposure_id {exposure_id!r} at position {position}",
+        )
+        return
+    conn.execute(
+        "INSERT INTO candidate_exposures (position, queue_id, exposure_id, attempt_id,"
+        " exposure_ordinal, start_token, artefact_sha256, task_family, protocol_id,"
+        " verifier_version, verifier_contract_digest, payload)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            position,
+            data["queue_id"],
+            exposure_id,
+            data["attempt_id"],
+            data["exposure_ordinal"],
+            data["start_token"],
+            data["artefact_sha256"],
+            data["task_family"],
+            data["protocol_id"],
+            data["verifier_version"],
+            data["verifier_contract_digest"],
+            json.dumps(
+                event.raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+        ),
+    )
+
+
+def _apply_verification_outcome(
+    conn: sqlite3.Connection,
+    position: int,
+    event: Event,
+    *,
+    exposure_positions: dict[str, int],
+) -> None:
+    queue = review_queue_row(conn)
+    if queue is None:
+        return
+    attempt_id = event.data.get("attempt_id")
+    if not isinstance(attempt_id, str):
+        return
+    exposure_pos = exposure_positions.get(attempt_id)
+    if exposure_pos is None:
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"missing candidate.exposed before verification.outcome for {attempt_id!r}",
+        )
+        return
+    if position <= exposure_pos:
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"verification.outcome for {attempt_id!r} precedes its candidate.exposed event",
+        )
+
+
 def _quarantine_relational(
     conn: sqlite3.Connection,
     position: int,
@@ -285,6 +525,7 @@ def _apply(
     events: list[Event],
     verification_attempts: set[str],
     *,
+    exposure_positions: dict[str, int],
     workspace: Path | None = None,
 ) -> None:
     event_index = {
@@ -319,6 +560,17 @@ def _apply(
             _apply_record_captured(conn, position, event, workspace, event_index)
         elif event.kind == DELIVERY_ESTIMATE_KIND:
             _apply_delivery_estimate(conn, position, event)
+        elif event.kind == REVIEW_QUEUE_OPENED_KIND:
+            _apply_review_queue_opened(conn, position, event)
+        elif event.kind == CANDIDATE_EXPOSED_KIND:
+            _apply_candidate_exposed(conn, position, event)
+        elif event.kind == VERIFICATION_OUTCOME_KIND:
+            _apply_verification_outcome(
+                conn,
+                position,
+                event,
+                exposure_positions=exposure_positions,
+            )
 
 
 def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:
