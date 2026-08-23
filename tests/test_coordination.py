@@ -12,6 +12,7 @@ The invariants under test are the ones the brief named:
 from __future__ import annotations
 
 import importlib.util
+import math
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -383,14 +384,34 @@ def _measured_beta() -> Beta:
 def test_ceiling_at_the_exp47_interval_is_one_at_epsilon_040():
     ceiling = routing.candidates_ceiling(_measured_beta(), 0.40)
     assert isinstance(ceiling, routing.Ceiling)
-    assert ceiling.n_max == 1
+    assert ceiling.n_attempt_max == 1
     assert ceiling.beta_used == pytest.approx(0.3346)  # the top of the interval
 
 
-def test_unmeasured_dependence_keeps_the_union_bound_ceiling():
-    ceiling = routing.candidates_ceiling(_measured_beta(), 0.60)
+def test_ceiling_is_zero_below_beta_upper():
+    ceiling = routing.candidates_ceiling(_measured_beta(), 0.3345)
     assert isinstance(ceiling, routing.Ceiling)
-    assert ceiling.n_max == 1
+    assert ceiling.n_attempt_max == 0
+
+
+def test_ceiling_is_one_at_beta_upper():
+    ceiling = routing.candidates_ceiling(_measured_beta(), 0.3346)
+    assert isinstance(ceiling, routing.Ceiling)
+    assert ceiling.n_attempt_max == 1
+
+
+def test_ceiling_does_not_round_up_at_a_float_boundary():
+    beta = Beta(MEASURED, None, None, 30, 10, 1 / 3, (1 / 3, 1 / 3), None)
+    epsilon = math.nextafter(1.0, -math.inf)
+    ceiling = routing.candidates_ceiling(beta, epsilon)
+    assert isinstance(ceiling, routing.Ceiling)
+    assert ceiling.n_attempt_max == 2
+
+
+def test_ceiling_grows_above_beta_upper():
+    ceiling = routing.candidates_ceiling(_measured_beta(), 0.70)
+    assert isinstance(ceiling, routing.Ceiling)
+    assert ceiling.n_attempt_max == 2
 
 
 def test_an_absent_beta_is_a_refusal_not_an_assumption():
@@ -410,14 +431,14 @@ def test_a_certain_bad_verifier_allows_zero_candidates():
     beta = Beta(MEASURED, None, None, 30, 30, 1.0, (1.0, 1.0), None)
     ceiling = routing.candidates_ceiling(beta, 0.99)
     assert isinstance(ceiling, routing.Ceiling)
-    assert ceiling.n_max == 0
+    assert ceiling.n_attempt_max == 0
 
 
 def test_a_measured_zero_beta_states_the_arithmetic_not_a_licence():
     beta = Beta(MEASURED, None, None, 30, 0, 0.0, (0.0, 0.0), None)
     ceiling = routing.candidates_ceiling(beta, 0.20)
     assert isinstance(ceiling, routing.Ceiling)
-    assert ceiling.n_max is None
+    assert ceiling.n_attempt_max is None
 
 
 def test_ceiling_for_the_real_shape_of_todays_trajectory_is_a_refusal(tmp_path):
