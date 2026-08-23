@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_requirements.py`
 > **Source:** `docs/40-spec/requirements-source.json`
-> **Source SHA-256:** `34d3807c7743ebf068d73b9cdde75ede33f36f8e42f538e009af89715f459122`
+> **Source SHA-256:** `189c7d8b13b6e2edf7a104958ded857394985ffad96762bc1d09a4a80b723d82`
 > **Do not hand-edit:** regenerate with `python scripts/build_requirements.py`.
 
 > **Provenance warning, 21 August 2026. Read this before citing anything below.**

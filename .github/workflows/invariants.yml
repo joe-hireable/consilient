@@ -28,6 +28,14 @@ jobs:
         run: python -m ruff check .
       - name: Invariant checks
         run: python -m pytest tests -q
+      # The producer for every generated document is re-run and its output compared to what is
+      # committed. This check existed, worked, and was wired into nothing: on 23 August 2026 it
+      # reported `checked=2 adverse=2` and exited 1 while CI was green, because no workflow ever
+      # called it. Both generated documents had drifted -- the decision index and the requirements
+      # -- which is this repository's canonical failure, a chokepoint with no enforcement rule,
+      # committed against its own enforcement machinery.
+      - name: Generated document drift check
+        run: python .github/scripts/check_generated_documents.py --check
       - name: Rename safety invariant check
         run: python .github/scripts/check_rename_safety.py --check
       - name: Spend escalation invariant check

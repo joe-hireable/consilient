@@ -29,6 +29,7 @@ import os
 import re
 import sys
 import time
+import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -1745,6 +1746,13 @@ def append(path: Path, event: EventPayload) -> EventPayload:
     return _write_validated(path, event)
 
 
+# Six attempts with doubling backoff from 40ms spans roughly 2.5s, which is far longer than a
+# file replace holds the path, and short enough that a genuinely stuck file fails the dispatch
+# rather than hanging it.
+_READ_RETRIES = 6
+_READ_BACKOFF = 0.04
+
+
 def _classify_lines(
     path_label: str, lines: Iterable[str]
 ) -> tuple[list[Event], list[Rejection]]:
@@ -1783,8 +1791,29 @@ def read(path: Path) -> tuple[list[Event], list[Rejection]]:
     """
     if not path.exists():
         return [], []
-    with path.open(encoding="utf-8") as fh:
-        return _classify_lines(str(path), fh)
+    # Windows denies a reader while a concurrent writer holds the file, and the trajectory is
+    # written continuously while every dispatched harness reads it at startup. That collision
+    # killed 6 of 6 failed dispatches on 23 August 2026 -- including the only Grok run -- with
+    # PermissionError raised out of `instructions.assemble`, seconds after the scheduler had
+    # already reported the work as dispatched. The harness never started, and a process-based
+    # check would have called it healthy. [measured]
+    #
+    # The condition is transient by construction: the writer replaces the file and releases it.
+    # Retry briefly, then fail loudly -- a reader that silently returned an empty trajectory
+    # would be far worse, because every downstream decision would be made against no history.
+    last: OSError | None = None
+    for attempt in range(_READ_RETRIES):
+        try:
+            with path.open(encoding="utf-8") as fh:
+                return _classify_lines(str(path), fh)
+        except PermissionError as exc:
+            last = exc
+            time.sleep(_READ_BACKOFF * (2**attempt))
+    raise EventError(
+        f"{path} could not be read after {_READ_RETRIES} attempts: it is held by another "
+        f"process. The trajectory is never partially reported -- refusing rather than "
+        f"continuing against an incomplete history ({last})."
+    )
 
 
 def _read_under_lock(path: Path, fd: int) -> tuple[list[Event], list[Rejection]]:

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import pathlib
+
+import re
+
+import os
+
 import hashlib
 import importlib.util
 import json
@@ -358,3 +364,51 @@ def test_unknown_argument_is_cli_misuse(tmp_path: Path) -> None:
     run = _run_checker(tmp_path, "--unknown")
 
     assert run.returncode == 2
+
+def test_the_committed_generated_documents_are_not_currently_drifted():
+    """The live tree, not the checker's mechanics.
+
+    Every other test in this file exercises the checker against fixtures, and all eight passed on
+    23 August 2026 while BOTH real generated documents were drifted -- `docs/decisions/index.md`
+    and `docs/40-spec/requirements.md`. The checker itself said so, exiting 1 with
+    `checked=2 adverse=2`, and nothing consumed that exit code: it was wired into no workflow and
+    no test. A check whose result nobody reads is a report. [measured]
+    """
+    root = pathlib.Path(__file__).resolve().parent.parent
+    script = root / ".github" / "scripts" / "check_generated_documents.py"
+    assert script.is_file(), "the generated-document checker must exist"
+    run = subprocess.run(
+        [sys.executable, str(script), "--check"],
+        cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    )
+    assert run.returncode == 0, (
+        "a generated document has drifted from its producer. Re-run the producer and commit the "
+        f"result; do not edit the generated file by hand. {run.stdout} {run.stderr}"
+    )
+
+
+def test_the_readme_counts_match_what_is_on_disk():
+    """Restated numbers drift, and these drifted by a factor of three.
+
+    On 23 August 2026 README.md claimed 34 ADRs and 35 registered experiments while the tree held
+    95 and 109. [measured] The counts sit in the public shop window of a project whose subject is
+    measurement honesty, which makes a stale count the same class of defect as an uncited
+    superlative -- and that one already has a check.
+    """
+    root = pathlib.Path(__file__).resolve().parent.parent
+    readme = (root / "README.md").read_text(encoding="utf-8", errors="replace")
+    adrs = len(list((root / "docs" / "decisions").glob("[0-9][0-9][0-9][0-9]-*.md")))
+    register = (root / "docs" / "10-research" / "experiment-register.md").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    exps = len(re.findall(r"^#{2,4}\s*EXP-\d+", register, re.M))
+    for claimed, actual, what in (
+        (re.search(r"(\d+) ADRs", readme), adrs, "ADRs"),
+        (re.search(r"(\d+) registered experiments", readme), exps, "registered experiments"),
+    ):
+        assert claimed, f"README no longer states a count of {what}; update this check with it"
+        assert int(claimed.group(1)) == actual, (
+            f"README claims {claimed.group(1)} {what}; the tree holds {actual}. "
+            "Correct the README — a number in public prose is a claim like any other."
+        )

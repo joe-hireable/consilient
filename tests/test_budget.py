@@ -65,6 +65,12 @@ PRODUCT_IMPORTS = BUDGET_IMPORTS | {
     "argparse",
     "contextlib",
     "contextvars",
+    # `time` earns its place by measurement, not convenience. Windows refuses a reader while a
+    # concurrent writer holds the trajectory, and that collision killed 6 of 6 failed dispatches
+    # on 23 August 2026. The repair is a bounded backoff in `events.read`, which needs a sleep.
+    # It carries no capability: no subprocess, no network, no credential, and `compile`, `eval`,
+    # `exec` and `__import__` stay forbidden regardless of what is importable.
+    "time",
     # `fcntl`, `msvcrt`, `os` and `time` are the F01 durability primitives: the
     # kernel-backed per-log lock (flock / locking), unbuffered os.write, fsync and
     # ftruncate in `events.py`. Added 22 Aug 2026. The dangerous `os` surface stays
