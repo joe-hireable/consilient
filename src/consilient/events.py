@@ -145,6 +145,20 @@ RECORD_KIND_ALIASES = frozenset(
 CAPABILITY_GAP_KIND = "capability.gap"
 GAP_FAILURES = frozenset({"failed", "silent", "refused", "not_implemented"})
 GAP_CLOSURES = frozenset({"retry", "escalate"})
+INTENT_RECORDED_KIND = "intent.recorded"
+INTENT_STARVED_KIND = "intent.starved"
+SCHEDULER_ACTOR = "consilient.scheduler"
+INTENT_RECORDED_FIELDS = frozenset({"tick", "selected", "not_selected"})
+INTENT_STARVED_FIELDS = frozenset({"unit", "reason", "ticks", "since"})
+# The four non-selection reasons of the supervision specification, section 2.1, and no
+# fifth. A bench recorded under an unnamed reason is the failure the record exists to
+# make visible.
+INTENT_REASON_PREFIXES = ("blocked_on:", "quota_exhausted:", "breaker_open:")
+INTENT_REASONS = frozenset({"no_capacity"})
+# "6 ticks or 60 minutes, whichever is longer" - both floors, not either
+# [asserted, preferential; supervision specification section 2.1].
+STARVATION_TICKS = 6
+STARVATION_WINDOW = timedelta(minutes=60)
 # The project's evidence tags (AGENTS.md working principle 1). A usage figure that
 # cannot name which of these it is has no business being displayed as a number.
 PROVENANCE = frozenset({"measured", "cited", "asserted"})
@@ -389,6 +403,7 @@ def validate(event: object) -> EventPayload:
     _check_usage_contract(event)
     _check_knowledge_contract(event)
     _check_capability_gap_contract(event)
+    _check_intent_contract(event)
     _check_attempt_identity(event)
     _check_attempt_contract(event)
     _check_verification_outcome_contract(event)
@@ -856,6 +871,199 @@ def _check_capability_gap_contract(event: EventPayload) -> None:
         raise EventError(
             f"{CAPABILITY_GAP_KIND} with failure {failure!r} must escalate, not retry"
         )
+
+
+def _intent_timestamp(value: object, where: str) -> datetime:
+    if not isinstance(value, str) or TS.fullmatch(value) is None:
+        raise EventError(f"{where} must be RFC3339 with an explicit offset")
+    return datetime.fromisoformat(value).astimezone(timezone.utc)
+
+
+def _check_intent_reason(value: object, where: str) -> None:
+    if not isinstance(value, str) or value != value.strip() or not value:
+        raise EventError(f"{where} reason must be a non-empty unpadded string")
+    if value in INTENT_REASONS:
+        return
+    for prefix in INTENT_REASON_PREFIXES:
+        if value.startswith(prefix) and value[len(prefix) :].strip():
+            return
+    raise EventError(
+        f"{where} reason must be one of {sorted(INTENT_REASONS)} or "
+        f"{list(INTENT_REASON_PREFIXES)} with a named subject, got {value!r}"
+    )
+
+
+def _check_intent_contract(event: EventPayload) -> None:
+    """The scheduler's own record: what was ready, what ran, and why the rest did not.
+
+    Every other supervision mechanism counts failures. F-08 produced no dispatch, no
+    lease and no call, so it was invisible to all of them for two days [measured,
+    `docs/00-context/orchestration-failure-modes-2026-08-23.md`]. Non-selection is only
+    countable if the reason is written down at the tick, under a fixed vocabulary.
+    """
+    kind = event["event"]
+    if kind not in (INTENT_RECORDED_KIND, INTENT_STARVED_KIND):
+        return
+    data = event["data"]
+    expected = (
+        INTENT_RECORDED_FIELDS
+        if kind == INTENT_RECORDED_KIND
+        else INTENT_STARVED_FIELDS
+    )
+    unexpected = sorted(set(data) - expected)
+    if unexpected:
+        raise EventError(f"{kind} carries unexpected field(s) {unexpected}")
+    missing = sorted(expected - set(data))
+    if missing:
+        raise EventError(f"{kind} must carry {missing}")
+
+    if kind == INTENT_STARVED_KIND:
+        for field in ("unit", "since"):
+            value = data[field]
+            if not isinstance(value, str) or not value.strip():
+                raise EventError(f"{kind} must carry a non-empty string {field}")
+        _intent_timestamp(data["since"], f"{kind} since")
+        _check_intent_reason(data["reason"], kind)
+        ticks = data["ticks"]
+        if not isinstance(ticks, int) or isinstance(ticks, bool):
+            raise EventError(f"{kind} ticks must be an integer")
+        if ticks < STARVATION_TICKS:
+            raise EventError(
+                f"{kind} claims a threshold that was not crossed: ticks {ticks} "
+                f"is below {STARVATION_TICKS}"
+            )
+        return
+
+    tick = data["tick"]
+    if not isinstance(tick, int) or isinstance(tick, bool) or tick < 0:
+        raise EventError(f"{kind} tick must be a non-negative integer")
+    selected = data["selected"]
+    if not isinstance(selected, list) or any(
+        not isinstance(unit, str) or not unit.strip() for unit in selected
+    ):
+        raise EventError(f"{kind} selected must be a list of unit names")
+    not_selected = data["not_selected"]
+    if not isinstance(not_selected, dict):
+        raise EventError(f"{kind} not_selected must be an object of unit to reason")
+    for unit, reason in not_selected.items():
+        if not isinstance(unit, str) or not unit.strip():
+            raise EventError(f"{kind} not_selected must be keyed by unit name")
+        _check_intent_reason(reason, f"{kind} {unit}")
+    both = sorted(set(selected) & set(not_selected))
+    if both:
+        raise EventError(
+            f"{kind} unit(s) {both} cannot be both selected and not selected"
+        )
+
+
+def _intent_runs(
+    prefix: Sequence[Event],
+) -> dict[str, tuple[str, datetime, datetime, int]]:
+    """Per unit, the reason it is currently not being selected and how long that has run.
+
+    Returns unit -> (reason, first_ts, last_ts, ticks). A unit that was selected, or that
+    stopped being ready, or whose reason changed, starts a new run: only an unbroken
+    repetition of one reason is starvation.
+    """
+    runs: dict[str, tuple[str, datetime, datetime, int]] = {}
+    last_tick: int | None = None
+    for event in prefix:
+        if event.kind != INTENT_RECORDED_KIND:
+            continue
+        tick = cast(int, event.data["tick"])
+        if last_tick is not None and tick <= last_tick:
+            # A replayed or out-of-order tick is not a further tick of waiting.
+            continue
+        last_tick = tick
+        ts = _intent_timestamp(event.raw["ts"], f"{INTENT_RECORDED_KIND} ts")
+        not_selected = cast(Mapping[str, str], event.data["not_selected"])
+        for unit in set(runs) - set(not_selected):
+            del runs[unit]
+        for unit, reason in not_selected.items():
+            run = runs.get(unit)
+            if run is None or run[0] != reason:
+                runs[unit] = (reason, ts, ts, 1)
+            else:
+                runs[unit] = (reason, run[1], ts, run[3] + 1)
+    return runs
+
+
+def starvation(
+    prefix: Sequence[Event],
+    *,
+    ticks: int = STARVATION_TICKS,
+    window: timedelta = STARVATION_WINDOW,
+) -> list[EventPayload]:
+    """The units starved as of the end of `prefix`, each reported once per run.
+
+    Both floors must be crossed - "6 ticks or 60 minutes, whichever is longer". Six ticks
+    inside a minute is a busy scheduler, not a starved unit.
+    """
+    reported = {
+        (event.data["unit"], event.data["reason"], event.data["since"])
+        for event in prefix
+        if event.kind == INTENT_STARVED_KIND
+    }
+    starved: list[EventPayload] = []
+    for unit, (reason, first_ts, last_ts, count) in sorted(
+        _intent_runs(prefix).items()
+    ):
+        if count < ticks or last_ts - first_ts < window:
+            continue
+        since = first_ts.isoformat()
+        if (unit, reason, since) in reported:
+            continue
+        starved.append({"unit": unit, "reason": reason, "ticks": count, "since": since})
+    return starved
+
+
+def record_intent(
+    path: Path,
+    *,
+    ts: str,
+    tick: int,
+    selected: Sequence[str] = (),
+    not_selected: Mapping[str, str],
+    actor: str = SCHEDULER_ACTOR,
+    ticks: int = STARVATION_TICKS,
+    window: timedelta = STARVATION_WINDOW,
+) -> list[EventPayload]:
+    """Write one tick of scheduler intent, then any starvation it has just established.
+
+    Returns the appended events, the intent record first. Emitting at the same chokepoint
+    that writes the record keeps `events.py` the single writer and means a scheduler
+    cannot record a bench without also surfacing a bench that has gone on too long.
+    """
+    intent = append(
+        path,
+        {
+            "v": SCHEMA_VERSION,
+            "ts": ts,
+            "event": INTENT_RECORDED_KIND,
+            "actor": actor,
+            "data": {
+                "tick": tick,
+                "selected": list(selected),
+                "not_selected": dict(not_selected),
+            },
+        },
+    )
+    written = [intent]
+    events, _rejected = read_all(path.parent)
+    for data in starvation(events, ticks=ticks, window=window):
+        written.append(
+            append(
+                path,
+                {
+                    "v": SCHEMA_VERSION,
+                    "ts": ts,
+                    "event": INTENT_STARVED_KIND,
+                    "actor": actor,
+                    "data": data,
+                },
+            )
+        )
+    return written
 
 
 def _check_evidence_class(event: EventPayload) -> None:
