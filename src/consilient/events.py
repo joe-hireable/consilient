@@ -54,7 +54,45 @@ VERIFICATION_OUTCOME_KIND = "verification.outcome"
 VERDICT_KIND = "attempt.verdict"
 VERDICT_CORRECTION_KIND = "attempt.verdict.correction"
 DECISION_KIND = "decision.autonomous"
+ACTION_PROPOSAL_KIND = "action.proposal"
 REVERSAL_KINDS = frozenset({"revert", "command", "inverse"})
+PROTECTED_DECISION_CLASSES = frozenset(
+    {
+        "money",
+        "credential",
+        "external_exposure",
+        "unrecoverable_state_loss",
+        "principal_authority",
+        "preference",
+    }
+)
+_AUTONOMOUS_ADMISSION_CLASSES = frozenset(
+    {
+        "contained_execution",
+        "proof_operation",
+        "material_choice",
+        "recoverable_mutation",
+    }
+)
+_PROTECTED_ADMISSION_CLASSES = frozenset(
+    {"protected_covered", "protected_uncovered"}
+)
+_DECISION_PROTOCOL_MARKERS = frozenset(
+    {
+        "decision_id",
+        "operation_id",
+        "ticket",
+        "owner",
+        "record_level",
+        "alternatives",
+        "only_admissible",
+        "evidence_refs",
+        "acceptance_contract_digest",
+        "protocol",
+        "binding",
+        "supersedes",
+    }
+)
 # ADR-0033 section 2: these are the exhaustive classes only the user may decide.
 USER_ONLY = frozenset(
     {
@@ -1171,11 +1209,29 @@ def _check_visibility_contract(event: EventPayload) -> None:
         )
 
 
-def _check_decision_contract(event: EventPayload) -> None:
-    """V0-22/23/24: autonomous decisions are reversible and outside user-only classes."""
-    if event["event"] != DECISION_KIND:
-        return
-    data = event["data"]
+def _decision_text(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise EventError(f"decision protocol {field} must be a non-empty string")
+    return value
+
+
+def _decision_digest(value: object, field: str) -> str:
+    text = _decision_text(value, field)
+    if re.fullmatch(r"[0-9a-f]{64}", text) is None:
+        raise EventError(f"decision protocol {field} must be a lower-case SHA-256 digest")
+    return text
+
+
+def _check_exact_event_reference(reference: object, field: str) -> None:
+    required = {"event_id", "event_kind", "event_sha256"}
+    if not isinstance(reference, dict) or set(reference) != required:
+        raise EventError(f"decision protocol {field} must be an exact F03 event reference")
+    _check_event_id(reference["event_id"])
+    _decision_text(reference["event_kind"], f"{field}.event_kind")
+    _decision_digest(reference["event_sha256"], f"{field}.event_sha256")
+
+
+def _check_decision_content(data: EventPayload) -> None:
     for field in ("decision", "reasoning", "falsifier"):
         value = data.get(field)
         if not isinstance(value, str) or not value.strip():
@@ -1218,10 +1274,263 @@ def _check_decision_contract(event: EventPayload) -> None:
     ):
         raise EventError("inverse reversal value must be a dotted importable symbol")
 
+
+def _check_alternatives(data: EventPayload) -> None:
+    alternatives = data["alternatives"]
+    if not isinstance(alternatives, list):
+        raise EventError("decision protocol alternatives must be an array")
+    for index, alternative in enumerate(alternatives):
+        if not isinstance(alternative, dict) or set(alternative) != {
+            "option",
+            "rejected_because",
+        }:
+            raise EventError(
+                f"decision protocol alternatives[{index}] must contain exactly option and rejected_because"
+            )
+        _decision_text(alternative["option"], f"alternatives[{index}].option")
+        _decision_text(
+            alternative["rejected_because"],
+            f"alternatives[{index}].rejected_because",
+        )
+
+    only_admissible = data.get("only_admissible")
+    if alternatives:
+        if only_admissible is not None:
+            raise EventError(
+                "decision protocol only_admissible is permitted only when alternatives is empty"
+            )
+        return
+    if not isinstance(only_admissible, dict) or set(only_admissible) != {"rule_refs"}:
+        raise EventError(
+            "decision protocol empty alternatives requires exact only_admissible.rule_refs"
+        )
+    rule_refs = only_admissible["rule_refs"]
+    if not isinstance(rule_refs, list) or not rule_refs:
+        raise EventError("decision protocol only_admissible.rule_refs must be non-empty")
+    for index, rule_ref in enumerate(rule_refs):
+        _decision_text(rule_ref, f"only_admissible.rule_refs[{index}]")
+
+
+def _check_protocol(value: object) -> str:
+    if not isinstance(value, dict):
+        raise EventError("decision protocol protocol must be an object")
+    status = value.get("status")
+    base = {"status", "threshold"}
+    completion = {
+        "instructions_ref",
+        "bar_ref",
+        "search_ref",
+        "killing_check_ref",
+    }
+    expected = base | completion if status == "completed" else base
+    if set(value) != expected:
+        missing = sorted(expected - set(value))
+        unexpected = sorted(set(value) - expected)
+        raise EventError(
+            f"decision protocol {status!r} fields mismatch; missing {missing}, unexpected {unexpected}"
+        )
+    if status not in {"not_warranted", "completed"}:
+        raise EventError("decision protocol status must be not_warranted or completed")
+    threshold = value["threshold"]
+    threshold_fields = {
+        "version",
+        "later_reliance",
+        "question_open",
+        "wrong_costs_more",
+    }
+    if not isinstance(threshold, dict) or set(threshold) != threshold_fields:
+        raise EventError("decision protocol threshold must carry its three versioned inputs")
+    _decision_text(threshold["version"], "protocol.threshold.version")
+    tri_states = {"true", "false", "unknown"}
+    states = []
+    for field in ("later_reliance", "question_open", "wrong_costs_more"):
+        state = threshold[field]
+        if state not in tri_states:
+            raise EventError(
+                f"decision protocol threshold.{field} must be true, false or unknown"
+            )
+        states.append(state)
+    if status == "not_warranted" and "false" not in states:
+        raise EventError("decision protocol not_warranted requires a false threshold input")
+    if status == "completed" and "false" in states:
+        raise EventError("decision protocol completed cannot carry a false threshold input")
+    for field in completion & set(value):
+        _check_exact_event_reference(value[field], f"protocol.{field}")
+    return cast(str, status)
+
+
+def _check_binding(value: object, *, protected_proposal: bool) -> str:
+    if not isinstance(value, dict):
+        raise EventError("decision protocol binding must be an object")
+    admission = value.get("kind")
+    if not isinstance(admission, str) or admission not in effects.ADMISSION_CLASSES:
+        raise EventError("decision protocol binding has an unknown admission class")
+    admitted = (
+        _PROTECTED_ADMISSION_CLASSES
+        if protected_proposal
+        else _AUTONOMOUS_ADMISSION_CLASSES
+    )
+    if admission not in admitted:
+        label = "protected proposal" if protected_proposal else "autonomous decision"
+        raise EventError(f"decision protocol admission {admission!r} is invalid for {label}")
+
+    execution_fields = {
+        "kind",
+        "effect_manifest_digest",
+        "sandbox_policy_digest",
+        "verifier_policy_digest",
+        "expected_receipt_digest",
+    }
+    if admission == "material_choice":
+        expected = {"kind"}
+    elif admission in {"contained_execution", "proof_operation"}:
+        expected = execution_fields
+    elif admission == "recoverable_mutation":
+        expected = execution_fields | {"recovery_proof_digest"}
+    elif admission == "protected_covered":
+        expected = {
+            "kind",
+            "protected_class",
+            "effect_manifest_digest",
+            "authority_ref",
+        }
+    else:
+        expected = {"kind", "protected_class", "effect_manifest_digest"}
+    if set(value) != expected:
+        raise EventError(
+            f"decision protocol binding for {admission} must contain exactly {sorted(expected)}"
+        )
+    for field in expected & {
+        "effect_manifest_digest",
+        "sandbox_policy_digest",
+        "verifier_policy_digest",
+        "expected_receipt_digest",
+        "recovery_proof_digest",
+    }:
+        _decision_digest(value[field], f"binding.{field}")
+    if "protected_class" in expected:
+        protected_class = value["protected_class"]
+        if protected_class not in PROTECTED_DECISION_CLASSES:
+            raise EventError("decision protocol binding has an unknown protected class")
+    if "authority_ref" in expected:
+        _check_exact_event_reference(value["authority_ref"], "binding.authority_ref")
+    return admission
+
+
+def _check_planning_record(
+    data: EventPayload,
+    *,
+    actor: str,
+    protected_proposal: bool,
+) -> None:
+    required = {
+        "decision_id",
+        "operation_id",
+        "ticket",
+        "owner",
+        "actor",
+        "record_level",
+        "decision",
+        "reasoning",
+        "falsifier",
+        "reversal",
+        "alternatives",
+        "evidence_refs",
+        "acceptance_contract_digest",
+        "protocol",
+        "binding",
+    }
+    optional = {"only_admissible", "supersedes"}
+    actual = set(data)
+    if not required <= actual or not actual <= required | optional:
+        raise EventError(
+            "decision protocol planning fields mismatch; "
+            f"missing {sorted(required - actual)}, unexpected {sorted(actual - required - optional)}"
+        )
+    for field in ("decision_id", "operation_id", "ticket", "owner", "actor"):
+        _decision_text(data[field], field)
+    if data["actor"] != actor:
+        raise EventError("decision protocol actor must match the event actor")
+    _check_decision_content(data)
+    _check_alternatives(data)
+    evidence_refs = data["evidence_refs"]
+    if not isinstance(evidence_refs, list) or not evidence_refs:
+        raise EventError("decision protocol evidence_refs must be a non-empty array")
+    for index, evidence_ref in enumerate(evidence_refs):
+        _check_exact_event_reference(evidence_ref, f"evidence_refs[{index}]")
+    _decision_digest(
+        data["acceptance_contract_digest"], "acceptance_contract_digest"
+    )
+    protocol_status = _check_protocol(data["protocol"])
+    admission = _check_binding(
+        data["binding"], protected_proposal=protected_proposal
+    )
+    expected_level = (
+        "full"
+        if admission in _PROTECTED_ADMISSION_CLASSES or protocol_status == "completed"
+        else "minimal"
+    )
+    if data["record_level"] != expected_level:
+        raise EventError(
+            f"decision protocol record_level must be {expected_level!r} for {admission}/{protocol_status}"
+        )
+    if "supersedes" in data:
+        _check_exact_event_reference(data["supersedes"], "supersedes")
+
+
+def decision_protocol_data(event: object) -> EventPayload | None:
+    """Return the strict nested P01 planning record, excluding legacy audit rows."""
+    raw = event.raw if isinstance(event, Event) else event
+    if not isinstance(raw, dict):
+        return None
+    data = raw.get("data")
+    if not isinstance(data, dict):
+        return None
+    if raw.get("event") == ACTION_PROPOSAL_KIND:
+        planning = data.get("planning")
+        return planning if isinstance(planning, dict) else None
+    if raw.get("event") == DECISION_KIND and _DECISION_PROTOCOL_MARKERS & set(data):
+        return data
+    return None
+
+
+def _check_decision_contract(event: EventPayload) -> None:
+    """V0-22/23/24 and P01: bind reversible decisions before consequence."""
+    if event["event"] == ACTION_PROPOSAL_KIND:
+        data = event["data"]
+        if set(data) != {"proposal_id", "planning"}:
+            raise EventError(
+                f"{ACTION_PROPOSAL_KIND} must contain exactly proposal_id and planning"
+            )
+        _decision_text(data["proposal_id"], "proposal_id")
+        planning = data["planning"]
+        if not isinstance(planning, dict):
+            raise EventError(f"{ACTION_PROPOSAL_KIND} planning must be an object")
+        _check_planning_record(
+            planning,
+            actor=cast(str, event["actor"]),
+            protected_proposal=True,
+        )
+        return
+    if event["event"] != DECISION_KIND:
+        return
+    data = event["data"]
+    _check_decision_content(data)
+
     decision_class = data.get("class")
     if isinstance(decision_class, str) and decision_class in USER_ONLY:
         raise EventError(
             f"decision class {decision_class!r} is reserved to the user (V0-23)"
+        )
+    if decision_class in PROTECTED_DECISION_CLASSES:
+        raise EventError(
+            f"decision class {decision_class!r} is protected and cannot be autonomous"
+        )
+    if _DECISION_PROTOCOL_MARKERS & set(data):
+        _check_planning_record(
+            data,
+            actor=cast(str, event["actor"]),
+            protected_proposal=False,
         )
 
 
@@ -1616,9 +1925,115 @@ def _validate_record_relations(
                     ) from exc
 
 
+def _planning_references(record: EventPayload) -> Iterator[tuple[str, object]]:
+    for index, reference in enumerate(cast(list[object], record["evidence_refs"])):
+        yield f"evidence_refs[{index}]", reference
+    protocol = cast(EventPayload, record["protocol"])
+    for field in (
+        "instructions_ref",
+        "bar_ref",
+        "search_ref",
+        "killing_check_ref",
+    ):
+        if field in protocol:
+            yield f"protocol.{field}", protocol[field]
+    if "supersedes" in record:
+        yield "supersedes", record["supersedes"]
+
+
+def _validate_decision_relations(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    """Bind each P01 record to unique identities and exact earlier events."""
+    history = list(prefix)
+    decision_ids: set[str] = set()
+    operation_ids: set[str] = set()
+    for prior in prefix:
+        record = decision_protocol_data(prior)
+        if record is None:
+            continue
+        decision_id = cast(str, record["decision_id"])
+        operation_id = cast(str, record["operation_id"])
+        if decision_id in decision_ids:
+            raise EventError(f"historical duplicate decision_id {decision_id!r}")
+        if operation_id in operation_ids:
+            raise EventError(f"historical duplicate operation_id {operation_id!r}")
+        decision_ids.add(decision_id)
+        operation_ids.add(operation_id)
+
+    for candidate in candidates:
+        record = decision_protocol_data(candidate)
+        if record is not None:
+            decision_id = cast(str, record["decision_id"])
+            operation_id = cast(str, record["operation_id"])
+            if decision_id in decision_ids:
+                raise EventError(f"duplicate decision_id {decision_id!r}")
+            if operation_id in operation_ids:
+                raise EventError(f"duplicate operation_id {operation_id!r}")
+
+            resolved: dict[str, Event | str] = {}
+            for field, reference in _planning_references(record):
+                try:
+                    resolved[field] = resolve_reference(reference, history)
+                except EventError as exc:
+                    raise EventError(
+                        f"decision protocol {field} must reference an exact earlier event: {exc}"
+                    ) from exc
+
+            superseded = resolved.get("supersedes")
+            if isinstance(superseded, Event):
+                previous = decision_protocol_data(superseded)
+                if (
+                    previous is None
+                    or superseded.kind != candidate["event"]
+                    or previous["ticket"] != record["ticket"]
+                ):
+                    raise EventError(
+                        "decision protocol supersedes must name an earlier planning record "
+                        "of the same kind and ticket"
+                    )
+
+            if candidate["event"] == ACTION_PROPOSAL_KIND:
+                proposal_id = cast(str, candidate["data"]["proposal_id"])
+                binding = cast(EventPayload, record["binding"])
+                authority_ref = binding.get("authority_ref")
+                if authority_ref is not None:
+                    try:
+                        authority = resolve_reference(authority_ref, history)
+                    except EventError as exc:
+                        raise EventError(
+                            "protected proposal authority must reference an exact earlier "
+                            f"first-party event: {exc}"
+                        ) from exc
+                    if not isinstance(authority, Event):
+                        raise EventError("protected proposal authority cannot be legacy/unmeasured")
+                    authority_data = authority.data
+                    if authority_data.get("human_decision") not in HUMAN_ONLY:
+                        raise EventError(
+                            "protected proposal authority must be a first-party human decision"
+                        )
+                    if authority_data.get("proposal_id") != proposal_id:
+                        raise EventError(
+                            "protected proposal authority proposal_id does not match"
+                        )
+                    if authority_data.get("decision_id") != decision_id:
+                        raise EventError(
+                            "protected proposal authority decision_id does not match"
+                        )
+
+            decision_ids.add(decision_id)
+            operation_ids.add(operation_id)
+        history.append(Event(candidate))
+
+
 register_transition_validator((RECORD_CAPTURED_KIND,), _validate_record_relations)
 register_transition_validator(
     (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT), _validate_effect_receipt_chain
+)
+register_transition_validator(
+    (DECISION_KIND, ACTION_PROPOSAL_KIND), _validate_decision_relations
 )
 
 

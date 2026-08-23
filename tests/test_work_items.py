@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from consilient import events, work_items
 from consilient.events import SCHEMA_VERSION, EventError, bypassed, read_all
 from consilient.work_items import (
     COMMITTED,
@@ -225,3 +226,65 @@ def test_work_script_writes_each_operation_to_the_selected_log(tmp_path):
         "work_item.comment",
         "work_item.completed",
     ]
+
+
+def test_material_choice_cannot_make_dependent_item_ready_without_prior_decision():
+    source = work_event("evidence.observed", {"claim": "measured"})
+    source["event_id"] = events.new_event_id()
+    source_ref = {
+        "event_id": source["event_id"],
+        "event_kind": source["event"],
+        "event_sha256": events.event_sha256(source),
+    }
+    decision = work_event(
+        events.DECISION_KIND,
+        {
+            "decision_id": "decision-1",
+            "operation_id": "operation-1",
+            "ticket": "CHOICE-1",
+            "owner": "owner",
+            "actor": "agent-one",
+            "record_level": "minimal",
+            "decision": "Choose the standard-library path",
+            "reasoning": "It satisfies the frozen contract",
+            "falsifier": "The contract requires an unavailable primitive",
+            "reversal": {
+                "kind": "inverse",
+                "value": "consilient.events.validate",
+            },
+            "alternatives": [
+                {"option": "Add a dependency", "rejected_because": "It is unnecessary"}
+            ],
+            "evidence_refs": [source_ref],
+            "acceptance_contract_digest": "a" * 64,
+            "protocol": {
+                "status": "not_warranted",
+                "threshold": {
+                    "version": "better-than-best.v1",
+                    "later_reliance": "false",
+                    "question_open": "true",
+                    "wrong_costs_more": "true",
+                },
+            },
+            "binding": {"kind": "material_choice"},
+        },
+    )
+    decision["event_id"] = events.new_event_id()
+    expected = events.event_sha256(decision)
+    dependent = work_event(
+        "work_item.opened",
+        {
+            "ticket": "DEPENDENT-1",
+            "accountable": "owner",
+            "decision_id": "decision-1",
+        },
+    )
+
+    assert not work_items.decision_readiness([], dependent, expected)
+    assert not work_items.decision_readiness([source, dependent, decision], dependent, expected)
+    assert not work_items.decision_readiness(
+        [source, decision, dependent], dependent, "0" * 64
+    )
+    assert work_items.decision_readiness(
+        [source, decision, dependent], dependent, expected
+    )

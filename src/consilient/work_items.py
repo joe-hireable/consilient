@@ -787,6 +787,77 @@ def _event_mapping(item: object) -> Mapping[str, object]:
     raise events.EventError("transition validator received an unknown event shape")
 
 
+def decision_readiness(
+    accepted_prefix: Sequence[object],
+    dependent_item: object,
+    expected_decision_digest: str,
+) -> bool:
+    """Dormant EXP-106 treatment: require an exact earlier material-choice record."""
+    if _DIGEST.fullmatch(expected_decision_digest) is None:
+        return False
+    try:
+        dependent = _event_mapping(dependent_item)
+    except events.EventError:
+        return False
+    dependent_data = dependent.get("data")
+    if not isinstance(dependent_data, Mapping):
+        return False
+    decision_id = dependent_data.get("decision_id")
+    if not isinstance(decision_id, str) or not decision_id.strip():
+        return False
+
+    before: list[Mapping[str, object]] = []
+    dependent_event_id = dependent.get("event_id")
+    for item in accepted_prefix:
+        try:
+            raw = _event_mapping(item)
+        except events.EventError:
+            return False
+        same_item = raw is dependent
+        if (
+            not same_item
+            and isinstance(dependent_event_id, str)
+            and raw.get("event_id") == dependent_event_id
+        ):
+            same_item = True
+        if same_item:
+            break
+        before.append(raw)
+
+    matched: Mapping[str, object] | None = None
+    for raw in before:
+        record = events.decision_protocol_data(raw)
+        if record is None or raw.get("event") != events.DECISION_KIND:
+            continue
+        binding = record.get("binding")
+        if (
+            record.get("decision_id") == decision_id
+            and isinstance(binding, Mapping)
+            and binding.get("kind") == "material_choice"
+            and events.event_sha256(cast(events.EventPayload, raw))
+            == expected_decision_digest
+        ):
+            matched = raw
+            break
+    if matched is None:
+        return False
+
+    matched_id = matched.get("event_id")
+    matched_digest = events.event_sha256(cast(events.EventPayload, matched))
+    for raw in before:
+        record = events.decision_protocol_data(raw)
+        if record is None or raw is matched:
+            continue
+        supersedes = record.get("supersedes")
+        if (
+            isinstance(supersedes, Mapping)
+            and supersedes.get("event_id") == matched_id
+            and supersedes.get("event_sha256") == matched_digest
+        ):
+            return False
+    return True
+
+
 def _turns_by_id(prefix: Sequence[object], candidates: Sequence[object]) -> dict[str, dict[str, Any]]:
     turns: dict[str, dict[str, Any]] = {}
     for item in (*prefix, *candidates):
