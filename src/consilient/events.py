@@ -259,6 +259,9 @@ def validate(event: object) -> EventPayload:
     if not isinstance(event["data"], dict):
         raise EventError("data must be an object")
 
+    if "event_id" in event:
+        _check_event_id(event["event_id"])
+
     _check_budget_contract(event)
     _check_usage_contract(event)
     _check_knowledge_contract(event)
@@ -275,6 +278,27 @@ def validate(event: object) -> EventPayload:
     _check_evidence_class(event)
     _check_dispatch_contract(event)
     return event
+
+
+def _check_event_id(value: object) -> None:
+    """Accept one spelling of UUIDv4, so IDs cannot gain aliases in replay."""
+    if (
+        not isinstance(value, str)
+        or re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", value)
+        is None
+    ):
+        raise EventError("event_id must be lower-case hyphenated UUIDv4 text")
+
+
+def _prepare_for_append(event: EventPayload) -> EventPayload:
+    """Attach one retry-stable identity before validating or attempting durability."""
+    if "event_id" not in event:
+        raw = bytearray(os.urandom(16))
+        raw[6] = (raw[6] & 0x0F) | 0x40
+        raw[8] = (raw[8] & 0x3F) | 0x80
+        text = raw.hex()
+        event["event_id"] = f"{text[:8]}-{text[8:12]}-{text[12:16]}-{text[16:20]}-{text[20:]}"
+    return validate(event)
 
 
 def _decimal_field(
@@ -1165,10 +1189,12 @@ def _write_validated(path: Path, event: EventPayload) -> EventPayload:
     path.parent.mkdir(parents=True, exist_ok=True)
     created = not path.exists()
     line = (canonical(event) + "\n").encode("utf-8")
-    fd = os.open(path, _OPEN_FLAGS)
+    fd = os.open(path, _TRANSACTION_OPEN_FLAGS)
     try:
         _lock_file(fd)
         try:
+            prefix, _rejected = _read_under_lock(path, fd)
+            _reject_duplicate_event_ids(tuple(prefix), (event,))
             offset = os.lseek(fd, 0, os.SEEK_END)
             try:
                 _write_all(fd, line)
@@ -1281,6 +1307,7 @@ def _transaction(
             prefix = tuple(accepted)
             rejections = tuple(rejected)
             batch = tuple(candidates)
+            _reject_duplicate_event_ids(prefix, batch)
             if validator is not None:
                 validator(prefix, rejections, batch)
             for candidate in batch:
@@ -1331,7 +1358,7 @@ def append_transaction(
     """
     if not candidates:
         raise EventError("a transaction must carry at least one candidate")
-    checked = [validate(candidate) for candidate in candidates]
+    checked = [_prepare_for_append(candidate) for candidate in candidates]
     budgeted = {candidate["event"] for candidate in checked} & {
         BUDGET_STATE_KIND,
         SPEND_RESERVED_KIND,
@@ -1354,7 +1381,7 @@ def append_transaction(
 
 def append(path: Path, event: EventPayload) -> EventPayload:
     """Validate and append. The only writer of the log."""
-    validate(event)
+    event = _prepare_for_append(event)
     if event["event"] in (BUDGET_STATE_KIND, SPEND_RESERVED_KIND):
         lock = (path.parent / BUDGET_LOCK).resolve()
         if _BUDGET_LOCK_HELD.get() == lock:
@@ -1442,7 +1469,102 @@ def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
         file_events, file_rejected = read(path)
         events.extend(file_events)
         rejected.extend(file_rejected)
+    seen_ids: dict[str, Event] = {}
+    for event in events:
+        event_id = event.raw.get("event_id")
+        if not isinstance(event_id, str):
+            continue
+        first = seen_ids.get(event_id)
+        if first is None:
+            seen_ids[event_id] = event
+            continue
+        rejected.append(
+            Rejection(
+                event.path or "",
+                event.line or 0,
+                "duplicate event_id "
+                f"{event_id!r}; first appeared at {first.path}:{first.line}",
+                event_sha256(event.raw),
+            )
+        )
     return events, rejected
+
+
+def _reject_duplicate_event_ids(
+    prefix: tuple[Event, ...], candidates: tuple[EventPayload, ...]
+) -> None:
+    """Fail closed on a reused identity while the F01 lock protects the prefix."""
+    seen: set[str] = set()
+    for existing in prefix:
+        event_id = existing.raw.get("event_id")
+        if not isinstance(event_id, str):
+            continue
+        if event_id in seen:
+            raise EventError(f"historical duplicate event_id {event_id!r}")
+        seen.add(event_id)
+    for candidate in candidates:
+        event_id = cast(str, candidate["event_id"])
+        if event_id in seen:
+            raise EventError(f"duplicate event_id {event_id!r}")
+        seen.add(event_id)
+
+
+def event_sha256(event: EventPayload) -> str:
+    """Digest the complete canonical event; identity and content remain distinct."""
+    return hashlib.sha256(canonical(event).encode("utf-8")).hexdigest()
+
+
+def resolve_reference(
+    reference: object, events: Iterable[Event], *, before: Event | None = None
+) -> Event | str:
+    """Resolve one exact reference to an earlier event, or mark a real legacy row.
+
+    A legacy reference may identify its stored schema-v1 event only by kind and
+    complete-content hash; it is explicitly unmeasured because it lacks an ID.
+    Any other missing or malformed modern reference fails closed.
+    """
+    if not isinstance(reference, dict):
+        raise EventError("event reference must be an object")
+    kind = reference.get("event_kind")
+    digest = reference.get("event_sha256")
+    if not isinstance(kind, str) or not kind:
+        raise EventError("event reference must carry event_kind as a non-empty string")
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise EventError("event reference must carry event_sha256 as 64 lower-case hex characters")
+
+    ordered = tuple(events)
+    event_id = reference.get("event_id")
+    if event_id is None:
+        legacy = [
+            event
+            for event in ordered
+            if "event_id" not in event.raw
+            and event.kind == kind
+            and event_sha256(event.raw) == digest
+        ]
+        if len(legacy) == 1:
+            return "unmeasured"
+        raise EventError("event reference is missing event_id")
+    _check_event_id(event_id)
+    matching = [event for event in ordered if event.raw.get("event_id") == event_id]
+    if not matching:
+        raise EventError(f"event reference {event_id!r} is missing")
+    if len(matching) != 1:
+        raise EventError(f"event reference {event_id!r} is not unique")
+    target = matching[0]
+    if before is not None:
+        try:
+            before_index = next(index for index, event in enumerate(ordered) if event is before)
+        except StopIteration as exc:
+            raise EventError("reference consumer is absent from trajectory order") from exc
+        target_index = next(index for index, event in enumerate(ordered) if event is target)
+        if target_index >= before_index:
+            raise EventError(f"event reference {event_id!r} is not earlier than its consumer")
+    if target.kind != kind:
+        raise EventError(f"event reference {event_id!r} has mismatched event_kind")
+    if event_sha256(target.raw) != digest:
+        raise EventError(f"event reference {event_id!r} has mismatched event_sha256")
+    return target
 
 
 def rejection_digest(rejected: list[Rejection]) -> str:
