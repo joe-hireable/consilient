@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import os
 import shutil
 import subprocess
 import sys
@@ -42,6 +43,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+# git exports GIT_DIR and GIT_INDEX_FILE into every hook it runs, and GIT_DIR overrides cwd — so a
+# subprocess inheriting them works against a different repository than the one it was pointed at,
+# silently. Every gate script here scrubs them, and `test_gate_scripts_scrub_the_git_environment`
+# refuses one that does not. The rule is deliberately blunt: it applies to any spawn, not only to
+# git calls, because a per-script exemption is how an invariant erodes.
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 # Windows and the CI runner both need an explicit timeout; a hung mutant must be a
 # failure, never a silent pass. A subprocess timeout does not kill grandchildren, so
@@ -193,6 +201,13 @@ def _pytest(
         text=True,
         encoding="utf-8",
         errors="replace",
+        # Every gate script in .github/scripts/ scrubs GIT_* before spawning, because git exports
+        # GIT_DIR and GIT_INDEX_FILE into any hook it runs and GIT_DIR overrides cwd — so a run
+        # inheriting them inspects a different repository than the one it was pointed at, silently.
+        # `test_gate_scripts_scrub_the_git_environment` refuses a script without it, and refused
+        # this one. The subprocess here runs pytest rather than git, but the invariant is
+        # deliberately blunt: a per-script exemption is how the rule erodes.
+        env=GIT_ENV,
         timeout=TEST_TIMEOUT_S,
         check=False,
     )
