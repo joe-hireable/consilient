@@ -18,6 +18,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
+import subprocess
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -43,28 +46,116 @@ from consilient.promote import (  # noqa: E402
 )
 
 VERIFIER_VERSION = "exp78-training-v1"
+EXECUTION_TIMEOUT_SECONDS = 5.0
+
+_CANDIDATE_RUNNER = r"""
+import json
+import sys
+
+payload = json.load(sys.stdin)
+namespace = {}
+try:
+    compiled = compile(payload["source"], "<candidate>", "exec")
+    exec(compiled, namespace)
+    solve = namespace.get("solve")
+    if not callable(solve):
+        raise TypeError("candidate has no solve function")
+except (SyntaxError, TypeError, ValueError):
+    json.dump({"ran": False, "outputs": []}, sys.stdout)
+    raise SystemExit(0)
+
+outputs = []
+for prompt in payload["prompts"]:
+    try:
+        outputs.append(str(solve(prompt)))
+    except (TypeError, ValueError, ArithmeticError):
+        outputs.append(None)
+json.dump({"ran": True, "outputs": outputs}, sys.stdout)
+"""
+
+
+def _kill_process_tree(process: subprocess.Popen[str]) -> None:
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=3,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    else:
+        try:
+            getattr(os, "killpg")(process.pid, getattr(signal, "SIGKILL", 9))
+        except (OSError, ProcessLookupError):
+            pass
+    if process.poll() is None:
+        try:
+            process.kill()
+        except OSError:
+            pass
+
+
+def run_candidate(
+    source: str, prompts: Sequence[str]
+) -> tuple[bool, list[str | None]]:
+    """Run candidate bytes with prompts only in an isolated child interpreter."""
+    process = subprocess.Popen(
+        [sys.executable, "-I", "-c", _CANDIDATE_RUNNER],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=(
+            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            if os.name == "nt"
+            else 0
+        ),
+        start_new_session=os.name != "nt",
+    )
+    payload = json.dumps({"source": source, "prompts": list(prompts)})
+    try:
+        stdout, _ = process.communicate(payload, timeout=EXECUTION_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        _kill_process_tree(process)
+        try:
+            process.communicate(timeout=3)
+        except subprocess.TimeoutExpired:
+            pass
+        return False, []
+    if process.returncode != 0:
+        return False, []
+    try:
+        result = json.loads(stdout)
+    except (json.JSONDecodeError, TypeError):
+        return False, []
+    if not isinstance(result, dict):
+        return False, []
+    outputs = result.get("outputs")
+    if result.get("ran") is not True or not isinstance(outputs, list):
+        return False, []
+    if len(outputs) != len(prompts) or not all(
+        output is None or isinstance(output, str) for output in outputs
+    ):
+        return False, []
+    return True, outputs
 
 
 def execute(source: str, cases: Sequence[tuple[str, str]]) -> tuple[bool, float]:
-    """Run the candidate. This is the execution boundary; reflection is not one."""
-    namespace: dict[str, object] = {}
-    try:
-        compiled = compile(source, "<candidate>", "exec")
-        exec(compiled, namespace)  # noqa: S102 — fixture execution, not product code
-        solve = namespace.get("solve")
-        if not callable(solve):
-            return False, 0.0
-    except (SyntaxError, TypeError, ValueError):
+    """Run in a child and score expected answers only in this parent process."""
+    ran, outputs = run_candidate(source, [prompt for prompt, _ in cases])
+    if not ran:
         return False, 0.0
     if not cases:
         return True, 0.0
-    hits = 0
-    for prompt, expected in cases:
-        try:
-            if str(solve(prompt)) == expected:
-                hits += 1
-        except (TypeError, ValueError, ArithmeticError):
-            continue
+    hits = sum(
+        output is not None and output == expected
+        for output, (_, expected) in zip(outputs, cases, strict=True)
+    )
     return True, hits / len(cases)
 
 
@@ -120,7 +211,7 @@ def evaluate_sealed_offline(
         manifest,
         candidate_source=candidate_source,
         baseline_source=baseline_source,
-        execute=execute,
+        execute=run_candidate,
         registry=registry,
         adverse=AdverseTable(0, 0, 0, 0, 0),
         contained=contained,

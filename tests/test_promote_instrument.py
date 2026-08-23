@@ -5,8 +5,10 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -46,13 +48,17 @@ def _exp78(name: str) -> str:
     return (EXP78 / name).read_text(encoding="utf-8")
 
 
-def _loop_execute():
+def _loop_module():
     script = Path("scripts/promote_loop.py")
     spec = importlib.util.spec_from_file_location("promote_loop", script)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.execute
+    return module
+
+
+def _loop_execute():
+    return _loop_module().execute
 
 
 def _manifest_dict(*, hidden: list[tuple[str, str]] | None = None) -> dict[str, object]:
@@ -78,9 +84,11 @@ def _manifest(**kwargs: object) -> SealedManifest:
     return SealedManifest.from_mapping(data)
 
 
-def _execute(source: str, cases: list[tuple[str, str]]) -> tuple[bool, float]:
-  execute = _loop_execute()
-  return execute(source, cases)
+def _run_candidate(
+    source: str, prompts: list[str]
+) -> tuple[bool, list[str | None]]:
+    run_candidate = _loop_module().run_candidate
+    return run_candidate(source, prompts)
 
 
 def _adverse(**overrides: int) -> AdverseTable:
@@ -110,7 +118,7 @@ def _evaluate(
         manifest,
         candidate_source=candidate,
         baseline_source=baseline,
-        execute=_execute,
+        execute=_run_candidate,
         registry=registry or LineageRegistry(),
         adverse=adverse or _adverse(),
         contained=contained,
@@ -134,6 +142,96 @@ def test_alternate_import_refuses_before_evaluation():
     assert isinstance(result, EvaluationRefusal)
     assert result.reason == "instrument_unsealed"
     assert "os" in result.detail
+
+
+def test_candidate_runs_in_another_process_without_parent_expected_answers():
+    source = """
+def solve(prompt):
+    if prompt == "pid":
+        return str(__import__("os").getpid())
+    frame = __import__("sys")._getframe()
+    while frame is not None:
+        for value in frame.f_locals.values():
+            if isinstance(value, (list, tuple)):
+                for item in value:
+                    if (
+                        isinstance(item, (list, tuple))
+                        and len(item) == 2
+                        and item[0] == prompt
+                    ):
+                        return str(item[1])
+        frame = frame.f_back
+    return "expected-answer-not-found"
+"""
+    ran, score = _loop_execute()(
+        source,
+        [("pid", str(os.getpid())), ("sealed prompt", "sealed expected answer")],
+    )
+    assert ran is True
+    assert score == 0.0
+
+
+def test_candidate_timeout_kills_descendant_process_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _loop_module()
+    monkeypatch.setattr(module, "EXECUTION_TIMEOUT_SECONDS", 0.2)
+    marker = tmp_path / "survived.txt"
+    grandchild = (
+        "import pathlib,time; time.sleep(0.8); "
+        f"pathlib.Path({str(marker)!r}).write_text('survived', encoding='utf-8')"
+    )
+    source = f"""
+def solve(prompt):
+    subprocess = __import__("subprocess")
+    sys = __import__("sys")
+    subprocess.Popen([sys.executable, "-c", {grandchild!r}])
+    __import__("time").sleep(60)
+"""
+    started = time.monotonic()
+    ran, score = module.execute(source, [("prompt", "answer")])
+    assert ran is False
+    assert score == 0.0
+    assert time.monotonic() - started < 5
+    time.sleep(1)
+    assert not marker.exists()
+
+
+def test_hung_windows_taskkill_falls_back_to_direct_child_kill(monkeypatch):
+    module = _loop_module()
+
+    class Windows:
+        name = "nt"
+
+    class Process:
+        pid = 123
+        killed = False
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            self.killed = True
+
+    def hung_taskkill(argv, *, timeout, **kwargs):
+        raise subprocess.TimeoutExpired(argv, timeout)
+
+    process = Process()
+    monkeypatch.setattr(module, "os", Windows())
+    monkeypatch.setattr(module.subprocess, "run", hung_taskkill)
+    module._kill_process_tree(process)
+    assert process.killed is True
+
+
+def test_candidate_cannot_crash_parent_with_malformed_child_output():
+    source = """
+__import__("sys").stdout.write("[]")
+__import__("sys").stdout.flush()
+__import__("os")._exit(0)
+"""
+    ran, score = _loop_execute()(source, [("prompt", "answer")])
+    assert ran is False
+    assert score == 0.0
 
 
 def test_repeat_query_refuses_second_lineage_use():

@@ -921,7 +921,24 @@ def _batch_is_retired(
     return (lineage_id, batch_id) in registry.retired_batches
 
 
-ExecuteFn = Callable[[str, Sequence[tuple[str, str]]], tuple[bool, float]]
+ExecuteFn = Callable[[str, Sequence[str]], tuple[bool, Sequence[str | None]]]
+
+
+def _execute_and_score(
+    execute: ExecuteFn,
+    source: str,
+    cases: Sequence[tuple[str, str]],
+) -> tuple[bool, float]:
+    ran, outputs = execute(source, [prompt for prompt, _ in cases])
+    if not ran or len(outputs) != len(cases):
+        return False, 0.0
+    if not cases:
+        return True, 0.0
+    hits = sum(
+        output is not None and output == expected
+        for output, (_, expected) in zip(outputs, cases, strict=True)
+    )
+    return True, hits / len(cases)
 
 
 def evaluate_sealed(
@@ -954,12 +971,18 @@ def evaluate_sealed(
     if scratch_postimage_digest != scratch_preimage_digest:
         return EvaluationRefusal(REVERSAL_MISMATCH)
 
-    ran_before, development_before = execute(baseline_source, list(manifest.development_tasks))
-    ran_after, development_after = execute(candidate_source, list(manifest.development_tasks))
+    ran_before, development_before = _execute_and_score(
+        execute, baseline_source, manifest.development_tasks
+    )
+    ran_after, development_after = _execute_and_score(
+        execute, candidate_source, manifest.development_tasks
+    )
     if not (ran_before and ran_after):
         return EvaluationRefusal(CANDIDATE_UNEXECUTABLE)
 
-    _, qualification_score = execute(candidate_source, list(manifest.hidden_items))
+    _, qualification_score = _execute_and_score(
+        execute, candidate_source, manifest.hidden_items
+    )
     qualification_accept = qualification_score >= manifest.acceptance_threshold
     development_improved = development_after > development_before
     if development_improved and not qualification_accept:
