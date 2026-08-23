@@ -62,6 +62,7 @@ ADMISSION_DISPOSITIONS = frozenset({"execute", "reshape", "refuse", "escalate"})
 READ_ONLY_EFFECTS = frozenset({"data.read", "network.call"})
 READ_ONLY_OPERATIONS = frozenset({"read", "fetch", "get", "head", "list"})
 PLANNING_OPERATIONS = frozenset({"plan", "choose", "decide"})
+PROOF_OPERATIONS = frozenset({"proof"})
 PROTECTED_ESCALATION_EFFECTS = frozenset(
     {
         "money.commit",
@@ -419,13 +420,29 @@ def _has_mutation_effects(manifest: EffectManifest) -> bool:
     return bool(effects & MUTATION_EFFECTS) and not effects <= READ_ONLY_EFFECTS
 
 
+def _planning_predicate(manifest: EffectManifest) -> bool:
+    operations = _manifest_operations(manifest)
+    effects = _manifest_effects(manifest)
+    return (
+        bool(operations)
+        and operations <= PLANNING_OPERATIONS
+        and bool(effects)
+        and effects <= READ_ONLY_EFFECTS
+    )
+
+
+def _proof_predicate(manifest: EffectManifest) -> bool:
+    operations = _manifest_operations(manifest)
+    return bool(operations) and operations <= PROOF_OPERATIONS and not _has_protected_effects(manifest)
+
+
 def _classify_admission(
     manifest: EffectManifest,
     facts: AdmissionFacts,
 ) -> AdmissionClass:
-    if facts.is_proof_operation:
+    if facts.is_proof_operation and _proof_predicate(manifest) and facts.contained:
         return "proof_operation"
-    if facts.is_material_choice:
+    if facts.is_material_choice and _planning_predicate(manifest):
         return "material_choice"
     if _observation_predicate(manifest) and facts.broker_confirms_observation:
         return "observation"
@@ -458,7 +475,9 @@ def _disposition_for(
         return "refuse", "recovery_proof_missing"
     if admission == "contained_execution" and not facts.contained:
         return "refuse", "process_not_contained"
-    return "execute", gate_reason
+    if admission in {"proof_operation", "material_choice", "observation", "contained_execution", "protected_covered"}:
+        return "execute", gate_reason
+    return "refuse", "unhandled_admission_class"
 
 
 def derive_admission(

@@ -443,3 +443,129 @@ def test_composite_manifest_inherits_least_recoverable_atom() -> None:
     )
     assert result.admission == "protected_uncovered"
     assert result.disposition == "escalate"
+
+
+def test_material_choice_flag_cannot_cover_uncovered_money_commit() -> None:
+    gate = admitted_gate(
+        grant_kind="principal_authority",
+        effect_classes=("money.commit",),
+        operations=("spend",),
+        decision_id=None,
+        recovery_proof_ref_value=None,
+        authority_event_value=None,
+    )
+    result = derive_admission(
+        manifest(effects=("money.commit",), operations=("spend",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(is_material_choice=True, authority_standing=False),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+
+
+def test_proof_operation_flag_cannot_cover_uncovered_money_commit() -> None:
+    gate = admitted_gate(
+        grant_kind="principal_authority",
+        effect_classes=("money.commit",),
+        operations=("spend",),
+        decision_id=None,
+        recovery_proof_ref_value=None,
+        authority_event_value=None,
+    )
+    result = derive_admission(
+        manifest(effects=("money.commit",), operations=("spend",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(is_proof_operation=True, contained=True, authority_standing=False),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+
+
+def test_planning_operations_cannot_launder_protected_effects() -> None:
+    gate = admitted_gate(
+        grant_kind="principal_authority",
+        effect_classes=("money.commit",),
+        operations=("plan",),
+        decision_id=None,
+        recovery_proof_ref_value=None,
+        authority_event_value=None,
+    )
+    result = derive_admission(
+        manifest(effects=("money.commit",), operations=("plan",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(is_material_choice=True, authority_standing=False),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+
+
+def test_proof_operations_cannot_launder_protected_effects() -> None:
+    gate = admitted_gate(
+        grant_kind="principal_authority",
+        effect_classes=("money.commit",),
+        operations=("proof",),
+        decision_id=None,
+        recovery_proof_ref_value=None,
+        authority_event_value=None,
+    )
+    result = derive_admission(
+        manifest(effects=("money.commit",), operations=("proof",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(is_proof_operation=True, contained=True, authority_standing=False),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+
+
+def test_proof_operation_flag_cannot_uncontain_process_run() -> None:
+    gate = admitted_gate(
+        effect_classes=("process.run",),
+        operations=("run",),
+    )
+    result = derive_admission(
+        manifest(effects=("process.run",), operations=("run",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(is_proof_operation=True, contained=False),
+    )
+    assert result.admission == "capability_gap"
+    assert result.disposition == "refuse"
+    assert result.reason == "process_not_contained"
+
+
+def test_material_choice_flag_cannot_uncontain_process_run() -> None:
+    gate = admitted_gate(
+        effect_classes=("process.run",),
+        operations=("run",),
+    )
+    result = derive_admission(
+        manifest(effects=("process.run",), operations=("run",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(is_material_choice=True, contained=False),
+    )
+    assert result.admission == "capability_gap"
+    assert result.disposition == "refuse"
+    assert result.reason == "process_not_contained"
+
+
+def test_material_choice_flag_without_planning_operations_is_ignored() -> None:
+    result = derive_admission(
+        manifest(effects=("data.read",), operations=("read",)),
+        capability_entry(gate=admitted_gate()),
+        AdmissionFacts(is_material_choice=True, broker_confirms_observation=True),
+    )
+    assert result.admission == "observation"
+    assert result.disposition == "execute"
+
+
+def test_proof_operation_without_containment_does_not_execute() -> None:
+    gate = admitted_gate(
+        effect_classes=("file.change",),
+        operations=("proof",),
+    )
+    result = derive_admission(
+        manifest(effects=("file.change",), operations=("proof",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(is_proof_operation=True, contained=False),
+    )
+    assert result.disposition != "execute"
+    assert result.admission != "proof_operation"
