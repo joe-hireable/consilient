@@ -39,7 +39,6 @@ ACCEPTED = "promote.accepted"
 REFUSED = "promote.refused"
 REVERSED = "promote.reversed"
 EVALUATED = "promote.evaluated"
-KINDS = (ACCEPTED, REFUSED, REVERSED, EVALUATED)
 
 INSTRUMENT_UNSEALED = "instrument_unsealed"
 CANDIDATE_UNEXECUTABLE = "candidate_unexecutable"
@@ -72,6 +71,37 @@ PRIVILEGED_EVALUATION_FIELDS = frozenset(
         "scratch_preimage_digest",
         "scratch_postimage_digest",
     }
+)
+IMPACT_CONTRACT_KIND = "promote.impact_contract.registered"
+PROMOTER_BETA_RECEIPT_KIND = "promote.promoter_beta.receipt"
+ACTIVATION_REFUSED = "promote.activation.refused"
+
+EXP104_EXPERIMENT_ID = "EXP-104"
+EXP104_BLOCKED = "exp104_blocked"
+EXP104_CONFIRMED = "exp104_confirmed"
+EXP104_KILLED = "exp104_killed"
+
+CANONICAL_ON_OTHER = "no activation"
+SAFETY_FLOOR_VERSION = "adr-0076-v0"
+PROMOTER_BETA_UPPER_CEILING = 0.20
+PROMOTER_BETA_MIN_REJECTED = 30
+
+CONTRACT_MISSING = "contract_missing"
+CONTRACT_WEAKENED = "contract_weakened"
+CONTRACT_MUTATED = "contract_mutated"
+GENERIC_BETA_SUBSTITUTION = "generic_beta_substitution"
+INSUFFICIENT_PROMOTER_BETA = "insufficient_promoter_beta"
+PROMOTER_BETA_ABOVE_CEILING = "promoter_beta_above_ceiling"
+ACTIVATION_EVIDENCE_INCOMPLETE = "activation_evidence_incomplete"
+
+KINDS = (
+    ACCEPTED,
+    REFUSED,
+    REVERSED,
+    EVALUATED,
+    IMPACT_CONTRACT_KIND,
+    PROMOTER_BETA_RECEIPT_KIND,
+    ACTIVATION_REFUSED,
 )
 
 # EXP-47 stopping rule 1 fired at composite β = 0.3132 ≥ 0.20. ADR-0018 binds persistence
@@ -207,6 +237,102 @@ class SealedManifest:
         )
 
 
+class MechanicalClass:
+    """Mechanical autonomy classes from ADR-0076 / self-improvement section 4."""
+
+    CANDIDATE_ONLY = "candidate_only"
+    SENSING_ONLY = "sensing_only"
+    ACTIVE_HARNESS = "active_harness"
+    INSTRUMENT = "instrument"
+    EXACT_ROLLBACK = "exact_rollback"
+    EXISTING_PRINCIPAL_EFFECT = "existing_principal_effect"
+    UNKNOWN_OR_MIXED = "unknown_or_mixed"
+
+    ALL = frozenset(
+        {
+            CANDIDATE_ONLY,
+            SENSING_ONLY,
+            ACTIVE_HARNESS,
+            INSTRUMENT,
+            EXACT_ROLLBACK,
+            EXISTING_PRINCIPAL_EFFECT,
+            UNKNOWN_OR_MIXED,
+        }
+    )
+
+
+@dataclass(frozen=True)
+class ImpactContract:
+    """Immutable impact contract frozen before first observation (ADR-0076)."""
+
+    experiment_id: str
+    target_surface: tuple[str, ...]
+    baseline_digests: Mapping[str, str]
+    on_confirm: str
+    on_kill: str
+    on_other: str
+    confirm_rule: str
+    kill_rule: str
+    horizon: str
+    largest_effect: str
+    safety_floor_version: str
+    mechanical_class: str
+
+    def __post_init__(self) -> None:
+        if self.on_other.strip().casefold() != CANONICAL_ON_OTHER:
+            raise ValueError(
+                f"on_other cannot be weakened; must be exactly {CANONICAL_ON_OTHER!r}"
+            )
+        if self.mechanical_class not in MechanicalClass.ALL:
+            raise ValueError(f"unknown mechanical_class {self.mechanical_class!r}")
+        for key, value in self.baseline_digests.items():
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError("baseline_digests keys must be non-empty strings")
+            if not isinstance(value, str) or len(value) != 64:
+                raise ValueError(
+                    f"baseline_digests[{key!r}] must be a lowercase SHA-256 digest"
+                )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "experiment_id": self.experiment_id,
+            "target_surface": list(self.target_surface),
+            "baseline_digests": dict(self.baseline_digests),
+            "on_confirm": self.on_confirm,
+            "on_kill": self.on_kill,
+            "on_other": self.on_other,
+            "confirm_rule": self.confirm_rule,
+            "kill_rule": self.kill_rule,
+            "horizon": self.horizon,
+            "largest_effect": self.largest_effect,
+            "safety_floor_version": self.safety_floor_version,
+            "mechanical_class": self.mechanical_class,
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, object]) -> ImpactContract:
+        baseline = data.get("baseline_digests", {})
+        if not isinstance(baseline, Mapping):
+            raise ValueError("baseline_digests must be an object")
+        surfaces = data.get("target_surface", [])
+        if not isinstance(surfaces, list):
+            raise ValueError("target_surface must be a list")
+        return cls(
+            experiment_id=str(data["experiment_id"]),
+            target_surface=tuple(str(item) for item in surfaces),
+            baseline_digests={str(k): str(v) for k, v in baseline.items()},
+            on_confirm=str(data["on_confirm"]),
+            on_kill=str(data["on_kill"]),
+            on_other=str(data["on_other"]),
+            confirm_rule=str(data["confirm_rule"]),
+            kill_rule=str(data["kill_rule"]),
+            horizon=str(data["horizon"]),
+            largest_effect=str(data["largest_effect"]),
+            safety_floor_version=str(data["safety_floor_version"]),
+            mechanical_class=str(data["mechanical_class"]),
+        )
+
+
 @dataclass(frozen=True)
 class LineageRegistry:
     retired_batches: frozenset[tuple[str, str]] = frozenset()
@@ -242,6 +368,313 @@ class CandidateInstrumentView:
         if name in {"hidden_items", "instrument_digest", "qualification_batch_id"}:
             raise AttributeError(f"{name} is privileged and unavailable to candidates")
         raise AttributeError(name)
+
+
+@dataclass(frozen=True)
+class PromoterBetaReceipt:
+    """Typed promoter-beta receipt; a generic task Beta cannot substitute (ADR-0076)."""
+
+    experiment_id: str
+    qualification_rule_digest: str
+    decision_surface_digest: str
+    instrument_digest: str
+    generator_policy_digest: str
+    sampling_frame_digest: str
+    interval_rule_digest: str
+    n_human_rejected: int
+    n_false_accept: int
+    wilson_interval: tuple[float, float]
+
+    @property
+    def receipt_kind(self) -> Literal["promoter_beta"]:
+        return "promoter_beta"
+
+    @property
+    def point(self) -> float:
+        return self.n_false_accept / self.n_human_rejected
+
+    @property
+    def upper_bound(self) -> float:
+        return self.wilson_interval[1]
+
+    def __post_init__(self) -> None:
+        if self.n_human_rejected < PROMOTER_BETA_MIN_REJECTED:
+            raise ValueError(
+                f"promoter beta needs at least {PROMOTER_BETA_MIN_REJECTED} human rejections"
+            )
+        if not 0 <= self.n_false_accept <= self.n_human_rejected:
+            raise ValueError("n_false_accept must lie in [0, n_human_rejected]")
+        low, high = self.wilson_interval
+        if not 0.0 <= low <= high <= 1.0:
+            raise ValueError("wilson_interval must satisfy 0 <= low <= high <= 1")
+        for field_name, value in (
+            ("qualification_rule_digest", self.qualification_rule_digest),
+            ("decision_surface_digest", self.decision_surface_digest),
+            ("instrument_digest", self.instrument_digest),
+            ("generator_policy_digest", self.generator_policy_digest),
+            ("sampling_frame_digest", self.sampling_frame_digest),
+            ("interval_rule_digest", self.interval_rule_digest),
+        ):
+            if len(value) != 64:
+                raise ValueError(f"{field_name} must be a lowercase SHA-256 digest")
+
+    @classmethod
+    def from_counts(
+        cls,
+        *,
+        experiment_id: str,
+        qualification_rule_digest: str,
+        decision_surface_digest: str,
+        instrument_digest: str,
+        generator_policy_digest: str,
+        sampling_frame_digest: str,
+        interval_rule_digest: str,
+        n_human_rejected: int,
+        n_false_accept: int,
+        wilson_interval: tuple[float, float],
+    ) -> PromoterBetaReceipt:
+        return cls(
+            experiment_id=experiment_id,
+            qualification_rule_digest=qualification_rule_digest,
+            decision_surface_digest=decision_surface_digest,
+            instrument_digest=instrument_digest,
+            generator_policy_digest=generator_policy_digest,
+            sampling_frame_digest=sampling_frame_digest,
+            interval_rule_digest=interval_rule_digest,
+            n_human_rejected=n_human_rejected,
+            n_false_accept=n_false_accept,
+            wilson_interval=wilson_interval,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "receipt_kind": self.receipt_kind,
+            "experiment_id": self.experiment_id,
+            "qualification_rule_digest": self.qualification_rule_digest,
+            "decision_surface_digest": self.decision_surface_digest,
+            "instrument_digest": self.instrument_digest,
+            "generator_policy_digest": self.generator_policy_digest,
+            "sampling_frame_digest": self.sampling_frame_digest,
+            "interval_rule_digest": self.interval_rule_digest,
+            "n_human_rejected": self.n_human_rejected,
+            "n_false_accept": self.n_false_accept,
+            "beta_point": self.point,
+            "wilson_interval": list(self.wilson_interval),
+            "wilson_upper": self.upper_bound,
+        }
+
+    def matches_contract(self, contract: ImpactContract) -> bool:
+        if self.experiment_id != contract.experiment_id:
+            return False
+        baseline = contract.baseline_digests
+        return (
+            self.qualification_rule_digest == baseline["qualification_rule"]
+            and self.decision_surface_digest == baseline["decision_surface"]
+            and self.instrument_digest == baseline["instrument"]
+            and self.generator_policy_digest == baseline["generator_policy"]
+            and self.sampling_frame_digest == baseline["sampling_frame"]
+            and self.interval_rule_digest == baseline["interval_rule"]
+        )
+
+
+@dataclass(frozen=True)
+class ActivationDecision:
+    action: Literal["promote", "refuse"]
+    reason: str
+    contract: ImpactContract | None
+    registration_digest: str | None
+
+
+def contract_digest(contract: ImpactContract) -> str:
+    canonical = json.dumps(contract.as_dict(), sort_keys=True, separators=(",", ":"))
+    return digest(canonical)
+
+
+def exp104_impact_contract() -> ImpactContract:
+    """Registered EXP-104 impact contract (BLOCKED; no treatment has run)."""
+    baseline = {
+        "parent": digest("exp104-parent-fixture"),
+        "epoch_anchor": digest("exp104-epoch-anchor-fixture"),
+        "instrument": digest("exp104-instrument-sealed-fixture"),
+        "qualification_rule": digest("exp104-qualification-accept-rule"),
+        "decision_surface": digest("exp104-self-change-surface"),
+        "generator_policy": digest("exp104-generator-policy-seed-1040076"),
+        "sampling_frame": digest("exp104-sampling-frame-120"),
+        "interval_rule": digest("exp104-wilson-95-one-sided"),
+    }
+    return ImpactContract(
+        experiment_id=EXP104_EXPERIMENT_ID,
+        target_surface=(".agents/skills/",),
+        baseline_digests=baseline,
+        on_confirm=(
+            "owner-gated activation proposal for tracked .agents/skills/ bytes only"
+        ),
+        on_kill="remove active recursive promotion; sensing path remains dormant",
+        on_other=CANONICAL_ON_OTHER,
+        confirm_rule=(
+            "C-B and C-A joint-success lower bounds > 0; promoter-beta upper < 0.20; "
+            "downstream harm upper <= 0.05"
+        ),
+        kill_rule=(
+            "instrument breach, protected effect, unproven rollback or promoter-beta kill"
+        ),
+        horizon="120 days or 16 branches complete four generations",
+        largest_effect="one tracked skill installation on the frozen task mixture",
+        safety_floor_version=SAFETY_FLOOR_VERSION,
+        mechanical_class=MechanicalClass.ACTIVE_HARNESS,
+    )
+
+
+def mechanical_disposition(mechanical_class: str) -> str:
+    """Return autonomous, principal_required, refused or capability_gap."""
+    match mechanical_class:
+        case MechanicalClass.CANDIDATE_ONLY | MechanicalClass.SENSING_ONLY:
+            return "autonomous"
+        case MechanicalClass.ACTIVE_HARNESS:
+            return "principal_required"
+        case MechanicalClass.EXACT_ROLLBACK:
+            return "autonomous"
+        case MechanicalClass.INSTRUMENT | MechanicalClass.EXISTING_PRINCIPAL_EFFECT:
+            return "refused"
+        case MechanicalClass.UNKNOWN_OR_MIXED:
+            return "capability_gap"
+        case _:
+            return "capability_gap"
+
+
+def decide_active_harness_activation(
+    *,
+    contract: ImpactContract | None,
+    registration_digest: str | None,
+    promoter_beta: PromoterBetaReceipt | beta_mod.Beta | None,
+    exp104_status: str = EXP104_BLOCKED,
+    owner_receipt_present: bool = False,
+    containment_current: bool = False,
+    instrument_sealed: bool = False,
+    scratch_reversal_proved: bool = False,
+    downstream_safety_met: bool = False,
+    joint_outcome_improved: bool = False,
+    no_conflicting_candidate: bool = True,
+) -> ActivationDecision:
+    """Fail-closed active-harness policy. Default and current register state refuse."""
+    if contract is None:
+        return ActivationDecision("refuse", CONTRACT_MISSING, None, registration_digest)
+    if contract.on_other.strip().casefold() != CANONICAL_ON_OTHER:
+        return ActivationDecision(
+            "refuse", CONTRACT_WEAKENED, contract, registration_digest
+        )
+    expected = contract_digest(contract)
+    if registration_digest is None or registration_digest != expected:
+        return ActivationDecision("refuse", CONTRACT_MUTATED, contract, registration_digest)
+    if promoter_beta is not None and isinstance(promoter_beta, beta_mod.Beta):
+        return ActivationDecision(
+            "refuse", GENERIC_BETA_SUBSTITUTION, contract, registration_digest
+        )
+    if exp104_status == EXP104_BLOCKED:
+        return ActivationDecision("refuse", EXP104_BLOCKED, contract, registration_digest)
+    if exp104_status == EXP104_KILLED:
+        return ActivationDecision("refuse", EXP104_KILLED, contract, registration_digest)
+    if exp104_status != EXP104_CONFIRMED:
+        return ActivationDecision(
+            "refuse", "exp104_not_confirmed", contract, registration_digest
+        )
+    if promoter_beta is None:
+        return ActivationDecision(
+            "refuse", INSUFFICIENT_PROMOTER_BETA, contract, registration_digest
+        )
+    if not promoter_beta.matches_contract(contract):
+        return ActivationDecision(
+            "refuse", CONTRACT_MUTATED, contract, registration_digest
+        )
+    if promoter_beta.upper_bound >= PROMOTER_BETA_UPPER_CEILING:
+        return ActivationDecision(
+            "refuse", PROMOTER_BETA_ABOVE_CEILING, contract, registration_digest
+        )
+    missing = [
+        name
+        for name, present in (
+            ("owner_receipt", owner_receipt_present),
+            ("containment", containment_current),
+            ("instrument_sealed", instrument_sealed),
+            ("scratch_reversal", scratch_reversal_proved),
+            ("downstream_safety", downstream_safety_met),
+            ("joint_outcome", joint_outcome_improved),
+            ("no_conflicting_candidate", no_conflicting_candidate),
+        )
+        if not present
+    ]
+    if missing:
+        return ActivationDecision(
+            "refuse",
+            ACTIVATION_EVIDENCE_INCOMPLETE,
+            contract,
+            registration_digest,
+        )
+    return ActivationDecision(
+        "promote", "activation_permitted", contract, registration_digest
+    )
+
+
+def record_impact_contract(log_dir: Path, contract: ImpactContract) -> dict[str, object]:
+    now = datetime.now(timezone.utc)
+    registration = contract_digest(contract)
+    return append(
+        log_dir / f"{now.date().isoformat()}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": now.isoformat(),
+            "event": IMPACT_CONTRACT_KIND,
+            "actor": ACTOR,
+            "data": {
+                "experiment_id": contract.experiment_id,
+                "registration_digest": registration,
+                "contract": contract.as_dict(),
+            },
+        },
+    )
+
+
+def record_promoter_beta_receipt(
+    log_dir: Path, receipt: PromoterBetaReceipt
+) -> dict[str, object]:
+    now = datetime.now(timezone.utc)
+    return append(
+        log_dir / f"{now.date().isoformat()}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": now.isoformat(),
+            "event": PROMOTER_BETA_RECEIPT_KIND,
+            "actor": ACTOR,
+            "data": receipt.as_dict(),
+        },
+    )
+
+
+def record_activation_refusal(
+    log_dir: Path, decision: ActivationDecision
+) -> dict[str, object]:
+    if decision.action != "refuse":
+        raise PromoteError("activation refusal cannot record a promote action")
+    if not decision.reason:
+        raise PromoteError("an activation refusal must name its reason")
+    now = datetime.now(timezone.utc)
+    payload: dict[str, object] = {
+        "reason": decision.reason,
+        "experiment_id": (
+            decision.contract.experiment_id if decision.contract is not None else None
+        ),
+        "registration_digest": decision.registration_digest,
+    }
+    return append(
+        log_dir / f"{now.date().isoformat()}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": now.isoformat(),
+            "event": ACTIVATION_REFUSED,
+            "actor": ACTOR,
+            "data": payload,
+        },
+    )
 
 
 def digest(payload: str) -> str:

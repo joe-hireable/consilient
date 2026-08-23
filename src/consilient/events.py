@@ -150,6 +150,17 @@ FEEDBACK_KINDS = frozenset(
 )
 GOAL_ACHIEVED = frozenset({"fully", "partially", "no"})
 
+# ADR-0076: immutable impact contracts and typed promoter-beta receipts (S01).
+IMPACT_CONTRACT_KIND = "promote.impact_contract.registered"
+PROMOTER_BETA_RECEIPT_KIND = "promote.promoter_beta.receipt"
+ACTIVATION_REFUSED_KIND = "promote.activation.refused"
+PROMOTE_CONTRACT_KINDS = frozenset(
+    {IMPACT_CONTRACT_KIND, PROMOTER_BETA_RECEIPT_KIND, ACTIVATION_REFUSED_KIND}
+)
+CANONICAL_ON_OTHER = "no activation"
+PROMOTE_ACTOR = "consilient.promote"
+DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+
 # feedback-signals.md rules 1–2: no approval-style signal is ever a training target,
 # and none is collected at all — response rating is not built. The prohibition lives
 # here in the schema, not in prose: validate() rejects these field names on any event.
@@ -307,6 +318,7 @@ def validate(event: object) -> EventPayload:
         from . import work_items
 
         work_items.check_event_contract(event)
+    _check_promote_contract(event)
     return event
 
 
@@ -804,6 +816,68 @@ def _check_dispatch_contract(event: EventPayload) -> None:
         event["data"].get("supervised"), bool
     ):
         raise EventError("dispatch events must record supervised as a boolean (ADR-0039)")
+
+
+def _check_promote_contract(event: EventPayload) -> None:
+    """ADR-0076: registered impact contracts and promoter-beta receipts are typed."""
+    kind = event["event"]
+    if kind not in PROMOTE_CONTRACT_KINDS:
+        return
+    if event["actor"] != PROMOTE_ACTOR:
+        raise EventError(
+            f"{kind} must be attributed to declared writer {PROMOTE_ACTOR!r}"
+        )
+    data = event["data"]
+    if kind == IMPACT_CONTRACT_KIND:
+        experiment_id = data.get("experiment_id")
+        if not isinstance(experiment_id, str) or not experiment_id.strip():
+            raise EventError(f"{kind} must carry a non-empty experiment_id")
+        digest_value = data.get("registration_digest")
+        if not isinstance(digest_value, str) or DIGEST_RE.fullmatch(digest_value) is None:
+            raise EventError(
+                f"{kind} must carry registration_digest as a lowercase SHA-256 digest"
+            )
+        contract = data.get("contract")
+        if not isinstance(contract, dict):
+            raise EventError(f"{kind} must carry contract as an object")
+        on_other = contract.get("on_other")
+        if not isinstance(on_other, str) or on_other.strip().casefold() != CANONICAL_ON_OTHER:
+            raise EventError(
+                f"{kind} contract.on_other cannot be weakened; must be {CANONICAL_ON_OTHER!r}"
+            )
+        return
+    if kind == PROMOTER_BETA_RECEIPT_KIND:
+        if data.get("receipt_kind") != "promoter_beta":
+            raise EventError(f"{kind} must carry receipt_kind promoter_beta")
+        n_rejected = data.get("n_human_rejected")
+        if not isinstance(n_rejected, int) or n_rejected < 30:
+            raise EventError(
+                f"{kind} must carry n_human_rejected as an integer >= 30"
+            )
+        for field in (
+            "qualification_rule_digest",
+            "decision_surface_digest",
+            "instrument_digest",
+            "generator_policy_digest",
+            "sampling_frame_digest",
+            "interval_rule_digest",
+        ):
+            value = data.get(field)
+            if not isinstance(value, str) or DIGEST_RE.fullmatch(value) is None:
+                raise EventError(
+                    f"{kind} must carry {field} as a lowercase SHA-256 digest"
+                )
+        interval = data.get("wilson_interval")
+        if (
+            not isinstance(interval, list)
+            or len(interval) != 2
+            or not all(isinstance(item, (int, float)) for item in interval)
+        ):
+            raise EventError(f"{kind} must carry wilson_interval as a two-number list")
+        return
+    reason = data.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise EventError(f"{kind} must carry a non-empty refusal reason")
 
 
 def _check_attempt_identity(event: EventPayload) -> None:
