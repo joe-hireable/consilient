@@ -37,6 +37,16 @@ from typing import Literal, assert_never, cast
 # [asserted], not derived.
 MIN_REJECTIONS = 30
 
+HUMAN_VERDICT_BETA = "human_verdict_beta"
+PROXY_ESTIMAND_KINDS = frozenset(
+    {
+        "mutation_proxy_beta",
+        "critic_proxy_beta",
+        "repository_consequence_false_shipment_cohort_lower_bound",
+    }
+)
+AUTHENTICATED_AUTH_STATUS = "authenticated"
+
 Verdict = Literal["measured", "insufficient_data"]
 
 INSUFFICIENT: Verdict = "insufficient_data"
@@ -169,6 +179,22 @@ def wilson(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:
     return max(0.0, centre - spread), min(1.0, centre + spread)
 
 
+def admits_human_beta_row(row: dict[str, object]) -> bool:
+    """Only authenticated human-verdict beta rows may enter the human-beta projection."""
+    estimand = row.get("estimand_kind")
+    if estimand in PROXY_ESTIMAND_KINDS:
+        return False
+    return (
+        estimand == HUMAN_VERDICT_BETA
+        and row.get("auth_status") == AUTHENTICATED_AUTH_STATUS
+    )
+
+
+def admits_sizing_input(row: dict[str, object]) -> bool:
+    """Sizing consumers share the same admission rule as the human-beta projection."""
+    return admits_human_beta_row(row)
+
+
 def compute(
     rows: Iterable[dict[str, object]],
     task_family: str | None = None,
@@ -235,8 +261,12 @@ def from_connection(
     task_family: str | None = None,
     verifier_version: str | None = None,
     min_rejections: int = MIN_REJECTIONS,
-    sampling_unconditioned: bool = False,
+    sampling_unconditioned: bool | None = None,
 ) -> Beta:
+    from . import projection as projection_mod
+
+    if sampling_unconditioned is None:
+        sampling_unconditioned = projection_mod.sampling_unconditioned(conn)
     rows = [
         {
             "ts": ts,
@@ -244,10 +274,19 @@ def from_connection(
             "verifier_version": ver,
             "verifier_accept": bool(acc),
             "human_verdict": verdict,
+            "estimand_kind": estimand,
+            "auth_status": auth,
         }
-        for ts, fam, ver, acc, verdict in conn.execute(
-            "SELECT ts, task_family, verifier_version, verifier_accept, human_verdict"
-            " FROM outcomes ORDER BY position"
+        for ts, fam, ver, acc, verdict, estimand, auth in conn.execute(
+            "SELECT ts, task_family, verifier_version, verifier_accept, human_verdict,"
+            " estimand_kind, auth_status FROM outcomes ORDER BY position"
         )
     ]
-    return compute(rows, task_family, verifier_version, min_rejections)
+    eligible = [row for row in rows if admits_human_beta_row(row)]
+    return compute(
+        eligible,
+        task_family,
+        verifier_version,
+        min_rejections,
+        sampling_unconditioned,
+    )

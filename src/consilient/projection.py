@@ -28,8 +28,10 @@ from .events import (
     USAGE_KIND,
     VERDICT_CORRECTION_KIND,
     VERDICT_KIND,
+    VERIFICATION_OUTCOME_KIND,
     Event,
     Rejection,
+    event_sha256,
     read_all,
 )
 
@@ -51,7 +53,9 @@ CREATE TABLE IF NOT EXISTS outcomes (
     task_family     TEXT,
     verifier_version TEXT,
     verifier_accept INTEGER NOT NULL,
-    human_verdict   TEXT
+    human_verdict   TEXT,
+    estimand_kind   TEXT,
+    auth_status     TEXT
 );
 CREATE INDEX IF NOT EXISTS outcomes_family ON outcomes (task_family, verifier_version);
 CREATE TABLE IF NOT EXISTS usage (
@@ -136,6 +140,18 @@ CREATE TABLE IF NOT EXISTS delivery_estimates (
 );
 CREATE INDEX IF NOT EXISTS delivery_estimates_delivery
     ON delivery_estimates (delivery_id, revision);
+CREATE TABLE IF NOT EXISTS relational_quarantines (
+    id       INTEGER PRIMARY KEY,
+    position INTEGER NOT NULL,
+    path     TEXT NOT NULL,
+    line     INTEGER NOT NULL,
+    digest   TEXT NOT NULL,
+    reason   TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS projection_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 class ProjectionError(RuntimeError):
@@ -159,8 +175,24 @@ def build(
     conn.executescript(SCHEMA)
     events, rejected = read_all(log_dir)
     resolved_workspace = workspace if workspace is not None else _infer_workspace(log_dir)
-    _apply(conn, events, workspace=resolved_workspace)
+    verification_attempts: set[str] = set()
+    for event in events:
+        if event.kind != VERIFICATION_OUTCOME_KIND:
+            continue
+        attempt_id = event.data.get("attempt_id")
+        if isinstance(attempt_id, str):
+            verification_attempts.add(attempt_id)
+    _apply(
+        conn,
+        events,
+        verification_attempts,
+        workspace=resolved_workspace,
+    )
     _apply_rejections(conn, rejected)
+    conn.execute(
+        "INSERT INTO projection_meta (key, value) VALUES (?, ?)",
+        ("sampling_unconditioned", "false"),
+    )
     conn.commit()
     return conn
 
@@ -185,9 +217,73 @@ def rejection_count(conn: sqlite3.Connection) -> int:
     return int(conn.execute("SELECT COUNT(*) FROM rejections").fetchone()[0])
 
 
+def relational_quarantine_count(conn: sqlite3.Connection) -> int:
+    return int(conn.execute("SELECT COUNT(*) FROM relational_quarantines").fetchone()[0])
+
+
+def relational_quarantines(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    return [
+        {
+            "position": row[0],
+            "path": row[1],
+            "line": row[2],
+            "digest": row[3],
+            "reason": row[4],
+        }
+        for row in conn.execute(
+            "SELECT position, path, line, digest, reason"
+            " FROM relational_quarantines ORDER BY id"
+        )
+    ]
+
+
+def sampling_unconditioned(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT value FROM projection_meta WHERE key = 'sampling_unconditioned'"
+    ).fetchone()
+    return row is not None and row[0] == "true"
+
+
+def set_sampling_unconditioned(conn: sqlite3.Connection, value: bool) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO projection_meta (key, value) VALUES (?, ?)",
+        ("sampling_unconditioned", "true" if value else "false"),
+    )
+
+
+def _quarantine_relational(
+    conn: sqlite3.Connection,
+    position: int,
+    event: Event,
+    reason: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO relational_quarantines (position, path, line, digest, reason)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (
+            position,
+            event.path or "",
+            event.line or 0,
+            event_sha256(event.raw),
+            reason,
+        ),
+    )
+
+
+def _verdict_auth_status(data: dict[str, object]) -> str:
+    via = data.get("via")
+    principal = data.get("principal")
+    if via == "phone_webauthn":
+        return "authenticated"
+    if via == "cli" and isinstance(principal, str) and principal.strip():
+        return "declared_principal"
+    return "unauthenticated"
+
+
 def _apply(
     conn: sqlite3.Connection,
     events: list[Event],
+    verification_attempts: set[str],
     *,
     workspace: Path | None = None,
 ) -> None:
@@ -212,7 +308,7 @@ def _apply(
             ),
         )
         if event.kind == OUTCOME_KIND:
-            _apply_outcome(conn, position, event)
+            _apply_outcome(conn, position, event, verification_attempts)
         elif event.kind == VERDICT_KIND:
             _apply_verdict(conn, position, event)
         elif event.kind == VERDICT_CORRECTION_KIND:
@@ -267,7 +363,12 @@ def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:
     )
 
 
-def _apply_outcome(conn: sqlite3.Connection, position: int, event: Event) -> None:
+def _apply_outcome(
+    conn: sqlite3.Connection,
+    position: int,
+    event: Event,
+    verification_attempts: set[str],
+) -> None:
     data = event.data
     for field in ("attempt_id", "task", "verifier_accept"):
         if field not in data:
@@ -282,14 +383,26 @@ def _apply_outcome(conn: sqlite3.Connection, position: int, event: Event) -> Non
     if conn.execute(
         "SELECT 1 FROM outcomes WHERE attempt_id = ?", (attempt_id,)
     ).fetchone():
-        raise ProjectionError(
-            f"duplicate attempt_id {attempt_id!r} at position {position}"
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"duplicate attempt_id {attempt_id!r} at position {position}",
         )
+        return
     if "human_verdict" in data:
         raise ProjectionError(
             f"{OUTCOME_KIND} cannot carry human_verdict; append a separate "
             f"{VERDICT_KIND} event"
         )
+    if data.get("component_join_required") and attempt_id not in verification_attempts:
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"missing component verification.outcome join for attempt {attempt_id!r}",
+        )
+        return
     accept = data["verifier_accept"]
     if not isinstance(accept, bool):
         raise ProjectionError(
@@ -297,8 +410,8 @@ def _apply_outcome(conn: sqlite3.Connection, position: int, event: Event) -> Non
         )
     conn.execute(
         "INSERT INTO outcomes (position, attempt_id, ts, task, task_family,"
-        " verifier_version, verifier_accept, human_verdict)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        " verifier_version, verifier_accept, human_verdict, estimand_kind, auth_status)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             position,
             attempt_id,
@@ -307,6 +420,8 @@ def _apply_outcome(conn: sqlite3.Connection, position: int, event: Event) -> Non
             data.get("task_family"),
             data.get("verifier_version"),
             int(accept),
+            None,
+            None,
             None,
         ),
     )
@@ -317,26 +432,40 @@ def _apply_verdict(conn: sqlite3.Connection, position: int, event: Event) -> Non
     attempt_id = data.get("attempt_id")
     verdict = data.get("human_verdict")
     if verdict not in ("accept", "reject"):
-        raise ProjectionError(
+        _quarantine_relational(
+            conn,
+            position,
+            event,
             f"{VERDICT_KIND} at position {position} must carry human_verdict "
-            "'accept' or 'reject'"
+            "'accept' or 'reject'",
         )
+        return
     row = conn.execute(
         "SELECT human_verdict FROM outcomes WHERE attempt_id = ?", (attempt_id,)
     ).fetchone()
     if row is None:
-        raise ProjectionError(
+        _quarantine_relational(
+            conn,
+            position,
+            event,
             f"{VERDICT_KIND} at position {position} references unknown attempt "
-            f"{attempt_id!r}"
+            f"{attempt_id!r}",
         )
+        return
     if row[0] is not None:
-        raise ProjectionError(
+        _quarantine_relational(
+            conn,
+            position,
+            event,
             f"attempt {attempt_id!r} already has a verdict; a second verdict at "
-            f"position {position} is ambiguous"
+            f"position {position} is ambiguous",
         )
+        return
+    auth_status = _verdict_auth_status(data)
     conn.execute(
-        "UPDATE outcomes SET human_verdict = ? WHERE attempt_id = ?",
-        (verdict, attempt_id),
+        "UPDATE outcomes SET human_verdict = ?, estimand_kind = ?, auth_status = ?"
+        " WHERE attempt_id = ?",
+        (verdict, "human_verdict_beta", auth_status, attempt_id),
     )
 
 
@@ -417,23 +546,37 @@ def _apply_verdict_correction(
         "SELECT human_verdict FROM outcomes WHERE attempt_id = ?", (attempt_id,)
     ).fetchone()
     if row is None:
-        raise ProjectionError(
+        _quarantine_relational(
+            conn,
+            position,
+            event,
             f"{VERDICT_CORRECTION_KIND} at position {position} references unknown "
-            f"attempt {attempt_id!r}"
+            f"attempt {attempt_id!r}",
         )
+        return
     current = row[0]
     if current is None:
-        raise ProjectionError(
-            f"attempt {attempt_id!r} has no verdict to correct at position {position}"
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"attempt {attempt_id!r} has no verdict to correct at position {position}",
         )
+        return
     if current != previous:
-        raise ProjectionError(
+        _quarantine_relational(
+            conn,
+            position,
+            event,
             f"{VERDICT_CORRECTION_KIND} at position {position} expected prior verdict "
-            f"{previous!r}, found {current!r}"
+            f"{previous!r}, found {current!r}",
         )
+        return
+    auth_status = _verdict_auth_status(data)
     conn.execute(
-        "UPDATE outcomes SET human_verdict = ? WHERE attempt_id = ?",
-        (verdict, attempt_id),
+        "UPDATE outcomes SET human_verdict = ?, estimand_kind = ?, auth_status = ?"
+        " WHERE attempt_id = ?",
+        (verdict, "human_verdict_beta", auth_status, attempt_id),
     )
 
 

@@ -297,12 +297,20 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
 def cmd_beta(args: argparse.Namespace) -> CommandResult:
     conn = projection.build(Path(args.log), Path(args.db))
     result = beta_mod.from_connection(conn, args.task_family, args.verifier_version)
-    quarantined = projection.rejection_count(conn)
+    parser_quarantined = projection.rejection_count(conn)
+    relational = projection.relational_quarantines(conn)
+    sampling = projection.sampling_unconditioned(conn)
     conn.close()
     # β is a rate over a denominator, so anything the log refused has to be visible
     # wherever the rate is. A β computed over a quietly shortened log is exactly the false
     # confidence this project exists to measure.
-    return {**result.as_dict(), "quarantined": quarantined}
+    return {
+        **result.as_dict(),
+        "quarantined": parser_quarantined,
+        "relational_quarantine_count": len(relational),
+        "relational_quarantine": relational,
+        "sampling_unconditioned": sampling,
+    }
 
 
 def _condition(
@@ -919,9 +927,30 @@ def render(command: str, result: CommandResult) -> str:
             point=result["point"],
             interval=tuple(result["interval"]) if result["interval"] else None,
             window=tuple(result["window"]) if result["window"] else None,
+            lower_bound_on_joint_error=result.get("lower_bound_on_joint_error", False),
+            caveat=result.get("caveat", ""),
         ).render()
+        extras: list[str] = []
+        parser_q = result.get("quarantined", 0)
+        relational_q = result.get("relational_quarantine_count", 0)
+        if parser_q:
+            extras.append(f"parser quarantine: {parser_q} line(s)")
+        if relational_q:
+            extras.append(f"relational quarantine: {relational_q} row(s)")
+            for row in result.get("relational_quarantine", []):
+                extras.append(
+                    f"  {row['path']}:{row['line']}  {row['reason']}"
+                )
+        sampling = result.get("sampling_unconditioned", False)
+        extras.append(
+            "sampling_unconditioned: "
+            + ("true (projection-derived)" if sampling else "false (projection-derived)")
+        )
+        extras.append(f"oracle caveat: {result.get('caveat', '')}")
         traj = _trajectory_line(result)
-        return f"{line}\n  {traj}" if traj else line
+        if traj:
+            extras.append(traj)
+        return "\n".join([line] + extras)
     if command == "dashboard":
         traj = result["trajectory"]
         unanswerable = sum(1 for g in result["schema_gaps"] if not g["answerable"])
