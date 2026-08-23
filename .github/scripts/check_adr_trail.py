@@ -13,10 +13,8 @@ Two legs:
    appear twice by design (highlight section plus their own row). Number collisions are
    already owned by `check_record_numbers.py` and are not re-checked here.
 
-2. **History ratchet** (git): for commits *after* the pin below that touch
-   `docs/decisions/NNNN-*.md`, if the parent blob's Status was ACCEPTED or SUPERSEDED and
-   the whitespace-insensitive diff deletes or modifies body lines without adding a
-   supersession pointer or a dated correction/update marker, the commit fails. Candidates
+2. **History ratchet** (git): accepted/superseded ADRs, settled experiment entries, and
+   correction records are protected from silent history edits. Candidates
    at or before the pin are reported, not failed — an ad-hoc scan on 21 Aug 2026 found nine
    candidate commits in existing history, and retroactive punishment is not the rule's point.
 
@@ -47,6 +45,7 @@ INDEX = DECISIONS / "index.md"
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 HISTORY_PIN = "1db009b"
+SETTLED_RECORD_PIN = "27d67a2"
 
 # Commits imported from the public repository's own history on 23 Aug 2026. That repository
 # was built as a series of curated tree snapshots — "Publish the verified tree, ..." — and
@@ -64,9 +63,15 @@ ADR_FILE = re.compile(r"^(\d{4})-.+\.md$")
 STATUS_LINE = re.compile(r"^\s*-?\s*\*\*Status:?\*\*:?\s*(.+)$", re.IGNORECASE)
 SUPERSEDED_FULL = re.compile(r"SUPERSEDED\s+by\s+\[?(\d{4})", re.IGNORECASE)
 SUPERSEDED_PART = re.compile(r"SUPERSEDED\s+IN\s+PART\s+by\s+\[?(\d{4})", re.IGNORECASE)
-# What legitimises an edit to a settled ADR: a new supersession pointer, or a dated
-# correction/update marker quoting the prior text. Heuristic [asserted]: the vocabulary
-# below is what this repository's own corrections use.
+EXPERIMENT_REGISTER = "docs/10-research/experiment-register.md"
+CORRECTION_RECORD = re.compile(r"^docs/00-context/corrections-[^/]+\.md$")
+EXPERIMENT_HEADING = re.compile(r"^###\s+(EXP-[A-Za-z0-9_-]+)\b.*$", re.MULTILINE)
+SECTION_HEADING = re.compile(r"^#{1,3}(?:\s+|$)", re.MULTILINE)
+OUTCOME_MARKER = re.compile(
+    r"\b(?:DONE|PASS(?:ED)?|FAIL(?:ED)?|STOPPED|COMPROMISED|FIRED|"
+    r"INSUFFICIENT[\s_-]*EVIDENCE|ACCEPTED|REJECTED)\b",
+    re.IGNORECASE,
+)
 EDIT_MARKERS = re.compile(r"supersed|update:|corrected|erratum", re.IGNORECASE)
 
 
@@ -125,16 +130,11 @@ def check_trail_integrity() -> list[str]:
 
 
 def classify_edit(parent_status: str, added: list[str], removed: list[str]) -> str:
-    """Pure core of the history leg. 'ok', 'ok-settled-with-marker', or 'violation'.
-
-    A settled ADR (ACCEPTED/SUPERSEDED) whose body lines change is legitimate only when the
-    same edit adds a supersession pointer or a dated correction marker.
-    """
+    """Pure core of the ADR history leg: 'ok' or 'violation'."""
     settled = bool(re.search(r"ACCEPTED|SUPERSEDED", parent_status, re.IGNORECASE))
-    if not settled or not removed:
+    if not settled or not any(line.strip() for line in removed):
         return "ok"
-    marker_added = any(EDIT_MARKERS.search(line) for line in added)
-    return "ok-settled-with-marker" if marker_added else "violation"
+    return "violation"
 
 
 def _git(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -151,13 +151,86 @@ def _git(args: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _experiment_entries(text: str) -> list[tuple[str, int, str, bool]]:
+    """Return (id, ordinal, exact section, settled) for ordered EXP headings."""
+    starts = list(EXPERIMENT_HEADING.finditer(text))
+    boundaries = [match.start() for match in SECTION_HEADING.finditer(text)]
+    ordinals: dict[str, int] = {}
+    entries: list[tuple[str, int, str, bool]] = []
+    for start in starts:
+        end = next((point for point in boundaries if point > start.start()), len(text))
+        experiment_id = start.group(1)
+        ordinals[experiment_id] = ordinals.get(experiment_id, 0) + 1
+        statuses = re.findall(r"`([^`]+)`", start.group(0))
+        entries.append(
+            (
+                experiment_id,
+                ordinals[experiment_id],
+                text[start.start() : end],
+                bool(statuses and OUTCOME_MARKER.search(statuses[-1])),
+            )
+        )
+    return entries
+
+
+def _settled_experiment_violation(parent: str, child: str) -> str | None:
+    parent_entries = _experiment_entries(parent)
+    child_entries = _experiment_entries(child)
+    for index, (experiment_id, ordinal, entry, settled) in enumerate(parent_entries):
+        if not settled:
+            continue
+        if index >= len(child_entries):
+            return f"{experiment_id}#{ordinal}"
+        child_id, _, child_entry, _ = child_entries[index]
+        if child_id != experiment_id or not child_entry.startswith(entry):
+            return f"{experiment_id}#{ordinal}"
+    return None
+
+
+def _correction_line(parent: str, child: str) -> int:
+    parent_lines = parent.splitlines()
+    child_lines = child.splitlines()
+    for index, line in enumerate(parent_lines):
+        if index >= len(child_lines) or child_lines[index] != line:
+            return index + 1
+    return len(parent_lines) + 1
+
+
+def _record_kind(rel: str) -> str | None:
+    if rel == EXPERIMENT_REGISTER:
+        return "experiment"
+    if CORRECTION_RECORD.fullmatch(rel):
+        return "correction"
+    if rel.startswith("docs/decisions/") and ADR_FILE.match(Path(rel).name):
+        return "adr"
+    return None
+
+
+def _at_or_before(sha: str, pin: str, pin_known: bool) -> bool:
+    return pin_known and _git(["merge-base", "--is-ancestor", sha, pin]).returncode == 0
+
+
 def check_history() -> tuple[list[str], list[str]]:
-    """(reported, failed). Post-pin silent edits of settled ADRs fail; the rest report."""
-    log = _git(["log", "--format=%H", "--name-only", "--", "docs/decisions/"])
+    """(reported, failed). Post-pin silent edits of protected records fail."""
+    log = _git(
+        [
+            "log",
+            "--format=%H",
+            "--name-only",
+            "--",
+            "docs/decisions/",
+            EXPERIMENT_REGISTER,
+            ":(glob)docs/00-context/corrections-*.md",
+        ]
+    )
     if log.returncode != 0:
         return [], [f"git log failed: {log.stderr.strip()[:200]}"]
     pinned = _git(["merge-base", "--is-ancestor", HISTORY_PIN, "HEAD"])
     pin_known = pinned.returncode == 0
+    settled_pinned = _git(
+        ["merge-base", "--is-ancestor", SETTLED_RECORD_PIN, "HEAD"]
+    )
+    settled_pin_known = settled_pinned.returncode == 0
 
     reported: list[str] = []
     failed: list[str] = []
@@ -171,33 +244,87 @@ def check_history() -> tuple[list[str], list[str]]:
             commits[-1][1].append(line.strip())
 
     for sha, touched in commits:
-        adr_paths = [p for p in touched if ADR_FILE.match(Path(p).name)]
+        adr_paths = [
+            p
+            for p in touched
+            if _record_kind(p) is not None or p.startswith("docs/decisions/")
+        ]
         if not adr_paths:
             continue
         for rel in adr_paths:
+            kind = _record_kind(rel)
             parent = _git(["show", f"{sha}^:{rel}"])
             child = _git(["show", f"{sha}:{rel}"])
-            if parent.returncode != 0 or child.returncode != 0:
-                continue  # added or deleted in this commit; not an edit
-            diff = _git(["diff", "--ignore-all-space", f"{sha}^", sha, "--", rel])
-            added = [
-                ln[1:]
-                for ln in diff.stdout.splitlines()
-                if ln.startswith("+") and not ln.startswith("+++")
-            ]
-            removed = [
-                ln[1:]
-                for ln in diff.stdout.splitlines()
-                if ln.startswith("-") and not ln.startswith("---")
-            ]
+            if kind == "experiment":
+                if parent.returncode == 0:
+                    locator = _settled_experiment_violation(
+                        parent.stdout, child.stdout if child.returncode == 0 else ""
+                    )
+                    if locator is not None:
+                        message = f"{sha} silently edits settled experiment {rel} {locator}"
+                        if _at_or_before(
+                            sha, SETTLED_RECORD_PIN, settled_pin_known
+                        ):
+                            reported.append(message + " (at/before pin — reported)")
+                        else:
+                            failed.append(message)
+                continue
+            if kind == "correction":
+                child_text = child.stdout if child.returncode == 0 else ""
+                if parent.returncode == 0 and not child_text.startswith(parent.stdout):
+                    locator = f"correction line {_correction_line(parent.stdout, child_text)}"
+                    message = f"{sha} silently edits correction record {rel} {locator}"
+                    if _at_or_before(sha, SETTLED_RECORD_PIN, settled_pin_known):
+                        reported.append(message + " (at/before pin — reported)")
+                    else:
+                        failed.append(message)
+                continue
+            if (
+                parent.returncode != 0
+                and child.returncode == 0
+                and (kind == "adr" or rel.startswith("docs/decisions/"))
+            ):
+                names = _git(["diff-tree", "--no-commit-id", "-r", "--name-status", "-M", sha])
+                for line in names.stdout.splitlines():
+                    status, *paths = line.split("\t")
+                    if status.startswith("R") and len(paths) == 2 and paths[1] == rel:
+                        old_rel = paths[0]
+                        if _record_kind(old_rel) == "adr":
+                            kind = "adr"
+                            rel = old_rel
+                            parent = _git(["show", f"{sha}^:{rel}"])
+                            child = _git(["show", f"{sha}:{rel}"])
+                        break
+            if kind is None:
+                continue
+            if parent.returncode != 0:
+                continue  # a new ADR has no prior text to protect
+            if child.returncode != 0:
+                added = []
+                removed = ["deleted"]
+            else:
+                diff = _git(["diff", "--ignore-all-space", f"{sha}^", sha, "--", rel])
+                added = [
+                    ln[1:]
+                    for ln in diff.stdout.splitlines()
+                    if ln.startswith("+") and not ln.startswith("+++")
+                ]
+                removed = [
+                    ln[1:]
+                    for ln in diff.stdout.splitlines()
+                    if ln.startswith("-") and not ln.startswith("---")
+                ]
+            marker_added = any(EDIT_MARKERS.search(line) for line in added)
             verdict = classify_edit(_status_of(parent.stdout), added, removed)
             if verdict != "violation":
                 continue
             message = f"{sha[:9]} silently edits settled ADR {rel}"
-            ancestor = _git(["merge-base", "--is-ancestor", sha, HISTORY_PIN])
+            pin = SETTLED_RECORD_PIN if marker_added else HISTORY_PIN
+            known = settled_pin_known if marker_added else pin_known
+            ancestor = _git(["merge-base", "--is-ancestor", sha, pin])
             if any(sha.startswith(known) for known in IMPORTED_PUBLIC_HISTORY):
                 reported.append(message + " (imported public snapshot — reported)")
-            elif pin_known and ancestor.returncode == 0:
+            elif known and ancestor.returncode == 0:
                 reported.append(message + " (at/before pin — reported)")
             else:
                 failed.append(message)
@@ -208,12 +335,12 @@ def _self_test() -> int:
     ok = True
     cases = [
         ("ACCEPTED", ["body"], ["old body"], "violation"),
-        ("ACCEPTED", ["Superseded by 0067"], ["old body"], "ok-settled-with-marker"),
+        ("ACCEPTED", ["Superseded by 0067"], ["old body"], "violation"),
         (
             "ACCEPTED",
             ["Update 21 Aug 2026: corrected"],
             ["old body"],
-            "ok-settled-with-marker",
+            "violation",
         ),
         ("PROPOSED", ["anything"], ["old body"], "ok"),
         ("ACCEPTED", ["reworded"], [], "ok"),
@@ -226,6 +353,31 @@ def _self_test() -> int:
                 file=sys.stderr,
             )
             ok = False
+    record_cases = [
+        (
+            "### EXP-1 — test `DONE`\n\nresult\n",
+            "### EXP-1 — test `DONE`\n\nresult\n\n### EXP-2 — next `READY`\n",
+            None,
+        ),
+        (
+            "### EXP-1 — test `DONE`\n\nresult\n",
+            "### EXP-1 — test `DONE`\n\nrewrite\n",
+            "EXP-1#1",
+        ),
+        (
+            "### EXP-1 — test `READY`\n\ndraft\n",
+            "### EXP-1 — test `READY`\n\nrevised\n",
+            None,
+        ),
+    ]
+    for parent, child, expected in record_cases:
+        got = _settled_experiment_violation(parent, child)
+        if got != expected:
+            print(f"self-test FAILED: experiment -> {got}, want {expected}", file=sys.stderr)
+            ok = False
+    if _correction_line("first\nsecond\n", "first\nrewrite\n") != 2:
+        print("self-test FAILED: correction locator", file=sys.stderr)
+        ok = False
     print("self-test " + ("passed" if ok else "FAILED"))
     return 0 if ok else 1
 
