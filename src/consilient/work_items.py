@@ -22,7 +22,35 @@ PLAN_FROZEN = "organisation.plan.frozen"
 TURN = "conversation.turn"
 DISPATCH_CLAIM_SCHEMA = "dispatch-claim.v1"
 NATIVE_SCHEMA = "native.v1"
-KINDS = frozenset({OPENED, COMMENT, COMPLETED, COMMITTED})
+WORK_MODEL_SCHEMA = "work-model.v1"
+STATE = "work_item.state"
+STATE_GROUP_WAITING = "WAITING"
+STATE_GROUP_RUNNING = "RUNNING"
+STATE_GROUP_NEEDS_YOU = "NEEDS_YOU"
+STATE_GROUP_DONE = "DONE"
+STATE_GROUP_DEAD = "DEAD"
+STATE_GROUPS = (
+    STATE_GROUP_WAITING,
+    STATE_GROUP_RUNNING,
+    STATE_GROUP_NEEDS_YOU,
+    STATE_GROUP_DONE,
+    STATE_GROUP_DEAD,
+)
+WORK_STATE_DEFINITIONS: dict[str, dict[str, str]] = {
+    "blocked": {"group": STATE_GROUP_WAITING},
+    "ready": {"group": STATE_GROUP_RUNNING},
+    "active": {"group": STATE_GROUP_RUNNING},
+    "refused": {"group": STATE_GROUP_NEEDS_YOU},
+    "unfunded": {"group": STATE_GROUP_NEEDS_YOU},
+    "closed": {"group": STATE_GROUP_DONE},
+    "failed": {"group": STATE_GROUP_DEAD},
+    "cancelled": {"group": STATE_GROUP_DEAD},
+    "expired": {"group": STATE_GROUP_DEAD},
+    "invalidated": {"group": STATE_GROUP_DEAD},
+    "superseded": {"group": STATE_GROUP_DEAD},
+}
+INFORM_EFFECTS = frozenset({"duration", "quality"})
+KINDS = frozenset({OPENED, COMMENT, COMPLETED, COMMITTED, STATE})
 TURN_ROLES = frozenset({"user", "assistant", "system"})
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _NATIVE_CLOSURE_FIELDS = frozenset(
@@ -38,6 +66,142 @@ _FORBIDDEN_PLAN_DEPENDENCY_FIELDS = frozenset(
     }
 )
 _THEATRE_ONLY_FIELDS = frozenset({"title", "model", "specialism"})
+
+
+def state_group(state: str) -> str:
+    try:
+        return WORK_STATE_DEFINITIONS[state]["group"]
+    except KeyError as exc:
+        raise events.EventError(f"unknown work-item state {state!r}") from exc
+
+
+def _check_work_state(value: object, field: str) -> str:
+    state = _text(value, field)
+    if state not in WORK_STATE_DEFINITIONS:
+        raise events.EventError(f"{field} must be one of the declared work-item states")
+    return state
+
+
+def _check_blocked_overlay(data: Mapping[str, object]) -> None:
+    if "is_blocked" not in data:
+        return
+    is_blocked = data.get("is_blocked")
+    if not isinstance(is_blocked, bool):
+        raise events.EventError("is_blocked must be a boolean when present")
+    if is_blocked:
+        _text(data.get("blocked_reason"), "blocked_reason")
+
+
+def _check_requires_edge(value: object, index: int) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise events.EventError(f"requires[{index}] must be an object")
+    return {
+        "target_ticket": _text(value.get("target_ticket"), f"requires[{index}].target_ticket"),
+    }
+
+
+def _check_informs_edge(value: object, index: int) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise events.EventError(f"informs[{index}] must be an object")
+    effect = value.get("effect")
+    if effect not in INFORM_EFFECTS:
+        raise events.EventError(
+            f"informs[{index}].effect must be one of {sorted(INFORM_EFFECTS)}"
+        )
+    sign = value.get("sign")
+    if not isinstance(sign, int) or isinstance(sign, bool) or sign not in (-1, 0, 1):
+        raise events.EventError(f"informs[{index}].sign must be -1, 0 or 1")
+    magnitude = value.get("magnitude_estimate")
+    if not isinstance(magnitude, (int, float)) or isinstance(magnitude, bool) or magnitude < 0:
+        raise events.EventError(
+            f"informs[{index}].magnitude_estimate must be a non-negative number"
+        )
+    return {
+        "target_ticket": _text(
+            value.get("target_ticket"), f"informs[{index}].target_ticket"
+        ),
+        "effect": cast(str, effect),
+        "sign": sign,
+        "magnitude_estimate": float(magnitude),
+        "expires_at": _text(value.get("expires_at"), f"informs[{index}].expires_at"),
+    }
+
+
+def _check_inform_score(value: object, index: int) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise events.EventError(f"inform_scores[{index}] must be an object")
+    effect = value.get("effect")
+    if effect not in INFORM_EFFECTS:
+        raise events.EventError(
+            f"inform_scores[{index}].effect must be one of {sorted(INFORM_EFFECTS)}"
+        )
+    observed_sign = value.get("observed_sign")
+    if (
+        not isinstance(observed_sign, int)
+        or isinstance(observed_sign, bool)
+        or observed_sign not in (-1, 0, 1)
+    ):
+        raise events.EventError(f"inform_scores[{index}].observed_sign must be -1, 0 or 1")
+    observed_magnitude = value.get("observed_magnitude")
+    if (
+        not isinstance(observed_magnitude, (int, float))
+        or isinstance(observed_magnitude, bool)
+        or observed_magnitude < 0
+    ):
+        raise events.EventError(
+            f"inform_scores[{index}].observed_magnitude must be a non-negative number"
+        )
+    return {
+        "target_ticket": _text(
+            value.get("target_ticket"), f"inform_scores[{index}].target_ticket"
+        ),
+        "effect": cast(str, effect),
+        "observed_sign": observed_sign,
+        "observed_magnitude": float(observed_magnitude),
+    }
+
+
+def _check_work_model_opened(data: dict[str, Any]) -> dict[str, object]:
+    revision = _positive_int(data.get("revision"), "revision")
+    state = _check_work_state(data.get("state"), "state")
+    requires_value = data.get("requires")
+    if not isinstance(requires_value, list):
+        raise events.EventError("requires must be an array")
+    requires = [
+        _check_requires_edge(item, index) for index, item in enumerate(requires_value)
+    ]
+    informs_value = data.get("informs")
+    if not isinstance(informs_value, list):
+        raise events.EventError("informs must be an array")
+    informs = [
+        _check_informs_edge(item, index) for index, item in enumerate(informs_value)
+    ]
+    _check_blocked_overlay(data)
+    return {"revision": revision, "state": state, "requires": requires, "informs": informs}
+
+
+def _inform_edges_match_scores(
+    informs: Sequence[Mapping[str, object]], scores: Sequence[Mapping[str, object]]
+) -> None:
+    if not informs:
+        return
+    if not scores:
+        raise events.EventError("inform_scores is required when informs edges are declared")
+    keyed = {
+        (cast(str, edge["target_ticket"]), cast(str, edge["effect"])): edge
+        for edge in informs
+    }
+    seen: set[tuple[str, str]] = set()
+    for index, score in enumerate(scores):
+        parsed = _check_inform_score(score, index)
+        key = (cast(str, parsed["target_ticket"]), cast(str, parsed["effect"]))
+        if key not in keyed:
+            raise events.EventError(
+                f"inform_scores[{index}] does not match a declared informs edge"
+            )
+        seen.add(key)
+    if seen != set(keyed):
+        raise events.EventError("every informs edge must be scored on close")
 
 
 def _text(value: object, field: str) -> str:
@@ -624,6 +788,8 @@ def check_event_contract(event: events.EventPayload) -> None:
             raise events.EventError(
                 "native.v1 work_item.opened is not admitted until task-management activation"
             )
+        elif schema == WORK_MODEL_SCHEMA:
+            _check_work_model_opened(data)
         elif schema is not None:
             raise events.EventError(f"unsupported item_schema {schema!r}")
     if kind == COMMENT:
@@ -632,6 +798,16 @@ def check_event_contract(event: events.EventPayload) -> None:
             raise events.EventError(
                 "work_item.comment must carry a non-empty evidence_class"
             )
+    if kind == STATE:
+        _check_work_state(data.get("state"), "state")
+        _check_blocked_overlay(data)
+    if kind == COMPLETED:
+        inform_scores = data.get("inform_scores")
+        if inform_scores is not None:
+            if not isinstance(inform_scores, list):
+                raise events.EventError("inform_scores must be an array when present")
+            for index, item in enumerate(inform_scores):
+                _check_inform_score(item, index)
 
 
 def validate(event: object) -> events.EventPayload:
@@ -730,6 +906,56 @@ def freeze_plan(
     return _append(log, PLAN_FROZEN, actor, data, ts=ts)
 
 
+def open_work_model_item(
+    log: Path,
+    *,
+    ticket: str,
+    accountable: str,
+    state: str,
+    revision: int = 1,
+    requires: list[dict[str, str]] | None = None,
+    informs: list[dict[str, object]] | None = None,
+    actor: str = DEFAULT_ACTOR,
+    is_blocked: bool | None = None,
+    blocked_reason: str | None = None,
+) -> events.EventPayload:
+    extra: dict[str, Any] = {
+        "item_schema": WORK_MODEL_SCHEMA,
+        "revision": revision,
+        "state": state,
+        "requires": requires or [],
+        "informs": informs or [],
+    }
+    if is_blocked is not None:
+        extra["is_blocked"] = is_blocked
+    if blocked_reason is not None:
+        extra["blocked_reason"] = blocked_reason
+    return open_item(
+        log,
+        ticket=ticket,
+        accountable=accountable,
+        actor=actor,
+        extra=extra,
+    )
+
+
+def record_state(
+    log: Path,
+    *,
+    ticket: str,
+    state: str,
+    actor: str = DEFAULT_ACTOR,
+    is_blocked: bool | None = None,
+    blocked_reason: str | None = None,
+) -> events.EventPayload:
+    data: dict[str, Any] = {"ticket": ticket, "state": state}
+    if is_blocked is not None:
+        data["is_blocked"] = is_blocked
+    if blocked_reason is not None:
+        data["blocked_reason"] = blocked_reason
+    return _append(log, STATE, actor, data)
+
+
 def open_item(
     log: Path,
     *,
@@ -773,9 +999,22 @@ def comment(
 
 
 def complete_item(
-    log: Path, *, ticket: str, actor: str = DEFAULT_ACTOR
+    log: Path,
+    *,
+    ticket: str,
+    actor: str = DEFAULT_ACTOR,
+    extra: dict[str, Any] | None = None,
 ) -> events.EventPayload:
-    return _append(log, COMPLETED, actor, {"ticket": ticket})
+    data: dict[str, Any] = {"ticket": ticket}
+    if extra is not None:
+        reserved = set(data)
+        collision = reserved & set(extra)
+        if collision:
+            raise events.EventError(
+                f"work_item.completed extra fields may not override {sorted(collision)}"
+            )
+        data.update(extra)
+    return _append(log, COMPLETED, actor, data)
 
 
 def _event_mapping(item: object) -> Mapping[str, object]:
@@ -900,6 +1139,8 @@ def validate_transition(
     plan_seen: set[tuple[str, int]] = set()
     plan_tips: dict[str, dict[str, Any]] = {}
     opened_by_ticket: dict[str, dict[str, Any]] = {}
+    work_model_informs: dict[str, list[dict[str, object]]] = {}
+    work_model_state: dict[str, dict[str, Any]] = {}
 
     for item in prefix:
         raw = _event_mapping(item)
@@ -925,6 +1166,28 @@ def validate_transition(
         elif kind == OPENED:
             ticket = cast(str, data["ticket"])
             opened_by_ticket[ticket] = data
+            if _opened_schema(data) == WORK_MODEL_SCHEMA:
+                work_model_informs[ticket] = cast(
+                    list[dict[str, object]], data.get("informs", [])
+                )
+                work_model_state[ticket] = data
+        elif kind == STATE:
+            ticket = cast(str, data["ticket"])
+            if ticket not in opened_by_ticket:
+                raise events.EventError(
+                    f"work_item.state references unknown ticket {ticket!r}"
+                )
+            work_model_state[ticket] = data
+        elif kind == COMPLETED:
+            ticket = cast(str, data["ticket"])
+            informs = work_model_informs.get(ticket, [])
+            if informs:
+                scores = data.get("inform_scores", [])
+                if not isinstance(scores, list):
+                    raise events.EventError(
+                        "inform_scores is required when informs edges are declared"
+                    )
+                _inform_edges_match_scores(informs, scores)
 
     turns = _turns_by_id(prefix, ())
 
@@ -1009,6 +1272,14 @@ def validate_transition(
             opened = opened_by_ticket.get(ticket)
             if opened is None:
                 continue
+            informs = work_model_informs.get(ticket, [])
+            if informs:
+                scores = data.get("inform_scores", [])
+                if not isinstance(scores, list):
+                    raise events.EventError(
+                        "inform_scores is required when informs edges are declared"
+                    )
+                _inform_edges_match_scores(informs, scores)
             if _NATIVE_CLOSURE_FIELDS & set(data) and (
                 _opened_schema(opened) == DISPATCH_CLAIM_SCHEMA
                 or (
@@ -1019,12 +1290,25 @@ def validate_transition(
                     "dispatch-claim completion cannot carry native task-closure evidence"
                 )
         elif kind == OPENED:
-            opened_by_ticket[cast(str, data["ticket"])] = data
+            ticket = cast(str, data["ticket"])
+            opened_by_ticket[ticket] = data
+            if _opened_schema(data) == WORK_MODEL_SCHEMA:
+                work_model_informs[ticket] = cast(
+                    list[dict[str, object]], data.get("informs", [])
+                )
+                work_model_state[ticket] = data
+        elif kind == STATE:
+            ticket = cast(str, data["ticket"])
+            if ticket not in opened_by_ticket:
+                raise events.EventError(
+                    f"work_item.state references unknown ticket {ticket!r}"
+                )
+            work_model_state[ticket] = data
 
 
 def _register_transition_validator() -> None:
     events.register_transition_validator(
-        (TURN, COMMITTED, PLAN_FROZEN, OPENED, COMPLETED),
+        (TURN, COMMITTED, PLAN_FROZEN, OPENED, STATE, COMPLETED),
         validate_transition,
     )
 

@@ -1,23 +1,34 @@
 from datetime import datetime, timezone
 import importlib.util
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from consilient import events, work_items
 from consilient.events import SCHEMA_VERSION, EventError, bypassed, read_all
+from consilient import projection
 from consilient.work_items import (
     COMMITTED,
     DISPATCH_CLAIM_SCHEMA,
+    STATE,
+    STATE_GROUPS,
+    WORK_MODEL_SCHEMA,
+    WORK_STATE_DEFINITIONS,
     comment,
     complete_item,
+    open_work_model_item,
+    record_state,
     open_item,
+    state_group,
     success_digest,
     validate,
 )
 
 
-def work_event(kind, data, actor="agent-one"):
+def work_event(
+    kind: str, data: dict[str, Any], actor: str = "agent-one"
+) -> dict[str, Any]:
     return {
         "v": SCHEMA_VERSION,
         "ts": datetime.now(timezone.utc).isoformat(),
@@ -288,3 +299,122 @@ def test_material_choice_cannot_make_dependent_item_ready_without_prior_decision
     assert work_items.decision_readiness(
         [source, decision, dependent], dependent, expected
     )
+
+
+def test_every_native_state_declares_one_of_five_groups() -> None:
+    groups = {definition["group"] for definition in WORK_STATE_DEFINITIONS.values()}
+    assert groups == set(STATE_GROUPS)
+    assert state_group("active") == "RUNNING"
+    assert state_group("unfunded") == "NEEDS_YOU"
+    assert state_group("blocked") == "WAITING"
+
+
+def test_blocked_overlay_requires_a_named_reason() -> None:
+    event = work_event(
+        STATE,
+        {"ticket": "WM-1", "state": "active", "is_blocked": True},
+    )
+    with pytest.raises(EventError, match="blocked_reason"):
+        validate(event)
+
+
+def test_active_and_blocked_can_coexist_with_a_reason(tmp_path: Path) -> None:
+    log = tmp_path / "log"
+    open_work_model_item(
+        log,
+        ticket="WM-1",
+        accountable="owner",
+        state="ready",
+    )
+    record_state(
+        log,
+        ticket="WM-1",
+        state="active",
+        is_blocked=True,
+        blocked_reason="waiting on stream-2 handoff",
+    )
+    recorded, rejected = read_all(log)
+    assert rejected == []
+    assert recorded[-1].data["is_blocked"] is True
+    assert recorded[-1].data["blocked_reason"] == "waiting on stream-2 handoff"
+
+
+def test_informs_edge_must_be_scored_on_close(tmp_path: Path) -> None:
+    log = tmp_path / "log"
+    open_work_model_item(
+        log,
+        ticket="WM-2",
+        accountable="owner",
+        state="ready",
+        informs=[
+            {
+                "target_ticket": "WM-1",
+                "effect": "duration",
+                "sign": -1,
+                "magnitude_estimate": 0.2,
+                "expires_at": "2026-09-22T12:00:00+00:00",
+            }
+        ],
+    )
+    record_state(log, ticket="WM-2", state="active")
+    with pytest.raises(EventError, match="inform_scores"):
+        complete_item(log, ticket="WM-2")
+
+
+def test_informs_edge_scores_on_close(tmp_path: Path) -> None:
+    log = tmp_path / "log"
+    open_work_model_item(
+        log,
+        ticket="WM-3",
+        accountable="owner",
+        state="ready",
+        informs=[
+            {
+                "target_ticket": "WM-0",
+                "effect": "quality",
+                "sign": 1,
+                "magnitude_estimate": 0.1,
+                "expires_at": "2026-09-22T12:00:00+00:00",
+            }
+        ],
+    )
+    record_state(log, ticket="WM-3", state="active")
+    complete_item(
+        log,
+        ticket="WM-3",
+        extra={
+            "inform_scores": [
+                {
+                    "target_ticket": "WM-0",
+                    "effect": "quality",
+                    "observed_sign": 1,
+                    "observed_magnitude": 0.08,
+                }
+            ]
+        },
+    )
+    recorded, rejected = read_all(log)
+    assert rejected == []
+    assert recorded[-1].data["inform_scores"][0]["observed_magnitude"] == 0.08
+
+
+def test_projection_emits_five_groups(tmp_path: Path) -> None:
+    log = tmp_path / "log"
+    open_work_model_item(log, ticket="WAIT", accountable="owner", state="blocked")
+    open_work_model_item(log, ticket="RUN", accountable="owner", state="ready")
+    record_state(log, ticket="RUN", state="active")
+    open_work_model_item(log, ticket="NEED", accountable="owner", state="unfunded")
+    open_work_model_item(log, ticket="DONE", accountable="owner", state="closed")
+    open_work_model_item(log, ticket="DEAD", accountable="owner", state="failed")
+
+    db = tmp_path / "state.sqlite"
+    conn = projection.build(log, db)
+    groups = projection.work_item_groups(conn)
+    conn.close()
+
+    assert set(groups) == set(STATE_GROUPS)
+    assert [item["ticket"] for item in groups["WAITING"]] == ["WAIT"]
+    assert [item["ticket"] for item in groups["RUNNING"]] == ["RUN"]
+    assert [item["ticket"] for item in groups["NEEDS_YOU"]] == ["NEED"]
+    assert [item["ticket"] for item in groups["DONE"]] == ["DONE"]
+    assert [item["ticket"] for item in groups["DEAD"]] == ["DEAD"]

@@ -38,6 +38,7 @@ from .events import (
     event_sha256,
     read_all,
 )
+from .work_items import STATE, WORK_MODEL_SCHEMA, state_group
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -204,6 +205,19 @@ CREATE TABLE IF NOT EXISTS measurement_results (
 );
 CREATE INDEX IF NOT EXISTS measurement_results_run
     ON measurement_results (run_id, position);
+CREATE TABLE IF NOT EXISTS work_items (
+    ticket          TEXT NOT NULL PRIMARY KEY,
+    revision        INTEGER NOT NULL,
+    state           TEXT NOT NULL,
+    state_group     TEXT NOT NULL,
+    is_blocked      INTEGER NOT NULL,
+    blocked_reason  TEXT,
+    accountable     TEXT NOT NULL,
+    requires        TEXT NOT NULL,
+    informs         TEXT NOT NULL,
+    inform_scores   TEXT,
+    payload         TEXT NOT NULL
+);
 """
 
 class ProjectionError(RuntimeError):
@@ -662,6 +676,144 @@ def _apply(
             _apply_measurement_registered(conn, position, event)
         elif event.kind == MEASUREMENT_RESULT_KIND:
             _apply_measurement_result(conn, position, event)
+        elif event.kind == "work_item.opened":
+            _apply_work_item_opened(conn, position, event)
+        elif event.kind == STATE:
+            _apply_work_item_state(conn, position, event)
+        elif event.kind == "work_item.completed":
+            _apply_work_item_completed(conn, position, event)
+
+
+def _work_item_row(
+    ticket: str,
+    revision: int,
+    state: str,
+    accountable: str,
+    requires: list[object],
+    informs: list[object],
+    *,
+    is_blocked: bool = False,
+    blocked_reason: str | None = None,
+    inform_scores: list[object] | None = None,
+    payload: dict[str, object],
+) -> tuple[object, ...]:
+    return (
+        ticket,
+        revision,
+        state,
+        state_group(state),
+        int(is_blocked),
+        blocked_reason,
+        accountable,
+        json.dumps(requires, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        json.dumps(informs, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        None
+        if inform_scores is None
+        else json.dumps(
+            inform_scores, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ),
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+    )
+
+
+def _apply_work_item_opened(conn: sqlite3.Connection, position: int, event: Event) -> None:
+    data = event.data
+    if data.get("item_schema") != WORK_MODEL_SCHEMA:
+        return
+    ticket = cast(str, data["ticket"])
+    state = cast(str, data["state"])
+    is_blocked = bool(data.get("is_blocked", False))
+    blocked_reason = cast(str | None, data.get("blocked_reason"))
+    conn.execute(
+        "INSERT OR REPLACE INTO work_items (ticket, revision, state, state_group,"
+        " is_blocked, blocked_reason, accountable, requires, informs, inform_scores,"
+        " payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        _work_item_row(
+            ticket,
+            int(data.get("revision", 1)),
+            state,
+            cast(str, data["accountable"]),
+            cast(list[object], data.get("requires", [])),
+            cast(list[object], data.get("informs", [])),
+            is_blocked=is_blocked,
+            blocked_reason=blocked_reason,
+            payload=cast(dict[str, object], data),
+        ),
+    )
+
+
+def _apply_work_item_state(conn: sqlite3.Connection, position: int, event: Event) -> None:
+    del position
+    data = event.data
+    ticket = cast(str, data["ticket"])
+    row = conn.execute(
+        "SELECT revision, accountable, requires, informs, payload FROM work_items"
+        " WHERE ticket = ?",
+        (ticket,),
+    ).fetchone()
+    if row is None:
+        return
+    state = cast(str, data["state"])
+    is_blocked = bool(data.get("is_blocked", False))
+    blocked_reason = cast(str | None, data.get("blocked_reason"))
+    conn.execute(
+        "UPDATE work_items SET state = ?, state_group = ?, is_blocked = ?,"
+        " blocked_reason = ? WHERE ticket = ?",
+        (state, state_group(state), int(is_blocked), blocked_reason, ticket),
+    )
+
+
+def _apply_work_item_completed(conn: sqlite3.Connection, position: int, event: Event) -> None:
+    del position
+    data = event.data
+    ticket = cast(str, data["ticket"])
+    inform_scores = data.get("inform_scores")
+    if inform_scores is None:
+        return
+    conn.execute(
+        "UPDATE work_items SET inform_scores = ? WHERE ticket = ?",
+        (
+            json.dumps(
+                inform_scores, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+            ticket,
+        ),
+    )
+
+
+def work_item_groups(conn: sqlite3.Connection) -> dict[str, list[dict[str, object]]]:
+    """Project work-model items into the five declared state groups."""
+    grouped: dict[str, list[dict[str, object]]] = {group: [] for group in (
+        "WAITING",
+        "RUNNING",
+        "NEEDS_YOU",
+        "DONE",
+        "DEAD",
+    )}
+    rows = conn.execute(
+        "SELECT ticket, revision, state, state_group, is_blocked, blocked_reason,"
+        " accountable, requires, informs, inform_scores"
+        " FROM work_items ORDER BY ticket"
+    ).fetchall()
+    for row in rows:
+        group = cast(str, row[3])
+        grouped.setdefault(group, []).append(
+            {
+                "ticket": row[0],
+                "revision": row[1],
+                "state": row[2],
+                "state_group": row[3],
+                "is_blocked": bool(row[4]),
+                "blocked_reason": row[5],
+                "accountable": row[6],
+                "requires": json.loads(cast(str, row[7])),
+                "informs": json.loads(cast(str, row[8])),
+                "inform_scores": None
+                if row[9] is None
+                else json.loads(cast(str, row[9])),
+            }
+        )
+    return grouped
 
 
 def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:
