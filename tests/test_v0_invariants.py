@@ -3041,7 +3041,22 @@ def test_foreign_commit_identifiers_may_only_decrease():
     # permalink in `agentic-organisation-bar-2026-08-22.md`, was truncated to twelve
     # characters instead (the gap-register convention), so it adds nothing here. The
     # unexamined count above is unchanged and remains the guard that bites.
-    assert total <= 21, (
+    # Raised 21 → 23 on 23 Aug 2026: the triggered-recall research cited two upstream
+    # permalinks as prior art — a pinned NousResearch/hermes-agent revision and a
+    # ruvnet/ruflo one. Both resolved against BOTH private corpora and appear in neither;
+    # the Hermes URL was fetched and resolves. THIS CEILING IS NOW RISING ONCE PER RESEARCH
+    # STREAM, which is a growth the ratchet was not designed to absorb: it is meant to fall
+    # as citations are aggregated away, not climb as prior art is cited properly. The
+    # structural answer is to separate a BARE identifier — how the original leak actually
+    # looked — from one embedded in a public forge URL that names its own repository, and
+    # that is queued as a unit rather than decided inside a ratchet raise.
+    #
+    # 21 → 25, not 23: this ceiling counts OCCURRENCES. Two distinct identifiers were
+    # allowlisted, but the ruflo revision is cited in both `bibliography.md` and the
+    # triggered-recall spec, and proper citation multiplies occurrences faster than
+    # entries. That is the clearest evidence the occurrence ceiling is measuring the wrong
+    # thing: the distinct-entry ceiling below is the one that tracks review effort.
+    assert total <= 25, (
         f"the allowlisted identifier total rose to {total}. Every one is individually cleared, "
         "so this is not a leak, but the number is meant to fall over time as citations are "
         "aggregated away. Raise this ceiling only with the same corpus test in the commit."
@@ -3214,7 +3229,8 @@ def test_foreign_identifier_gate_can_pass_and_still_refuses_the_unknown():
     # no longer describes every entry; the ALLOWLIST reason records which route was used.
     # Raised 15 → 16 on 22 Aug 2026 for the second ruvnet/ruflo revision in a public compare
     # link. Cleared the same way: the URL was fetched and both revisions resolve.
-    assert len(module.ALLOWLIST) <= 16, (
+    # Raised 16 → 18 on 23 Aug 2026 for the two upstream prior-art permalinks above.
+    assert len(module.ALLOWLIST) <= 18, (
         f"the foreign-identifier allowlist grew to {len(module.ALLOWLIST)}; each entry means "
         "someone cleared that identifier — by the scrubbed corpus test, or by positive public "
         "provenance recorded in its reason. Raise this only with that result in the same commit."

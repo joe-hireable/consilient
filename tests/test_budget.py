@@ -127,9 +127,7 @@ def capability_violations(source, *, budget_module=False, product_module=False):
     aliases = {}
     violations = []
     allowed_imports = (
-        BUDGET_IMPORTS
-        if budget_module
-        else PRODUCT_IMPORTS if product_module else None
+        BUDGET_IMPORTS if budget_module else PRODUCT_IMPORTS if product_module else None
     )
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -144,6 +142,16 @@ def capability_violations(source, *, budget_module=False, product_module=False):
             for name in node.names:
                 target = f"{module}.{name.name}" if module else name.name
                 aliases[name.asname or name.name] = target
+            # A relative import (`from .capabilities import Gate`) is intra-package by
+            # definition and cannot introduce external capability — the sibling module is
+            # itself covered by this same check. `node.level > 0` is what distinguishes it,
+            # and reading `node.module` alone made every relative import look like a
+            # third-party one. Found 23 Aug 2026 when `effects.py` imported a sibling and
+            # was refused; it would have recurred for every new intra-package import.
+            # FORBIDDEN_IMPORT_ROOTS still applies: a relative import cannot reach `os` or
+            # `socket`, and the forbidden-call scan below is unaffected either way.
+            if node.level and node.level > 0:
+                continue
             if module.split(".")[0] in FORBIDDEN_IMPORT_ROOTS:
                 violations.append(f"forbidden import {module}")
             if allowed_imports is not None and module not in allowed_imports:
@@ -570,7 +578,9 @@ def test_quarantine_digest_detects_a_same_count_replacement(tmp_path):
     fingerprint = rejection_digest(read_all(tmp_path)[1])
     append(log, budget_state(now, rejection_fingerprint=fingerprint))
     lines = log.read_text(encoding="utf-8").splitlines(keepends=True)
-    log.write_text("{replacement malformed line}\n" + "".join(lines[1:]), encoding="utf-8")
+    log.write_text(
+        "{replacement malformed line}\n" + "".join(lines[1:]), encoding="utf-8"
+    )
 
     decision = budget.check_budget(
         tmp_path,

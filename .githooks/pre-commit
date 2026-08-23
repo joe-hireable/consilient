@@ -36,6 +36,22 @@ if [ -f "$error_record" ]; then
   python "$error_checker" "$error_record" >&2 || exit 1
 fi
 
+# A PROVISIONAL ADR must register the experiment it nominates. The suite checks
+# this too, but the suite runs for whoever comes next -- three times an ADR
+# landed naming an unregistered experiment, and because a green suite gates unit
+# retirement, one of them held four finished units and read as inactivity
+# (F-06). Here it refuses the author instead. Bookkeeping, not correctness: the
+# message says so, because a documentation defect that presents as a build
+# failure sends the next agent hunting in the wrong place.
+adr_checker=".github/scripts/check_adr_experiments.py"
+if [ -f "$adr_checker" ]; then
+  if ! python "$adr_checker" --staged >/dev/null 2>&1; then
+    echo "pre-commit: REFUSED - bookkeeping, not a build failure." >&2
+    python "$adr_checker" --staged >&2
+    exit 1
+  fi
+fi
+
 # Commit-attribution gate: while dispatch claims are live in this worktree, a
 # commit must name its committer and may not stage a path another live run
 # claims. Policy: src/consilient/commit_gate.py.

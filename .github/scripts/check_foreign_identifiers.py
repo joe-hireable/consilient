@@ -67,6 +67,20 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 # Removing an entry is always permitted. Adding one means a human re-ran that test and wrote
 # down the answer.
 ALLOWLIST = {
+    # Two upstream permalinks cited by the triggered-recall research as prior art, 23 Aug
+    # 2026: a pinned NousResearch/hermes-agent revision and a ruvnet/ruflo revision. Both
+    # were resolved against BOTH private corpora and neither appears in either; the Hermes
+    # URL was additionally fetched and resolves. This class of entry now recurs with every
+    # research stream that cites upstream by permalink, which is a growth the ratchet cannot
+    # absorb indefinitely — the structural answer is to distinguish a bare identifier, which
+    # is how the original leak looked, from one embedded in a public forge URL that names its
+    # own repository. That is queued as a unit rather than decided here.
+    "55b67004d7a43bf42a2ebcce2a45c95f8a5d86db1d6687f70dbe01584e50f1aa": "bibliography.md - pinned NousResearch/hermes-agent revision cited as memory prior art. "
+    "Resolved against both private corpora: present in neither. Public URL fetched 23 Aug 2026 "
+    "and resolves.",
+    "296e0896c9844b0308aa780d4133cd0fabe3b3c033db8cf0f46d6da052b450fb": "bibliography.md and triggered-recall spec - ruvnet/ruflo automatic-intelligence path, "
+    "pinned. Resolved against both private corpora: present in neither. Same repository as the "
+    "already-cleared entries below.",
     "f0c3152ae865438726f4697dabc5dcf3f696bed2b9ffe349ab52f92afe0f32f9": "gap-register-2026-08-22.md - the head of a public GitHub compare link showing "
     "same-day drift in ruvnet/ruflo against the base revision allowlisted below. Cleared "
     "22 Aug 2026 by positive public provenance: the compare URL was fetched and both "
