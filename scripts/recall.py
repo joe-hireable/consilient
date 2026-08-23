@@ -42,12 +42,18 @@ def main(argv: list[str] | None = None) -> int:
         default=8000,
         help="character budget for the pack (default 8000)",
     )
+    parser.add_argument(
+        "--continuation",
+        default=None,
+        help="continuation cursor from a prior recall receipt",
+    )
     args = parser.parse_args(argv)
     print(
         pack(
             Path(args.log),
             query=args.query,
             limit_chars=args.limit_chars,
+            continuation_cursor=args.continuation,
         ),
         end="",
     )
