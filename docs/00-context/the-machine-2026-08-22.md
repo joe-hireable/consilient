@@ -804,3 +804,46 @@ already measured that structures which look collaborative are often echo. **Ever
 the different class of facts it brings or be cut** — a `simulation` agent that only asks a model to
 imagine a result brings nothing a generalist could not. **The categories earn their existence by
 executing, not by being named.** [asserted]
+
+### Memory should be triggered, not fetched
+
+> "Perhaps we could have a semantically-intelligent layer that automatically surfaces memories in
+> real-time based on conversation? Perhaps could also surface context around those memories as well
+> like the specific conversations those memories were made or whatever. Like human memory works -
+> sometimes a memory it's triggered by stimuli like a conversation, word, smell, feeling or whatever.
+> I dont think current memory systems in AI agents work like thst and ours can. If memorys are >n
+> score relevant to query then they are surfaced alongside said query as context for the agent so it
+> has it in context before triggering any reasoning. action or response"
+
+**The distinction is architectural, not a tuning parameter.** Current agent memory is overwhelmingly
+**pull**: either the agent decides to search, or a fixed block is always loaded. The principal
+describes **involuntary recall** — relevance-gated injection that happens *before* reasoning begins,
+triggered by the conversation rather than by a decision to look. **An agent cannot search for what it
+does not know it has forgotten**, which is precisely why pull-based memory recalls rarely and
+intermittently. [asserted]
+
+**What already exists to build on.** The trajectory is append-only, so **the conversation a memory was
+formed in is recoverable by construction** — his "context around the memory" needs no new store.
+`recall.py` gives bounded verbatim context because EXP-45 measured condensation dropping around 59% of
+what mattered. ADR-0074 defines recall as integrity-checked addressability plus an honest
+bounded-retrieval receipt. `instructions.py` already assembles layered context per task. **The
+surfacing layer is the missing piece, not the memory.** [measured]
+
+**Four failure modes it must specify against, because a bad surfacer is worse than none:**
+
+1. **An injected memory is not neutral.** A wrong one steers reasoning before it starts, and the agent
+   cannot tell it was unbidden. **This is a β question**: the rate at which the surfacer injects a
+   memory that degrades the answer. It must be measurable, not assumed.
+2. **Memories go stale.** One true in July can be false now. Surfacing it as present-tense context is
+   how a system confidently repeats something it should have retired.
+3. **A memory is the same class of facts as whatever wrote it.** Surfacing one's own prior conclusion
+   as evidence is **echo**, and this project refuses it everywhere else. A memory may inform; it must
+   not count as an independent anchor under ADR-0081.
+4. **Relevance is not usefulness.** Semantic similarity finds what resembles the query, which is not
+   the same as what would change the answer. **The threshold `n` must be set against decision
+   relevance**, and the honest default is to surface less rather than more.
+
+**And the context budget is the hard constraint.** Every surfaced memory displaces something else.
+ADR-0030 already forbids silent truncation and requires a declared context estimate before model
+selection. **A surfacer that quietly evicts task material to make room for a recollection has made the
+answer worse while appearing to enrich it.** [asserted]
