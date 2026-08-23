@@ -101,3 +101,4 @@
 | [0094](0094-make-scientific-execution-a-pinned-evidence-producing-profile.md) | Make scientific execution a pinned evidence-producing profile, not a second laboratory platform | PROVISIONAL | — |
 | [0095](0095-project-orchestration-from-consumed-evidence-and-interrupt-on-decision-change.md) | Project orchestration from consumed evidence, isolate contributions, and interrupt on decision change | PROVISIONAL | — |
 | [0096](0096-render-record-derived-observability-graphs-without-generated-explanations.md) | Render record-derived observability graphs without generated explanations | PROVISIONAL | — |
+| [0097](0097-keep-automatic-triggered-recall-inert-until-it-beats-pull.md) | Keep automatic triggered recall inert until it beats deliberate pull | PROVISIONAL | — |
