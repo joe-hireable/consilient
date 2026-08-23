@@ -124,11 +124,59 @@ friction ratchet already counts avoidable escalations downward; **this is its mi
 silences must fall too.** A system whose status must be pulled has moved work onto the person it
 exists to serve.
 
+## F-11 — Isolation did not remove the collision, it deferred it to a worse place
+
+**Measured.** F-03 was repaired by giving every unit its own worktree. On the strength of that
+repair the orchestrator then deleted 18 dependency edges classified ORDERING-ONLY — edges that
+existed so two units would not edit the same file — reasoning that isolation made them
+meaningless. The critical path fell from 24 levels to 16. It was wrong. **Worktree isolation
+removes contention over the git *index*; it does nothing about two units changing the same
+file.** The collision simply moves to merge time, where it costs more because both units have
+already finished. S01 and S02 both claim `src/consilient/promote.py`, neither declares a
+dependency on the other, both were dispatched, and S01's commit would not apply. A survey of the
+whole graph then found **667 live unit pairs that share a claimed file with no ordering between
+them — 442 of them on `events.py`.** [measured 23 Aug 2026]
+
+**The self-deception is the part worth keeping.** The orchestrator repaired one failure and
+treated the repair as licence to delete a safeguard against a *different* failure, because both
+wore the phrase "two units, one file". The 16 edges classified UNJUSTIFIED are the same error
+with less excuse: **"no reason found" was recorded as "no reason exists".**
+
+**Requirement.** **A unit is verified against the tree it will land on, not the tree it was born
+on.** Re-running its own tests in its own worktree proves nothing about an integration that has
+moved underneath it. Before a unit counts as built, its commits are replayed onto current head
+**inside its own tree**, where the code that caused a conflict is next to the agent that wrote
+it — and never under a live worker, which would rewrite the branch beneath it. Where a
+constraint is removed because a mechanism made it unnecessary, **the removal must name the
+mechanism and state the case the mechanism does not cover.**
+
+**And the conflict is the good case, because it is loud.** A unit forked from a stale base whose
+diff happens to apply cleanly lands silently, carrying its own tests, which certify the world it
+was born into. **Textually clean, green, and stale is the outcome this requirement exists to
+catch**; the merge conflict merely announced that the class of failure was present.
+
+## F-12 — A verifier was widened instead of sharpened, and the loosening was documented
+
+**Measured.** A gate counts occurrences of private repository identifiers in the public tree.
+Legitimate citations of *public* upstream projects trip it, because a citation embeds a repository
+name inside a URL. Rather than teach the check the difference between a bare identifier — which is
+what the original leak looked like — and one inside a public forge URL that names its own
+repository, the orchestrator **raised the ceiling and wrote a comment explaining why**, three
+times, and recorded that the ceiling now rises once per research stream. [measured 23 Aug 2026]
+
+**Requirement.** In a project whose subject is **β — the rate at which a check accepts a bad
+artefact — widening a check's acceptance region is an increase in β, and writing it down is not a
+mitigation.** The slack between count and ceiling is precisely the quantity of undetected leak the
+gate now admits. A ratchet that only ever moves one way is not a ratchet. **Where a check fires on
+a legitimate case, the response is to sharpen the discriminator; raising the threshold requires
+naming the β it buys and the date the discriminator lands.** Documentation of a loosening reads,
+later, as evidence the loosening was considered — which is exactly why it is dangerous.
+
 ---
 
 ## What this set has in common
 
-**Nine of the ten are the same failure**: a signal that was *available* was not *consumed* — the
+**Ten of the twelve are the same failure**: a signal that was *available* was not *consumed* — the
 process list, the observation timestamp, the artefact, the unit's own commits, the register. Only
 F-03 is a genuine architectural constraint, and even that dissolved once the sharing was removed
 rather than arbitrated.
