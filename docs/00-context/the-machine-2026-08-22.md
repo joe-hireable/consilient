@@ -755,3 +755,52 @@ proceed with the best candidate and record that the bar was not beaten.** [asser
 **And the threshold cannot be self-assessed.** "We have exceeded the bar" claimed by whatever proposed
 the approach is echo. ADR-0081's consilience gate already governs this: a high-consequence conclusion
 needs anchors of genuinely different classes. **Exceeding the bar is exactly such a conclusion.**
+
+### Categories are agents, not labels; and two axes, not one
+
+> "Multi-model, multi-harness, multi-agent collaborative and dynamic reasoning to the level of smarter
+> than the smartest humans reasoning capabilities due to ability to run parallel research,
+> experimentation, simulation etc streams … All of the following need to be specific work categories
+> AND native agents with all the tools plugins skills context they need for any given task dynamically
+> provided by the orchestrator … dont forget the categorisation of worker types and also subject
+> matter expertise. figure out how we can train custom models natively autonomously specifically for
+> these agent configs … everything should be multi-model orchestration so every agent config, training
+> datasets, memory, capabilities, mcps, plugins, skills, hooks etc needs to be entirely portable like
+> other harnesses do."
+
+**Four things here are new; three are already decided and must be consumed.**
+
+**Already decided:** ADR-0084 compiles portable capabilities per harness and refuses semantic loss —
+**portability of capabilities is settled**, and extending it to agent configs and training datasets is
+an extension, not a new decision. ADR-0086 acquires expertise as a proven capability bundle and tunes
+only after retrieval demonstrably loses. ADR-0074 fixes the boundary: **training is a persistent
+mutation of learned model state; everything short of that is retrieval.** [measured]
+
+**New, and unspecified:**
+
+**1. A category is an agent, not a label.** The work-taxonomy stream in flight defines labels for
+measurement. The principal wants each category to be a **native agent** whose tools, plugins, skills
+and context are **assembled per task by the orchestrator** — `instructions.py` already layers context
+and `capabilities.py` already selects a fail-closed inventory, so the machinery exists and is unwired
+to this purpose.
+
+**2. Two orthogonal axes.** *Worker type* — what kind of work this is: discovery, research,
+hypothesis, experiment, simulation, mathematical modelling, data science, specification, planning,
+implementation, verification, delivery. *Subject-matter expertise* — what domain it is in. **A
+discovery agent in genomics and a discovery agent in payments share a method and share nothing else.**
+Conflating the axes produces either a hundred bespoke agents or a dozen that know nothing.
+
+**3. Native scientific and mathematical capability, using open data.** Experiments and simulations must
+find and use open-source datasets. Working principle 10 already requires this: **a public dataset is a
+different class of facts from a model's training**, and is the cheapest second induction available.
+
+**4. Adopt before building — working principle 9 applied to agent configuration itself.** *"Start from
+existing best agent configs and skills and mcps etc open source free no account required only and then
+perfect them."* The constraint is exacting and should not be softened: **open source, free, and
+requiring no account.** ADR-0065 already tiers adoption and ADR-0036 is upstream-first.
+
+**The honest risk in all of this.** A per-category agent fleet is a large surface, and this project has
+already measured that structures which look collaborative are often echo. **Every agent role must name
+the different class of facts it brings or be cut** — a `simulation` agent that only asks a model to
+imagine a result brings nothing a generalist could not. **The categories earn their existence by
+executing, not by being named.** [asserted]
