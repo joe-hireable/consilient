@@ -66,6 +66,49 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 # against BOTH private corpora with a scrubbed environment: none resolved in either. [measured]
 # Removing an entry is always permitted. Adding one means a human re-ran that test and wrote
 # down the answer.
+# A bare 40-hex string is what the leak actually looked like: 71 private commit identifiers
+# reached a results file with nothing around them to say where they came from. A permalink is
+# the opposite -- `https://github.com/OWNER/REPO/commit/<sha>` names the repository it belongs
+# to, in public, in the same string. Treating the two as one quantity is what made this gate's
+# ceiling rise once per research stream: eleven distinct public upstreams are cited in
+# `docs/` today, and every honest citation of prior art pushed the count towards a wall.
+# [measured 23 Aug 2026, recorded as F-12]
+#
+# So the discriminator is the shape, not the count. A permalink into a public forge is a
+# citation and passes. A bare identifier still requires ALLOWLIST, unchanged -- the leak-shaped
+# class is not loosened by this, it is separated from the class that was inflating it.
+#
+# The denylist is the safety catch: a permalink is only a citation if neither URL segment names
+# a private repository. Those two names are already public in AGENTS.md, so naming them here
+# discloses nothing new, and a permalink constructed against a private repo is refused with
+# every other bare identifier.
+FORGE_PERMALINK = re.compile(
+    r"https://(?:github\.com|gitlab\.com)/"
+    r"([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)/"
+    r"(?:commit|blob|tree|raw|blame)/([0-9a-f]{40})(?![0-9a-f])"
+)
+PRIVATE_REPOS = {"hireable-3.0", "jobboard-v2"}
+
+
+def strip_public_citations(text: str) -> tuple[str, set[str]]:
+    """Remove permalinks into public upstreams; return the rest and the repos cited.
+
+    Removal is per OCCURRENCE, not per identifier. An id that appears inside a permalink here
+    and bare somewhere else is still caught in the bare position, which is the position that
+    matters.
+    """
+    cited: set[str] = set()
+
+    def replace(m: "re.Match[str]") -> str:
+        owner, repo = m.group(1).lower(), m.group(2).lower()
+        if owner in PRIVATE_REPOS or repo in PRIVATE_REPOS:
+            return m.group(0)
+        cited.add(f"{owner}/{repo}")
+        return " "
+
+    return FORGE_PERMALINK.sub(replace, text), cited
+
+
 ALLOWLIST = {
     # Two upstream permalinks cited by the triggered-recall research as prior art, 23 Aug
     # 2026: a pinned NousResearch/hermes-agent revision and a ruvnet/ruflo revision. Both
@@ -169,6 +212,7 @@ def scan(paths: list[str]) -> list[tuple[str, set[str]]]:
     same defect class as enumerating a different tree than the one requested."""
     findings: list[tuple[str, set[str]]] = []
     cache: dict[str, bool] = {}
+    cited: set[str] = set()
     for relative in paths:
         if relative.startswith(EXEMPT_PREFIXES):
             continue
@@ -179,6 +223,8 @@ def scan(paths: list[str]) -> list[tuple[str, set[str]]]:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        text, cited_here = strip_public_citations(text)
+        cited.update(cited_here)
         foreign = set()
         for sha in set(SHA_RE.findall(text)):
             if sha not in cache:
@@ -187,11 +233,33 @@ def scan(paths: list[str]) -> list[tuple[str, set[str]]]:
                 foreign.add(sha)
         if foreign:
             findings.append((relative, foreign))
+    scan.cited = sorted(cited)  # type: ignore[attr-defined]
     return findings
 
 
 def self_test() -> None:
     """The check must detect a foreign SHA and must not flag one of our own."""
+    sha = "a1b2c3d4" + "0" * 32
+    rest, cited = strip_public_citations(
+        f"see https://github.com/pallets/itsdangerous/commit/{sha} for detail"
+    )
+    assert sha not in rest, "a permalink into a public upstream must not count as bare"
+    assert cited == {"pallets/itsdangerous"}, cited
+    # The safety catch, and the reason the denylist exists at all: a permalink is only a
+    # citation when neither segment names a private repository. Construct one against a
+    # private repo and it must survive stripping, to be refused with every other bare id.
+    for private in ("hireable-3.0", "jobboard-v2"):
+        rest, cited = strip_public_citations(
+            f"https://github.com/someone/{private}/commit/{sha}"
+        )
+        assert sha in rest, f"a {private} permalink must still be caught"
+        assert not cited, cited
+    # Stripping is per occurrence. An id cited in a permalink AND written bare elsewhere is
+    # still caught in the bare position, which is the position that leaks.
+    rest, _ = strip_public_citations(
+        f"https://github.com/pallets/itsdangerous/commit/{sha} and bare {sha}"
+    )
+    assert sha in rest, "a bare occurrence must survive even when the id is also cited"
     assert SHA_RE.search("a" * 40), "a bare 40-hex string must match"
     assert not SHA_RE.search("a" * 39), "39 characters is not a commit id"
     assert not SHA_RE.search("b" * 41), "41 characters is not a commit id"
@@ -256,6 +324,14 @@ def main() -> int:
         )
         return 1
 
+    cited = getattr(scan, "cited", [])
+    if cited:
+        # Named, not merely tolerated. A citation that passes silently is indistinguishable
+        # from a check that stopped looking.
+        print(
+            f"recognised {len(cited)} public upstream(s) cited by permalink: "
+            + ", ".join(cited)
+        )
     print(
         f"foreign-identifier invariant passes: {len(ALLOWLIST)} allowlisted identifier(s),"
         " 0 unexamined"

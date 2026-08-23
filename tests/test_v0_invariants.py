@@ -3051,15 +3051,25 @@ def test_foreign_commit_identifiers_may_only_decrease():
     # looked — from one embedded in a public forge URL that names its own repository, and
     # that is queued as a unit rather than decided inside a ratchet raise.
     #
-    # 21 → 25, not 23: this ceiling counts OCCURRENCES. Two distinct identifiers were
-    # allowlisted, but the ruflo revision is cited in both `bibliography.md` and the
-    # triggered-recall spec, and proper citation multiplies occurrences faster than
-    # entries. That is the clearest evidence the occurrence ceiling is measuring the wrong
-    # thing: the distinct-entry ceiling below is the one that tracks review effort.
-    assert total <= 25, (
-        f"the allowlisted identifier total rose to {total}. Every one is individually cleared, "
-        "so this is not a leak, but the number is meant to fall over time as citations are "
-        "aggregated away. Raise this ceiling only with the same corpus test in the commit."
+    # 25 → 10, downward, because the queued structural fix landed on 23 Aug 2026. The check
+    # now strips permalinks into public upstreams before counting -- a bare 40-hex string is
+    # what the leak actually looked like, while `github.com/OWNER/REPO/commit/<sha>` names its
+    # own repository in public in the same string. Twelve public upstreams are cited in `docs/`
+    # today; each of them was previously inflating this number, which is why it rose once per
+    # research stream.
+    #
+    # This is the first time this ceiling has moved down, and moving down is the whole point:
+    # a ratchet that only ever loosens is not a ratchet, it is a record of surrender (F-12).
+    # Occurrences fell 25 → 10 and distinct identifiers 18 → 6, so twelve ALLOWLIST entries
+    # are now unused. They are left in place deliberately -- removing entries from a security
+    # allowlist by hand, in the same change that alters what the gate counts, is two edits
+    # whose interaction nobody can review. It is queued on its own.
+    assert total <= 10, (
+        f"the bare foreign-identifier total rose to {total}. Every one is individually cleared, "
+        "so this is not yet a leak. But these are BARE identifiers now -- permalinks into public "
+        "upstreams no longer count here -- so a rise means something leak-shaped entered the "
+        "tree, not that someone cited prior art. Sharpen the discriminator or clear the "
+        "identifier against both corpora; do not raise this ceiling to make it pass."
     )
 
 
