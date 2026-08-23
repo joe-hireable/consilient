@@ -16,11 +16,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_MANIFEST = ROOT / "docs" / "generated-manifest.json"
 TIMEOUT_S = 120
-GIT_ENV = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+GIT_ENV = {
+    key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+}
 SHELL_METACHARACTERS = frozenset(";|&$`<>")
 HEADER_PRODUCER = re.compile(r"^\s*>\s*\*\*Producer:\*\*\s*`([^`]+)`\s*$")
 HEADER_SOURCE = re.compile(r"^\s*>\s*\*\*Source:\*\*\s*`([^`]+)`\s*$")
-HEADER_DIGEST = re.compile(r"^\s*>\s*\*\*Source SHA-256:\*\*\s*`([0-9a-f]{64})`\s*$", re.IGNORECASE)
+HEADER_DIGEST = re.compile(
+    r"^\s*>\s*\*\*Source SHA-256:\*\*\s*`([0-9a-f]{64})`\s*$", re.IGNORECASE
+)
 HEADER_NO_EDIT = re.compile(
     r"^\s*>\s*\*\*Do not hand-edit:\*\*\s*regenerate with `([^`]+)`\.\s*$"
 )
@@ -71,7 +75,17 @@ def source_digest(root: Path, sources: tuple[str, ...]) -> str:
             raise ValueError(f"source pattern matched no files: {pattern}")
         for resolved in paths:
             relative = resolved.relative_to(root).as_posix()
-            file_digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+            # Normalise line endings before digesting, exactly as the producers now do.
+            # `.gitattributes` sets `* text=auto eol=lf`, so a Windows checkout holds CRLF in the
+            # working tree and LF in the object store. Digesting raw bytes makes the digest a
+            # property of the checkout rather than of the content: the check then passes on the
+            # machine that generated the document and fails everywhere else. Measured 23 August
+            # 2026 — it passed in the authoring worktree and exited 1 on a clean checkout of the
+            # same commit. The producers were repaired first and this copy was missed, which left
+            # the two disagreeing and the gate red for a different reason.
+            file_digest = hashlib.sha256(
+                resolved.read_bytes().replace(b"\r\n", b"\n")
+            ).hexdigest()
             digest.update(relative.encode("utf-8"))
             digest.update(b"\0")
             digest.update(file_digest.encode("ascii"))
@@ -92,9 +106,13 @@ def _parse_entry(raw: dict[str, object]) -> ManifestEntry:
             raise ValueError(f"manifest entry header missing {name}")
     check_args = raw["check_args"]
     sources = raw["sources"]
-    if not isinstance(check_args, list) or not all(isinstance(arg, str) for arg in check_args):
+    if not isinstance(check_args, list) or not all(
+        isinstance(arg, str) for arg in check_args
+    ):
         raise ValueError("check_args must be a string array")
-    if not isinstance(sources, list) or not all(isinstance(source, str) for source in sources):
+    if not isinstance(sources, list) or not all(
+        isinstance(source, str) for source in sources
+    ):
         raise ValueError("sources must be a string array")
     return ManifestEntry(
         output=str(raw["output"]),
@@ -204,7 +222,14 @@ def check_manifest(path: Path, *, root: Path) -> tuple[list[EntryResult], int]:
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         return ([EntryResult(output=str(path), ok=False, detail=str(error))], 1)
     if not isinstance(payload, dict):
-        return ([EntryResult(output=str(path), ok=False, detail="manifest must be an object")], 1)
+        return (
+            [
+                EntryResult(
+                    output=str(path), ok=False, detail="manifest must be an object"
+                )
+            ],
+            1,
+        )
     try:
         entries = validate_manifest(payload, root=root)
     except ValueError as error:
@@ -221,7 +246,9 @@ def check_manifest(path: Path, *, root: Path) -> tuple[list[EntryResult], int]:
             problems.append(producer_problem)
         if problems:
             adverse += 1
-            results.append(EntryResult(output=entry.output, ok=False, detail="; ".join(problems)))
+            results.append(
+                EntryResult(output=entry.output, ok=False, detail="; ".join(problems))
+            )
         else:
             results.append(EntryResult(output=entry.output, ok=True, detail="ok"))
     return results, adverse
@@ -235,7 +262,9 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_MANIFEST,
         help="path to docs/generated-manifest.json",
     )
-    parser.add_argument("--check", action="store_true", help="verify every admitted generated document")
+    parser.add_argument(
+        "--check", action="store_true", help="verify every admitted generated document"
+    )
     args = parser.parse_args(argv)
     if not args.check:
         print("FAIL --check is required", file=sys.stderr)
