@@ -34,7 +34,9 @@ CUT_RETAINED = re.compile(
     r"^CUT(?:\s+\([^)]*\))?\s*/\s*RETAINED(?:\s+\([^)]*\))?(?:\s+—.*)?$",
     re.IGNORECASE,
 )
-EXPLICIT_REFERENCE = re.compile(r"\bADR-(\d{4})\b|\[(?:ADR-)?(\d{4})\]|`(?:ADR-)?(\d{4})`", re.IGNORECASE)
+EXPLICIT_REFERENCE = re.compile(
+    r"\bADR-(\d{4})\b|\[(?:ADR-)?(\d{4})\]|`(?:ADR-)?(\d{4})`", re.IGNORECASE
+)
 LEADING_REFERENCE = re.compile(r"^\s*(?:\[|`)?(?:ADR-)?(\d{4})\b", re.IGNORECASE)
 
 
@@ -63,7 +65,9 @@ def _canonical_status(number: str, status: str) -> str | None:
 
 
 def _reference(value: str, *, leading: bool = False) -> str | None:
-    match = LEADING_REFERENCE.match(value) if leading else EXPLICIT_REFERENCE.search(value)
+    match = (
+        LEADING_REFERENCE.match(value) if leading else EXPLICIT_REFERENCE.search(value)
+    )
     if match is None:
         return None
     return next(group for group in match.groups() if group is not None)
@@ -74,10 +78,16 @@ def _status_relation(status: str) -> str | None:
     if match is None:
         return None
     direction = match.group("direction").lower()
-    target = _reference(match.group("target"), leading=direction.startswith("superseded"))
+    target = _reference(
+        match.group("target"), leading=direction.startswith("superseded")
+    )
     if target is None:
         return None
-    return f"superseded by {target}" if direction.startswith("superseded") else f"supersedes {target}"
+    return (
+        f"superseded by {target}"
+        if direction.startswith("superseded")
+        else f"supersedes {target}"
+    )
 
 
 def _parse(path: Path) -> Decision:
@@ -97,12 +107,18 @@ def _parse(path: Path) -> Decision:
         header.append(line)
     statuses = _metadata(header, STATUS)
     if len(statuses) != 1:
-        raise ValueError(f"{path.name}: missing Status metadata" if not statuses else f"{path.name}: multiple Status metadata rows")
+        raise ValueError(
+            f"{path.name}: missing Status metadata"
+            if not statuses
+            else f"{path.name}: multiple Status metadata rows"
+        )
     raw_status = statuses[0]
     status = _canonical_status(number, raw_status)
     if status is None:
         raise ValueError(f"{path.name}: unrecognised status {raw_status!r}")
-    relations = [relation for relation in [_status_relation(raw_status)] if relation is not None]
+    relations = [
+        relation for relation in [_status_relation(raw_status)] if relation is not None
+    ]
     for value in _metadata(header, SUPERSEDES):
         target = _reference(value)
         if target is not None:
@@ -113,7 +129,14 @@ def _parse(path: Path) -> Decision:
         title=title,
         status=status,
         relations=tuple(dict.fromkeys(relations)),
-        digest=hashlib.sha256(path.read_bytes()).hexdigest(),
+        # Normalise line endings before digesting. `.gitattributes` sets `* text=auto eol=lf`, so a
+        # file checked out on Windows carries CRLF in the working tree and LF in the object store.
+        # Digesting the working-tree bytes bakes the checkout's line endings into the committed
+        # header, and the result is a check that passes for whoever generated it and fails for
+        # everyone else. Measured 23 August 2026: this check passed in the authoring worktree and
+        # exited 1 on a clean checkout of the same commit, with 31 CRLF files responsible — so the
+        # gate would have gone red on the public repository immediately after publication.
+        digest=hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
     )
 
 
@@ -122,7 +145,9 @@ def _escape(value: str) -> str:
 
 
 def decisions() -> list[Decision]:
-    parsed = [_parse(path) for path in sorted(DECISIONS.glob("[0-9][0-9][0-9][0-9]-*.md"))]
+    parsed = [
+        _parse(path) for path in sorted(DECISIONS.glob("[0-9][0-9][0-9][0-9]-*.md"))
+    ]
     by_number: dict[str, Decision] = {}
     for decision in parsed:
         if decision.number in by_number:
@@ -163,7 +188,9 @@ def render(records: list[Decision]) -> bytes:
 
 def write_atomic(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "wb") as handle:
@@ -180,7 +207,9 @@ def write_atomic(path: Path, content: bytes) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="fail if the index has drifted")
+    parser.add_argument(
+        "--check", action="store_true", help="fail if the index has drifted"
+    )
     args = parser.parse_args(argv)
     try:
         rendered = render(decisions())
@@ -190,7 +219,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         current = TARGET.read_bytes() if TARGET.exists() else b""
         if current != rendered:
-            print("FAIL docs/decisions/index.md has drifted; run python scripts/build_decision_index.py")
+            print(
+                "FAIL docs/decisions/index.md has drifted; run python scripts/build_decision_index.py"
+            )
             return 1
         print("docs/decisions/index.md is current")
         return 0

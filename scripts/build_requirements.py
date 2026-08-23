@@ -43,7 +43,12 @@ SYMBOL = {
 def source_digest() -> str:
     digest = hashlib.sha256()
     relative = SOURCE.relative_to(ROOT).as_posix()
-    file_digest = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+    # Normalise line endings first — see the same repair in build_decision_index.py. Digesting
+    # working-tree bytes under `* text=auto eol=lf` bakes the authoring checkout's line endings
+    # into the committed header, so the check passes for its author and fails for everyone else.
+    file_digest = hashlib.sha256(
+        SOURCE.read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()
     digest.update(relative.encode("utf-8"))
     digest.update(b"\0")
     digest.update(file_digest.encode("ascii"))
@@ -63,7 +68,9 @@ def render(reqs: list[dict[str, object]]) -> str:
     add("> **Producer:** `scripts/build_requirements.py`")
     add(f"> **Source:** `{SOURCE_GLOB}`")
     add(f"> **Source SHA-256:** `{source_digest()}`")
-    add("> **Do not hand-edit:** regenerate with `python scripts/build_requirements.py`.")
+    add(
+        "> **Do not hand-edit:** regenerate with `python scripts/build_requirements.py`."
+    )
     add("")
     add(
         "> **Provenance warning, 21 August 2026. Read this before citing anything below.**\n"
@@ -141,7 +148,9 @@ def render(reqs: list[dict[str, object]]) -> str:
 def write_atomic(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     encoded = content.encode("utf-8")
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "wb") as handle:
