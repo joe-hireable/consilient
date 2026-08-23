@@ -22,8 +22,8 @@ every absent join must render as `unknown`, never as an inferred edge. [measured
 ADR-0053 fixes one offline surface: `consil dashboard` emits one self-contained HTML file, opened
 directly from the filesystem, with no server, port, authentication flow, bundler, frontend
 dependency, third-party import or second implementation language. [measured] `dashboard.py` already
-renders SVG, so the extension reuses that renderer and Python's standard library; there is no D3,
-Cytoscape, npm package, web worker or new CLI subcommand. [measured]
+renders SVG, so the extension reuses that renderer, HTML/CSS and Python's standard library; there is
+no JavaScript, canvas runtime, D3, Cytoscape, npm package, web worker or new CLI subcommand. [asserted]
 
 `events.py` remains the only trajectory writer. [asserted] The dashboard receives an immutable
 accepted prefix plus read-only plan files and projection rows, and has no callable path back to
@@ -204,7 +204,8 @@ so rather than generating prose. [asserted]
 
 ## Native refresh, automatic rendering and staleness
 
-There is one pure renderer and two pull triggers; neither is a new orchestrator. [asserted]
+Current dashboard rendering is manual; no source currently invokes it automatically. [measured]
+There is one pure renderer and two specified pull triggers; neither is a new orchestrator. [asserted]
 
 1. `consil dashboard` always reads a fresh accepted JSONL prefix, checks the SQLite projection head
    and plan-set digest, and atomically replaces the HTML before returning its path. [asserted]
@@ -258,8 +259,8 @@ Implementation does not ship until one bounded test for each invariant fails on 
 defect. [asserted]
 
 - **One surface:** the six-command CLI snapshot is unchanged and `consil dashboard` still emits one
-  self-contained file with no remote resource, server, port, script bundle or third-party import.
-  [asserted]
+  self-contained file with no JavaScript, remote resource, server, port, script bundle or
+  third-party import. [asserted]
 - **Render-only:** an AST/source-to-sink check proves the dashboard cannot call trajectory, work-item,
   dispatch, route, budget, capability or effect writers. [asserted]
 - **Canonical source:** a deliberately stale SQLite head and plan cache are labelled/refused against
