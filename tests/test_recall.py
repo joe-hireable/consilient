@@ -14,6 +14,14 @@ from consilient.events import SCHEMA_VERSION, VERDICT_KIND, append
 from consilient.recall import ALWAYS_INCLUDE_KINDS, pack, parse_receipt
 
 
+def _pack_body(text: str) -> str:
+    marker = "<!-- consilient:recall-receipt:v1"
+    index = text.find(marker)
+    if index == -1:
+        return text
+    return text[:index]
+
+
 def _ts(offset_s: int = 0) -> str:
     return (datetime.now(timezone.utc) + timedelta(seconds=offset_s)).isoformat()
 
@@ -39,9 +47,9 @@ def _write(log_dir: Path, *events) -> None:
 def test_empty_log_reports_no_events(tmp_path):
     log_dir = tmp_path / "log"
     log_dir.mkdir()
-    assert pack(log_dir, query="", limit_chars=1000) == (
-        "# Recall pack\n\nNo events in log.\n"
-    )
+    text = pack(log_dir, query="", limit_chars=1000)
+    assert _pack_body(text) == "# Recall pack\n\nNo events in log.\n"
+    assert parse_receipt(text)["scanned_universe_count"] == 0
 
 
 def test_verbatim_field_present_in_pack(tmp_path):
@@ -72,7 +80,7 @@ def test_omitted_count_footer_when_over_budget(tmp_path):
                 data={"n": index, "padding": "x" * 80},
             ),
         )
-    text = pack(log_dir, query="note", limit_chars=600)
+    text = pack(log_dir, query="note", limit_chars=2400)
     assert "omitted to fit character limit" in text
     assert " event(s) omitted" in text
 
@@ -150,7 +158,7 @@ def test_character_bound_respected(tmp_path):
                 data={"n": index, "body": "word " * 20},
             ),
         )
-    limit = 900
+    limit = 2400
     text = pack(log_dir, query="note", limit_chars=limit)
     assert len(text) <= limit
 
