@@ -20,13 +20,17 @@ from __future__ import annotations
 
 import argparse
 import collections
+import hashlib
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "docs/40-spec/requirements-source.json"
-TARGET = ROOT / "docs/40-spec/requirements.md"
+SOURCE = ROOT / "docs" / "40-spec" / "requirements-source.json"
+TARGET = ROOT / "docs" / "40-spec" / "requirements.md"
+SOURCE_GLOB = "docs/40-spec/requirements-source.json"
 
 SYMBOL = {
     "met": "MET",
@@ -34,6 +38,17 @@ SYMBOL = {
     "substrate-only": "SUBSTRATE ONLY",
     "absent": "ABSENT",
 }
+
+
+def source_digest() -> str:
+    digest = hashlib.sha256()
+    relative = SOURCE.relative_to(ROOT).as_posix()
+    file_digest = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+    digest.update(relative.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(file_digest.encode("ascii"))
+    digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def render(reqs: list[dict[str, object]]) -> str:
@@ -45,6 +60,11 @@ def render(reqs: list[dict[str, object]]) -> str:
     lines: list[str] = []
     add = lines.append
     add("# Requirements — audit-extracted, attribution not attested\n")
+    add("> **Producer:** `scripts/build_requirements.py`")
+    add(f"> **Source:** `{SOURCE_GLOB}`")
+    add(f"> **Source SHA-256:** `{source_digest()}`")
+    add("> **Do not hand-edit:** regenerate with `python scripts/build_requirements.py`.")
+    add("")
     add(
         "> **Provenance warning, 21 August 2026. Read this before citing anything below.**\n"
         ">\n"
@@ -118,6 +138,24 @@ def render(reqs: list[dict[str, object]]) -> str:
     return "\n".join(lines)
 
 
+def write_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = content.encode("utf-8")
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -125,8 +163,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    reqs = json.loads(SOURCE.read_text(encoding="utf-8"))
-    rendered = render(reqs)
+    try:
+        reqs = json.loads(SOURCE.read_text(encoding="utf-8"))
+        rendered = render(reqs)
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError) as error:
+        print(f"FAIL {error}", file=sys.stderr)
+        return 1
 
     if args.check:
         current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
@@ -139,7 +181,7 @@ def main() -> int:
         print(f"{TARGET.name} matches {SOURCE.name}: {len(reqs)} requirements")
         return 0
 
-    TARGET.write_text(rendered, encoding="utf-8", newline="\n")
+    write_atomic(TARGET, rendered)
     print(f"wrote {TARGET.relative_to(ROOT)} — {len(reqs)} requirements")
     return 0
 

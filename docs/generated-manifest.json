@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "output": "docs/40-spec/requirements.md",
+      "producer": "scripts/build_requirements.py",
+      "check_args": ["--check"],
+      "sources": ["docs/40-spec/requirements-source.json"],
+      "header": {
+        "producer": "scripts/build_requirements.py",
+        "source": "docs/40-spec/requirements-source.json"
+      }
+    },
+    {
+      "output": "docs/decisions/index.md",
+      "producer": "scripts/build_decision_index.py",
+      "check_args": ["--check"],
+      "sources": ["docs/decisions/[0-9][0-9][0-9][0-9]-*.md"],
+      "header": {
+        "producer": "scripts/build_decision_index.py",
+        "source": "docs/decisions/[0-9][0-9][0-9][0-9]-*.md"
+      }
+    }
+  ]
+}

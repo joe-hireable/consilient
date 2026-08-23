@@ -1,5 +1,10 @@
 # Requirements — audit-extracted, attribution not attested
 
+> **Producer:** `scripts/build_requirements.py`
+> **Source:** `docs/40-spec/requirements-source.json`
+> **Source SHA-256:** `34d3807c7743ebf068d73b9cdde75ede33f36f8e42f538e009af89715f459122`
+> **Do not hand-edit:** regenerate with `python scripts/build_requirements.py`.
+
 > **Provenance warning, 21 August 2026. Read this before citing anything below.**
 >
 > These requirements were extracted by an automated audit of the principal's messages.
