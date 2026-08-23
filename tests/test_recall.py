@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
+
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
+from consilient import events
 from consilient.events import SCHEMA_VERSION, VERDICT_KIND, append
-from consilient.recall import ALWAYS_INCLUDE_KINDS, pack
+from consilient.recall import ALWAYS_INCLUDE_KINDS, pack, parse_receipt
 
 
 def _ts(offset_s: int = 0) -> str:
@@ -165,3 +168,48 @@ def test_limit_chars_must_be_positive(tmp_path):
     log_dir.mkdir()
     with pytest.raises(ValueError, match="limit_chars"):
         pack(log_dir, query="", limit_chars=0)
+
+def test_assemble_shrinks_its_scan_window_rather_than_dying_on_a_long_trajectory(tmp_path):
+    """A growing trajectory must not kill every dispatch at startup.
+
+    The recall receipt carries one entry per omitted event, so it grows with the whole log.
+    At 1,336 events against an 8,000-character budget it stopped fitting, `_fit_output` raised,
+    and every dispatched harness died in `instructions.assemble` before it reached a model --
+    six of six failed dispatches on 23 August 2026, including the only Grok run. The scheduler
+    reported all of them as dispatched. [measured]
+
+    A fixed window would only move the cliff, so the window halves until the pack fits, and the
+    receipt reports `scan_complete` truthfully rather than claiming a scan nothing performed.
+    """
+    from consilient import instructions
+
+    log = tmp_path / 'log'
+    log.mkdir()
+    day = log / '2026-08-23.jsonl'
+    lines = []
+    for i in range(900):
+        lines.append(json.dumps({
+            'v': events.SCHEMA_VERSION,
+            'ts': '2026-08-23T12:00:00+00:00',
+            'event': 'note.recorded',
+            'actor': 'test',
+            'data': {'text': 'padding ' * 20, 'n': i},
+        }))
+    day.write_text(chr(10).join(lines) + chr(10), encoding='utf-8')
+
+    skills = tmp_path / 'skills'
+    skills.mkdir()
+    assembly = instructions.assemble(skills, log, task='a task that needs recent history')
+    assert assembly is not None
+
+    text = None
+    for attr in ('recall', 'recall_pack', 'recall_text'):
+        if hasattr(assembly, attr):
+            text = getattr(assembly, attr)
+            break
+    assert text, 'the assembly must carry a recall pack'
+    got = parse_receipt(text)
+    assert got['scan_complete'] is False, (
+        'a window smaller than the log must not be reported as a complete scan'
+    )
+    assert 0 < got['scanned_universe_count'] < 900

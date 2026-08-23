@@ -394,8 +394,45 @@ def assemble(
     layer; what it cannot enforce is that a caller records at all."""
     if not task.strip():
         raise ValueError("an assembly serves a task; the task text may not be empty")
+    # Bound the scan window, and shrink it until the receipt fits.
+    #
+    # `read_all` returns every event ever recorded, and the recall receipt carries one entry per
+    # OMITTED event -- so the receipt grows with the whole trajectory and eventually cannot fit
+    # inside its own budget. At 1,336 events against an 8,000-character limit it stopped fitting,
+    # `_fit_output` raised, and every dispatch died at startup before it reached a harness. The
+    # log was 3.9 MB and growing by roughly 2 MB a day. [measured 23 Aug 2026]
+    #
+    # A fixed window would only move the cliff: 80 events fit today and 120 did not, but that
+    # ratio is a property of how large events happen to be, and it drifts. So the window shrinks
+    # until the pack fits, which cannot silently stop working as the trajectory changes shape.
+    #
+    # The receipt reports `scan_complete` truthfully. A bounded scan reported as complete would
+    # be a claim about evidence nothing ever looked at, which is the exact defect class this
+    # repository exists to measure.
     events, _ = read_all(log_dir)
-    pack = recall.pack_events(events, query=task, limit_chars=recall_limit_chars)
+    window = len(events)
+    pack = None
+    last_error: ValueError | None = None
+    while True:
+        candidate = events if window >= len(events) else events[-window:]
+        try:
+            pack = recall.pack_events(
+                candidate,
+                query=task,
+                limit_chars=recall_limit_chars,
+                scan_complete=window >= len(events),
+            )
+            break
+        except ValueError as exc:
+            last_error = exc
+            if window <= 1:
+                raise ValueError(
+                    "the recall receipt does not fit in "
+                    f"{recall_limit_chars} characters even for a single event; the budget is "
+                    f"too small for this trajectory ({last_error})"
+                ) from exc
+            window = max(1, window // 2)
+
     skills, omitted = select_skills(
         skills_dir, task, limit=skill_limit, budget_chars=skill_chars
     )

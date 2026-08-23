@@ -264,6 +264,7 @@ def _pack_with_receipt(
     limit_chars: int,
     rejections: Sequence[Rejection] = (),
     continuation_cursor: str | None = None,
+    scan_complete: bool = True,
 ) -> str:
     if limit_chars < 1:
         raise ValueError("limit_chars must be at least 1")
@@ -297,7 +298,7 @@ def _pack_with_receipt(
             omitted=omitted_entries,
             bytes_used=len(_EMPTY_PACK),
             continuation_cursor=None,
-            scan_complete=True,
+            scan_complete=scan_complete,
             context_complete=True,
         )
         return _fit_output(_EMPTY_PACK, receipt, limit_chars)
@@ -328,7 +329,7 @@ def _pack_with_receipt(
             omitted=omitted_entries,
             bytes_used=len(_NO_MATCH_PACK),
             continuation_cursor=None,
-            scan_complete=True,
+            scan_complete=scan_complete,
             context_complete=True,
         )
         return _fit_output(_NO_MATCH_PACK, receipt, limit_chars)
@@ -396,7 +397,7 @@ def _pack_with_receipt(
             omitted=provisional_omitted,
             bytes_used=len(body),
             continuation_cursor=continuation,
-            scan_complete=True,
+            scan_complete=scan_complete,
             context_complete=continuation is None,
         )
         if len(body) + len(_serialise_receipt(receipt)) + 1 <= limit_chars:
@@ -493,12 +494,19 @@ def pack_events(
     limit_chars: int,
     rejections: Sequence[Rejection] = (),
     continuation_cursor: str | None = None,
+    scan_complete: bool = True,
 ) -> str:
-    """The pack over an already-read event list."""
+    """The pack over an already-read event list.
+
+    `scan_complete=False` says the caller handed over a WINDOW of the trajectory rather than all
+    of it. The receipt carries that through, because a bounded scan reported as complete is a
+    claim about evidence the packer never saw. Callers that bound their window must say so.
+    """
     return _pack_with_receipt(
         events,
         query=query,
         limit_chars=limit_chars,
+        scan_complete=scan_complete,
         rejections=rejections,
         continuation_cursor=continuation_cursor,
     )
