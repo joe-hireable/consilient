@@ -6406,6 +6406,53 @@ layout, task wording or node-count distribution; whether unrecorded reasoning is
 evidence anchor is substantively correct; long-run maintenance cost; or whether a future incumbent
 exceeds the retrieved bar. [asserted]
 
+### EXP-142 - Are a held-out contract suite's errors independent of the checks' errors, or do they fail on the same artefacts? `BLOCKED: no held-out contract exists, and no isolation check enforces that a builder cannot read one`
+
+**Decides:** whether ADR-0103's contract-beta is admissible as the Gate A1 quantity, or is biased in
+the direction that flatters the system and must be killed. [asserted] It does not decide beta's
+value and does not open any gate.
+
+**Why this is the load-bearing question.** contract-beta = P(checks accept | contract violated). The
+contract violation is established by a held-out suite written by a different model family. If that
+suite's errors are INDEPENDENT of the checks' errors, the estimate is sound. If both fail on the same
+artefacts - which is plausible, because both are produced by language models trained on overlapping
+data - then the artefacts that matter most are invisible to both, they are never counted as
+violations, and **contract-beta is biased downward.** A gate opening on a flattering number is worse
+than a gate that stays shut, so this experiment gates the ADR rather than merely informing it.
+
+**Precondition:** before any arm runs, fix the isolation. The held-out contract must be committed
+before the build dispatch, authored by a family different from the builder's, and unreachable from
+the builder's brief, worktree and claims. Without a mechanical check for that, a builder may read
+the contract and the experiment measures nothing. [asserted]
+
+**Design.** For a frozen set of artefacts, obtain three independent judgements per artefact: the
+project's own checks (accept or reject); the held-out contract suite (violation or not); and a
+third, deliberately different oracle - execution against a reference behaviour, a differential
+comparison against an independently generated implementation, or a human. The third oracle is what
+makes the correlation measurable at all; two judgements can only be compared, never calibrated.
+
+**Primary quantity:** the conditional agreement between the checks and the held-out suite on
+artefacts the third oracle marks bad - reported as a correlation with an interval, not as an
+agreement percentage. Agreement percentage would look reassuringly high whatever the correlation is.
+
+**Stopping rule, fixed in advance.** Kill ADR-0103 if the checks and the held-out suite fail together
+on bad artefacts at a rate exceeding chance by more than 0.2 in correlation, with the interval
+excluding zero. [asserted] Report inconclusive if 120 artefacts with third-oracle labels accumulate
+without the interval excluding zero either way. Confirm only if the correlation's upper bound sits
+below 0.2.
+
+**The objection this experiment cannot answer.** It measures whether the two oracles fail together on
+defects SOMETHING can detect. A defect no available oracle detects is invisible to the experiment by
+construction, and no amount of sampling reaches it. [asserted] That residual is the honest floor
+under every automated measurement of beta in this project, and it is the reason ADR-0103 keeps
+human-verdict beta alive as an unblocking signal rather than deleting it.
+
+**Watch also, as a Goodhart tripwire:** contracts that never fail. A held-out suite that never marks
+a violation is not evidence of quality; it is evidence the contract was written to match what the
+builder was going to do anyway. Report the violation rate alongside the correlation.
+
+**Status:** BLOCKED on the precondition. [measured 23 August 2026]
+
 ### EXP-141 - Can beta be measured prospectively from live dispatch to an interval narrower than the one history mining could not reach? `BLOCKED: prospective accept/reject join recorded at dispatch time`
 
 **Decides:** whether ADR-0100's replacement route for Gate A1 confirms, or is killed exactly as

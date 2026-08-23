@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `0f6237f7652a81f330aaeefdb1d306ff9231647737d723ec9097ad057fab7059`
+> **Source SHA-256:** `1afca6fb4d7739f4e42dc3ff0bf90a1026e0d2477edbc282794194ddef6e4dfc`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -107,3 +107,4 @@
 | [0100](0100-measure-beta-prospectively-from-live-dispatch-and-retire-history-mining.md) | Measure β prospectively from live dispatch, and retire history mining | PROVISIONAL | — |
 | [0101](0101-widen-the-scope-to-any-domain-and-keep-coding-as-v0.md) | Widen the scope to any domain, and keep coding as v0 | ACCEPTED | — |
 | [0102](0102-keep-telephony-out-of-the-open-source-tree-at-launch.md) | Keep telephony out of the open-source tree at launch | ACCEPTED | — |
+| [0103](0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md) | Make contract-β the gate quantity, and keep human-β as alignment rather than a blocker | PROVISIONAL | — |
