@@ -67,7 +67,7 @@ current v0 architecture. This specification defines future behaviour and claims 
 ## 3. The retrieved composite bar and the surviving delta
 
 The brief's minimum workflow comparator is Superpowers v6.3.0, tag `v6.3.0`, commit
-`b36e0829c6d0140e93cfef2ca599b1b07d4a7797`, retrieved and matched byte-for-byte to the installed
+[`b36e0829c`](https://github.com/obra/superpowers/commit/b36e0829c6d0140e93cfef2ca599b1b07d4a7797), retrieved and matched byte-for-byte to the installed
 package on 23 August 2026. Its `brainstorming` skill visibly classifies spike, bounded and
 architectural work, explores repository context, asks one question at a time, compares two or three
 approaches, obtains human approval, writes a specification and self-reviews it. Its `writing-plans`
