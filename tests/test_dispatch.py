@@ -429,7 +429,7 @@ def test_run_process_writes_an_artefact_file(tmp_path):
     script = _load_script()
     stdout_path = tmp_path / "stdout.txt"
     stderr_path = tmp_path / "stderr.txt"
-    code, timed_out, _duration = script.run_process(
+    code, timed_out, _duration, _timing = script.run_process(
         [sys.executable, "-c", "print('pong')"],
         cwd=tmp_path,
         stdout_path=stdout_path,
@@ -445,7 +445,7 @@ def test_run_process_kills_a_sleeping_child(tmp_path):
     script = _load_script()
     stdout_path = tmp_path / "stdout.txt"
     stderr_path = tmp_path / "stderr.txt"
-    code, timed_out, duration = script.run_process(
+    code, timed_out, duration, _timing = script.run_process(
         [sys.executable, "-c", "import time; time.sleep(30)"],
         cwd=tmp_path,
         stdout_path=stdout_path,
@@ -617,7 +617,7 @@ def test_default_headroom_refresh_is_bounded_and_uses_the_local_probe(
     def fake_run(argv, **kwargs):
         captured["argv"] = argv
         captured["kwargs"] = kwargs
-        return 0, False, 0.1
+        return 0, False, 0.1, None
 
     monkeypatch.setattr(script, "run_process", fake_run)
 
@@ -731,7 +731,7 @@ def test_run_harness_scrubs_git_environment(monkeypatch, tmp_path):
 
     def fake_run_process(_argv, *, env, **_kwargs):
         captured.update(env)
-        return 0, False, 0.1
+        return 0, False, 0.1, None
 
     monkeypatch.setattr(script, "run_process", fake_run_process)
     harness = harness_by_id("codex")
@@ -777,7 +777,7 @@ def test_live_dispatches_consume_recorded_instruction_assemblies(monkeypatch, tm
         )
         stdout_path.parent.mkdir(parents=True, exist_ok=True)
         stdout_path.write_text("pong\n", encoding="utf-8")
-        return 0, False, 0.1
+        return 0, False, 0.1, None
 
     monkeypatch.setattr(script, "build_command", fake_build_command)
     monkeypatch.setattr(script, "run_process", fake_run_process)
@@ -1179,7 +1179,7 @@ def test_cursor_run_holds_the_agent_lock(tmp_path, monkeypatch):
             return super().__exit__(*exc)
 
     monkeypatch.setattr(script, "ExclusiveFileLock", Spy)
-    monkeypatch.setattr(script, "run_process", lambda *_a, **_k: (0, False, 0.1))
+    monkeypatch.setattr(script, "run_process", lambda *_a, **_k: (0, False, 0.1, None))
     harness = harness_by_id("cursor-composer")
     assert harness is not None
     result = script.run_harness(
@@ -1204,7 +1204,7 @@ def test_non_cursor_run_does_not_take_the_cursor_lock(tmp_path, monkeypatch):
 
     def fake_run_process(_argv, **_kwargs):
         held["exists"] = lock.exists()
-        return 0, False, 0.1
+        return 0, False, 0.1, None
 
     monkeypatch.setattr(script, "run_process", fake_run_process)
     harness = harness_by_id("codex")

@@ -32,6 +32,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -74,6 +75,9 @@ from consilient.harness import (  # noqa: E402
     record_fanout,
     record_outcome,
     record_refusal,
+    record_request,
+    build_request_timing,
+    extract_usage_from_output,
     select,
     select_fanout,
     select_model,
@@ -110,6 +114,14 @@ GIT_ENV = {
 
 
 @dataclass(frozen=True)
+class StreamTiming:
+    t_send: str
+    t_first_chunk: str
+    t_first_nonempty_chunk: str
+    n_chunks: int
+
+
+@dataclass(frozen=True)
 class RunResult:
     harness: Harness
     status: str
@@ -125,6 +137,7 @@ class RunResult:
     run_id: str
     stdout_path: str
     stderr_path: str
+    request_timing: object | None = None
 
 
 def record_dispatch_error(log_dir: Path, result: RunResult) -> None:
@@ -533,6 +546,46 @@ def kill_process_tree(process: subprocess.Popen[bytes]) -> None:
             pass
 
 
+def _drain_stream(
+    pipe: Any,
+    out_path: Path,
+    *,
+    chunk_size: int = 4096,
+) -> tuple[int, str | None, str | None]:
+    """Read pipe in chunks; return count and first-chunk timestamps."""
+    n_chunks = 0
+    t_first: str | None = None
+    t_first_nonempty: str | None = None
+    with out_path.open("wb") as handle:
+        while True:
+            chunk = pipe.read(chunk_size)
+            if not chunk:
+                break
+            now = datetime.now(timezone.utc).isoformat()
+            n_chunks += 1
+            if t_first is None:
+                t_first = now
+            if t_first_nonempty is None and chunk.strip():
+                t_first_nonempty = now
+            handle.write(chunk)
+    return n_chunks, t_first, t_first_nonempty
+
+
+def _stream_reader(
+    pipe: Any,
+    out_path: Path,
+    meta: dict[str, Any],
+    *,
+    chunk_size: int = 4096,
+) -> None:
+    n_chunks, t_first, t_first_nonempty = _drain_stream(
+        pipe, out_path, chunk_size=chunk_size
+    )
+    meta["n_chunks"] = n_chunks
+    meta["t_first"] = t_first
+    meta["t_first_nonempty"] = t_first_nonempty
+
+
 def run_process(
     argv: list[str],
     *,
@@ -541,7 +594,7 @@ def run_process(
     stderr_path: Path,
     timeout_s: int,
     env: dict[str, str] | None = None,
-) -> tuple[int | None, bool, float]:
+) -> tuple[int | None, bool, float, StreamTiming | None]:
     """Run argv, writing output to files (not pipes), and kill the process tree on timeout."""
     cwd = cwd.resolve()
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
@@ -553,29 +606,71 @@ def run_process(
         kwargs["start_new_session"] = True
     started = time.perf_counter()
     timed_out = False
-    with stdout_path.open("wb") as out, stderr_path.open("wb") as err:
+    t_send = datetime.now(timezone.utc).isoformat()
+    timing: StreamTiming | None = None
+    try:
+        process = subprocess.Popen(
+            argv,
+            cwd=str(cwd),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            **kwargs,
+        )
+    except OSError:
+        return None, False, time.perf_counter() - started, None
+    assert process.stdout is not None and process.stderr is not None
+    stdout_meta: dict[str, Any] = {}
+    stderr_meta: dict[str, Any] = {}
+    stdout_thread = threading.Thread(
+        target=_stream_reader,
+        args=(process.stdout, stdout_path, stdout_meta),
+        daemon=True,
+    )
+    stderr_thread = threading.Thread(
+        target=_stream_reader,
+        args=(process.stderr, stderr_path, stderr_meta),
+        daemon=True,
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+    try:
+        process.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        kill_process_tree(process)
         try:
-            process = subprocess.Popen(
-                argv,
-                cwd=str(cwd),
-                stdin=subprocess.DEVNULL,
-                stdout=out,
-                stderr=err,
-                env=env,
-                **kwargs,
-            )
-        except OSError:
-            return None, False, time.perf_counter() - started
-        try:
-            process.wait(timeout=timeout_s)
+            process.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            timed_out = True
-            kill_process_tree(process)
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                pass
-    return process.returncode, timed_out, time.perf_counter() - started
+            pass
+    stdout_thread.join(timeout=10)
+    stderr_thread.join(timeout=10)
+    n_chunks = int(stdout_meta.get("n_chunks", 0)) + int(stderr_meta.get("n_chunks", 0))
+    candidates = [
+        ts
+        for ts in (stdout_meta.get("t_first"), stderr_meta.get("t_first"))
+        if isinstance(ts, str)
+    ]
+    nonempty_candidates = [
+        ts
+        for ts in (
+            stdout_meta.get("t_first_nonempty"),
+            stderr_meta.get("t_first_nonempty"),
+        )
+        if isinstance(ts, str)
+    ]
+    t_first = min(candidates) if candidates else t_send
+    t_first_nonempty = (
+        min(nonempty_candidates) if nonempty_candidates else t_first
+    )
+    timing = StreamTiming(
+        t_send=t_send,
+        t_first_chunk=t_first,
+        t_first_nonempty_chunk=t_first_nonempty,
+        n_chunks=n_chunks,
+    )
+    return process.returncode, timed_out, time.perf_counter() - started, timing
 
 
 def refresh_default_headroom(path: Path) -> str | None:
@@ -595,7 +690,7 @@ def refresh_default_headroom(path: Path) -> str | None:
                 return None
     with tempfile.TemporaryDirectory(prefix="consilient-headroom-") as directory:
         temporary = Path(directory)
-        code, timed_out, _duration = run_process(
+        code, timed_out, _duration, _timing = run_process(
             [
                 sys.executable,
                 str(ROOT / "scripts" / "headroom.py"),
@@ -951,6 +1046,7 @@ def run_harness(
     permissions: PermissionMode = DEFAULT_PERMISSION_MODE,
     log_dir: Path | None = None,
     in_flight: str = "",
+    in_flight_at_dispatch: int = 0,
     family: str | None = None,
     pools: tuple[PoolState, ...] = (),
     claim_run_id: str | None = None,
@@ -1007,6 +1103,7 @@ def run_harness(
     argv = built
     env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    stream_timing: StreamTiming | None = None
     if harness.id == "grok":
         grok_home = Path(env.get("GROK_HOME", Path.home() / ".grok"))
         auth_path = Path(env.get("GROK_AUTH_PATH", grok_home / "auth.json"))
@@ -1017,7 +1114,7 @@ def run_harness(
     try:
         if harness.id == "cursor-composer":
             with ExclusiveFileLock(DEFAULT_CURSOR_LOCK, timeout_s=float(timeout_s)):
-                code, timed_out, duration = run_process(
+                code, timed_out, duration, stream_timing = run_process(
                     argv,
                     cwd=cwd,
                     stdout_path=stdout_path,
@@ -1026,7 +1123,7 @@ def run_harness(
                     env=env,
                 )
         else:
-            code, timed_out, duration = run_process(
+            code, timed_out, duration, stream_timing = run_process(
                 argv,
                 cwd=cwd,
                 stdout_path=stdout_path,
@@ -1063,6 +1160,18 @@ def run_harness(
         diff_bytes=diff_bytes,
         timed_out=timed_out,
     )
+    request_timing = None
+    if stream_timing is not None:
+        usage = extract_usage_from_output(stdout, harness.id)
+        request_timing = build_request_timing(
+            t_send=stream_timing.t_send,
+            t_first_chunk=stream_timing.t_first_chunk,
+            t_first_nonempty_chunk=stream_timing.t_first_nonempty_chunk,
+            n_chunks=stream_timing.n_chunks,
+            output_tokens=usage["output_tokens"],
+            cache_read_input_tokens=usage["cache_read_input_tokens"],
+            in_flight_at_dispatch=in_flight_at_dispatch,
+        )
     return RunResult(
         harness=harness,
         status=status,
@@ -1078,6 +1187,7 @@ def run_harness(
         run_id=run_id,
         stdout_path=str(stdout_path),
         stderr_path=str(stderr_path),
+        request_timing=request_timing,
     )
 
 
@@ -1515,12 +1625,21 @@ def dispatch_one(
         permissions=permissions,
         log_dir=log_dir,
         in_flight=in_flight,
+        in_flight_at_dispatch=len(live),
         family=family,
         pools=pools,
         claim_run_id=run_id,
         max_turns=max_turns,
         max_tokens=max_tokens,
     )
+    if result.request_timing is not None:
+        record_request(
+            log_dir,
+            ts=now_ts(),
+            run_id=result.run_id,
+            harness_id=harness.id,
+            timing=result.request_timing,
+        )
     recorded = record_outcome(
         log_dir,
         ts=now_ts(),
@@ -1673,6 +1792,7 @@ def dispatch_fanout(
             permissions=permissions,
             log_dir=log_dir,
             in_flight=in_flight,
+            in_flight_at_dispatch=len(live),
             family=family,
             pools=pools,
             # The claim covering both children is the parent's, so the badge the
@@ -1681,6 +1801,14 @@ def dispatch_fanout(
             max_turns=max_turns,
             max_tokens=max_tokens,
         )
+        if result.request_timing is not None:
+            record_request(
+                log_dir,
+                ts=now_ts(),
+                run_id=result.run_id,
+                harness_id=harness.id,
+                timing=result.request_timing,
+            )
         record_outcome(
             log_dir,
             ts=now_ts(),
