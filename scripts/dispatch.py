@@ -814,11 +814,8 @@ def build_command(
         )
         if isinstance(caps, str):
             return caps
-        extra = optional_flags(help_blob, "--always-approve")
-        for flag in bypass:
-            if flag not in extra:
-                extra.append(flag)
-        return [binary, "-p", instruction, "--cwd", str(cwd), *caps, *extra]
+        extra = optional_flags(help_blob, *bypass)
+        return [binary, "--prompt-file", brief.as_posix(), "--cwd", str(cwd), *caps, *extra]
     if harness.id == "codex":
         binary = find_codex()
         if binary is None:
@@ -985,6 +982,13 @@ def run_harness(
     argv = built
     env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    if harness.id == "grok":
+        grok_home = Path(env.get("GROK_HOME", Path.home() / ".grok"))
+        auth_path = Path(env.get("GROK_AUTH_PATH", grok_home / "auth.json"))
+        env["GROK_HOME"] = str((run_dir / "grok-home").resolve())
+        env["GROK_AUTH_PATH"] = str(auth_path.resolve())
+        for surface in ("SKILLS", "RULES", "AGENTS", "MCPS", "HOOKS", "SESSIONS"):
+            env[f"GROK_CLAUDE_{surface}_ENABLED"] = "false"
     try:
         if harness.id == "cursor-composer":
             with ExclusiveFileLock(DEFAULT_CURSOR_LOCK, timeout_s=float(timeout_s)):
