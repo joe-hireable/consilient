@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from consilient.effects import EFFECT_CLASSES, EffectError, EffectManifest
+from consilient.effects import EFFECT_CLASSES, OUTBOUND_EFFECTS, EffectError, EffectManifest
 from consilient.events import EventError, SCHEMA_VERSION, append, append_transaction, validate
 
 
@@ -103,6 +103,25 @@ def receipt_data(*, receipt_id: str, status: str, supersedes: str | None = None)
     return data
 
 
+_MISSING = object()
+DISCLOSURE_DIGEST = "9" * 64
+
+
+def outbound_record(
+    *,
+    operation: str = "send_email",
+    disclosure: object = _MISSING,
+    **overrides: object,
+) -> dict[str, object]:
+    record = manifest().to_record()
+    record["effects"] = ["message.send"]
+    record["operations"] = [operation]
+    if disclosure is not _MISSING:
+        record["disclosure"] = disclosure
+    record.update(overrides)
+    return record
+
+
 def test_effect_classes_are_exact_and_manifest_digest_is_canonical() -> None:
     """Production break caught: a padded/case-varied effect could enter the manifest."""
     assert EFFECT_CLASSES == frozenset(
@@ -187,3 +206,47 @@ def test_receipt_chain_allows_one_unknown_resolution_and_refuses_a_fork(tmp_path
             tmp_path / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl",
             event("effect.receipt", receipt_data(receipt_id="receipt-fork", status="succeeded")),
         )
+
+
+def test_outbound_effects_are_exactly_message_send() -> None:
+    """Production break caught: an outbound class drops off the disclosure requirement."""
+    assert OUTBOUND_EFFECTS == frozenset({"message.send"})
+    assert OUTBOUND_EFFECTS <= EFFECT_CLASSES
+
+
+@pytest.mark.parametrize("operation", ["send_email", "send_sms"])
+def test_outbound_effect_refuses_missing_disclosure(operation: str) -> None:
+    """Production break caught: send_email/send_sms can ship with no disclosure hash."""
+    with pytest.raises(EffectError, match="disclosure"):
+        EffectManifest.from_record(outbound_record(operation=operation))
+
+
+@pytest.mark.parametrize(
+    "disclosure",
+    [
+        "",
+        "This call is from an automated system.",
+        "G" * 64,
+        {"kind": "prompt", "text": "I am an AI"},
+    ],
+)
+def test_outbound_effect_refuses_plaintext_or_malformed_disclosure(disclosure: object) -> None:
+    """Production break caught: a prompt-shaped disclosure can be stripped by injection."""
+    with pytest.raises(EffectError, match="disclosure"):
+        EffectManifest.from_record(outbound_record(disclosure=disclosure))
+
+
+def test_outbound_effect_accepts_pre_rendered_disclosure_digest() -> None:
+    """A hash of pre-rendered bytes is the only admitted disclosure shape."""
+    value = EffectManifest.from_record(outbound_record(disclosure=DISCLOSURE_DIGEST))
+    assert value.disclosure == DISCLOSURE_DIGEST
+    replayed = EffectManifest.from_record(value.to_record())
+    assert replayed.disclosure == DISCLOSURE_DIGEST
+    assert replayed.digest == value.digest
+
+
+def test_non_outbound_manifest_does_not_require_disclosure() -> None:
+    """Read-only work is not an outbound effect; disclosure stays optional."""
+    value = manifest()
+    assert value.disclosure is None
+    assert "disclosure" not in value.to_record()

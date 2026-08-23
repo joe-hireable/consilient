@@ -83,6 +83,8 @@ MUTATION_EFFECTS = frozenset(
         "network.call",
     }
 )
+OUTBOUND_EFFECTS = frozenset({"message.send"})
+OUTBOUND_OPERATIONS = frozenset({"send_email", "send_sms"})
 
 
 class EffectError(ValueError):
@@ -220,6 +222,7 @@ class EffectManifest:
     declared_residuals: object
     ceilings: object
     parent_operation_id: str | None = None
+    disclosure: str | None = None
 
     def __post_init__(self) -> None:
         _text(self.operation_id, "operation_id")
@@ -235,11 +238,20 @@ class EffectManifest:
         _digest(adapter["implementation_digest"], "adapter.implementation_digest")
         _protected(self.forward, "forward")
         _protected(self.scope, "scope")
-        _strings(self.operations, "operations")
+        operations = _strings(self.operations, "operations")
         effects = _strings(self.effects, "effects")
         unknown = sorted(set(effects) - EFFECT_CLASSES)
         if unknown:
             raise EffectError(f"effects must use exact effect classes, got {unknown}")
+        outbound = bool(set(effects) & OUTBOUND_EFFECTS) and bool(
+            set(operations) & OUTBOUND_OPERATIONS
+        )
+        if outbound:
+            if self.disclosure is None:
+                raise EffectError("disclosure is required for outbound message.send effects")
+            object.__setattr__(self, "disclosure", _digest(self.disclosure, "disclosure"))
+        elif self.disclosure is not None:
+            raise EffectError("disclosure is only permitted for outbound message.send effects")
 
         for field, value in (
             ("inventory_snapshot", self.inventory_snapshot),
@@ -308,14 +320,22 @@ class EffectManifest:
         }
         if self.parent_operation_id is not None:
             record["parent_operation_id"] = _thaw(self.parent_operation_id)
+        if self.disclosure is not None:
+            record["disclosure"] = _thaw(self.disclosure)
         return record
 
     @classmethod
     def from_record(cls, value: object) -> "EffectManifest":
         record = _mapping(value, "manifest")
-        required = set(cls.__dataclass_fields__) - {"parent_operation_id"}
-        optional = required | {"parent_operation_id"}
-        if set(record) not in (required, optional):
+        optional_fields = {"parent_operation_id", "disclosure"}
+        required = set(cls.__dataclass_fields__) - optional_fields
+        allowed = (
+            required,
+            required | {"parent_operation_id"},
+            required | {"disclosure"},
+            required | optional_fields,
+        )
+        if set(record) not in allowed:
             raise EffectError("manifest has missing or unknown fields")
         return cls(**cast(Any, dict(record)))
 
