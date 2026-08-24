@@ -746,20 +746,20 @@ _MINI_STREAM_PLAN = """\
 """
 
 
-def test_parse_plan_units_reads_claims_and_dependencies():
+def test_parse_plan_units_reads_claims_and_dependencies() -> None:
     units = coordination.parse_plan_units({"mini.md": _MINI_STREAM_PLAN})
     assert set(units) == {"A", "B", "C"}
     assert units["B"].depends == ("A",)
     assert units["C"].paths == ("src/widget.py", "docs/readme.md")
 
 
-def test_derive_lane_order_follows_declared_dependencies():
+def test_derive_lane_order_follows_declared_dependencies() -> None:
     units = coordination.parse_plan_units({"mini.md": _MINI_STREAM_PLAN})
     order = coordination.derive_lane_order(units, "src/widget.py")
     assert order == ("A", "B", "C")
 
 
-def test_lane_order_inversion_detects_dependency_violations():
+def test_lane_order_inversion_detects_dependency_violations() -> None:
     units = coordination.parse_plan_units({"mini.md": _MINI_STREAM_PLAN})
     hand = coordination.parse_build_plan_lanes(_MINI_BUILD_PLAN)
     # Hand table says A -> B -> C which matches dependencies — no inversion.
@@ -769,14 +769,14 @@ def test_lane_order_inversion_detects_dependency_violations():
     assert inversions == (("src/widget.py", "B", "A"),)
 
 
-def test_claim_order_violation_refuses_until_predecessors_complete():
+def test_claim_order_violation_refuses_until_predecessors_complete() -> None:
     units = coordination.parse_plan_units({"mini.md": _MINI_STREAM_PLAN})
     assert coordination.claim_order_violation("C", frozenset(), units) is not None
     assert coordination.claim_order_violation("C", frozenset({"A"}), units) is not None
     assert coordination.claim_order_violation("C", frozenset({"A", "B"}), units) is None
 
 
-def test_overlapping_claims_without_dependency_still_impose_serial_order():
+def test_overlapping_claims_without_dependency_still_impose_serial_order() -> None:
     plan = """\
 ## X — one
 
@@ -802,7 +802,7 @@ def test_overlapping_claims_without_dependency_still_impose_serial_order():
     assert coordination.claim_order_violation("Y", frozenset(), units) is not None
 
 
-def test_coordination_lane_derived_order_respects_t02_before_c03():
+def test_coordination_lane_derived_order_respects_t02_before_c03() -> None:
     """Measured contract: T02 -> C03 on src/consilient/coordination.py (build plan)."""
     plans_dir = ROOT / "docs" / "superpowers" / "plans"
     build_plan = (plans_dir / "2026-08-22-build-plan.md").read_text(encoding="utf-8")
