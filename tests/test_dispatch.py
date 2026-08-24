@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from consilient.cli import build_parser
-from consilient.events import read, validate
+from consilient.events import read, read_all, validate
 from consilient.harness import (
     DEFAULT_POOLS,
     HARNESSES,
@@ -1442,3 +1442,100 @@ def test_parse_status_rejects_unknown_values():
     assert parse_status("silent") == "silent"
     with pytest.raises(ValueError, match="unknown dispatch status"):
         parse_status("success")
+
+
+def test_every_write_admitted_form_proves_read_write_stage_commit_and_index_isolation(
+    tmp_path,
+):
+    script = _load_script()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "tracked.txt").write_text("seed\n", encoding="utf-8")
+    _git(repo, "init")
+    _git(repo, "add", "tracked.txt")
+    _git(repo, "commit", "-m", "seed")
+    indexes: list[Path] = []
+    for form in script.WORKSPACE_FORMS:
+        dest = tmp_path / form
+        workspace = script.probe_workspace_form(
+            form, repo, dest, runtime_id="grok", runtime_version="1.0"
+        )
+        assert workspace.form == form
+        assert workspace.index_path.exists()
+        indexes.append(workspace.index_path)
+    assert len(set(indexes)) == len(indexes)
+
+
+def test_failed_workspace_probe_does_not_reach_run_process(tmp_path, monkeypatch):
+    script = _load_script()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "tracked.txt").write_text("seed\n", encoding="utf-8")
+    _git(repo, "init")
+    _git(repo, "add", "tracked.txt")
+    _git(repo, "commit", "-m", "seed")
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("run_process must not run after a failed workspace probe")
+
+    monkeypatch.setattr(script, "run_process", boom)
+    monkeypatch.setattr(
+        script,
+        "provision_isolated_workspace",
+        lambda *_args, **_kwargs: "linked_worktree failed: probe refused",
+    )
+    payload, code = script.dispatch_one(
+        decision=select(probes=INSTALLED, pools=DEFAULT_POOLS, requested="grok"),
+        task="pong",
+        cwd=repo,
+        log_dir=tmp_path / "log",
+        runs_dir=tmp_path / "runs",
+        timeout_s=5,
+        model=None,
+        dry_run=False,
+        claims=("src",),
+    )
+    assert payload["status"] == "failed"
+    assert code == 1
+    assert "probe refused" in payload["reason"]
+    events, _rejected = read_all(tmp_path / "log")
+    kinds = [event.kind for event in events]
+    assert "dispatch.outcome" in kinds
+    assert "work_item.opened" in kinds
+    assert "work_item.completed" in kinds
+
+
+def test_unready_native_item_does_not_reach_run_process(tmp_path, monkeypatch):
+    from consilient import work_items
+
+    script = _load_script()
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("run_process must not run for an unready native item")
+
+    monkeypatch.setattr(script, "run_process", boom)
+    payload, code = script.dispatch_one(
+        decision=select(probes=INSTALLED, pools=DEFAULT_POOLS, requested="grok"),
+        task="pong",
+        cwd=tmp_path,
+        log_dir=tmp_path / "log",
+        runs_dir=tmp_path / "runs",
+        timeout_s=5,
+        model=None,
+        dry_run=False,
+        native_claim={
+            "ticket": "native:missing",
+            "revision": 1,
+            "task_family": "code",
+            "protocol_id": "pytest",
+            "protocol_version": "v1",
+        },
+    )
+    assert payload["status"] == "refused"
+    assert code == 2
+    assert "unready" in payload["reason"]
+    events, _rejected = read_all(tmp_path / "log")
+    assert work_items.OPENED not in [
+        event.kind for event in events if event.data.get("run_id")
+    ]
+    del work_items

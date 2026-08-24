@@ -309,6 +309,180 @@ def git_workspace(cwd: Path) -> tuple[Path, Path] | None:
     return git_dir, work_tree
 
 
+WORKSPACE_FORMS = ("linked_worktree", "isolated_git_env", "full_clone")
+
+
+class WorkspaceProbeError(RuntimeError):
+    """A workspace form failed read, write, stage or throwaway commit."""
+
+
+@dataclass(frozen=True)
+class IsolatedWorkspace:
+    form: str
+    work_tree: Path
+    git_dir: Path
+    index_path: Path
+    runtime_id: str
+    runtime_version: str
+
+
+def _git_identity_env() -> dict[str, str]:
+    env = dict(GIT_ENV)
+    env.setdefault("GIT_AUTHOR_NAME", "consilient.dispatch")
+    env.setdefault("GIT_AUTHOR_EMAIL", "dispatch@consilient.invalid")
+    env.setdefault("GIT_COMMITTER_NAME", "consilient.dispatch")
+    env.setdefault("GIT_COMMITTER_EMAIL", "dispatch@consilient.invalid")
+    return env
+
+
+def _run_git(
+    cwd: Path,
+    *args: str,
+    extra_env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    git = which_binary("git")
+    if git is None:
+        raise WorkspaceProbeError("git is not installed")
+    env = _git_identity_env()
+    if extra_env:
+        env.update(extra_env)
+    return subprocess.run(
+        [git, "-C", str(cwd), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+        env=env,
+    )
+
+
+def workspace_index_path(work_tree: Path, extra_env: Mapping[str, str] | None = None) -> Path:
+    completed = _run_git(work_tree, "rev-parse", "--git-path", "index", extra_env=extra_env)
+    if completed.returncode != 0:
+        raise WorkspaceProbeError(completed.stderr or "could not resolve git index")
+    raw = (completed.stdout or "").strip()
+    index = Path(raw)
+    if not index.is_absolute():
+        index = (work_tree / index).resolve()
+    return index
+
+
+def _probe_read_write_stage_commit(
+    work_tree: Path, extra_env: Mapping[str, str] | None = None
+) -> None:
+    tracked = _run_git(work_tree, "ls-files", extra_env=extra_env)
+    if tracked.returncode != 0:
+        raise WorkspaceProbeError(tracked.stderr or "read probe failed")
+    names = [line for line in (tracked.stdout or "").splitlines() if line.strip()]
+    if not names:
+        raise WorkspaceProbeError("read probe found no tracked file")
+    sample = work_tree / names[0]
+    sample.read_bytes()
+    probe = work_tree / f".consilient-workspace-probe-{os.getpid()}"
+    probe.write_text("probe\n", encoding="utf-8")
+    added = _run_git(work_tree, "add", probe.name, extra_env=extra_env)
+    if added.returncode != 0:
+        raise WorkspaceProbeError(added.stderr or "stage probe failed")
+    committed = _run_git(
+        work_tree, "commit", "-m", "consilient workspace probe", extra_env=extra_env
+    )
+    if committed.returncode != 0:
+        raise WorkspaceProbeError(committed.stderr or "throwaway commit probe failed")
+    probe.unlink(missing_ok=True)
+
+
+def _materialise_workspace_form(form: str, source: Path, dest: Path) -> Mapping[str, str]:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        shutil.rmtree(dest)
+    if form == "linked_worktree":
+        branch = f"consilient-ws-{dest.name}"
+        completed = _run_git(
+            source, "worktree", "add", "-b", branch, str(dest)
+        )
+        if completed.returncode != 0:
+            raise WorkspaceProbeError(completed.stderr or "linked worktree add failed")
+        return {}
+    if form == "isolated_git_env":
+        git_dir = dest.parent / f"{dest.name}.git"
+        if git_dir.exists():
+            shutil.rmtree(git_dir)
+        completed = _run_git(
+            source, "clone", "--separate-git-dir", str(git_dir), str(source), str(dest)
+        )
+        if completed.returncode != 0:
+            raise WorkspaceProbeError(completed.stderr or "isolated git clone failed")
+        return {"GIT_DIR": str(git_dir.resolve()), "GIT_WORK_TREE": str(dest.resolve())}
+    if form == "full_clone":
+        completed = _run_git(source, "clone", str(source), str(dest))
+        if completed.returncode != 0:
+            raise WorkspaceProbeError(completed.stderr or "full clone failed")
+        return {}
+    raise WorkspaceProbeError(f"unknown workspace form {form!r}")
+
+
+def probe_workspace_form(
+    form: str,
+    source: Path,
+    dest: Path,
+    *,
+    runtime_id: str,
+    runtime_version: str,
+) -> IsolatedWorkspace:
+    """Prove one form with an actual read, write, stage and throwaway commit."""
+    extra = dict(_materialise_workspace_form(form, source, dest))
+    _probe_read_write_stage_commit(dest, extra_env=extra or None)
+    workspace = git_workspace(dest)
+    if workspace is None:
+        raise WorkspaceProbeError("probed workspace is not a git work tree")
+    git_dir, work_tree = workspace
+    if extra.get("GIT_DIR"):
+        git_dir = Path(extra["GIT_DIR"])
+    index = workspace_index_path(dest, extra_env=extra or None)
+    return IsolatedWorkspace(
+        form=form,
+        work_tree=work_tree,
+        git_dir=git_dir,
+        index_path=index,
+        runtime_id=runtime_id,
+        runtime_version=runtime_version,
+    )
+
+
+def provision_isolated_workspace(
+    cwd: Path,
+    *,
+    run_id: str,
+    dest_root: Path,
+    runtime_id: str,
+    runtime_version: str,
+) -> IsolatedWorkspace | None | str:
+    """Provision a proved isolated workspace, or None when cwd is not a git repo.
+
+    A git repository that cannot prove any form returns a refusal string so the
+    caller can record an adverse attempt and skip launch.
+    """
+    if git_workspace(cwd) is None:
+        return None
+    dest_root.mkdir(parents=True, exist_ok=True)
+    last_error = "no workspace form was attempted"
+    for form in WORKSPACE_FORMS:
+        target = dest_root / form / run_id
+        try:
+            return probe_workspace_form(
+                form,
+                cwd,
+                target,
+                runtime_id=runtime_id,
+                runtime_version=runtime_version,
+            )
+        except (WorkspaceProbeError, OSError) as exc:
+            last_error = f"{form} failed: {exc}"
+            continue
+    return f"no runtime-conformant isolated workspace: {last_error}"
+
+
 def wsl_git_exports(cwd: Path) -> str:
     workspace = git_workspace(cwd)
     if workspace is None:
@@ -1843,6 +2017,7 @@ def dispatch_one(
     pools: tuple[PoolState, ...] = (),
     max_turns: int = DEFAULT_MAX_TURNS,
     max_tokens: int = DEFAULT_MAX_TOKENS,
+    native_claim: Mapping[str, object] | None = None,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "dispatch")
@@ -1917,78 +2092,180 @@ def dispatch_one(
         }
         return payload, 0 if isinstance(built, list) else _exit_for("refused")
 
-    if claims:
-        hit = coordination.conflict(claims, live, cwd=cwd)
-        if hit is not None:
-            return _claim_conflict_refusal(
-                log_dir=log_dir,
-                ts=ts,
+    try:
+        if native_claim is not None:
+            claim_event = coordination.claim_ready_work(
+                log_dir,
                 run_id=run_id,
-                task=task,
                 cwd=cwd,
-                hit=hit,
-                live=live,
+                timeout_s=timeout_s,
+                ticket=str(native_claim["ticket"]),
+                revision=int(native_claim["revision"]),
+                attempt_id=str(native_claim.get("attempt_id") or run_id),
+                harness=harness.id,
+                model=str(native_claim.get("model") or (model or harness.id)),
+                family=str(native_claim.get("family") or harness.family),
+                pool=str(native_claim.get("pool") or harness.pool),
+                capability_context_digest=str(
+                    native_claim.get("capability_context_digest") or ("0" * 64)
+                ),
+                candidate_ordinal=int(native_claim.get("candidate_ordinal") or 1),
+                predecessor_bindings=list(
+                    native_claim.get("predecessor_bindings") or []
+                ),
+                task_family=str(native_claim.get("task_family") or ""),
+                protocol_id=str(native_claim.get("protocol_id") or ""),
+                protocol_version=str(native_claim.get("protocol_version") or ""),
+                epsilon=float(native_claim.get("epsilon") or 0.40),
+                now=now,
+                task=task,
+                exposure_state=str(native_claim.get("exposure_state") or "pre_verifier"),
+                estimate=native_claim.get("estimate"),  # type: ignore[arg-type]
+                estimand_kind=(
+                    str(native_claim["estimand_kind"])
+                    if native_claim.get("estimand_kind") is not None
+                    else None
+                ),
+                auth_status=(
+                    str(native_claim["auth_status"])
+                    if native_claim.get("auth_status") is not None
+                    else None
+                ),
             )
-
-    claim_event = coordination.open_claim(
-        log_dir,
-        run_id=run_id,
-        paths=claims,
-        cwd=cwd,
-        timeout_s=timeout_s,
-        harness=harness.id,
-        task=task,
-        now=now,
-    )
+        else:
+            claim_event = coordination.open_claim(
+                log_dir,
+                run_id=run_id,
+                paths=claims,
+                cwd=cwd,
+                timeout_s=timeout_s,
+                harness=harness.id,
+                task=task,
+                now=now,
+            )
+    except coordination.ClaimConflict as exc:
+        return _claim_conflict_refusal(
+            log_dir=log_dir,
+            ts=ts,
+            run_id=run_id,
+            task=task,
+            cwd=cwd,
+            hit=exc.hit,
+            live=exc.live,
+        )
+    except coordination.ClaimReadyError as exc:
+        recorded = record_refusal(
+            log_dir,
+            ts=ts,
+            run_id=run_id,
+            task=task,
+            cwd=str(cwd),
+            reason=str(exc),
+            considered=[],
+            attempted="native claim",
+        )
+        return (
+            {
+                "status": "refused",
+                "reason": str(exc),
+                "run_id": run_id,
+                "cwd": str(cwd),
+                "recorded": str(log_dir / f"{ts[:10]}.jsonl"),
+                "event": recorded["event"],
+            },
+            _exit_for("refused"),
+        )
 
     claim_released: bool | str = False
     dispatch_raised = False
     try:
         run_dir = (runs_dir / run_id).resolve()
-        result = run_harness(
-            harness,
-            task=task,
-            cwd=cwd,
-            run_dir=run_dir,
-            timeout_s=timeout_s,
-            model=model,
+        isolated = provision_isolated_workspace(
+            cwd,
             run_id=run_id,
-            permissions=permissions,
-            log_dir=log_dir,
-            in_flight=in_flight,
-            in_flight_at_dispatch=len(live),
-            family=family,
-            pools=pools,
-            claim_run_id=run_id,
-            max_turns=max_turns,
-            max_tokens=max_tokens,
+            dest_root=run_dir / "workspace",
+            runtime_id=harness.id,
+            runtime_version="unprobed",
         )
-        if result.request_timing is not None:
-            record_request(
+        if isinstance(isolated, str):
+            result = RunResult(
+                harness=harness,
+                status="failed",
+                reason=isolated,
+                exit_code=None,
+                stdout="",
+                stderr="",
+                artefact_bytes=0,
+                diff_bytes=0,
+                timed_out=False,
+                duration_s=0.0,
+                command=(),
+                run_id=run_id,
+                stdout_path="",
+                stderr_path="",
+            )
+            recorded = record_outcome(
+                log_dir,
+                ts=now_ts(),
+                run_id=run_id,
+                task=task,
+                cwd=str(cwd),
+                harness=harness,
+                status="failed",
+                reason=isolated,
+                exit_code=None,
+                artefact_bytes=0,
+                diff_bytes=0,
+                timed_out=False,
+                duration_s=0.0,
+                command=(),
+            )
+        else:
+            launch_cwd = isolated.work_tree if isolated is not None else cwd
+            result = run_harness(
+                harness,
+                task=task,
+                cwd=launch_cwd,
+                run_dir=run_dir,
+                timeout_s=timeout_s,
+                model=model,
+                run_id=run_id,
+                permissions=permissions,
+                log_dir=log_dir,
+                in_flight=in_flight,
+                in_flight_at_dispatch=len(live),
+                family=family,
+                pools=pools,
+                claim_run_id=run_id,
+                max_turns=max_turns,
+                max_tokens=max_tokens,
+            )
+            if result.request_timing is not None:
+                record_request(
+                    log_dir,
+                    ts=now_ts(),
+                    run_id=result.run_id,
+                    harness_id=harness.id,
+                    timing=result.request_timing,
+                )
+            recorded = record_outcome(
                 log_dir,
                 ts=now_ts(),
                 run_id=result.run_id,
-                harness_id=harness.id,
-                timing=result.request_timing,
+                task=task,
+                cwd=str(cwd),
+                harness=harness,
+                status=parse_status(result.status),
+                reason=result.reason,
+                exit_code=result.exit_code,
+                artefact_bytes=result.artefact_bytes,
+                diff_bytes=result.diff_bytes,
+                timed_out=result.timed_out,
+                duration_s=result.duration_s,
+                command=result.command,
             )
-        recorded = record_outcome(
-            log_dir,
-            ts=now_ts(),
-            run_id=result.run_id,
-            task=task,
-            cwd=str(cwd),
-            harness=harness,
-            status=parse_status(result.status),
-            reason=result.reason,
-            exit_code=result.exit_code,
-            artefact_bytes=result.artefact_bytes,
-            diff_bytes=result.diff_bytes,
-            timed_out=result.timed_out,
-            duration_s=result.duration_s,
-            command=result.command,
-        )
-        record_dispatch_error(log_dir, result)
-        _harvest_quietly(log_dir, runs_dir)
+            record_dispatch_error(log_dir, result)
+            _harvest_quietly(log_dir, runs_dir)
     except BaseException:
         dispatch_raised = True
         raise
@@ -2091,33 +2368,58 @@ def dispatch_fanout(
         }
         return payload, 0
 
-    if claims:
-        hit = coordination.conflict(claims, live, cwd=cwd)
-        if hit is not None:
-            return _claim_conflict_refusal(
-                log_dir=log_dir,
-                ts=ts,
-                run_id=run_id,
-                task=task,
-                cwd=cwd,
-                hit=hit,
-                live=live,
-            )
-
-    claim_event = coordination.open_claim(
-        log_dir,
-        run_id=run_id,
-        paths=claims,
-        cwd=cwd,
-        timeout_s=timeout_s,
-        harness=f"{decision.first.id},{decision.second.id}",
-        task=task,
-        now=now,
-    )
+    try:
+        claim_event = coordination.open_claim(
+            log_dir,
+            run_id=run_id,
+            paths=claims,
+            cwd=cwd,
+            timeout_s=timeout_s,
+            harness=f"{decision.first.id},{decision.second.id}",
+            task=task,
+            now=now,
+        )
+    except coordination.ClaimConflict as exc:
+        return _claim_conflict_refusal(
+            log_dir=log_dir,
+            ts=ts,
+            run_id=run_id,
+            task=task,
+            cwd=cwd,
+            hit=exc.hit,
+            live=exc.live,
+        )
 
     claim_released: bool | str = False
     dispatch_raised = False
     try:
+        isolated = provision_isolated_workspace(
+            cwd,
+            run_id=run_id,
+            dest_root=(runs_dir / run_id).resolve() / "workspace",
+            runtime_id=decision.first.id,
+            runtime_version="unprobed",
+        )
+        if isinstance(isolated, str):
+            recorded = record_refusal(
+                log_dir,
+                ts=now_ts(),
+                run_id=run_id,
+                task=task,
+                cwd=str(cwd),
+                reason=isolated,
+                considered=decision.considered,
+                attempted="fan-out workspace probe",
+            )
+            payload = {
+                "status": "failed",
+                "reason": isolated,
+                "run_id": run_id,
+                "cwd": str(cwd),
+                "recorded": str(log_dir / f"{recorded['ts'][:10]}.jsonl"),
+                "event": recorded["event"],
+            }
+            return payload, _exit_for("failed")
         results: list[RunResult] = []
         for harness in (decision.first, decision.second):
             child_id = make_run_id(now_ts(), task, harness.id)
