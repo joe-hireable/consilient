@@ -231,6 +231,12 @@ def test_outbound_effect_refuses_missing_disclosure(operation: str) -> None:
         EffectManifest.from_record(outbound_record(operation=operation))
 
 
+def test_outbound_effect_refuses_missing_disclosure_for_any_operation_label() -> None:
+    """Production break caught: another operation label must not bypass message.send disclosure."""
+    with pytest.raises(EffectError, match="disclosure"):
+        EffectManifest.from_record(outbound_record(operation="send_push"))
+
+
 @pytest.mark.parametrize(
     "disclosure",
     [

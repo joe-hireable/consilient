@@ -82,7 +82,6 @@ MUTATION_EFFECTS = frozenset(
     }
 )
 OUTBOUND_EFFECTS = frozenset({"message.send"})
-OUTBOUND_OPERATIONS = frozenset({"send_email", "send_sms"})
 
 
 class EffectError(ValueError):
@@ -278,14 +277,12 @@ class EffectManifest:
         _digest(adapter["implementation_digest"], "adapter.implementation_digest")
         _protected(self.forward, "forward")
         _protected(self.scope, "scope")
-        operations = _strings(self.operations, "operations")
+        _strings(self.operations, "operations")
         effects = _strings(self.effects, "effects")
         unknown = sorted(set(effects) - EFFECT_CLASSES)
         if unknown:
             raise EffectError(f"effects must use exact effect classes, got {unknown}")
-        outbound = bool(set(effects) & OUTBOUND_EFFECTS) and bool(
-            set(operations) & OUTBOUND_OPERATIONS
-        )
+        outbound = bool(set(effects) & OUTBOUND_EFFECTS)
         if outbound:
             if self.disclosure is None:
                 raise EffectError("disclosure is required for outbound message.send effects")
