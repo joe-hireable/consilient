@@ -1042,22 +1042,80 @@ def write_expected(
         "progress_deadline_s": progress_deadline_s,
         "grace_s": grace_s,
     }
-    path = runs_dir / f"{run_id}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, object] = {}
-    if path.exists():
-        try:
-            loaded = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            loaded = None
-        if isinstance(loaded, dict):
-            payload = loaded
-    payload["expected"] = record
-    encoded = json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(encoded, encoding="utf-8")
-    os.replace(tmp, path)
-    return path
+    return _store_dispatch_field(runs_dir, run_id, "expected", record)
+
+
+def inspect_uncommitted_tracked(cwd: Path) -> tuple[bool, tuple[str, ...]]:
+    """Tracked paths that differ from HEAD. Untracked files are not output.
+
+    The incumbent is `git status --porcelain --untracked-files=no`, already
+    used here by EXP-96 to refuse a dirty measurement corpus. [measured]
+    A failed inspection is not a clean tree (F-09).
+    """
+    git = which_binary("git")
+    if git is None:
+        return False, ()
+    try:
+        completed = subprocess.run(
+            [
+                git,
+                "-C",
+                str(cwd.resolve()),
+                "-c",
+                "core.quotepath=false",
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=no",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            env=GIT_ENV,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False, ()
+    if completed.returncode != 0:
+        return False, ()
+    paths: set[str] = set()
+    for raw in (completed.stdout or "").splitlines():
+        if len(raw) < 4:
+            continue
+        remainder = raw[3:]
+        if " -> " in remainder:
+            left, right = remainder.split(" -> ", 1)
+            paths.add(left)
+            paths.add(right)
+        else:
+            paths.add(remainder)
+    return True, tuple(sorted(paths))
+
+
+def write_terminal(
+    runs_dir: Path,
+    *,
+    run_id: str,
+    exit_code: int | None,
+    cwd: Path,
+    claim_disposition: str,
+) -> Path:
+    """Write `dispatch/<run_id>.json` `terminal` after the child exits.
+
+    BU-4 / N04. F-02 measured a worker exiting with output uncommitted and
+    the queue reading idle: the claim released, the paths did not. The
+    wrapper writes the list; an exit with uncommitted tracked changes is
+    an incomplete outcome, not a success. [measured]
+    """
+    inspected, paths = inspect_uncommitted_tracked(cwd)
+    record = {
+        "exit_code": exit_code,
+        "uncommitted_tracked_paths": list(paths),
+        "claim_disposition": claim_disposition,
+        "outcome": "complete" if inspected and not paths else "incomplete",
+        "inspected": inspected,
+    }
+    return _store_dispatch_field(runs_dir, run_id, "terminal", record)
 
 
 @dataclass(frozen=True)
@@ -1825,6 +1883,13 @@ def run_harness(
                 env=env,
             )
     except TimeoutError as exc:
+        write_terminal(
+            run_dir.parent,
+            run_id=run_id,
+            exit_code=None,
+            cwd=cwd,
+            claim_disposition="held" if claim_run_id else "none",
+        )
         return RunResult(
             harness=harness,
             status="refused",
@@ -1842,6 +1907,13 @@ def run_harness(
             stderr_path=str(stderr_path),
         )
     write_started(run_dir.parent, run_id, now=datetime.now(timezone.utc))
+    write_terminal(
+        run_dir.parent,
+        run_id=run_id,
+        exit_code=code,
+        cwd=cwd,
+        claim_disposition="held" if claim_run_id else "none",
+    )
     stdout = _read(stdout_path)
     stderr = _read(stderr_path)
     artefact_bytes = len(stdout.encode("utf-8")) + len(stderr.encode("utf-8"))
