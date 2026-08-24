@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: If you use Consilient, please cite it using these metadata.
+title: Consilient
+type: software
+abstract: An open-source Agent Command Post. It sends harnesses — Claude Code, Codex, Cursor, Grok, or a model on your own hardware — and measures β, the rate at which automated checks accept a bad artefact.
+authors:
+  - family-names: Brown
+    given-names: Joe
+    email: joe@gethireable.com
+license: MIT
+repository-code: "https://github.com/joe-hireable/consilient"
+url: "https://github.com/joe-hireable/consilient"
+version: 0.1.0
+keywords:
+  - agents
+  - verification
+  - false-acceptance-rate
+  - harness
+  - evaluation
