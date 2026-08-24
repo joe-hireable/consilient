@@ -7,12 +7,20 @@ else. It is released by any of three independent events, checked at read time:
 1. `work_item.completed` on the same ticket (the dispatcher released it);
 2. the run's own `dispatch.outcome` or `dispatch.refused` (the run ended, whatever the
    release path forgot to write);
-3. its own `expires_at` passing — opened time plus the run timeout plus a grace margin.
+3. its own `expires_at` passing — a 30 s fencing-token lease when `lease_s`
+   is set, otherwise the historical run-timeout-plus-grace bound.
 
 The third is the one that matters: a crashed or SIGKILLed dispatcher cannot hold a claim
 forever. The stale `.budget.lock` measured on this machine refuses forever after a
 SIGKILL because it is a file; a claim is a projection over events with a clock, so the
 passage of time alone releases it. No lock file exists to go stale.
+
+F-04 measured a killed dispatch holding its claim for the full run timeout (one hour).
+BU-3 replaces that with a 30 s lease and a monotonically increasing fencing epoch:
+another run may reclaim the path at expiry, and `admit_write` rejects a token that has
+gone backwards, so the expired holder cannot corrupt after it wakes. [cited: Kleppmann
+2016; Burrows 2006, bibliography § 16, both [FULL]] A live holder renews the same
+epoch; only a new acquire increments it.
 
 A claim with no declared paths conflicts with nothing and protects nothing — it exists
 so the run is visible in the work-item stream, not to exclude others. The refusal
@@ -31,7 +39,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import beta, routing, work_items
-from .events import Event, EventError, EventPayload, SCHEMA_VERSION, append_transaction, read_all
+from .events import (
+    Event,
+    EventError,
+    EventPayload,
+    SCHEMA_VERSION,
+    append_transaction,
+    read_all,
+)
 
 # Plan unit ids: F01, T01, T01B, AA, etc.
 _PLAN_UNIT_ID = re.compile(r"\b([A-Z][A-Z0-9]*)\b")
@@ -46,9 +61,14 @@ _LANE_TABLE_MARKER = "## Parallelism and claim lanes"
 DISPATCH_ACTOR = "consilient.dispatch"
 
 CLAIM_TICKET_PREFIX = "dispatch:"
-# Added to the run timeout to form the claim TTL. A run cannot legitimately outlive its
-# timeout (the runner kills the process tree at the deadline), so anything beyond it is
-# grace for the recording path, not for the work.
+# One Chubby-style session: short enough that a killed holder is reclaimable in the
+# BU-3 fixture (≤30 s), long enough that a live process can renew before expiry.
+# timeout_s on open_claim remains the run bound; it is not the claim bound.
+LEASE_TTL_S = 30
+# Historical additive: open_claim still uses timeout_s + CLAIM_GRACE_S when the
+# caller does not pass lease_s. That default is what the commit-gate clock
+# fixture pins. BU-3's 30 s lease is the lease_s=LEASE_TTL_S path; replacing
+# the default needs tests/test_commit_gate.py, which this unit was not given.
 CLAIM_GRACE_S = 300
 # The in-flight table is context-window spend. It is bounded for the same reason the
 # recall pack is bounded: an unbounded coordination section crowds out the task.
@@ -57,6 +77,10 @@ IN_FLIGHT_LIMIT_CHARS = 2000
 _TERMINAL_DISPATCH_KINDS = frozenset(
     {"dispatch.outcome", "dispatch.refused", "dispatch.fanout"}
 )
+
+
+class StaleEpoch(ValueError):
+    """A write whose fencing token is behind the live claim's epoch."""
 
 
 @dataclass(frozen=True)
@@ -71,15 +95,16 @@ class Claim:
     harness: str | None
     opened_at: str
     expires_at: str
-    fencing_epoch: int | None = None
+    # BU-3's fencing token. Defaults to 1 so a claim written before fencing
+    # existed still projects as a live holder at the lowest epoch rather than
+    # as an unfenced None; nothing may outrank it without a real acquire.
+    fencing_epoch: int = 1
 
 
 class ClaimConflict(EventError):
     """The locked admission refused a path overlap. One lease already exists."""
 
-    def __init__(
-        self, hit: tuple[Claim, str, str], live: tuple[Claim, ...]
-    ) -> None:
+    def __init__(self, hit: tuple[Claim, str, str], live: tuple[Claim, ...]) -> None:
         claim, requested, held = hit
         self.hit = hit
         self.live = live
@@ -202,9 +227,17 @@ def _claim_from_event(ticket: str, event: Event) -> Claim | None:
     harness = data.get("harness")
     cwd = data.get("cwd")
     epoch_raw = data.get("fencing_epoch")
-    fencing_epoch = epoch_raw if isinstance(epoch_raw, int) and not isinstance(
-        epoch_raw, bool
-    ) else None
+    # Missing or unparseable is epoch 1, not a dropped claim: a claim written
+    # before fencing existed still excludes, and refusing to project it would
+    # hand the path to a second dispatcher, which is the failure fencing exists
+    # to stop. `_next_fencing_epoch` then outranks it from 2 upwards.
+    fencing_epoch = (
+        epoch_raw
+        if isinstance(epoch_raw, int)
+        and not isinstance(epoch_raw, bool)
+        and epoch_raw >= 1
+        else 1
+    )
     return Claim(
         ticket=ticket,
         run_id=run_id,
@@ -216,6 +249,16 @@ def _claim_from_event(ticket: str, event: Event) -> Claim | None:
         expires_at=str(data["expires_at"]),
         fencing_epoch=fencing_epoch,
     )
+
+
+def admit_write(*, token: int, claim: Claim) -> Claim:
+    """The resource check: reject a token that has gone backwards or was never issued."""
+    if token != claim.fencing_epoch:
+        raise StaleEpoch(
+            f"fencing token {token} is behind live epoch {claim.fencing_epoch} "
+            f"for run {claim.run_id}"
+        )
+    return claim
 
 
 def live_claims(events: Iterable[Event], *, now: datetime) -> tuple[Claim, ...]:
@@ -282,27 +325,35 @@ def _is_dispatch_claim_payload(data: Mapping[str, object]) -> bool:
 
 
 def _next_fencing_epoch(
-    prefix: Sequence[Event], paths: Sequence[str], *, cwd: Path
+    prefix: Sequence[Event], paths: Sequence[str], *, cwd: Path, ticket: str
 ) -> int:
     """Monotone epoch over every overlapping claim, including expired ones.
 
     Kleppmann's fencing token: expiry alone is unsafe because the expired holder
     can wake and write. The next lease on the same paths must outrank every
-    earlier token, live or not.
+    earlier token, live or not. Path-scoped so independent files do not share a
+    sequencer; the same ticket always continues its own sequence, so a re-open
+    that has since narrowed its paths still cannot reuse a token it already spent.
     """
     highest = 0
     requested = [canonical_path(path, cwd=cwd) for path in paths]
     for event in prefix:
-        if event.kind != work_items.OPENED or not _is_dispatch_claim_payload(event.data):
+        if event.kind != work_items.OPENED or not _is_dispatch_claim_payload(
+            event.data
+        ):
             continue
         epoch = event.data.get("fencing_epoch")
         if not isinstance(epoch, int) or isinstance(epoch, bool) or epoch < 1:
+            continue
+        if event.data.get("ticket") == ticket:
+            highest = max(highest, epoch)
             continue
         held = event.data.get("paths")
         if not isinstance(held, list):
             continue
         if any(
-            isinstance(item, str) and any(paths_overlap(want, item) for want in requested)
+            isinstance(item, str)
+            and any(paths_overlap(want, item) for want in requested)
             for item in held
         ):
             highest = max(highest, epoch)
@@ -380,7 +431,9 @@ def _validate_dispatch_claim_admission(
             hit = conflict(paths, live, cwd=cwd)
             if hit is not None:
                 raise ClaimConflict(hit, live)
-        expected = _next_fencing_epoch(history, paths, cwd=cwd)
+        expected = _next_fencing_epoch(
+            history, paths, cwd=cwd, ticket=claim_ticket(str(data["run_id"]))
+        )
         if data.get("fencing_epoch") != expected:
             raise EventError(
                 f"fencing epoch {data.get('fencing_epoch')!r} is stale; expected {expected}"
@@ -399,17 +452,29 @@ def open_claim(
     task: str | None = None,
     now: datetime | None = None,
     extra: Mapping[str, object] | None = None,
+    lease_s: int | None = None,
 ) -> EventPayload:
-    """Admit one dispatch claim atomically: conflict-check and append under F02."""
+    """Admit one dispatch claim atomically: conflict-check and append under F02.
+
+    Pass `lease_s=LEASE_TTL_S` for a 30 s fencing-token lease. Callers that omit
+    it keep the historical `timeout_s + CLAIM_GRACE_S` bound so the commit-gate
+    clock fixture, which this unit does not own, stays green.
+    """
+    if timeout_s < 0:
+        raise ValueError("timeout_s must be non-negative")
+    if lease_s is not None and lease_s < 1:
+        raise ValueError("lease_s must be at least 1")
     opened = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    expires = opened + timedelta(seconds=timeout_s + CLAIM_GRACE_S)
+    ttl_s = lease_s if lease_s is not None else timeout_s + CLAIM_GRACE_S
+    expires = opened + timedelta(seconds=ttl_s)
     canonical = [canonical_path(path, cwd=cwd) for path in paths]
+    ticket = claim_ticket(run_id)
     accepted: tuple[Event, ...] | list[Event]
     if log.exists():
         accepted, _rejected = read_all(log)
     else:
         accepted = []
-    epoch = _next_fencing_epoch(accepted, canonical, cwd=cwd)
+    epoch = _next_fencing_epoch(accepted, canonical, cwd=cwd, ticket=ticket)
     event = _claim_event_payload(
         run_id=run_id,
         paths=canonical,
@@ -439,10 +504,64 @@ def open_claim(
             raise
         accepted, _rejected = read_all(log) if log.exists() else ([], [])
         event["data"]["fencing_epoch"] = _next_fencing_epoch(
-            accepted, canonical, cwd=cwd
+            accepted, canonical, cwd=cwd, ticket=ticket
         )
         written = append_transaction(log, [event], validator)
     return written[0]
+
+
+def _live_claim(events: Iterable[Event], *, run_id: str, now: datetime) -> Claim:
+    """The one live claim held by `run_id`, or a refusal when it has already gone."""
+    for claim in live_claims(events, now=now):
+        if claim.run_id == run_id:
+            return claim
+    raise StaleEpoch(f"run {run_id} has no live claim to renew")
+
+
+def renew_claim(
+    log: Path,
+    *,
+    run_id: str,
+    token: int,
+    cwd: Path,
+    now: datetime | None = None,
+) -> EventPayload:
+    """Extend a live holder's lease. The epoch does not rise; only a new acquire does.
+
+    A renewal is not an acquire, so it does not run the admission validator: that
+    one demands the *next* epoch and would reject a holder for keeping its own.
+    What it re-checks under the F02 lock is the property renewal actually needs —
+    that the same holder is still live on the same token at write time.
+    """
+    stamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    accepted: tuple[Event, ...] | list[Event]
+    if log.exists():
+        accepted, _rejected = read_all(log)
+    else:
+        accepted = []
+    claim = admit_write(
+        token=token, claim=_live_claim(accepted, run_id=run_id, now=stamp)
+    )
+    event = _claim_event_payload(
+        run_id=run_id,
+        paths=claim.paths,
+        cwd=cwd,
+        opened=stamp,
+        expires=stamp + timedelta(seconds=LEASE_TTL_S),
+        fencing_epoch=claim.fencing_epoch,
+        harness=claim.harness,
+        task=None,
+        written_at=datetime.now(timezone.utc),
+    )
+
+    def validator(
+        prefix: tuple[Event, ...],
+        _rejections: object,
+        _candidates: tuple[EventPayload, ...],
+    ) -> None:
+        admit_write(token=token, claim=_live_claim(prefix, run_id=run_id, now=stamp))
+
+    return append_transaction(log, [event], validator)[0]
 
 
 def close_claim(log: Path, *, run_id: str) -> EventPayload:
@@ -522,6 +641,8 @@ def release_claims_when_worker_gone(
         else:
             results.append(ClaimRelease(run_id, False, "liveness unknown"))
     return tuple(results)
+
+
 def admit_composite_exposure(
     *,
     candidate_ordinal: int,
@@ -543,19 +664,14 @@ def admit_composite_exposure(
     """
     del protocol_id
     if not task_family.strip() or not protocol_version.strip():
-        return ExposureAdmission(
-            False, "composite verifier scope is missing", None
-        )
+        return ExposureAdmission(False, "composite verifier scope is missing", None)
     if estimand_kind is not None and estimand_kind != beta.HUMAN_VERDICT_BETA:
         return ExposureAdmission(
             False,
             f"estimand {estimand_kind!r} is not an authenticated human_verdict_beta",
             None,
         )
-    if (
-        auth_status is not None
-        and auth_status != beta.AUTHENTICATED_AUTH_STATUS
-    ):
+    if auth_status is not None and auth_status != beta.AUTHENTICATED_AUTH_STATUS:
         return ExposureAdmission(
             False,
             f"auth_status {auth_status!r} is not authenticated; proxy and declared-principal rows refuse",
@@ -604,12 +720,17 @@ def _native_items_from_prefix(
     items: dict[tuple[str, int], EventPayload] = {}
     for event in prefix:
         data = event.data
-        if event.kind != work_items.OPENED or data.get("item_schema") != work_items.NATIVE_SCHEMA:
+        if (
+            event.kind != work_items.OPENED
+            or data.get("item_schema") != work_items.NATIVE_SCHEMA
+        ):
             continue
         ticket = data.get("ticket")
         revision = data.get("revision")
-        if isinstance(ticket, str) and isinstance(revision, int) and not isinstance(
-            revision, bool
+        if (
+            isinstance(ticket, str)
+            and isinstance(revision, int)
+            and not isinstance(revision, bool)
         ):
             items[(ticket, revision)] = data
     return items
@@ -648,7 +769,9 @@ def native_readiness_refusal(
     item = items.get((ticket, revision))
     if item is None:
         return f"unready: native item {ticket!r} revision {revision} is absent"
-    newer = [rev for (item_ticket, rev) in items if item_ticket == ticket and rev > revision]
+    newer = [
+        rev for (item_ticket, rev) in items if item_ticket == ticket and rev > revision
+    ]
     if newer:
         return f"stale-revision: {ticket!r} revision {revision} is superseded by {max(newer)}"
     paused = any(
@@ -666,7 +789,9 @@ def native_readiness_refusal(
     if not isinstance(dependencies, list):
         return "unready: native dependencies are unreadable"
     if len(predecessor_bindings) != len(dependencies):
-        return "predecessor-mismatched: binding count does not match frozen dependencies"
+        return (
+            "predecessor-mismatched: binding count does not match frozen dependencies"
+        )
     bindings_by_ticket = {
         str(binding.get("ticket")): binding for binding in predecessor_bindings
     }
@@ -682,7 +807,11 @@ def native_readiness_refusal(
             "handoff_contract_digest"
         ):
             return f"predecessor-mismatched: hand-off digest for {dep_ticket} does not match"
-        sealed = _predecessor_sealed(prefix, dep_ticket, int(dep_revision) if isinstance(dep_revision, int) else 0)
+        sealed = _predecessor_sealed(
+            prefix,
+            dep_ticket,
+            int(dep_revision) if isinstance(dep_revision, int) else 0,
+        )
         if sealed is None:
             return f"unready: predecessor {dep_ticket} is not evidence-closed"
         artefacts = sealed.get("artefacts")
@@ -690,19 +819,17 @@ def native_readiness_refusal(
         artefact_items = artefacts if isinstance(artefacts, list) else []
         receipt_items = receipts if isinstance(receipts, list) else []
         artefact_digests = [
-            item.get("digest")
-            for item in artefact_items
-            if isinstance(item, Mapping)
+            item.get("digest") for item in artefact_items if isinstance(item, Mapping)
         ]
         receipt_digests = [
-            item.get("digest")
-            for item in receipt_items
-            if isinstance(item, Mapping)
+            item.get("digest") for item in receipt_items if isinstance(item, Mapping)
         ]
         if binding.get("artefact_digest") not in artefact_digests:
             return f"predecessor-mismatched: artefact digest for {dep_ticket} is not sealed"
         if binding.get("receipt_digest") not in receipt_digests:
-            return f"predecessor-mismatched: receipt digest for {dep_ticket} is not sealed"
+            return (
+                f"predecessor-mismatched: receipt digest for {dep_ticket} is not sealed"
+            )
     del cwd
     return None
 
@@ -764,7 +891,7 @@ def claim_ready_work(
         if not admission.admitted:
             raise ClaimReadyError(admission.reason)
 
-    epoch = _next_fencing_epoch(accepted, owned, cwd=cwd)
+    epoch = _next_fencing_epoch(accepted, owned, cwd=cwd, ticket=claim_ticket(run_id))
     extra = {
         "ticket_ref": ticket,
         "revision": revision,
@@ -854,7 +981,9 @@ def render_in_flight(
     stamp = now.astimezone(timezone.utc).isoformat()
     if not live:
         return f"## In flight right now\n\nNo live dispatch claims at {stamp}.\n"
-    header = f"## In flight right now\n\n{len(live)} live dispatch claim(s) at {stamp}:\n"
+    header = (
+        f"## In flight right now\n\n{len(live)} live dispatch claim(s) at {stamp}:\n"
+    )
     rows = []
     for claim in live:
         paths = ", ".join(f"`{path}`" for path in claim.paths) or "(no paths declared)"
@@ -976,9 +1105,7 @@ def _units_claiming_path(
     return tuple(sorted(claimed))
 
 
-def _transitive_depends(
-    unit_id: str, units: Mapping[str, PlanUnit]
-) -> frozenset[str]:
+def _transitive_depends(unit_id: str, units: Mapping[str, PlanUnit]) -> frozenset[str]:
     seen: set[str] = set()
     queue = list(units[unit_id].depends)
     while queue:
@@ -990,7 +1117,9 @@ def _transitive_depends(
     return frozenset(seen)
 
 
-def _stable_serial_order(unit_ids: Sequence[str], units: Mapping[str, PlanUnit]) -> tuple[str, ...]:
+def _stable_serial_order(
+    unit_ids: Sequence[str], units: Mapping[str, PlanUnit]
+) -> tuple[str, ...]:
     """Topological order with path-overlap serialisation and unit-id tie-break."""
     ids = tuple(sorted(unit_ids))
     if not ids:
@@ -1012,9 +1141,7 @@ def _stable_serial_order(unit_ids: Sequence[str], units: Mapping[str, PlanUnit])
             ):
                 left_paths = [canonical_path(p) for p in units[left].paths]
                 right_paths = [canonical_path(p) for p in units[right].paths]
-                if any(
-                    paths_overlap(a, b) for a in left_paths for b in right_paths
-                ):
+                if any(paths_overlap(a, b) for a in left_paths for b in right_paths):
                     if left < right:
                         must_precede[right].add(left)
                     else:
@@ -1039,9 +1166,7 @@ def _stable_serial_order(unit_ids: Sequence[str], units: Mapping[str, PlanUnit])
     return tuple(ordered)
 
 
-def derive_lane_order(
-    units: Mapping[str, PlanUnit], lane_path: str
-) -> tuple[str, ...]:
+def derive_lane_order(units: Mapping[str, PlanUnit], lane_path: str) -> tuple[str, ...]:
     """Serial order for one mutable lane derived from claims and depends edges."""
     return _stable_serial_order(_units_claiming_path(units, lane_path), units)
 
@@ -1074,9 +1199,7 @@ def lane_order_inversions(
     return tuple(inversions)
 
 
-def claim_predecessors(
-    unit_id: str, units: Mapping[str, PlanUnit]
-) -> frozenset[str]:
+def claim_predecessors(unit_id: str, units: Mapping[str, PlanUnit]) -> frozenset[str]:
     """Units that must finish before ``unit_id`` may open a claim."""
     if unit_id not in units:
         return frozenset()

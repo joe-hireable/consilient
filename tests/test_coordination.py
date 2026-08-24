@@ -117,9 +117,22 @@ def test_open_claim_is_live_until_completed(tmp_path):
     coordination.open_claim(
         log, run_id="run-1", paths=["src"], cwd=tmp_path, timeout_s=600, now=T0
     )
-    assert [c.run_id for c in _live(log, now=T0)] == ["run-1"]
+    live = _live(log, now=T0)
+    assert [c.run_id for c in live] == ["run-1"]
+    assert live[0].fencing_epoch == 1
     coordination.close_claim(log, run_id="run-1")
     assert _live(log, now=T0) == ()
+
+
+def test_open_claim_without_lease_s_keeps_timeout_plus_grace(tmp_path):
+    """The historical bound stays until dispatch and the commit-gate clock fixture move."""
+    log = tmp_path / "log"
+    coordination.open_claim(
+        log, run_id="run-legacy-ttl", paths=["src"], cwd=tmp_path, timeout_s=60, now=T0
+    )
+    grace = coordination.CLAIM_GRACE_S
+    assert _live(log, now=T0 + timedelta(seconds=60 + grace - 1)) != ()
+    assert _live(log, now=T0 + timedelta(seconds=60 + grace + 1)) == ()
 
 
 def test_a_crashed_dispatchers_claim_expires_on_its_own(tmp_path):
@@ -127,15 +140,149 @@ def test_a_crashed_dispatchers_claim_expires_on_its_own(tmp_path):
 
     The stale `.budget.lock` measured on this machine refuses forever after a
     SIGKILL because it is a file. A claim is a projection with a clock, so the
-    passage of time alone releases it.
+    passage of time alone releases it. BU-3 replaces the hour-plus-grace TTL
+    with a 30 s fencing-token lease, so a killed holder is reclaimable in one
+    lease period rather than one run timeout.
     """
     log = tmp_path / "log"
     coordination.open_claim(
-        log, run_id="run-dies", paths=["src"], cwd=tmp_path, timeout_s=60, now=T0
+        log,
+        run_id="run-dies",
+        paths=["src"],
+        cwd=tmp_path,
+        timeout_s=3600,
+        now=T0,
+        lease_s=coordination.LEASE_TTL_S,
     )
-    grace = coordination.CLAIM_GRACE_S
-    assert _live(log, now=T0 + timedelta(seconds=60 + grace - 1)) != ()
-    assert _live(log, now=T0 + timedelta(seconds=60 + grace + 1)) == ()
+    ttl = coordination.LEASE_TTL_S
+    assert _live(log, now=T0 + timedelta(seconds=ttl - 1)) != ()
+    assert _live(log, now=T0 + timedelta(seconds=ttl + 1)) == ()
+
+
+def test_a_killed_dispatch_claim_is_reclaimable_within_thirty_seconds(tmp_path):
+    """BU-3: a killed dispatch's claim is reclaimable in ≤30 s.
+
+    timeout_s is the run bound, not the claim bound. A one-hour run that dies
+    must not hold the path for an hour.
+    """
+    log = tmp_path / "log"
+    coordination.open_claim(
+        log,
+        run_id="run-killed",
+        paths=["src/consilient/coordination.py"],
+        cwd=tmp_path,
+        timeout_s=3600,
+        now=T0,
+        lease_s=coordination.LEASE_TTL_S,
+    )
+    held = [c.fencing_epoch for c in _live(log, now=T0)]
+    assert held == [1]
+    at_deadline = T0 + timedelta(seconds=coordination.LEASE_TTL_S)
+    assert _live(log, now=at_deadline) == ()
+    hit = coordination.conflict(
+        ["src/consilient/coordination.py"], _live(log, now=at_deadline), cwd=tmp_path
+    )
+    assert hit is None
+    coordination.open_claim(
+        log,
+        run_id="run-reclaim",
+        paths=["src/consilient/coordination.py"],
+        cwd=tmp_path,
+        timeout_s=3600,
+        now=at_deadline,
+        lease_s=coordination.LEASE_TTL_S,
+    )
+    reclaimed = _live(log, now=at_deadline)
+    assert [c.run_id for c in reclaimed] == ["run-reclaim"]
+    assert reclaimed[0].fencing_epoch == 2
+
+
+def test_a_displaced_writer_is_rejected_on_a_stale_epoch(tmp_path):
+    """BU-3 / Kleppmann: the resource rejects a token that has gone backwards."""
+    log = tmp_path / "log"
+    first = coordination.open_claim(
+        log,
+        run_id="run-old",
+        paths=["src"],
+        cwd=tmp_path,
+        timeout_s=3600,
+        now=T0,
+        lease_s=coordination.LEASE_TTL_S,
+    )
+    stale = first["data"]["fencing_epoch"]
+    assert stale == 1
+    live = _live(log, now=T0)
+    assert coordination.admit_write(token=stale, claim=live[0]) is live[0]
+    deadline = T0 + timedelta(seconds=coordination.LEASE_TTL_S)
+    coordination.open_claim(
+        log,
+        run_id="run-new",
+        paths=["src"],
+        cwd=tmp_path,
+        timeout_s=3600,
+        now=deadline,
+        lease_s=coordination.LEASE_TTL_S,
+    )
+    current = _live(log, now=deadline)
+    assert current[0].fencing_epoch == 2
+    with pytest.raises(coordination.StaleEpoch, match="behind live epoch 2"):
+        coordination.admit_write(token=stale, claim=current[0])
+    assert coordination.admit_write(token=2, claim=current[0]) is current[0]
+
+
+def test_renew_claim_extends_the_lease_without_raising_the_epoch(tmp_path):
+    """A live holder buys another 30 s; Chubby renews the session, not the sequencer."""
+    log = tmp_path / "log"
+    coordination.open_claim(
+        log,
+        run_id="run-live",
+        paths=["src"],
+        cwd=tmp_path,
+        timeout_s=3600,
+        now=T0,
+        lease_s=coordination.LEASE_TTL_S,
+    )
+    mid = T0 + timedelta(seconds=coordination.LEASE_TTL_S - 1)
+    coordination.renew_claim(log, run_id="run-live", token=1, cwd=tmp_path, now=mid)
+    after_first_lease = T0 + timedelta(seconds=coordination.LEASE_TTL_S + 1)
+    live = _live(log, now=after_first_lease)
+    assert [c.run_id for c in live] == ["run-live"]
+    assert live[0].fencing_epoch == 1
+    with pytest.raises(coordination.StaleEpoch):
+        coordination.renew_claim(
+            log, run_id="run-live", token=0, cwd=tmp_path, now=after_first_lease
+        )
+
+
+def test_a_claim_without_an_epoch_projects_as_epoch_one(tmp_path):
+    """Historical claims predate fencing tokens; they remain live at epoch 1."""
+    from consilient.events import SCHEMA_VERSION, append
+
+    log = tmp_path / "log"
+    log.mkdir()
+    now = datetime.now(timezone.utc)
+    ts = now.isoformat()
+    append(
+        log / f"{ts[:10]}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": ts,
+            "event": work_items.OPENED,
+            "actor": "consilient.dispatch",
+            "data": {
+                "ticket": "dispatch:legacy",
+                "accountable": "consilient.dispatch",
+                "run_id": "legacy",
+                "paths": ["src"],
+                "cwd": str(tmp_path),
+                "opened_at": ts,
+                "expires_at": (now + timedelta(seconds=60)).isoformat(),
+            },
+        },
+    )
+    live = _live(log, now=now + timedelta(seconds=1))
+    assert len(live) == 1
+    assert live[0].fencing_epoch == 1
 
 
 def test_a_terminal_outcome_releases_the_claim_without_a_completion(tmp_path):
