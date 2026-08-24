@@ -374,11 +374,12 @@ UNMAPPED_REASONING_PROVENANCE = (
 UNMAPPED_POOL_PROVENANCE = "unmapped model id; no verified pool-assignment source"
 CURSOR_MODELS_POOL_PROVENANCE = (
     "Cursor Models and Pricing, https://cursor.com/docs/models-and-pricing, "
-    "retrieved 2026-08-23; Composer 2.5 and Cursor Grok 4.5/4.6 are Cursor Models"
+    "retrieved 2026-08-24; Composer 2.5 and Cursor Grok 4.5/4.6 are Cursor Models"
 )
-CURSOR_UNVERIFIED_POOL_PROVENANCE = (
+CURSOR_OTHER_MODELS_POOL_PROVENANCE = (
     "Cursor Models and Pricing, https://cursor.com/docs/models-and-pricing, "
-    "retrieved 2026-08-23; exact Kimi/GLM CLI ids are not individually classified"
+    "retrieved 2026-08-24; selected third-party models draw from Other Models "
+    "(vendor classification, not EXP-94 per-request account attribution)"
 )
 
 # Default is bypass: the principal asked that dispatched harnesses run like this Grok
@@ -581,36 +582,36 @@ def allows_reasoning_scaffold(model: ModelOption) -> bool:
     return model.reasoning_capability == "absent"
 
 
-# `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids. The
-# Cursor Models pool serves the non-vendor families below; claude-*/gpt-*/gemini-* bill
-# to the avoided Other Models pool (CURSOR_OTHER_PREFIXES). Only cursor-composer has a
+# `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids. Cursor
+# vendor models below draw from Cursor Models; selected third-party models draw from Other
+# Models. Only cursor-composer has a
 # measured multi-model surface today; the other harnesses expose no probed model list
 # here, so they register none rather than an invented one. `auto` is deliberately absent:
 # selection must name what it spends. Registry order is the preference order within a
 # family when pools tie — highest measured tier first [asserted].
-CURSOR_MODEL_POOL_ASSIGNMENTS: tuple[tuple[str, str, bool, str], ...] = (
-    ("composer-2.5", "composer", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("composer-2.5-fast", "composer", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("kimi-k3-max", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
-    ("kimi-k3-high", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
-    ("kimi-k3-low", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
-    ("kimi-k2.7-code", "kimi", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
-    ("cursor-grok-4.6-xhigh", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.6-xhigh-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.6-high", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.6-high-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.6-medium", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.6-medium-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.6-low", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.6-low-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.5-high", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.5-high-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.5-medium", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.5-medium-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.5-low", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("cursor-grok-4.5-low-fast", "grok", True, CURSOR_MODELS_POOL_PROVENANCE),
-    ("glm-5.2-max", "glm", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
-    ("glm-5.2-high", "glm", False, CURSOR_UNVERIFIED_POOL_PROVENANCE),
+CURSOR_MODEL_POOL_ASSIGNMENTS: tuple[tuple[str, str, str, bool, str], ...] = (
+    ("composer-2.5", "composer", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("composer-2.5-fast", "composer", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("kimi-k3-max", "kimi", "cursor-other", True, CURSOR_OTHER_MODELS_POOL_PROVENANCE),
+    ("kimi-k3-high", "kimi", "cursor-other", True, CURSOR_OTHER_MODELS_POOL_PROVENANCE),
+    ("kimi-k3-low", "kimi", "cursor-other", True, CURSOR_OTHER_MODELS_POOL_PROVENANCE),
+    ("kimi-k2.7-code", "kimi", "cursor-other", True, CURSOR_OTHER_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-xhigh", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-xhigh-fast", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-high", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-high-fast", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-medium", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-medium-fast", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-low", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.6-low-fast", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-high", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-high-fast", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-medium", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-medium-fast", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-low", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("cursor-grok-4.5-low-fast", "grok", "cursor-models", True, CURSOR_MODELS_POOL_PROVENANCE),
+    ("glm-5.2-max", "glm", "cursor-other", True, CURSOR_OTHER_MODELS_POOL_PROVENANCE),
+    ("glm-5.2-high", "glm", "cursor-other", True, CURSOR_OTHER_MODELS_POOL_PROVENANCE),
 )
 
 MODELS: tuple[ModelOption, ...] = tuple(
@@ -618,11 +619,11 @@ MODELS: tuple[ModelOption, ...] = tuple(
         model_id,
         "cursor-composer",
         family,
-        "cursor-models",
+        pool,
         pool_verified=pool_verified,
         pool_provenance=pool_provenance,
     )
-    for model_id, family, pool_verified, pool_provenance in CURSOR_MODEL_POOL_ASSIGNMENTS
+    for model_id, family, pool, pool_verified, pool_provenance in CURSOR_MODEL_POOL_ASSIGNMENTS
 )
 
 
