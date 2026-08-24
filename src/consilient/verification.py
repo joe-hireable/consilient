@@ -31,8 +31,6 @@ EXP105_PREFIX_N = 30
 SELECTOR = "first_matching_trajectory_order"
 ORDER_RULE = "trajectory_position_ascending"
 
-REVIEW_QUEUE_OPENED_KIND = "review.queue.opened"
-CANDIDATE_EXPOSED_KIND = "candidate.exposed"
 ATTEMPT_REVIEWED_KIND = "attempt.reviewed"
 REVIEW_PRESENTATION_FROZEN_KIND = "review.presentation.frozen"
 
