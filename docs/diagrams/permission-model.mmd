@@ -1,0 +1,107 @@
+%% **Producer:** `scripts/build_diagrams.py`
+%% **Source:** `src/consilient/effects.py`
+%% **Source SHA-256:** `f0d8ed24a8ba8915c9ab308afdbf6f9f8e74dd8153bd8586661edb8df65955f3`
+%% **Do not hand-edit:** regenerate with `python scripts/build_diagrams.py`.
+
+flowchart TB
+  subgraph derive_admission["derive_admission"]
+  derive_admission_1{"facts.caller_metadata is not None"}
+  derive_admission_2{"not capability.available"}
+  derive_admission_1 -->|no| derive_admission_2
+  capability_gap["capability_gap"]
+  derive_admission_2 -->|yes| capability_gap
+  derive_admission_3{"gate.state != 'admitted'"}
+  derive_admission_2 -->|no| derive_admission_3
+  capability_gap["capability_gap"]
+  derive_admission_3 -->|yes| capability_gap
+  derive_admission_4{"_gate_expired(gate)"}
+  derive_admission_3 -->|no| derive_admission_4
+  capability_gap["capability_gap"]
+  derive_admission_4 -->|yes| capability_gap
+  derive_admission_5{"not matches"}
+  derive_admission_4 -->|no| derive_admission_5
+  capability_gap["capability_gap"]
+  derive_admission_5 -->|yes| capability_gap
+  derive_admission_6{"admission == 'observation' and (not facts.broker_confirms_observation)"}
+  derive_admission_5 -->|no| derive_admission_6
+  capability_gap["capability_gap"]
+  derive_admission_6 -->|yes| capability_gap
+  derive_admission_7{"admission == 'capability_gap'"}
+  derive_admission_6 -->|no| derive_admission_7
+  derive_admission_8{"'process.run' in effects and (not facts.contained)"}
+  derive_admission_7 -->|yes| derive_admission_8
+  capability_gap["capability_gap"]
+  derive_admission_8 -->|yes| capability_gap
+  capability_gap["capability_gap"]
+  derive_admission_8 -->|no| capability_gap
+  derive_admission_9["return"]
+  derive_admission_7 -->|no| derive_admission_9
+  end
+  subgraph _classify_admission["_classify_admission"]
+  _classify_admission_1{"facts.is_proof_operation and _proof_predicate(manifest) and facts.contained"}
+  proof_operation["proof_operation"]
+  _classify_admission_1 -->|yes| proof_operation
+  _classify_admission_2{"facts.is_material_choice and _planning_predicate(manifest)"}
+  _classify_admission_1 -->|no| _classify_admission_2
+  material_choice["material_choice"]
+  _classify_admission_2 -->|yes| material_choice
+  _classify_admission_3{"_observation_predicate(manifest) and facts.broker_confirms_observation"}
+  _classify_admission_2 -->|no| _classify_admission_3
+  observation["observation"]
+  _classify_admission_3 -->|yes| observation
+  _classify_admission_4{"'process.run' in effects"}
+  _classify_admission_3 -->|no| _classify_admission_4
+  _classify_admission_5{"facts.contained"}
+  _classify_admission_4 -->|yes| _classify_admission_5
+  contained_execution["contained_execution"]
+  _classify_admission_5 -->|yes| contained_execution
+  capability_gap["capability_gap"]
+  _classify_admission_5 -->|no| capability_gap
+  _classify_admission_6{"_has_protected_effects(manifest)"}
+  _classify_admission_4 -->|no| _classify_admission_6
+  _classify_admission_7{"facts.authority_standing"}
+  _classify_admission_6 -->|yes| _classify_admission_7
+  protected_covered["protected_covered"]
+  _classify_admission_7 -->|yes| protected_covered
+  protected_uncovered["protected_uncovered"]
+  _classify_admission_7 -->|no| protected_uncovered
+  _classify_admission_8{"_has_mutation_effects(manifest)"}
+  _classify_admission_6 -->|no| _classify_admission_8
+  recoverable_mutation["recoverable_mutation"]
+  _classify_admission_8 -->|yes| recoverable_mutation
+  capability_gap["capability_gap"]
+  _classify_admission_8 -->|no| capability_gap
+  end
+  subgraph disposition["_disposition_for"]
+  protected_uncovered --> escalate
+  protected_uncovered["protected_uncovered"]
+  escalate["escalate"]
+  recoverable_mutation --> execute
+  recoverable_mutation["recoverable_mutation"]
+  execute["execute"]
+  recoverable_mutation --> reshape
+  recoverable_mutation["recoverable_mutation"]
+  reshape["reshape"]
+  recoverable_mutation --> refuse
+  recoverable_mutation["recoverable_mutation"]
+  refuse["refuse"]
+  observation --> execute
+  observation["observation"]
+  execute["execute"]
+  contained_execution --> execute
+  contained_execution["contained_execution"]
+  execute["execute"]
+  proof_operation --> execute
+  proof_operation["proof_operation"]
+  execute["execute"]
+  material_choice --> execute
+  material_choice["material_choice"]
+  execute["execute"]
+  protected_covered --> execute
+  protected_covered["protected_covered"]
+  execute["execute"]
+  capability_gap --> execute
+  capability_gap["capability_gap"]
+  execute["execute"]
+  end
+

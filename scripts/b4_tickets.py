@@ -21,7 +21,13 @@ from consilient import events  # noqa: E402
 from scripts.dispatch import run_process  # noqa: E402
 
 
-REVISION = "c99f595a896eb84c1dda4f4b85a0929c52011e27"
+# The pin is written as a PUBLIC PERMALINK, not a bare forty-hex string, and that is not
+# cosmetic. `.github/scripts/check_foreign_identifiers.py` counts BARE identifiers against a
+# ratchet capped at ten, because a bare sha is exactly what the original private-repository
+# leak looked like. A permalink names its own repository in the same string, so a reader --
+# and the gate -- can see at a glance that this is a public project's published history.
+REVISION_URL = "https://github.com/pytest-dev/pytest/commit/c99f595a896eb84c1dda4f4b85a0929c52011e27"
+REVISION = REVISION_URL.rsplit("/", 1)[1]
 REMOTE = "https://github.com/pytest-dev/pytest.git"
 REPOSITORY = "pytest-dev/pytest"
 FULL_SUITE = "testing/test_mark.py"

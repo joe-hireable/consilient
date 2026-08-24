@@ -684,9 +684,9 @@ def test_a_deferred_human_verdict_amends_one_attempt_for_beta(tmp_path):
 
     conn = projection.build(log_dir, db)
     assert conn.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 1
-    assert conn.execute("SELECT estimand_kind, auth_status FROM outcomes").fetchone() == (
-        beta_mod.HUMAN_VERDICT_BETA, "declared_principal"
-    )
+    assert conn.execute(
+        "SELECT estimand_kind, auth_status FROM outcomes"
+    ).fetchone() == (beta_mod.HUMAN_VERDICT_BETA, "declared_principal")
     result = beta_mod.from_connection(conn)
     assert result.verdict == beta_mod.INSUFFICIENT
     assert result.n_rejected == 0
@@ -736,7 +736,12 @@ def test_two_verdicts_for_one_attempt_quarantine_the_duplicate(tmp_path):
         append(path, verdict("attempt-001", human_verdict))
 
     conn = projection.build(log_dir, db)
-    assert conn.execute("SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] == "accept"
+    assert (
+        conn.execute(
+            "SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'"
+        ).fetchone()[0]
+        == "accept"
+    )
     reasons = projection.relational_quarantines(conn)
     assert len(reasons) == 1 and "already has a verdict" in reasons[0]["reason"]
     conn.close()
@@ -749,7 +754,12 @@ def test_duplicate_attempt_identity_quarantines_the_later_row(tmp_path):
         append(path, outcome("attempt-001", task, True))
 
     conn = projection.build(log_dir, db)
-    assert conn.execute("SELECT task FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] == "first-task"
+    assert (
+        conn.execute(
+            "SELECT task FROM outcomes WHERE attempt_id = 'attempt-001'"
+        ).fetchone()[0]
+        == "first-task"
+    )
     reasons = projection.relational_quarantines(conn)
     assert len(reasons) == 1 and "duplicate attempt_id" in reasons[0]["reason"]
     conn.close()
@@ -767,7 +777,9 @@ def test_attempt_identity_not_task_selects_the_deferred_verdict(tmp_path):
         conn.execute("SELECT attempt_id, human_verdict FROM outcomes ORDER BY position")
     )
     assert rows == [("attempt-001", None), ("attempt-002", "reject")]
-    assert conn.execute("SELECT estimand_kind, auth_status FROM outcomes WHERE attempt_id = 'attempt-002'").fetchone() == (beta_mod.HUMAN_VERDICT_BETA, "declared_principal")
+    assert conn.execute(
+        "SELECT estimand_kind, auth_status FROM outcomes WHERE attempt_id = 'attempt-002'"
+    ).fetchone() == (beta_mod.HUMAN_VERDICT_BETA, "declared_principal")
     result = beta_mod.from_connection(conn)
     assert result.verdict == beta_mod.INSUFFICIENT
     assert result.n_rejected == 0 and result.n_false_accept == 0
@@ -861,7 +873,12 @@ def test_a_correction_against_the_wrong_prior_verdict_is_quarantined(tmp_path):
     )
 
     conn = projection.build(log_dir, db)
-    assert conn.execute("SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] == "accept"
+    assert (
+        conn.execute(
+            "SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'"
+        ).fetchone()[0]
+        == "accept"
+    )
     reasons = projection.relational_quarantines(conn)
     assert len(reasons) == 1 and "expected prior verdict" in reasons[0]["reason"]
     conn.close()
@@ -879,7 +896,12 @@ def test_a_correction_without_an_existing_verdict_is_quarantined(tmp_path):
     )
 
     conn = projection.build(log_dir, db)
-    assert conn.execute("SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'").fetchone()[0] is None
+    assert (
+        conn.execute(
+            "SELECT human_verdict FROM outcomes WHERE attempt_id = 'attempt-001'"
+        ).fetchone()[0]
+        is None
+    )
     reasons = projection.relational_quarantines(conn)
     assert len(reasons) == 1 and "no verdict to correct" in reasons[0]["reason"]
     conn.close()
@@ -3272,6 +3294,11 @@ def test_foreign_identifier_gate_can_pass_and_still_refuses_the_unknown():
     # Raised 15 → 16 on 22 Aug 2026 for the second ruvnet/ruflo revision in a public compare
     # link. Cleared the same way: the URL was fetched and both revisions resolve.
     # Raised 16 → 18 on 23 Aug 2026 for the two upstream prior-art permalinks above.
+    # NOT raised on 24 Aug 2026, deliberately. Gate B4's pytest pin first arrived as a bare
+    # forty-hex constant and would have needed an entry here. Writing it as a public permalink
+    # instead — which names its own repository in the same string — removed the need for one.
+    # An allowlist that grows every time the tree cites something public is a gate being paid
+    # off in instalments; the entry avoided is worth more than the entry justified.
     assert len(module.ALLOWLIST) <= 18, (
         f"the foreign-identifier allowlist grew to {len(module.ALLOWLIST)}; each entry means "
         "someone cleared that identifier — by the scrubbed corpus test, or by positive public "

@@ -1,0 +1,183 @@
+%% **Producer:** `scripts/build_diagrams.py`
+%% **Source:** `src/consilient/projection.py`
+%% **Source SHA-256:** `8b1ca456f1e738f900113a135e4438e5a24ab7b14f431b31d2b91eed730ebd03`
+%% **Do not hand-edit:** regenerate with `python scripts/build_diagrams.py`.
+
+erDiagram
+  events {
+    INTEGER position PK
+    TEXT ts
+    TEXT kind
+    TEXT actor
+    TEXT principal
+    TEXT task
+    TEXT payload
+  }
+  outcomes {
+    INTEGER position PK
+    TEXT attempt_id
+    TEXT ts
+    TEXT task
+    TEXT task_family
+    TEXT verifier_version
+    INTEGER verifier_accept
+    TEXT human_verdict
+    TEXT estimand_kind
+    TEXT auth_status
+  }
+  usage {
+    INTEGER id PK
+    INTEGER position
+    TEXT provider
+    TEXT kind
+    TEXT status
+    TEXT detail
+    TEXT observed_at
+    TEXT measure
+    TEXT window_label
+    TEXT used_fraction
+    TEXT resets_at
+    TEXT amount
+    TEXT currency
+    TEXT period
+    TEXT provenance
+  }
+  rejections {
+    INTEGER id PK
+    TEXT path
+    INTEGER line
+    TEXT reason
+  }
+  record_facts {
+    INTEGER position
+    TEXT record_id PK
+    TEXT event_id
+    TEXT event_kind
+    TEXT event_sha256
+    TEXT digest
+    TEXT kind
+    TEXT actor
+    TEXT work_item
+    TEXT capability_contract
+    TEXT source
+    TEXT valid_from
+    TEXT valid_to
+    TEXT object_locator
+    INTEGER byte_count
+    TEXT consent_purpose
+    TEXT retention_class
+    TEXT object_status
+  }
+  record_relations {
+    INTEGER id PK
+    INTEGER position
+    TEXT record_id
+    TEXT relation
+    TEXT target_event_id
+    TEXT target_event_kind
+    TEXT target_event_sha256
+    TEXT target_record_id
+    TEXT relation_status
+  }
+  record_defects {
+    INTEGER id PK
+    INTEGER position
+    TEXT record_id
+    TEXT defect_kind
+    TEXT detail
+  }
+  delivery_estimates {
+    INTEGER position PK
+    TEXT delivery_id
+    TEXT estimate_id
+    INTEGER revision
+    TEXT predecessor_estimate_id
+    TEXT original_estimate_id
+    TEXT commitment_digest
+    TEXT plan_digest
+    TEXT earliest_at
+    TEXT latest_at
+    TEXT issued_at
+    TEXT evidence_class
+    TEXT method
+    INTEGER sample_size
+    TEXT cause
+    INTEGER notice_preceded_upper_bound
+    TEXT payload
+  }
+  relational_quarantines {
+    INTEGER id PK
+    INTEGER position
+    TEXT path
+    INTEGER line
+    TEXT digest
+    TEXT reason
+  }
+  projection_meta {
+    TEXT key PK
+    TEXT value
+  }
+  review_queues {
+    INTEGER position PK
+    TEXT queue_id
+    INTEGER stream_cap
+    INTEGER exp105_prefix_n
+    INTEGER rejection_target
+    TEXT population
+    TEXT task_family
+    TEXT protocol_id
+    TEXT verifier_version
+    TEXT verifier_contract_digest
+    INTEGER start_position
+    TEXT eligible_universe_digest
+    TEXT selector
+    TEXT order_rule
+    TEXT payload
+  }
+  candidate_exposures {
+    INTEGER position PK
+    TEXT queue_id
+    TEXT exposure_id
+    TEXT attempt_id
+    INTEGER exposure_ordinal
+    TEXT start_token
+    TEXT artefact_sha256
+    TEXT task_family
+    TEXT protocol_id
+    TEXT verifier_version
+    TEXT verifier_contract_digest
+    TEXT payload
+  }
+  measurement_registrations {
+    INTEGER position PK
+    TEXT run_id
+    TEXT config_hash
+    TEXT hardware_id
+    TEXT payload
+  }
+  measurement_results {
+    INTEGER position PK
+    TEXT run_id
+    TEXT fixture
+    TEXT payload
+  }
+  work_items {
+    TEXT ticket PK
+    INTEGER revision
+    TEXT state
+    TEXT state_group
+    INTEGER is_blocked
+    TEXT blocked_reason
+    TEXT accountable
+    TEXT requires
+    TEXT informs
+    TEXT inform_scores
+    TEXT payload
+  }
+  native_work_items {
+    TEXT ticket
+    INTEGER revision
+    TEXT state
+    TEXT blockers
+  }
+

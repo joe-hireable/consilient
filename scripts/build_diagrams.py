@@ -192,7 +192,38 @@ def _terminal_disposition(statements: list[ast.stmt]) -> str | None:
     return disposition
 
 
-def _disposition_edges(fn: ast.FunctionDef) -> list[tuple[str, str]]:
+def _declared_admission_classes(tree: ast.Module) -> tuple[str, ...]:
+    """Every admission class the type declares, in declaration order.
+
+    The walker below can only see a class named in an explicit `admission == "X"` test. A
+    guard-clause function ends with a bare return that applies to EVERY class not handled above
+    it, and that arm is invisible without knowing the full set. Reading `AdmissionClass` gives
+    the universe from the same source of truth the code uses.
+    """
+    for node in tree.body:
+        target = None
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            target = node.target.id
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
+            first = node.targets[0]
+            target = first.id if isinstance(first, ast.Name) else None
+        if target != "AdmissionClass":
+            continue
+        value = node.value
+        if isinstance(value, ast.Subscript):
+            members = value.slice
+            elements = members.elts if isinstance(members, ast.Tuple) else [members]
+            names = tuple(
+                e.value for e in elements if isinstance(e, ast.Constant) and isinstance(e.value, str)
+            )
+            if names:
+                return names
+    return ()
+
+
+def _disposition_edges(
+    fn: ast.FunctionDef, universe: tuple[str, ...] = ()
+) -> list[tuple[str, str]]:
     edges: list[tuple[str, str]] = []
 
     def walk(statements: list[ast.stmt], pending: tuple[str, ...]) -> None:
@@ -214,6 +245,21 @@ def _disposition_edges(fn: ast.FunctionDef) -> list[tuple[str, str]]:
                         edges.append((name, disposition))
 
     walk(fn.body, ())
+
+    # The trailing top-level return is the DEFAULT ARM: in a guard-clause function it applies to
+    # every class the guards above did not claim. Without this the diagram silently omits real
+    # routing -- `material_choice` reaches `execute` only through this arm, and a permission model
+    # that leaves out where a class actually goes is worse than no diagram, because it looks
+    # complete. Measured 24 August 2026 by a test asserting that very edge.
+    handled = {source for source, _ in edges}
+    trailing = fn.body[-1] if fn.body else None
+    if universe and isinstance(trailing, ast.Return):
+        disposition, _reason = _return_strings(trailing)
+        if disposition:
+            for name in universe:
+                if name not in handled:
+                    edges.append((name, disposition))
+
     return list(dict.fromkeys(edges))
 
 
@@ -285,7 +331,7 @@ def render_permission(root: Path) -> str:
     disposition = _function(tree, "_disposition_for")
     if disposition is not None:
         lines.append('  subgraph disposition["_disposition_for"]')
-        edges = _disposition_edges(disposition)
+        edges = _disposition_edges(disposition, _declared_admission_classes(tree))
         if not edges:
             _emit_control_flow(disposition, lines)
         for source, dest in edges:

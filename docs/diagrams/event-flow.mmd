@@ -1,0 +1,42 @@
+%% **Producer:** `scripts/build_diagrams.py`
+%% **Source:** `src/consilient/events.py`
+%% **Source SHA-256:** `18715069e42635adde93ce1df19468c611ff20c50307d17e940ec384524b1ec8`
+%% **Do not hand-edit:** regenerate with `python scripts/build_diagrams.py`.
+
+flowchart TB
+  subgraph kinds["event kinds"]
+    k0["attempt.outcome"]
+    k1["verification.outcome"]
+    k2["review.queue.opened"]
+    k3["candidate.exposed"]
+    k4["attempt.reviewed"]
+    k5["review.presentation.frozen"]
+    k6["attempt.verdict"]
+    k7["attempt.verdict.correction"]
+    k8["decision.autonomous"]
+    k9["action.proposal"]
+    k10["budget.state"]
+    k11["usage.observed"]
+    k12["spend.reserved"]
+    k13["knowledge.retrieved"]
+    k14["record.captured"]
+    k15["capability.gap"]
+    k16["intent.recorded"]
+    k17["intent.starved"]
+    k18["feedback.asked"]
+    k19["feedback.declined"]
+    k20["feedback.answered"]
+    k21["promote.impact_contract.registered"]
+    k22["promote.promoter_beta.receipt"]
+    k23["promote.activation.refused"]
+    k24["visibility.change"]
+    k25["delivery.estimate"]
+    k26["measurement.registered"]
+    k27["measurement.result"]
+  end
+  NEW["new kind"] --> CONST["*_KIND constant"]
+  CONST --> kinds
+  kinds --> VALIDATE["validate()"]
+  VALIDATE --> APPEND["events.append()"]
+  VALIDATE -.-> REGISTER["register_transition_validator()"]
+
