@@ -624,6 +624,44 @@ def downstream_count(uid: str, units: dict) -> int:
     return len(seen)
 
 
+def _content_landed(sha: str) -> bool:
+    """Are this commit's added lines already present in HEAD, line for line?
+
+    Identity of WORK, not of commit message. A subject is not identity: 14 subjects recur in
+    this repository's history and one recurs 24 times [measured 24 August 2026]. A patch-id is
+    not identity either -- `git patch-id` normalises whitespace, and in Python whitespace is the
+    language, so moving a statement into a loop preserves the patch-id while changing the
+    meaning.
+
+    Deliberately asymmetric: it asks only whether what the commit ADDS is present, not whether
+    HEAD matches the commit. A unit whose work landed and was then built upon should still
+    retire. The thresholds are the discriminator -- below twenty added lines a diff is too small
+    to tell "landed" from "coincidentally similar", so it stays escalated rather than guessing.
+    """
+    show = sh(["git", "show", "--format=", "-U0", sha])
+    if show.returncode != 0:
+        return False
+    added: dict[str, list[str]] = {}
+    path = None
+    for line in show.stdout.splitlines():
+        if line.startswith("+++ b/"):
+            path = line[6:].strip()
+        elif line.startswith("+") and not line.startswith("+++") and path:
+            body = line[1:].strip()
+            if body:
+                added.setdefault(path, []).append(body)
+    total = sum(len(v) for v in added.values())
+    if total < 20:
+        return False
+    absent = 0
+    for file_path, lines in added.items():
+        head = sh(["git", "show", f"HEAD:{file_path}"])
+        blob = head.stdout if head.returncode == 0 else ""
+        present = {ln.strip() for ln in blob.splitlines()}
+        absent += sum(1 for ln in lines if ln not in present)
+    return (total - absent) / total >= 0.99
+
+
 def reclaim_expired_slots(state: dict) -> list[str]:
     """Free slots whose leash has run out, before anything can return early.
 
@@ -1444,10 +1482,21 @@ def main() -> int:
         # 2026: NINE of twelve units reported as unmergeable had already landed under a different
         # sha with an identical subject, including T01, which gates 22 units and had been
         # "blocked" for hours on a merge that had already happened.
-        _subject = sh(["git", "log", "-1", "--format=%s", _sha]).stdout.strip()
-        if _subject and sh(
-            ["git", "log", "--format=%H", "--fixed-strings", "--grep", _subject, "HEAD"]
-        ).stdout.split():
+        # Retire on CONTENT, never on a commit subject. MEASURED 24 August 2026: across 646
+        # commits there are 590 distinct subjects and 14 reused ones -- a single subject appears
+        # 24 TIMES and another 18, carrying different patch content. Grepping the subject and
+        # retiring on any hit is therefore a false-accept path in the driver's own classifier: a
+        # check accepting "this work has landed" when it has not. It demonstrably did so --
+        # src/consilient/harness.py carries a duplicated block, `_validate_instance` bound at
+        # both 292 and 605 and `grammar_accepts` at 344 and 657, giving 17 mypy no-redef errors
+        # in the product tree.
+        #
+        # Content coverage instead: take the unit's own added lines and ask whether they are
+        # actually present in HEAD's copy of the same file. Retire only at >= 99% coverage AND
+        # at least 20 added lines -- below either bar it falls through and stays escalated,
+        # because a small diff cannot distinguish "landed" from "coincidentally similar".
+        _covered = _content_landed(_sha)
+        if _covered:
             # Record it as BUILT, not force_done. MEASURED 24 August 2026: force_done is written
             # here and read nowhere -- `done` is derived from consumed review receipts alone --
             # so the conflict was popped and then RE-ADDED by the merge loop later in the same
@@ -1468,7 +1517,7 @@ def main() -> int:
             if _uid in state.setdefault("resolve_dispatched", []):
                 state["resolve_dispatched"].remove(_uid)
             print(
-                f"driver: {_uid} already landed under another sha ({_subject[:48]!r}); retiring"
+                f"driver: {_uid} already landed -- its added lines are present in HEAD; retiring"
             )
             continue
         if sh(["git", "merge-tree", "--write-tree", "--name-only", "HEAD", _sha]).stdout.count(
