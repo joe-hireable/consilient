@@ -189,7 +189,10 @@ def scan(
         source = root / relative
         try:
             text = source.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        except OSError as error:
+            # Not `continue`: a tracked file this gate cannot open is a file it did
+            # not check, and a gate that silently no-ops is worse than no gate.
+            found.append((relative.replace("\\", "/"), "", f"unreadable: {error}"))
             continue
         for target in link_targets(text):
             reason = failure(source, target, root=root, tracked=known)
@@ -230,9 +233,14 @@ def self_test() -> None:
 
 
 def tracked(*pattern: str) -> list[str]:
-    """Tracked paths, repository-relative and forward-slashed. Empty pattern means all."""
+    """Tracked paths, repository-relative. Empty pattern means all.
+
+    `-z` because `git ls-files` otherwise C-quotes any path with a non-ASCII
+    character, and a quoted path does not open -- which would have been a file
+    skipped rather than a file checked.
+    """
     completed = subprocess.run(
-        ["git", "ls-files", *pattern],
+        ["git", "ls-files", "-z", *pattern],
         cwd=ROOT,
         env=GIT_ENV,
         capture_output=True,
@@ -243,7 +251,7 @@ def tracked(*pattern: str) -> list[str]:
     )
     if completed.returncode != 0:
         raise RuntimeError(completed.stderr.strip() or "cannot enumerate tracked files")
-    return [line for line in completed.stdout.splitlines() if line]
+    return [entry for entry in completed.stdout.split("\0") if entry]
 
 
 def main() -> int:
