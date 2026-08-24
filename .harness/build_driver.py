@@ -17,12 +17,14 @@ State lives in .harness/driver-state.json.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pathlib
 import re
 import subprocess
 import sys
+from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 UNITS = ROOT / ".harness/plan-units.json"
@@ -299,6 +301,132 @@ def committed(uid: str, unit: dict) -> bool:
     return any(
         line.strip().lower().startswith(want) for line in (r.stdout or "").splitlines()
     )
+
+
+def artefact_identity(unit: dict[str, Any]) -> str | None:
+    """Hash the current committed blobs the review is permitted to judge."""
+    claims = unit.get("claims")
+    if not isinstance(claims, list) or not all(isinstance(path, str) for path in claims):
+        return None
+    blobs = []
+    for path in sorted(claims):
+        result = sh(["git", "rev-parse", "HEAD:" + path])
+        blob = result.stdout.strip()
+        if result.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", blob):
+            return None
+        blobs.append((path, blob))
+    return hashlib.sha256(
+        json.dumps(blobs, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+
+
+def append_review_outcome(outcome: dict[str, Any]) -> None:
+    """Record consumed critic evidence through the one trajectory writer."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from datetime import datetime, timezone
+
+    from consilient import events  # type: ignore[import-untyped]
+
+    now = datetime.now(timezone.utc)
+    events.append(
+        LOG / (now.date().isoformat() + ".jsonl"),
+        {
+            "v": 1,
+            "ts": now.isoformat(),
+            "event": "review.outcome",
+            "actor": "build_driver",
+            "data": outcome,
+        },
+    )
+
+
+def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> set[str]:
+    """Only a current, consumed SOUND review may retire a unit."""
+    retired: set[str] = set()
+    results = state.get("review_results", {})
+    if not isinstance(results, dict):
+        return retired
+    for uid, result in results.items():
+        if uid not in units or not isinstance(result, dict):
+            continue
+        if result.get("outcome") != "SOUND":
+            continue
+        artefact = artefact_identity(units[uid])
+        if artefact is not None and result.get("artefact") == artefact:
+            retired.add(uid)
+    return retired
+
+
+def consume_review_verdict(state: dict[str, Any], uid: str, unit: dict[str, Any]) -> str:
+    """Consume one strict reviewer receipt; anything else is a retryable check error."""
+    expected = state.setdefault("review_expected", {}).get(uid)
+    if not isinstance(expected, dict):
+        expected = {}
+    attempt = expected.get("attempt")
+    artefact = expected.get("artefact")
+    consumed = state.setdefault("review_consumed", {}).get(uid)
+    if consumed == expected and expected:
+        return "consumed"
+
+    outcome = "check_error"
+    findings: list[str] = []
+    try:
+        outer = json.loads((BRIEFS / f"{uid}-verify.out").read_text(encoding="utf-8"))
+        if not isinstance(outer, dict) or outer.get("status") != "ok":
+            raise ValueError("outer dispatch did not succeed")
+        inner = json.loads(outer["stdout_tail"])
+        if (
+            not isinstance(inner, dict)
+            or set(inner) != {"v", "unit", "artefact", "attempt", "verdict", "findings"}
+            or inner.get("v") != 1
+            or inner.get("unit") != uid
+            or inner.get("artefact") != artefact
+            or inner.get("attempt") != attempt
+            or artefact_identity(unit) != artefact
+            or inner.get("verdict") not in {"SOUND", "DEFECTIVE"}
+            or not isinstance(inner.get("findings"), list)
+            or not all(isinstance(finding, str) and finding.strip() for finding in inner["findings"])
+            or (inner["verdict"] == "SOUND" and inner["findings"])
+            or (inner["verdict"] == "DEFECTIVE" and not inner["findings"])
+            or not isinstance(attempt, int)
+        ):
+            raise ValueError("invalid review verdict")
+        outcome = inner["verdict"]
+        findings = inner["findings"]
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+
+    record = {
+        "unit": uid,
+        "artefact": artefact,
+        "attempt": attempt,
+        "outcome": outcome,
+        "findings": findings,
+    }
+    append_review_outcome(record)
+    state["review_consumed"][uid] = expected
+    state.setdefault("review_results", {})[uid] = record
+    dispatched = state.setdefault("review_dispatched", [])
+    if uid in dispatched:
+        dispatched.remove(uid)
+    if outcome == "SOUND":
+        state.setdefault("done", [])
+        if uid not in state["done"]:
+            state["done"].append(uid)
+        state.setdefault("verified", [])
+        if uid not in state["verified"]:
+            state["verified"].append(uid)
+        if uid in state.setdefault("built", []):
+            state["built"].remove(uid)
+        state.setdefault("repair_findings", {}).pop(uid, None)
+        state.setdefault("rejected_artefacts", {}).pop(uid, None)
+    elif outcome == "DEFECTIVE":
+        for key in ("done", "verified", "built"):
+            if uid in state.setdefault(key, []):
+                state[key].remove(uid)
+        state.setdefault("repair_findings", {})[uid] = findings
+        state.setdefault("rejected_artefacts", {})[uid] = artefact
+    return outcome
 
 
 FAMILY = {
@@ -746,7 +874,7 @@ def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
     return f"applied {applied} commit(s) from {uid}"
 
 
-def write_verify_brief(uid: str, unit: dict) -> pathlib.Path:
+def write_verify_brief(uid: str, unit: dict, artefact: str, attempt: int) -> pathlib.Path:
     """Adversarial review of a landed unit, by a different model family than built it.
 
     A unit whose own tests pass has marked its own homework. `CONSILIENCE.md`: agreement
@@ -811,8 +939,17 @@ different class of evidence is that you RUN it.**
 ## Report
 
 For each of the six checks: pass, or the finding with its reproduction. **What you broke to test the
-tests, and whether they caught it.** The incumbent and how this compares. And a one-word verdict on
-the first line: **SOUND** or **DEFECTIVE**.
+tests, and whether they caught it.** The incumbent and how this compares.
+
+## Required machine receipt
+
+Your final output must be this exact JSON object and nothing else. `findings` is empty for SOUND and
+contains one or more non-empty strings for DEFECTIVE. The immutable artefact identity and attempt
+number are fixed below; a mismatch is refused and retried.
+
+```json
+{{"v":1,"unit":"{uid}","artefact":"{artefact}","attempt":{attempt},"verdict":"SOUND|DEFECTIVE","findings":[]}}
+```
 """,
         encoding="utf-8",
     )
@@ -873,7 +1010,7 @@ exactly that number going up. Say which hunk defeated you and what the two readi
     return path
 
 
-def write_brief(uid: str, unit: dict) -> pathlib.Path:
+def write_brief(uid: str, unit: dict, repair_findings: list[str] | None = None) -> pathlib.Path:
     BRIEFS.mkdir(parents=True, exist_ok=True)
     path = BRIEFS / f"{uid}.md"
     claims = "\n".join(f"- `{c}`" for c in unit["claims"])
@@ -892,6 +1029,10 @@ def write_brief(uid: str, unit: dict) -> pathlib.Path:
     note = unit.get("note", "")
     if note:
         note = chr(10) + "## Read this before you start" + chr(10) + chr(10) + note + chr(10)
+    if repair_findings:
+        note += "\n## Repair required\n\nThe prior adversarial review found:\n" + "\n".join(
+            "- " + finding for finding in repair_findings
+        ) + "\nRepair these findings; the unit cannot retire until a changed artefact receives a SOUND review.\n"
     body = f"""# Build {uid} exactly as the plan specifies. Test-first, one commit.
 
 ## Your assignment
@@ -1085,21 +1226,15 @@ def hold_tick_lock():
 def main() -> int:
     units = load(UNITS, {})
     state = load(STATE, {"done": [], "attempts": {}})
-    done = set(state.get("done", []))
-    # A unit merged BY HAND cannot be retired by commit match: the merge commit is not the sha
-    # the plan recorded, so the driver re-tries the original, conflicts, and re-opens a unit whose
-    # work is already in the tree. T01 -- which gates 22 units -- was re-opened three times that
-    # way on 24 August 2026, each time undoing a retirement recorded minutes earlier.
-    # `force_done` is the durable override: it is applied every tick, so it survives a concurrent
-    # tick overwriting the file, which a one-off edit to `done` does not.
-    forced = [u for u in state.get("force_done", []) if u in units]
-    for uid in forced:
-        done.add(uid)
-        state.setdefault("done", [])
-        if uid not in state["done"]:
-            state["done"].append(uid)
-        state.get("conflicts", {}).pop(uid, None)
-        state.get("in_flight", {}).pop(uid, None)
+    # `done` means retired. Old `done`, `verified`, and `force_done` values predate structured,
+    # identity-bound review receipts, so none can substitute for current evidence.
+    done = retired_units(state, units)
+    built = set(state.setdefault("built", []))
+    for uid in state.get("done", []):
+        if uid not in done and uid in units and committed(uid, units[uid]):
+            built.add(uid)
+    state["done"] = sorted(done)
+    state["built"] = sorted(built)
 
     # Retire anything that landed since the last tick, whether we dispatched it or not.
     # Bring back anything that finished in its own tree, then judge it.
@@ -1153,10 +1288,9 @@ def main() -> int:
                 0, state.get("attempts", {}).get(uid, 1) - 1
             )
             state["in_flight"].pop(uid, None)
-            for key in ("resolve_dispatched", "review_dispatched"):
-                bucket = state.get(key, [])
-                if uid in bucket:
-                    bucket.remove(uid)
+            bucket = state.get("resolve_dispatched", [])
+            if uid in bucket:
+                bucket.remove(uid)
             # A crashed review is the quietest failure of the lot: the unit stays "done", the
             # review never happens, and nothing anywhere records that the artefact was never
             # checked by a different model family. Three units reached done this way today.
@@ -1168,6 +1302,17 @@ def main() -> int:
                 + str(freed)
                 + " claim(s) held by runs that are gone"
             )
+
+    # A review process owns the output until it exits. Once none is live, consume every receipt;
+    # malformed, stale and failed output are explicit check errors and will be retried.
+    if live_dispatchers() == 0:
+        for uid in sorted(list(state.setdefault("review_dispatched", []))):
+            outcome = consume_review_verdict(state, uid, units[uid])
+            print(f"driver: review of {uid} consumed as {outcome}")
+    done = retired_units(state, units)
+    built = set(state.setdefault("built", []))
+    state["done"] = sorted(done)
+    state["built"] = sorted(built)
 
     import time as _time_m
 
@@ -1221,7 +1366,9 @@ def main() -> int:
     # merge loop only ever looked at in_flight, so its output was stranded exactly as F-02
     # describes. V01 sat built-and-unmergeable this way while the tick reported it every time and
     # did nothing about it. [measured 23 Aug 2026]
-    mergeable = [uid for uid in units if uid not in done and (WORKTREES / uid).exists()]
+    mergeable = [
+        uid for uid in units if uid not in done and uid not in built and (WORKTREES / uid).exists()
+    ]
     for uid in mergeable:
         if True:
             started, leash = state.get("in_flight", {}).get(uid, (0.0, 0.0))
@@ -1243,14 +1390,23 @@ def main() -> int:
         )
 
     green = None
+    rejected = state.setdefault("rejected_artefacts", {})
     for uid, unit in units.items():
-        if uid not in done and committed(uid, unit):
+        artefact = artefact_identity(unit)
+        if (
+            uid not in done
+            and uid not in built
+            and artefact is not None
+            and rejected.get(uid) != artefact
+            and committed(uid, unit)
+        ):
             if green is None:
                 green = suite_green()
             if green:
-                done.add(uid)
-                built = state.setdefault("built_by", {})
-                built.setdefault(uid, state.get("last_arm", {}).get(uid, "codex"))
+                built_by = state.setdefault("built_by", {})
+                built_by.setdefault(uid, state.get("last_arm", {}).get(uid, "codex"))
+                state.setdefault("built", []).append(uid)
+                built.add(uid)
                 print(
                     f"driver: {uid} built (plan commit present, suite green) — awaiting review"
                 )
@@ -1258,11 +1414,10 @@ def main() -> int:
 
     # Built but unreviewed units get an adversarial reviewer from a different family before
     # they count as complete. Verifying by the unit's own tests alone is echo.
-    verified = set(state.setdefault("verified", []))
     pending_review = [
         u
-        for u in sorted(done)
-        if u not in verified and u not in state.setdefault("review_dispatched", [])
+        for u in sorted(state.setdefault("built", []))
+        if u not in state.setdefault("review_dispatched", [])
     ]
 
     live = live_dispatchers()
@@ -1274,8 +1429,17 @@ def main() -> int:
         reviewers = [a for a in ARMS if FAMILY.get(a[0]) != FAMILY.get(builder)]
         if not reviewers:
             continue
+        artefact = artefact_identity(units[uid])
+        if artefact is None:
+            continue
         rh, rm, rl = reviewers[0]
-        vb = write_verify_brief(uid, units[uid])
+        attempt = state.setdefault("review_attempts", {}).get(uid, 0) + 1
+        state["review_attempts"][uid] = attempt
+        state.setdefault("review_expected", {})[uid] = {
+            "artefact": artefact,
+            "attempt": attempt,
+        }
+        vb = write_verify_brief(uid, units[uid], artefact, attempt)
         vargs = [
             sys.executable,
             "scripts/dispatch.py",
@@ -1290,6 +1454,7 @@ def main() -> int:
             "bypass",
             "--max-turns",
             str(DEFAULT_TURNS),
+            "--json",
         ]
         if rm:
             vargs += ["--model", rm]
@@ -1343,6 +1508,7 @@ def main() -> int:
         u
         for u in units
         if u not in done
+        and u not in state.setdefault("built", [])
         and u not in inflight
         and u not in built_unmerged
         and attempts.get(u, 0) < 3
@@ -1377,7 +1543,7 @@ def main() -> int:
             break
         unit = units[uid]
         n = attempts.get(uid, 0)
-        brief = write_brief(uid, unit)
+        brief = write_brief(uid, unit, state.setdefault("repair_findings", {}).get(uid))
         rot = state.get("arm_rotation", 0)
         harness, model, leash = pick_arm(rot + n, state)
         state["arm_rotation"] = rot + 1
