@@ -742,6 +742,12 @@ def write_brief(uid: str, unit: dict) -> pathlib.Path:
         if "/" in unit["plan"]
         else "docs/superpowers/plans/" + unit["plan"]
     )
+    # A per-unit note carries what the plan cannot: why an earlier attempt refused, what has
+    # since changed, and which of its objections were right. Without it the same refusal
+    # simply repeats -- T01 refused three times for reasons two-thirds already resolved.
+    note = unit.get("note", "")
+    if note:
+        note = chr(10) + "## Read this before you start" + chr(10) + chr(10) + note + chr(10)
     body = f"""# Build {uid} exactly as the plan specifies. Test-first, one commit.
 
 ## Your assignment
@@ -782,6 +788,7 @@ handful your plan unit names.
 ## Claim exactly these and nothing else
 
 {claims}
+{note}
 
 **If a path you need is not in that list, stop and say so in your report** rather than claiming it.
 An under-declared claim races silently; that is a defect this project has already measured.
