@@ -43,8 +43,8 @@ You say what you want, in your own words, and what would count as done.
 Consilient takes it from there. It sends the work to whichever agent runtimes you already
 use — Claude Code, Codex, Cursor, Grok, opencode, or any other you favour — or to a model
 running on your own hardware when none of them fits. It keeps a single record of everything that
-happened. It comes back with the result, and with the number nobody else hands you: **how
-often its own checks are wrong.**
+happened. It comes back with the result, and with how often its own checks are wrong —
+measured on *your* work, then used to decide what may run unattended.
 
 It does not replace those runtimes. It commands them. They are called *harnesses*. Consilient is not.
 
@@ -53,7 +53,7 @@ It does not replace those runtimes. It commands them. They are called *harnesses
 ## The number, and why it is the point
 
 Every agent eventually says *checks passed*. That sentence is worth exactly as much as the
-checks behind it, and nobody measures those checks.
+checks behind it, and those checks are rarely measured against the work they waved through.
 
 Consilient calls that measurement **β** (beta): of the bad work that reaches your automated
 checks, the share those checks wave through. A low β means your tests, your type checker and
@@ -214,6 +214,12 @@ about the whole approach, and nobody here has yet asked it properly.
 
 ## Where to go next
 
+- [`what-this-is.md`](05-guide/what-this-is.md) — five ideas, no jargon. The contract, not
+  the reasoning.
+- [`for-your-field.md`](05-guide/for-your-field.md) — what a non-coding reader gets today,
+  and what is still open.
+- [`first-hour.md`](05-guide/first-hour.md) — install, then `consil beta`: a rate with its
+  interval, or an honest refusal.
 - [`CONSILIENCE.md`](../CONSILIENCE.md) — the one sentence everything here derives from.
 - [`getting-started.md`](00-context/getting-started.md) — every command run against this tree
   with its real output pasted in, including the ones that fail.
@@ -221,3 +227,5 @@ about the whole approach, and nobody here has yet asked it properly.
   words, verbatim, with the measured distance from the code.
 - [`v0-draft.md`](40-spec/v0-draft.md) — the approved implementation boundary and the gates.
 - [`open-questions.md`](00-context/open-questions.md) — what is still open.
+- [`ways-to-contribute.md`](00-context/ways-to-contribute.md) — falsifying an ADR is welcome,
+  not an attack.
