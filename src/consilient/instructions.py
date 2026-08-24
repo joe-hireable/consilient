@@ -58,14 +58,24 @@ Invariants, each with a test in the same commit (tests/test_instructions.py):
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from . import beta as beta_mod
 from . import promote, recall
-from .events import SCHEMA_VERSION, Event, EventPayload, append, canonical, read_all
+from .events import (
+    SCHEMA_VERSION,
+    Event,
+    EventError,
+    EventPayload,
+    append,
+    canonical,
+    event_sha256,
+    read_all,
+    resolve_reference,
+)
 
 ACTOR = "consilient.instructions"
 ASSEMBLED = "instructions.assembled"
@@ -115,6 +125,15 @@ INERT_NOTICE = (
 
 INERT = "inert"
 ACTIVE = "active"
+BETTER_THAN_BEST_NAME = "better-than-best"
+BETTER_THAN_BEST_FILE = "SKILL.md"
+PROTOCOL_COMPLETED = "completed"
+PROTOCOL_NOT_WARRANTED = "not_warranted"
+COST_UNIT = "review_adjusted_minutes"
+RELIANCE_CONSUMERS = frozenset(
+    {"later_work", "money", "public_claim", "design_constraint"}
+)
+TRI_STATES = frozenset({"true", "false", "unknown"})
 
 # Tokens too frequent to discriminate one skill from another. Selection is recorded
 # with its matched tokens, so a bad match is auditable rather than hidden.
@@ -217,6 +236,86 @@ class Reconstruction:
         return self.found and all(report.ok for report in self.layers)
 
 
+@dataclass(frozen=True)
+class IndexAnswer:
+    """One generated-index hit compared by question, scope and version digest."""
+
+    question_digest: str
+    scope_digest: str
+    version_digest: str
+    verified: bool
+
+
+@dataclass(frozen=True)
+class IndexLookup:
+    """A same-question lookup. Incomplete indexes cannot prove absence."""
+
+    complete: bool
+    question_digest: str
+    scope_digest: str
+    version_digest: str
+    answers: tuple[IndexAnswer, ...] = ()
+
+
+@dataclass(frozen=True)
+class CostCeiling:
+    """One review-adjusted-minutes ceiling. Unversioned inputs are incomparable."""
+
+    minutes: float
+    policy_version: str
+    unit: str = COST_UNIT
+
+
+@dataclass(frozen=True)
+class ProtocolThreshold:
+    """Conservative proxies for the Better-Than-Best skill's three conditions."""
+
+    later_reliance: str
+    question_open: str
+    wrong_costs_more: str
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("later_reliance", self.later_reliance),
+            ("question_open", self.question_open),
+            ("wrong_costs_more", self.wrong_costs_more),
+        ):
+            if value not in TRI_STATES:
+                raise ValueError(f"{name} must be true, false or unknown")
+
+    @property
+    def selects(self) -> bool:
+        return "false" not in (
+            self.later_reliance,
+            self.question_open,
+            self.wrong_costs_more,
+        )
+
+    @property
+    def false_reasons(self) -> tuple[str, ...]:
+        return tuple(
+            name
+            for name, state in (
+                ("later_reliance", self.later_reliance),
+                ("question_open", self.question_open),
+                ("wrong_costs_more", self.wrong_costs_more),
+            )
+            if state == "false"
+        )
+
+
+@dataclass(frozen=True)
+class ProtocolBinding:
+    """Decision-protocol references derived from a threshold and the pinned tree."""
+
+    status: str
+    threshold: ProtocolThreshold
+    instructions_ref: dict[str, str] | None
+    bar_ref: dict[str, str] | None
+    search_ref: dict[str, str] | None
+    killing_check_ref: dict[str, str] | None
+
+
 def _tokens(text: str) -> frozenset[str]:
     return frozenset(
         token
@@ -293,6 +392,94 @@ def select_skills(
         spent += len(ref.body)
     omitted += max(0, len(candidates) - (limit if limit else 0))
     return tuple(chosen), omitted
+
+
+def _later_reliance(consumers: Sequence[str] | None) -> str:
+    if consumers is None:
+        return "unknown"
+    return "true" if any(kind in RELIANCE_CONSUMERS for kind in consumers) else "false"
+
+
+def _question_open(index: IndexLookup | None) -> str:
+    if index is None:
+        return "unknown"
+    matched = any(
+        answer.verified
+        and answer.question_digest == index.question_digest
+        and answer.scope_digest == index.scope_digest
+        and answer.version_digest == index.version_digest
+        for answer in index.answers
+    )
+    if matched:
+        return "false"
+    if not index.complete:
+        return "unknown"
+    return "true"
+
+
+def _wrong_costs_more(
+    rework: CostCeiling | None, protocol: CostCeiling | None
+) -> str:
+    if rework is None or protocol is None:
+        return "unknown"
+    if not rework.policy_version or not protocol.policy_version:
+        return "unknown"
+    if rework.policy_version != protocol.policy_version:
+        return "unknown"
+    if rework.unit != protocol.unit:
+        return "unknown"
+    return "true" if rework.minutes > protocol.minutes else "false"
+
+
+def protocol_threshold(
+    *,
+    consumers: Sequence[str] | None = None,
+    index: IndexLookup | None = None,
+    rework_ceiling: CostCeiling | None = None,
+    protocol_cost_ceiling: CostCeiling | None = None,
+) -> ProtocolThreshold:
+    """Return the three conservative proxies. Unknown never becomes a skip."""
+
+    return ProtocolThreshold(
+        later_reliance=_later_reliance(consumers),
+        question_open=_question_open(index),
+        wrong_costs_more=_wrong_costs_more(rework_ceiling, protocol_cost_ceiling),
+    )
+
+
+def _skill_file(skills_dir: Path, name: str) -> Path:
+    return skills_dir / name / BETTER_THAN_BEST_FILE
+
+
+def _load_named_skill(skills_dir: Path, name: str) -> SkillRef:
+    path = _skill_file(skills_dir, name)
+    if not path.is_file():
+        raise InstructionError(f"the {name} skill is missing from {path.as_posix()}")
+    body = path.read_text(encoding="utf-8")
+    fields = _frontmatter(body)
+    recorded_name = fields.get("name") or path.parent.name
+    if recorded_name != name:
+        raise InstructionError(
+            f"skill at {path.as_posix()} declares name {recorded_name!r}, not {name!r}"
+        )
+    return SkillRef(
+        name=recorded_name,
+        path=f"{skills_dir.as_posix().rstrip('/')}/{name}/{BETTER_THAN_BEST_FILE}",
+        sha256=promote.digest(body),
+        matched=(),
+        body=body,
+    )
+
+
+def _bind_selected_skill(
+    skills: tuple[SkillRef, ...], skills_dir: Path, threshold: ProtocolThreshold | None
+) -> tuple[SkillRef, ...]:
+    if threshold is None or not threshold.selects:
+        return skills
+    required = _load_named_skill(skills_dir, BETTER_THAN_BEST_NAME)
+    if any(skill.name == required.name for skill in skills):
+        return skills
+    return (required, *skills)
 
 
 def _render_core(core_version: int) -> str:
@@ -466,6 +653,7 @@ def assemble(
     recall_limit_chars: int = RECALL_LIMIT_CHARS,
     skill_limit: int = SKILL_LIMIT,
     skill_chars: int = SKILL_CHARS,
+    threshold: ProtocolThreshold | None = None,
 ) -> Assembly:
     """Assemble the four layers for one task.
 
@@ -481,6 +669,7 @@ def assemble(
     skills, omitted = select_skills(
         skills_dir, task, limit=skill_limit, budget_chars=skill_chars
     )
+    skills = _bind_selected_skill(skills, skills_dir, threshold)
     adapted = _adapted_from_events(events)
     text = render(skills, pack, adapted, skills_omitted=omitted)
     return Assembly(
@@ -708,7 +897,15 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
                 continue
             name = entry.get("name")
             recorded_sha = entry.get("sha256")
-            path = skills_dir / str(name) / "SKILL.md"
+            recorded_path = entry.get("path")
+            path = skills_dir / str(name) / BETTER_THAN_BEST_FILE
+            if isinstance(recorded_path, str):
+                normalised = recorded_path.replace("\\", "/")
+                suffix = f"{name}/{BETTER_THAN_BEST_FILE}"
+                if not normalised.endswith(suffix):
+                    skill_reports_ok = False
+                    skill_details.append(f"{name}: path drifted")
+                    continue
             if not path.exists():
                 skill_reports_ok = False
                 skill_details.append(f"{name}: file gone")
@@ -828,3 +1025,127 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
             )
 
     return Reconstruction(assembly_id, True, tuple(reports))
+
+
+def _event_reference(raw: EventPayload) -> dict[str, str]:
+    event_id = raw.get("event_id")
+    kind = raw.get("event")
+    if not isinstance(event_id, str) or not isinstance(kind, str):
+        raise InstructionError("instructions.assembled is missing a stable identity")
+    return {
+        "event_id": event_id,
+        "event_kind": kind,
+        "event_sha256": event_sha256(raw),
+    }
+
+
+def _same_task_assembly(events: Sequence[Event], task: str) -> Event | None:
+    found: Event | None = None
+    for event in events:
+        if event.kind != ASSEMBLED:
+            continue
+        recall_data = event.data.get("recall")
+        if not isinstance(recall_data, dict):
+            continue
+        if recall_data.get("query") != task:
+            continue
+        found = event
+    return found
+
+
+def _require_reconstructed_skill(
+    log_dir: Path, skills_dir: Path, assembly_event: Event
+) -> None:
+    assembly_id = assembly_event.data.get("assembly_id")
+    if not isinstance(assembly_id, str):
+        raise InstructionError("instructions.assembled is missing assembly_id")
+    result = reconstruct(log_dir, skills_dir, assembly_id)
+    if not result.ok:
+        raise InstructionError(
+            "the pinned skill body does not reconstruct from the same tree"
+        )
+    recorded_skills = assembly_event.data.get("skills")
+    if not isinstance(recorded_skills, list):
+        raise InstructionError("instructions.assembled carries no skills")
+    required = _load_named_skill(skills_dir, BETTER_THAN_BEST_NAME)
+    match: dict[str, object] | None = None
+    for entry in recorded_skills:
+        if isinstance(entry, dict) and entry.get("name") == BETTER_THAN_BEST_NAME:
+            match = entry
+            break
+    if match is None:
+        raise InstructionError(
+            "the earlier same-task assembly does not contain the better-than-best skill"
+        )
+    if match.get("path") != required.path:
+        raise InstructionError("the recorded skill path does not match the pinned tree")
+    if match.get("sha256") != required.sha256:
+        raise InstructionError("the recorded skill digest does not match the pinned body")
+    replayed = _skill_file(skills_dir, BETTER_THAN_BEST_NAME).read_text(encoding="utf-8")
+    if replayed != required.body or promote.digest(replayed) != required.sha256:
+        raise InstructionError("the reconstructed skill body does not match the pinned body")
+
+
+def bind_protocol(
+    log_dir: Path,
+    skills_dir: Path,
+    *,
+    task: str,
+    threshold: ProtocolThreshold,
+    bar_ref: Mapping[str, str] | None = None,
+    search_ref: Mapping[str, str] | None = None,
+    killing_check_ref: Mapping[str, str] | None = None,
+    events: Sequence[Event] | None = None,
+) -> ProtocolBinding:
+    """Bind completion artefacts only when the threshold fires.
+
+    A firing threshold needs an earlier same-task assembly whose Better-Than-Best
+    name, path, digest and body reconstruct from the pinned tree, plus bar, search
+    and killing-check references. A non-firing threshold cannot carry those
+    artefacts.
+    """
+    if not task.strip():
+        raise ValueError("an assembly serves a task; the task text may not be empty")
+    prefix = list(events) if events is not None else read_all(log_dir)[0]
+    if not threshold.selects:
+        if bar_ref is not None or search_ref is not None or killing_check_ref is not None:
+            raise InstructionError(
+                "a non-firing threshold cannot carry a completion artefact"
+            )
+        return ProtocolBinding(
+            status=PROTOCOL_NOT_WARRANTED,
+            threshold=threshold,
+            instructions_ref=None,
+            bar_ref=None,
+            search_ref=None,
+            killing_check_ref=None,
+        )
+    if bar_ref is None or search_ref is None or killing_check_ref is None:
+        raise InstructionError(
+            "a firing threshold requires bar, search and killing-check references"
+        )
+    for label, reference in (
+        ("bar_ref", bar_ref),
+        ("search_ref", search_ref),
+        ("killing_check_ref", killing_check_ref),
+    ):
+        try:
+            resolve_reference(reference, prefix)
+        except EventError as exc:
+            raise InstructionError(
+                f"{label} does not resolve to an earlier event"
+            ) from exc
+    assembly_event = _same_task_assembly(prefix, task)
+    if assembly_event is None:
+        raise InstructionError(
+            "a firing threshold requires an earlier same-task instructions.assembled event"
+        )
+    _require_reconstructed_skill(log_dir, skills_dir, assembly_event)
+    return ProtocolBinding(
+        status=PROTOCOL_COMPLETED,
+        threshold=threshold,
+        instructions_ref=_event_reference(assembly_event.raw),
+        bar_ref=dict(bar_ref),
+        search_ref=dict(search_ref),
+        killing_check_ref=dict(killing_check_ref),
+    )
