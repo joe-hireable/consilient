@@ -357,6 +357,41 @@ def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> se
     return retired
 
 
+def _verdict_candidates(outer: dict[str, Any]) -> list[str]:
+    """Every JSON object in the reviewer's output that might be the verdict, newest last.
+
+    MEASURED 24 August 2026. The parser required `stdout_tail` to BE the verdict JSON. It is
+    not: it is the LAST 2000 CHARACTERS of the reviewer's stdout, and a reviewer writes prose
+    around its verdict. All 44 verdicts consumed that day came back `check_error`, so nothing
+    could retire -- reviews dispatched, billed, and discarded at a later stage than before.
+
+    The envelope carries `stdout_path`, the whole output on disk, so the verdict is looked for
+    across all of it rather than in whatever happened to fall inside a 2000-character window.
+    This changes only where the candidate is FOUND. Every field is still validated afterwards
+    exactly as before -- v, unit, artefact, attempt, verdict, findings -- so a wrong verdict
+    cannot be admitted by looking in more places for it.
+    """
+    seen: list[str] = []
+    blobs: list[str] = []
+    path = outer.get("stdout_path")
+    if isinstance(path, str) and path:
+        try:
+            blobs.append(pathlib.Path(path).read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            pass
+    tail = outer.get("stdout_tail")
+    if isinstance(tail, str) and tail:
+        blobs.append(tail)
+    for blob in blobs:
+        # Objects that name a verdict at all. Non-greedy and brace-balanced only to one level,
+        # which is enough: the receipt is flat by specification.
+        for match in re.finditer(r"\{[^{}]*\"verdict\"[^{}]*\}", blob, re.S):
+            text = match.group(0)
+            if text not in seen:
+                seen.append(text)
+    return seen
+
+
 def consume_review_verdict(state: dict[str, Any], uid: str, unit: dict[str, Any]) -> str:
     """Consume one strict reviewer receipt; anything else is a retryable check error."""
     expected = state.setdefault("review_expected", {}).get(uid)
@@ -374,7 +409,16 @@ def consume_review_verdict(state: dict[str, Any], uid: str, unit: dict[str, Any]
         outer = json.loads((BRIEFS / f"{uid}-verify.out").read_text(encoding="utf-8"))
         if not isinstance(outer, dict) or outer.get("status") != "ok":
             raise ValueError("outer dispatch did not succeed")
-        inner = json.loads(outer["stdout_tail"])
+        inner = None
+        for candidate in _verdict_candidates(outer):
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict) and parsed.get("unit") == uid:
+                inner = parsed
+        if inner is None:
+            raise ValueError("no verdict object found in the reviewer's output")
         if (
             not isinstance(inner, dict)
             or set(inner) != {"v", "unit", "artefact", "attempt", "verdict", "findings"}
