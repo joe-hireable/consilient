@@ -23,6 +23,7 @@ is recorded `silent` and is not retried on another pool.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shlex
@@ -33,6 +34,7 @@ import sys
 import tempfile
 import time
 import threading
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +45,13 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from consilient import coordination, instructions  # noqa: E402
 from consilient.capabilities import CapabilityError, select_capabilities  # noqa: E402
+from consilient.effects import (  # noqa: E402
+    EffectManifest,
+    ProofObservation,
+    RecoveryProof,
+    canonical_state_digest,
+    evaluate_recovery_proof,
+)
 from consilient.error_tracking import (  # noqa: E402
     ErrorRecordError,
     append_record,
@@ -2073,6 +2082,172 @@ def dispatch_fanout(
     if first.status == "ok" and second.status == "ok":
         return payload, 0
     return payload, _exit_for(worst)
+
+
+# --- ADR-0075 isolated recovery proof ---------------------------------------
+# Scratch forward/inverse execution stays in this script boundary, never in the
+# AST-locked product package; `consilient.effects` owns the pure verdict and is
+# given only observations, never the adapter's own account of what it did.
+
+_PROOF_ESCAPES = {
+    "network": "network",
+    "credential": "credential",
+    "spawn_child": "escaped_child",
+}
+
+
+def _ordered_unique(values: Sequence[str]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(values))
+
+
+def _scan_state(root: Path) -> dict[str, str]:
+    """Read one tree as a path->text map. Scratch only, so text files only."""
+
+    return {
+        path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _scan_enclosing(enclosing: Path, scratch: Path) -> dict[str, str]:
+    """The admitted root minus the declared scope: what must not have moved."""
+
+    return {
+        relative: content
+        for relative, content in _scan_state(enclosing).items()
+        if not (enclosing / relative).is_relative_to(scratch)
+    }
+
+
+class _ProofObserver:
+    """The outer sandbox. It records and refuses; the adapter cannot see it."""
+
+    def __init__(self, scratch: Path, enclosing: Path, verifier_policy_digest: str) -> None:
+        self.scratch = scratch
+        self.enclosing = enclosing
+        self.observed_verifier_policy = verifier_policy_digest
+        self.escaped: list[str] = []
+        self.residuals: list[str] = ["elapsed_time"]
+        self.log: list[dict[str, object]] = []
+
+    def _deny(self, kind: str, label: str) -> None:
+        self.escaped.append(label)
+        self.log.append({"step": kind, "allowed": False, "detail": label})
+
+    def run(self, steps: object) -> str:
+        denied = False
+        for step in steps if isinstance(steps, Sequence) else ():
+            item = step if isinstance(step, Mapping) else {}
+            kind = str(item.get("kind", ""))
+            if kind == "write":
+                target = (self.scratch / str(item.get("path", ""))).resolve()
+                if not target.is_relative_to(self.enclosing):
+                    self._deny(kind, "out_of_root")
+                    denied = True
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(str(item.get("content", "")), encoding="utf-8")
+                self.log.append(
+                    {
+                        "step": kind,
+                        "allowed": True,
+                        "detail": target.relative_to(self.enclosing).as_posix(),
+                    }
+                )
+            elif kind == "process":
+                residuals = item.get("residuals", ())
+                self.residuals.extend(
+                    str(name) for name in (residuals if isinstance(residuals, Sequence) else ())
+                )
+                self.log.append({"step": kind, "allowed": True, "detail": "residual_only"})
+            elif kind == "change_verifier_policy":
+                self.observed_verifier_policy = str(item.get("digest", ""))
+                self.log.append({"step": kind, "allowed": True, "detail": "verifier_policy"})
+            elif kind in _PROOF_ESCAPES:
+                self._deny(kind, _PROOF_ESCAPES[kind])
+                denied = True
+            else:
+                # ponytail: an unknown step kind fails closed rather than passing.
+                self._deny(kind, "unknown_step")
+                denied = True
+        return "failed" if denied else "succeeded"
+
+
+def run_isolated_recovery_proof(
+    scratch_root: Path,
+    verifier_log: Path,
+    *,
+    identities: Mapping[str, str],
+    manifest: EffectManifest,
+    start_files: Mapping[str, str],
+    adapter: Mapping[str, object],
+    sandbox_policy_digest: str,
+    verifier_policy_digest: str,
+) -> RecoveryProof:
+    """Run one scratch-only recovery proof and return the pure verdict.
+
+    The runner is handed a new scratch root and a verifier log and nothing else:
+    no live target, network, credential, provider or spend handle is reachable
+    from this signature, which is what makes the proof isolated rather than a
+    rehearsal against the thing it is meant to protect.
+    """
+
+    scratch = Path(scratch_root).resolve()
+    enclosing = scratch.parent
+    scratch.mkdir(parents=True, exist_ok=True)
+    for relative, content in start_files.items():
+        seeded = scratch / relative
+        seeded.parent.mkdir(parents=True, exist_ok=True)
+        seeded.write_text(content, encoding="utf-8")
+
+    start_digest = canonical_state_digest(_scan_state(scratch))
+    enclosing_before = canonical_state_digest(_scan_enclosing(enclosing, scratch))
+
+    observer = _ProofObserver(scratch, enclosing, verifier_policy_digest)
+    forward_status = observer.run(adapter.get("forward", ()))
+    forward_digest = canonical_state_digest(_scan_state(scratch))
+    inverse_status = observer.run(adapter.get("inverse", ()))
+    end_digest = canonical_state_digest(_scan_state(scratch))
+    enclosing_after = canonical_state_digest(_scan_enclosing(enclosing, scratch))
+
+    log_path = Path(verifier_log)
+    lines = [json.dumps(entry, ensure_ascii=False, sort_keys=True) for entry in observer.log]
+    with log_path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write("".join(line + "\n" for line in lines))
+    observer_log_digest = hashlib.sha256(log_path.read_bytes()).hexdigest()
+
+    declared_expected = manifest.expected_state
+    expected_digest = (
+        str(declared_expected.get("commitment", ""))
+        if isinstance(declared_expected, Mapping)
+        else ""
+    )
+    # An expected state the manifest never committed to is unmatchable, and
+    # `evaluate_recovery_proof` reports it as a capability gap before comparing.
+    if len(expected_digest) != 64:
+        expected_digest = "0" * 64
+
+    return evaluate_recovery_proof(
+        manifest=manifest,
+        observation=ProofObservation(
+            start_state_digest=start_digest,
+            forward_state_digest=forward_digest,
+            end_state_digest=end_digest,
+            enclosing_before_digest=enclosing_before,
+            enclosing_after_digest=enclosing_after,
+            expected_state_digest=expected_digest,
+            forward_status=forward_status,
+            inverse_status=inverse_status,
+            sandbox_policy_digest=sandbox_policy_digest,
+            verifier_policy_digest=verifier_policy_digest,
+            observed_verifier_policy_digest=observer.observed_verifier_policy,
+            observer_log_digest=observer_log_digest,
+            escaped_attempts=_ordered_unique(observer.escaped),
+            observed_residuals=_ordered_unique(observer.residuals),
+        ),
+        **identities,
+    )
 
 
 def positive_int(value: str) -> int:

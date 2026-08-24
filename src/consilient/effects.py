@@ -200,6 +200,48 @@ def _strings(value: object, field: str, *, allow_empty: bool = False) -> tuple[s
     return items
 
 
+def _relative_state_path(path: str, field: str) -> str:
+    posix = _text(path, field).replace("\\", "/")
+    if posix.startswith("/") or (len(posix) >= 2 and posix[1] == ":"):
+        raise EffectError(f"{field} must be a relative path")
+    parts = [part for part in posix.split("/") if part not in {"", "."}]
+    if not parts or any(part == ".." for part in parts):
+        raise EffectError(f"{field} must stay inside scope")
+    return "/".join(parts)
+
+
+def canonical_state_digest(files: Mapping[str, str]) -> str:
+    """Canonical digest of a secret-free path→text map; no filesystem is read."""
+
+    if not isinstance(files, Mapping):
+        raise EffectError("state files must be an object")
+    lines: list[str] = []
+    seen: set[str] = set()
+    for raw_path, content in files.items():
+        path = _relative_state_path(str(raw_path), "state path")
+        if path in seen:
+            raise EffectError("state paths must not contain duplicates")
+        if not isinstance(content, str):
+            raise EffectError("state content must be a string")
+        seen.add(path)
+        payload = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        lines.append(f"{path}:{payload}")
+    lines.sort()
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def _keyed_commitment_digest(value: object, field: str) -> str | None:
+    item = _mapping(value, field)
+    if item.get("kind") != "keyed_commitment":
+        return None
+    return _digest(item["commitment"], f"{field}.commitment")
+
+
+_PROOF_RUN_STATUSES = frozenset({"succeeded", "failed", "not_run"})
+RecoveryStatus = Literal["passed", "refused", "capability_gap"]
+RECOVERY_STATUSES = frozenset({"passed", "refused", "capability_gap"})
+
+
 @dataclass(frozen=True)
 class EffectManifest:
     """The sole secret-free declaration of one adapter invocation."""
@@ -516,6 +558,203 @@ def derive_admission(
 
     disposition, reason = _disposition_for(admission, match_reason, facts)
     return AdmissionResult(admission, disposition, reason)
+
+
+@dataclass(frozen=True)
+class ProofObservation:
+    """Independent outer-sandbox observations of one scratch proof run."""
+
+    start_state_digest: str
+    forward_state_digest: str
+    end_state_digest: str
+    enclosing_before_digest: str
+    enclosing_after_digest: str
+    expected_state_digest: str
+    forward_status: str
+    inverse_status: str
+    sandbox_policy_digest: str
+    verifier_policy_digest: str
+    observed_verifier_policy_digest: str
+    observer_log_digest: str
+    escaped_attempts: Sequence[str]
+    observed_residuals: Sequence[str]
+
+    def __post_init__(self) -> None:
+        for field in (
+            "start_state_digest",
+            "forward_state_digest",
+            "end_state_digest",
+            "enclosing_before_digest",
+            "enclosing_after_digest",
+            "expected_state_digest",
+            "sandbox_policy_digest",
+            "verifier_policy_digest",
+            "observed_verifier_policy_digest",
+            "observer_log_digest",
+        ):
+            object.__setattr__(self, field, _digest(getattr(self, field), field))
+        for field in ("forward_status", "inverse_status"):
+            status = _text(getattr(self, field), field)
+            if status not in _PROOF_RUN_STATUSES:
+                raise EffectError(f"{field} must be one of {sorted(_PROOF_RUN_STATUSES)}")
+            object.__setattr__(self, field, status)
+        object.__setattr__(
+            self,
+            "escaped_attempts",
+            _strings(self.escaped_attempts, "escaped_attempts", allow_empty=True),
+        )
+        object.__setattr__(
+            self,
+            "observed_residuals",
+            _strings(self.observed_residuals, "observed_residuals", allow_empty=True),
+        )
+
+
+@dataclass(frozen=True)
+class RecoveryProof:
+    """Bound result of one isolated recovery proof, reusable only when passed."""
+
+    proof_operation_id: str
+    proof_decision_id: str
+    proof_intent_id: str
+    live_operation_id: str
+    manifest: EffectManifest
+    observation: ProofObservation
+    status: RecoveryStatus
+    reason: str
+    digest: str | None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.manifest, EffectManifest):
+            raise EffectError("recovery proof must bind an EffectManifest")
+        if not isinstance(self.observation, ProofObservation):
+            raise EffectError("recovery proof must bind a ProofObservation")
+        if self.status not in RECOVERY_STATUSES:
+            raise EffectError("recovery proof status is unknown")
+        _text(self.reason, "reason")
+        if self.status == "passed":
+            if self.digest is None:
+                raise EffectError("a passing recovery proof must carry a digest")
+            _digest(self.digest, "digest")
+        elif self.digest is not None:
+            raise EffectError("only a passing recovery proof may carry a digest")
+
+
+def _proof_binding_digest(
+    *,
+    proof_operation_id: str,
+    proof_decision_id: str,
+    proof_intent_id: str,
+    live_operation_id: str,
+    manifest: EffectManifest,
+    observation: ProofObservation,
+) -> str:
+    payload = {
+        "end_state_digest": observation.end_state_digest,
+        "enclosing_after_digest": observation.enclosing_after_digest,
+        "forward_state_digest": observation.forward_state_digest,
+        "live_operation_id": live_operation_id,
+        "manifest_digest": manifest.digest,
+        "observer_log_digest": observation.observer_log_digest,
+        "proof_decision_id": proof_decision_id,
+        "proof_intent_id": proof_intent_id,
+        "proof_operation_id": proof_operation_id,
+        "residuals": list(observation.observed_residuals),
+        "sandbox_policy_digest": observation.sandbox_policy_digest,
+        "start_state_digest": observation.start_state_digest,
+        "verifier_policy_digest": observation.verifier_policy_digest,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+def evaluate_recovery_proof(
+    *,
+    proof_operation_id: str,
+    proof_decision_id: str,
+    proof_intent_id: str,
+    live_operation_id: str,
+    manifest: EffectManifest,
+    observation: ProofObservation,
+) -> RecoveryProof:
+    """Classify one executed scratch proof. Confidence and exit codes are not inputs."""
+
+    def finish(status: RecoveryStatus, reason: str, digest: str | None = None) -> RecoveryProof:
+        return RecoveryProof(
+            proof_operation_id=proof_operation_id,
+            proof_decision_id=proof_decision_id,
+            proof_intent_id=proof_intent_id,
+            live_operation_id=live_operation_id,
+            manifest=manifest,
+            observation=observation,
+            status=status,
+            reason=reason,
+            digest=digest,
+        )
+
+    identities = (
+        proof_operation_id,
+        proof_decision_id,
+        proof_intent_id,
+        live_operation_id,
+    )
+    if any(not isinstance(item, str) or not item.strip() for item in identities):
+        return finish("refused", "proof_identities_missing")
+    if live_operation_id == proof_operation_id:
+        return finish("refused", "live_operation_not_separate")
+    if "process.run" in _manifest_effects(manifest):
+        return finish("capability_gap", "process_run_not_restorable")
+
+    escaped = tuple(observation.escaped_attempts)
+    if escaped:
+        if set(escaped) <= {"escaped_child"}:
+            return finish("refused", "escaped_child")
+        return finish("refused", "escaped_protected_effect")
+    if observation.observed_verifier_policy_digest != observation.verifier_policy_digest:
+        return finish("refused", "verifier_policy_changed")
+
+    start_commitment = _keyed_commitment_digest(manifest.start_state, "start_state")
+    if start_commitment is None:
+        return finish("capability_gap", "start_state_not_comparable")
+    if start_commitment != observation.start_state_digest:
+        return finish("refused", "start_state_mismatch")
+
+    if observation.forward_status == "not_run" or observation.inverse_status == "not_run":
+        return finish("refused", "proof_not_executed")
+    if observation.forward_status != "succeeded":
+        return finish("refused", "forward_failed")
+
+    expected_commitment = _keyed_commitment_digest(manifest.expected_state, "expected_state")
+    if expected_commitment is None:
+        return finish("capability_gap", "expected_state_not_comparable")
+    if expected_commitment != observation.expected_state_digest:
+        return finish("refused", "expected_state_mismatch")
+    if observation.forward_state_digest != observation.expected_state_digest:
+        return finish("refused", "expected_state_mismatch")
+    if _has_mutation_effects(manifest) and observation.forward_state_digest == observation.start_state_digest:
+        return finish("refused", "forward_did_not_mutate")
+    if observation.inverse_status != "succeeded" or observation.end_state_digest != observation.start_state_digest:
+        return finish("refused", "inverse_failed")
+    if observation.enclosing_after_digest != observation.enclosing_before_digest:
+        return finish("refused", "enclosing_scope_mismatch")
+
+    declared = set(_strings(manifest.declared_residuals, "declared_residuals", allow_empty=True))
+    observed = set(observation.observed_residuals)
+    if not observed <= declared:
+        return finish("refused", "undeclared_residual")
+
+    digest = _proof_binding_digest(
+        proof_operation_id=proof_operation_id,
+        proof_decision_id=proof_decision_id,
+        proof_intent_id=proof_intent_id,
+        live_operation_id=live_operation_id,
+        manifest=manifest,
+        observation=observation,
+    )
+    return finish("passed", "restored", digest)
 
 
 def _binding(value: object) -> EffectManifest | None:
