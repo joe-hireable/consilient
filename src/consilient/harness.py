@@ -673,7 +673,7 @@ def grammar_accepts(constraint: GrammarConstraint, text: str) -> bool:
     return _validate_instance(constrained_only, constraint.constrained_schema)
 
 
-Status = Literal["ok", "silent", "failed", "timeout", "refused"]
+Status = Literal["ok", "silent", "failed", "timeout", "refused", "killed"]
 DecisionKind = Literal["run", "refuse"]
 VerdictKind = Literal["agree", "disagree", "incomparable"]
 PermissionMode = Literal["bypass", "prompt"]
@@ -1444,6 +1444,7 @@ def parse_status(value: str) -> Status:
         "failed": "failed",
         "timeout": "timeout",
         "refused": "refused",
+        "killed": "killed",
     }
     try:
         return mapping[value]
@@ -1547,7 +1548,7 @@ def classify_gap(status: str, reason: str) -> tuple[str, str, str] | None:
             "a human inspects why the harness reported success and produced nothing; "
             "dispatch policy already forbids an unattended retry on another pool",
         )
-    if status in ("failed", "timeout"):
+    if status in ("failed", "timeout", "killed"):
         return (
             "failed",
             "retry",

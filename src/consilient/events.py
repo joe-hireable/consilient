@@ -123,6 +123,9 @@ KNOWLEDGE_STATUSES = frozenset({"ok", "unavailable", "not_configured"})
 VERIFICATION_STATUSES = frozenset(
     {"completed", "error", "timeout", "refused", "not_run"}
 )
+DISPATCH_STATUSES = frozenset(
+    {"ok", "silent", "failed", "timeout", "refused", "killed", "error"}
+)
 ACQUISITION_CHANNELS = frozenset(
     {
         "artefact_execution",
@@ -1296,6 +1299,11 @@ def _check_dispatch_contract(event: EventPayload) -> None:
         event["data"].get("supervised"), bool
     ):
         raise EventError("dispatch events must record supervised as a boolean (ADR-0039)")
+    status = event["data"].get("status")
+    if event["event"] in ("dispatch.outcome", "dispatch.refused") and status is not None and (
+        not isinstance(status, str) or status not in DISPATCH_STATUSES
+    ):
+        raise EventError(f"unknown dispatch status {status!r}")
 
 
 def _check_measurement_contract(event: EventPayload) -> None:
@@ -2804,9 +2812,10 @@ def read(path: Path) -> tuple[list[Event], list[Rejection]]:
             last = exc
             time.sleep(_READ_BACKOFF * (2**attempt))
     raise EventError(
-        f"{path} could not be read after {_READ_RETRIES} attempts: it is held by another "
-        f"process. The trajectory is never partially reported -- refusing rather than "
-        f"continuing against an incomplete history ({last})."
+        f"{path} could not be read after {_READ_RETRIES} attempts: observed access denial "
+        f"({last}); it may be held by another process. The trajectory is never partially "
+        "reported -- refusing rather than "
+        "continuing against an incomplete history."
     )
 
 
@@ -2826,7 +2835,12 @@ def _read_under_lock(path: Path, fd: int) -> tuple[list[Event], list[Rejection]]
         if not chunk:
             break
         chunks.append(chunk)
-    text = b"".join(chunks).decode("utf-8")
+    payload = b"".join(chunks)
+    if payload and not payload.endswith(b"\n"):
+        raise EventError(
+            f"refusing append to {path.name!r}: torn line at byte offset {payload.rfind(b'\n') + 1}"
+        )
+    text = payload.decode("utf-8")
     normalised = text.replace("\r\n", "\n").replace("\r", "\n")
     return _classify_lines(str(path), normalised.splitlines(keepends=True))
 
@@ -2836,6 +2850,8 @@ def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
     events: list[Event] = []
     rejected: list[Rejection] = []
     for path in sorted(directory.glob("*.jsonl")):
+        if not path.is_file():
+            continue
         file_events, file_rejected = read(path)
         events.extend(file_events)
         rejected.extend(file_rejected)
