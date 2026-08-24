@@ -151,7 +151,9 @@ ARMS = [
 # here, not the turn count, so the cap should be generous enough never to be the binding limit.
 DEFAULT_TURNS = 150
 
-CURSOR_CONCURRENCY = 6  # startup-scoped lock since 24 Aug; runs overlap after ~20s settle
+CURSOR_CONCURRENCY = (
+    6  # startup-scoped lock since 24 Aug; runs overlap after ~20s settle
+)
 
 
 def pick_arm(index: int, state: dict) -> tuple:
@@ -317,7 +319,9 @@ def committed(uid: str, unit: dict) -> bool:
 def artefact_identity(unit: dict[str, Any]) -> str | None:
     """Hash the current committed blobs the review is permitted to judge."""
     claims = unit.get("claims")
-    if not isinstance(claims, list) or not all(isinstance(path, str) for path in claims):
+    if not isinstance(claims, list) or not all(
+        isinstance(path, str) for path in claims
+    ):
         return None
     blobs = []
     for path in sorted(claims):
@@ -387,7 +391,9 @@ def _verdict_candidates(outer: dict[str, Any]) -> list[str]:
     path = outer.get("stdout_path")
     if isinstance(path, str) and path:
         try:
-            blobs.append(pathlib.Path(path).read_text(encoding="utf-8", errors="replace"))
+            blobs.append(
+                pathlib.Path(path).read_text(encoding="utf-8", errors="replace")
+            )
         except OSError:
             pass
     tail = outer.get("stdout_tail")
@@ -403,7 +409,9 @@ def _verdict_candidates(outer: dict[str, Any]) -> list[str]:
     return seen
 
 
-def consume_review_verdict(state: dict[str, Any], uid: str, unit: dict[str, Any]) -> str:
+def consume_review_verdict(
+    state: dict[str, Any], uid: str, unit: dict[str, Any]
+) -> str:
     """Consume one strict reviewer receipt; anything else is a retryable check error."""
     expected = state.setdefault("review_expected", {}).get(uid)
     if not isinstance(expected, dict):
@@ -440,7 +448,10 @@ def consume_review_verdict(state: dict[str, Any], uid: str, unit: dict[str, Any]
             or artefact_identity(unit) != artefact
             or inner.get("verdict") not in {"SOUND", "DEFECTIVE"}
             or not isinstance(inner.get("findings"), list)
-            or not all(isinstance(finding, str) and finding.strip() for finding in inner["findings"])
+            or not all(
+                isinstance(finding, str) and finding.strip()
+                for finding in inner["findings"]
+            )
             or (inner["verdict"] == "SOUND" and inner["findings"])
             or (inner["verdict"] == "DEFECTIVE" and not inner["findings"])
             or not isinstance(attempt, int)
@@ -967,7 +978,9 @@ def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
     return f"applied {applied} commit(s) from {uid}"
 
 
-def write_verify_brief(uid: str, unit: dict, artefact: str, attempt: int) -> pathlib.Path:
+def write_verify_brief(
+    uid: str, unit: dict, artefact: str, attempt: int
+) -> pathlib.Path:
     """Adversarial review of a landed unit, by a different model family than built it.
 
     A unit whose own tests pass has marked its own homework. `CONSILIENCE.md`: agreement
@@ -1103,7 +1116,9 @@ exactly that number going up. Say which hunk defeated you and what the two readi
     return path
 
 
-def write_brief(uid: str, unit: dict, repair_findings: list[str] | None = None) -> pathlib.Path:
+def write_brief(
+    uid: str, unit: dict, repair_findings: list[str] | None = None
+) -> pathlib.Path:
     BRIEFS.mkdir(parents=True, exist_ok=True)
     path = BRIEFS / f"{uid}.md"
     claims = "\n".join(f"- `{c}`" for c in unit["claims"])
@@ -1121,11 +1136,20 @@ def write_brief(uid: str, unit: dict, repair_findings: list[str] | None = None) 
     # simply repeats -- T01 refused three times for reasons two-thirds already resolved.
     note = unit.get("note", "")
     if note:
-        note = chr(10) + "## Read this before you start" + chr(10) + chr(10) + note + chr(10)
+        note = (
+            chr(10)
+            + "## Read this before you start"
+            + chr(10)
+            + chr(10)
+            + note
+            + chr(10)
+        )
     if repair_findings:
-        note += "\n## Repair required\n\nThe prior adversarial review found:\n" + "\n".join(
-            "- " + finding for finding in repair_findings
-        ) + "\nRepair these findings; the unit cannot retire until a changed artefact receives a SOUND review.\n"
+        note += (
+            "\n## Repair required\n\nThe prior adversarial review found:\n"
+            + "\n".join("- " + finding for finding in repair_findings)
+            + "\nRepair these findings; the unit cannot retire until a changed artefact receives a SOUND review.\n"
+        )
     body = f"""# Build {uid} exactly as the plan specifies. Test-first, one commit.
 
 ## Your assignment
@@ -1399,6 +1423,16 @@ def main() -> int:
             # retry -- F-05. But a repeated identical death IS evidence, and auto-repair that
             # silently retries a systematic defect is how a system ships with its own bugs built
             # in. Three of the same failure stops being repaired and starts being escalated.
+            # Releasing what a dead run held is hygiene, not repair, so it happens for every
+            # death INCLUDING an escalated one. The escalation used to `continue` straight past
+            # this block, so an escalated unit kept its slot for ever: Y02 died the same way 77
+            # times while still counted as in flight. Stopping the retries is right; leaking the
+            # capacity is not. [measured 24 Aug 2026]
+            state["in_flight"].pop(uid, None)
+            for bucket_name in ("resolve_dispatched", "review_dispatched"):
+                bucket = state.get(bucket_name, [])
+                if uid in bucket:
+                    bucket.remove(uid)
             if len(seen) >= 3 and len(set(seen[-3:])) == 1:
                 print(
                     "driver: ESCALATION -- "
@@ -1412,10 +1446,6 @@ def main() -> int:
             state.setdefault("attempts", {})[uid] = max(
                 0, state.get("attempts", {}).get(uid, 1) - 1
             )
-            state["in_flight"].pop(uid, None)
-            bucket = state.get("resolve_dispatched", [])
-            if uid in bucket:
-                bucket.remove(uid)
             # A crashed review is the quietest failure of the lot: the unit stays "done", the
             # review never happens, and nothing anywhere records that the artefact was never
             # checked by a different model family. Three units reached done this way today.
@@ -1520,13 +1550,18 @@ def main() -> int:
                 f"driver: {_uid} already landed -- its added lines are present in HEAD; retiring"
             )
             continue
-        if sh(["git", "merge-tree", "--write-tree", "--name-only", "HEAD", _sha]).stdout.count(
-            "CONFLICT"
-        ) == 0:
+        if (
+            sh(
+                ["git", "merge-tree", "--write-tree", "--name-only", "HEAD", _sha]
+            ).stdout.count("CONFLICT")
+            == 0
+        ):
             conflicts.pop(_uid, None)
             if _uid in state.setdefault("resolve_dispatched", []):
                 state["resolve_dispatched"].remove(_uid)
-            print(f"driver: {_uid} conflict was stale -- it merges cleanly against current HEAD")
+            print(
+                f"driver: {_uid} conflict was stale -- it merges cleanly against current HEAD"
+            )
     _now_m = _time_m.time()
     _dispatchers_alive = live_dispatchers()
     # Every unmerged worktree, not just the in-flight ones. A unit that finished, dropped out of
@@ -1535,7 +1570,9 @@ def main() -> int:
     # describes. V01 sat built-and-unmergeable this way while the tick reported it every time and
     # did nothing about it. [measured 23 Aug 2026]
     mergeable = [
-        uid for uid in units if uid not in done and uid not in built and (WORKTREES / uid).exists()
+        uid
+        for uid in units
+        if uid not in done and uid not in built and (WORKTREES / uid).exists()
     ]
     for uid in mergeable:
         if True:
@@ -1589,7 +1626,16 @@ def main() -> int:
     ]
 
     live = live_dispatchers()
-    reviews_out = 0
+    # Reviews ALREADY outstanding count against MAX_REVIEWS. This started at 0 each tick, so it
+    # counted only what this tick launched and never what was still running: every tick added up
+    # to twelve more on top of the backlog. MEASURED 24 Aug 2026 -- 64 reviews in flight against
+    # a cap of 12, one unit on its 27th review attempt, and 68 check_error against 3 SOUND.
+    #
+    # Each review full-clones a 136 MB workspace, so sixty-four of them thrash the machine badly
+    # enough that none of them finish, which is why the verification tier produced almost nothing
+    # while looking maximally busy. MAX_REVIEWS was always meant to be a concurrency cap -- the
+    # name says so -- and this makes it one instead of a per-tick rate.
+    reviews_out = len(state.setdefault("review_dispatched", []))
     for uid in pending_review:
         if reviews_out >= MAX_REVIEWS or live >= MAX_CONCURRENT:
             break
@@ -1838,7 +1884,9 @@ def main() -> int:
 if __name__ == "__main__":
     _lock = hold_tick_lock()
     if _lock is None:
-        print("driver: another tick holds the lock; exiting rather than competing for the suite")
+        print(
+            "driver: another tick holds the lock; exiting rather than competing for the suite"
+        )
         raise SystemExit(0)
     try:
         raise SystemExit(main())
