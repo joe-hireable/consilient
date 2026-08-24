@@ -130,6 +130,41 @@ ARMS = [
 ]
 
 
+# cursor-agent serialises on an exclusive file lock in scripts/dispatch.py, so more than one
+# concurrent cursor dispatch does not run in parallel — it waits out the leash and fails.
+CURSOR_CONCURRENCY = 1
+
+
+def pick_arm(index: int, state: dict) -> tuple:
+    """Choose an arm, refusing to oversubscribe one that serialises.
+
+    `scripts/dispatch.py` takes an EXCLUSIVE FILE LOCK around every cursor-composer run
+    (`DEFAULT_CURSOR_LOCK`), so exactly one can execute at a time. Dispatching several
+    simultaneously does not parallelise them — the extras block on the lock for the whole leash and
+    then fail with "cursor-agent lock held: could not acquire ... within 3600.0s". Measured on
+    24 August 2026: B04, L03 and Q02 each burned a full hour that way while one cursor run worked,
+    which is most of the Cursor capacity spent on waiting. [measured]
+
+    So a second concurrent cursor slot is skipped rather than queued, and the rotation moves on to a
+    harness that can actually start. This is the F-08 lesson in a new place: capacity that cannot be
+    used is not capacity, and a scheduler that treats a serialised arm as parallel reports itself
+    busy while nothing happens.
+    """
+    inflight = state.get("in_flight", {})
+    arms_by_unit = state.get("last_arm", {})
+    cursor_live = sum(
+        1 for uid in inflight if arms_by_unit.get(uid) == "cursor-composer"
+    )
+    for offset in range(len(ARMS)):
+        harness, model, leash = ARMS[(index + offset) % len(ARMS)]
+        if harness == "cursor-composer" and cursor_live >= CURSOR_CONCURRENCY:
+            continue
+        return harness, model, leash
+    # Every arm is a saturated cursor slot. Return the nominal one and let dispatch refuse loudly
+    # rather than inventing a harness that was not configured.
+    return ARMS[index % len(ARMS)]
+
+
 def sh(args, **kw):
     return subprocess.run(
         args,
@@ -1090,7 +1125,7 @@ def main() -> int:
         n = attempts.get(uid, 0)
         brief = write_brief(uid, unit)
         rot = state.get("arm_rotation", 0)
-        harness, model, leash = ARMS[(rot + n) % len(ARMS)]
+        harness, model, leash = pick_arm(rot + n, state)
         state["arm_rotation"] = rot + 1
         args = [
             sys.executable,
@@ -1144,7 +1179,7 @@ def main() -> int:
             continue
         rbrief = write_resolve_brief(uid, unit, why)
         rot = state.get("arm_rotation", 0)
-        harness, model, leash = ARMS[rot % len(ARMS)]
+        harness, model, leash = pick_arm(rot, state)
         state["arm_rotation"] = rot + 1
         rargs = [
             sys.executable,
