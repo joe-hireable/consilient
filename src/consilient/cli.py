@@ -16,6 +16,7 @@ import re
 import shutil
 import sqlite3
 import sys
+import time
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -852,19 +853,41 @@ def _gate(conditions: list[CommandResult]) -> CommandResult:
     return {"status": status, "passed": status == "pass", "conditions": conditions}
 
 
+_DB_BUSY_RETRIES = 6
+_DB_BUSY_BACKOFF = 0.05
+
+
 def cmd_doctor(args: argparse.Namespace) -> CommandResult:
     log, db = Path(args.log), Path(args.db)
     # Replay must inspect prior state before anything rebuilds the projection; rebuilding
     # first would recreate the tautological A2 check repaired on 20 August 2026. The beta
     # read that used to follow here fed Gate B2's throughput threshold, withdrawn by
     # ADR-0045.
-    try:
-        replay = cmd_replay(args)
-    except PermissionError as exc:
-        raise EventError(
-            f"state database is locked or busy at {db}; close any process using it, "
-            "then run consil doctor again"
-        ) from exc
+    # A contended database is the NORMAL case here, not an exceptional one. This repository
+    # runs twenty-odd agents appending to the trajectory and rebuilding the projection, and a
+    # gate check that gives up the moment a writer holds the file cannot be trusted on a live
+    # system -- which is the same defect as the A2 race it exists to decide. MEASURED 24 August
+    # 2026: `doctor` exited 2 with "state database is locked or busy" whenever a writer thread
+    # was mid-append, so the verdict depended on timing rather than on state.
+    #
+    # Bounded exponential retry, matching the precedent already set for trajectory reads in
+    # events.py. It fails CLOSED after the last attempt: a lock we never got is reported, never
+    # silently treated as a pass.
+    replay = None
+    for attempt in range(_DB_BUSY_RETRIES):
+        try:
+            replay = cmd_replay(args)
+            break
+        except PermissionError as exc:
+            if attempt == _DB_BUSY_RETRIES - 1:
+                raise EventError(
+                    f"state database is locked or busy at {db} after "
+                    f"{_DB_BUSY_RETRIES} attempts; close any process using it, "
+                    "then run consil doctor again"
+                ) from exc
+            time.sleep(_DB_BUSY_BACKOFF * (2**attempt))
+    if replay is None:  # pragma: no cover - the loop either breaks or raises
+        raise EventError(f"state database at {db} could not be read")
     a1, b1, b2 = _experiment_conditions()
     gates = {
         "A": _gate([a1, _replay_condition(replay, log, db), _capture_condition(log)]),
