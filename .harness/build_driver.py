@@ -30,6 +30,7 @@ BRIEFS = ROOT / ".harness/dispatch/briefs-driver"
 TAIL = ROOT / ".harness/dispatch/briefs-2026-08-22/_tail.md"
 LOG = ROOT / ".harness" / "log"
 RUNS = ROOT / ".harness" / "dispatch"
+PUBLISH_STOP = ROOT / ".harness" / "STOP-PUBLISH"
 
 # The build plan's recommended order. Foundation first, then the task spine, then recall
 # and delivery; ingress and self-improvement last because they unlock nothing upstream.
@@ -440,6 +441,9 @@ def publish_if_ready(state: dict, green: bool | None) -> str:
     Publishing is the only thing this driver does that cannot be undone, so it is the one place
     two independent checks are worth the duplication.
     """
+    if PUBLISH_STOP.exists():
+        return "publish held: STOP-PUBLISH is present"
+
     ahead = sh(["git", "rev-list", "--count", "public/main..HEAD"]).stdout.strip()
     if not ahead or ahead == "0":
         return ""
