@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -13,11 +15,11 @@ from consilient.capabilities import (
     default_gate,
     parse_inventory_entry,
 )
+from consilient import effects as effects_mod
 from consilient.effects import (
     ADMISSION_CLASSES,
     ADMISSION_DISPOSITIONS,
     AdmissionFacts,
-    EffectError,
     EffectManifest,
     derive_admission,
 )
@@ -569,3 +571,56 @@ def test_proof_operation_without_containment_does_not_execute() -> None:
     )
     assert result.disposition != "execute"
     assert result.admission != "proof_operation"
+
+
+def test_planning_operations_constant_is_deleted() -> None:
+    assert not hasattr(effects_mod, "PLANNING_OPERATIONS")
+
+
+def _function_source(name: str) -> str:
+    source = Path(effects_mod.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            segment = ast.get_source_segment(source, node)
+            if segment is None:
+                raise AssertionError(f"{name} has no source segment")
+            return segment
+    raise AssertionError(f"{name} is missing")
+
+
+def test_disposition_for_has_no_unreachable_arms() -> None:
+    text = _function_source("_disposition_for")
+    assert "capability_gap" not in text
+    assert "unhandled_admission_class" not in text
+    assert "process_not_contained" not in text
+
+
+def test_derive_admission_documents_that_it_is_unwired() -> None:
+    doc = derive_admission.__doc__ or ""
+    assert "ADR-0078" in doc
+    assert "unwired" in doc.casefold()
+
+
+def test_derive_admission_has_no_production_caller() -> None:
+    callers: list[str] = []
+    root = Path(effects_mod.__file__).resolve().parent
+    for path in root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            called = (
+                func.id
+                if isinstance(func, ast.Name)
+                else func.attr
+                if isinstance(func, ast.Attribute)
+                else ""
+            )
+            if called != "derive_admission":
+                continue
+            if path.resolve() == Path(effects_mod.__file__).resolve():
+                continue
+            callers.append(f"{path.name}:{node.lineno}")
+    assert callers == []

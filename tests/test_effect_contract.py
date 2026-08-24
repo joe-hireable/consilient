@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import ast
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
-from consilient.effects import EFFECT_CLASSES, OUTBOUND_EFFECTS, EffectError, EffectManifest
+from consilient import effects as effects_mod
+from consilient.effects import (
+    EFFECT_CLASSES,
+    MUTATION_EFFECTS,
+    OUTBOUND_EFFECTS,
+    READ_ONLY_EFFECTS,
+    EffectError,
+    EffectManifest,
+)
 from consilient.events import EventError, SCHEMA_VERSION, append, append_transaction, validate
 
 
@@ -250,3 +260,39 @@ def test_non_outbound_manifest_does_not_require_disclosure() -> None:
     value = manifest()
     assert value.disclosure is None
     assert "disclosure" not in value.to_record()
+
+
+def test_mutation_effects_are_disjoint_from_read_only_effects() -> None:
+    """A read-only class in MUTATION_EFFECTS makes the observation predicate lie."""
+    assert MUTATION_EFFECTS & READ_ONLY_EFFECTS == frozenset()
+    assert "data.read" not in MUTATION_EFFECTS
+    assert "network.call" not in MUTATION_EFFECTS
+
+
+@pytest.mark.parametrize("operation", ["write", "plan"])
+def test_observation_intent_refuses_a_mutating_operation(operation: str) -> None:
+    """Decision-free observation cannot record a mutating provider operation."""
+    record = manifest().to_record()
+    record["operations"] = [operation]
+    value = EffectManifest.from_record(record)
+    with pytest.raises(EventError, match="read-only"):
+        validate(event("effect.intent", intent_data(value, observation=True)))
+
+
+def _function_def(tree: ast.AST, name: str) -> ast.FunctionDef:
+    for node in tree.body if isinstance(tree, ast.Module) else ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return node
+    raise AssertionError(f"{name} is missing")
+
+
+def test_intent_calls_observation_predicate() -> None:
+    """An inline effects-only check misses a mutating operation on a read class."""
+    source = Path(effects_mod.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    names = {
+        node.func.id
+        for node in ast.walk(_function_def(tree, "_intent"))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "_observation_predicate" in names

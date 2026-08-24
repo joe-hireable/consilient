@@ -61,7 +61,6 @@ ADMISSION_DISPOSITIONS = frozenset({"execute", "reshape", "refuse", "escalate"})
 
 READ_ONLY_EFFECTS = frozenset({"data.read", "network.call"})
 READ_ONLY_OPERATIONS = frozenset({"read", "fetch", "get", "head", "list"})
-PLANNING_OPERATIONS = frozenset({"plan", "choose", "decide"})
 PROOF_OPERATIONS = frozenset({"proof"})
 PROTECTED_ESCALATION_EFFECTS = frozenset(
     {
@@ -79,9 +78,7 @@ MUTATION_EFFECTS = frozenset(
         "file.change",
         "system.change",
         "external.change",
-        "data.read",
         "process.run",
-        "network.call",
     }
 )
 OUTBOUND_EFFECTS = frozenset({"message.send"})
@@ -458,8 +455,7 @@ def _has_protected_effects(manifest: EffectManifest) -> bool:
 
 
 def _has_mutation_effects(manifest: EffectManifest) -> bool:
-    effects = _manifest_effects(manifest)
-    return bool(effects & MUTATION_EFFECTS) and not effects <= READ_ONLY_EFFECTS
+    return bool(_manifest_effects(manifest) & MUTATION_EFFECTS)
 
 
 def _planning_predicate(manifest: EffectManifest) -> bool:
@@ -467,7 +463,7 @@ def _planning_predicate(manifest: EffectManifest) -> bool:
     effects = _manifest_effects(manifest)
     return (
         bool(operations)
-        and operations <= PLANNING_OPERATIONS
+        and operations <= frozenset({"plan", "choose", "decide"})
         and bool(effects)
         and effects <= READ_ONLY_EFFECTS
     )
@@ -505,8 +501,6 @@ def _disposition_for(
     gate_reason: str,
     facts: AdmissionFacts,
 ) -> tuple[Disposition, str]:
-    if admission == "capability_gap":
-        return "refuse", gate_reason
     if admission == "protected_uncovered":
         return "escalate", "protected_class_without_standing_authority"
     if admission == "recoverable_mutation":
@@ -515,11 +509,7 @@ def _disposition_for(
         if facts.recovery_proof_passed is False:
             return "reshape", "recovery_proof_failed"
         return "refuse", "recovery_proof_missing"
-    if admission == "contained_execution" and not facts.contained:
-        return "refuse", "process_not_contained"
-    if admission in {"proof_operation", "material_choice", "observation", "contained_execution", "protected_covered"}:
-        return "execute", gate_reason
-    return "refuse", "unhandled_admission_class"
+    return "execute", gate_reason
 
 
 def derive_admission(
@@ -527,7 +517,11 @@ def derive_admission(
     capability: CapabilityEntry,
     facts: AdmissionFacts = AdmissionFacts(),
 ) -> AdmissionResult:
-    """Derive one fail-closed admission class and disposition from manifest and gate facts."""
+    """Derive one fail-closed admission class and disposition from manifest and gate facts.
+
+    ADR-0078 named this derivation. It is unwired: no production caller invokes it.
+    Tests exercise the classifier; validating an effect.intent does not.
+    """
 
     if facts.caller_metadata is not None:
         # Caller-supplied principal metadata is recorded, not authenticated admission.
@@ -807,10 +801,7 @@ def _intent(data: Mapping[str, object]) -> None:
         _text(admission["observation_id"], "effect.intent.observation_id")
         if data["decision_id"] is not None:
             raise EffectError("observation intent must carry decision_id: null")
-        if manifest is None or not set(_strings(manifest.effects, "manifest.effects")) <= {
-            "data.read",
-            "network.call",
-        }:
+        if manifest is None or not _observation_predicate(manifest):
             raise EffectError("observation intent requires an inline read-only manifest")
         return
     if kind != "material":
