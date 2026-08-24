@@ -56,6 +56,11 @@ jobs:
         # a blind test is reported as survival, so the checker cannot itself become a
         # check that cannot fail -- which is the defect it exists to find.
         run: python .github/scripts/check_guard_mutation.py --self-test
+      - name: Measurement recorded invariant check
+        if: ${{ !cancelled() }}
+        # ADR-0057 keeps user trajectories out of CI. This synthetic control exercises the real
+        # replay join and fails if measurement.result can lack prior measurement.registered.
+        run: python .github/scripts/check_measurement_recorded.py --self-test
       - name: Generated document drift check
         if: ${{ !cancelled() }}
         run: python .github/scripts/check_generated_documents.py --check
