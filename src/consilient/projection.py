@@ -24,6 +24,8 @@ from typing import cast
 from .events import (
     CANDIDATE_EXPOSED_KIND,
     DELIVERY_ESTIMATE_KIND,
+    EventError,
+    KNOWLEDGE_RETRIEVED_KIND,
     MEASUREMENT_REGISTERED_KIND,
     MEASUREMENT_RESULT_KIND,
     OUTCOME_KIND,
@@ -35,8 +37,10 @@ from .events import (
     VERIFICATION_OUTCOME_KIND,
     Event,
     Rejection,
+    decision_protocol_data,
     event_sha256,
     read_all,
+    resolve_reference,
 )
 from .work_items import STATE, WORK_MODEL_SCHEMA, state_group
 
@@ -1493,3 +1497,295 @@ def state_digest(conn: sqlite3.Connection) -> str:
                 ).encode()
             )
     return hasher.hexdigest()
+
+
+CONSILIENCE_STATUSES = frozenset(
+    {"converged", "insufficient", "disagreed", "unmeasured"}
+)
+_UNMEASURED_REASONS = (
+    "unmeasured: missing acquisition metadata",
+    "unmeasured: unknown derivation roots",
+    "unmeasured: legacy identity",
+)
+
+
+class _Reading:
+    def __init__(self, ref: dict[str, str]) -> None:
+        self.ref = ref
+        self.event: Event | None = None
+        self.reasons: list[str] = []
+        self.slot = False
+        self.channel: str | None = None
+        self.observation_anchor: str | None = None
+        self.roots: frozenset[str] | None = None
+        self.conclusion_id: str | None = None
+        self.contract: str | None = None
+        self.polarity: str | None = None
+
+
+def _events_from_conn(conn: sqlite3.Connection) -> list[Event]:
+    loaded: list[Event] = []
+    for row in conn.execute("SELECT payload FROM events ORDER BY position"):
+        payload = json.loads(cast(str, row[0]))
+        if isinstance(payload, dict):
+            loaded.append(Event(cast(dict[str, object], payload)))
+    return loaded
+
+
+def _polarity(event: Event, acquisition: dict[str, object]) -> str | None:
+    alternative = acquisition.get("alternative")
+    if not isinstance(alternative, str) or not alternative:
+        return None
+    if event.kind == VERIFICATION_OUTCOME_KIND:
+        accept = event.data.get("verifier_accept")
+        if not isinstance(accept, bool):
+            return None
+        return ("support:" if accept else "oppose:") + alternative
+    stance = acquisition.get("stance")
+    if stance == "supports":
+        return "support:" + alternative
+    if stance == "opposes":
+        return "oppose:" + alternative
+    return None
+
+
+def _classify_reading(
+    reference: object, ordered: list[Event], consumer: Event
+) -> _Reading:
+    if not isinstance(reference, dict):
+        reading = _Reading(
+            {"event_id": "", "event_kind": "", "event_sha256": ""}
+        )
+        reading.reasons.append("malformed evidence reference")
+        return reading
+    ref = {
+        "event_id": str(reference.get("event_id", "")),
+        "event_kind": str(reference.get("event_kind", "")),
+        "event_sha256": str(reference.get("event_sha256", "")),
+    }
+    reading = _Reading(ref)
+    try:
+        resolved = resolve_reference(reference, ordered, before=consumer)
+    except EventError as exc:
+        detail = str(exc)
+        if "not earlier" in detail:
+            reading.reasons.append("not earlier than the decision")
+        elif "event_sha256" in detail:
+            reading.reasons.append("mismatched event_sha256")
+        elif "missing" in detail:
+            reading.reasons.append("missing event")
+        else:
+            reading.reasons.append(detail)
+        return reading
+    if not isinstance(resolved, Event):
+        reading.reasons.append("unmeasured: legacy identity")
+        return reading
+    event = resolved
+    reading.event = event
+    acquisition = event.data.get("acquisition")
+    if not isinstance(acquisition, dict):
+        reading.reasons.append("unmeasured: missing acquisition metadata")
+        return reading
+    channel = acquisition.get("channel")
+    if not isinstance(channel, str):
+        reading.reasons.append("unmeasured: missing acquisition metadata")
+        return reading
+    reading.channel = channel
+    anchor = acquisition.get("observation_anchor")
+    reading.observation_anchor = anchor if isinstance(anchor, str) else None
+    conclusion = acquisition.get("conclusion_id")
+    reading.conclusion_id = conclusion if isinstance(conclusion, str) else None
+    contract = acquisition.get("acceptance_contract_digest")
+    reading.contract = contract if isinstance(contract, str) else None
+    roots = acquisition.get("derivation_roots")
+    if roots == "unknown" or roots == []:
+        reading.reasons.append("unmeasured: unknown derivation roots")
+        return reading
+    if isinstance(roots, list) and roots and all(isinstance(item, str) for item in roots):
+        reading.roots = frozenset(cast(list[str], roots))
+    else:
+        reading.reasons.append("unmeasured: unknown derivation roots")
+        return reading
+    if event.kind == VERIFICATION_OUTCOME_KIND:
+        status = event.data.get("status")
+        if status != "completed":
+            reading.reasons.append(str(status) if isinstance(status, str) else "not completed")
+            return reading
+    elif event.kind == KNOWLEDGE_RETRIEVED_KIND:
+        status = event.data.get("status")
+        if status != "ok":
+            reading.reasons.append(str(status) if isinstance(status, str) else "not completed")
+            return reading
+    else:
+        reading.reasons.append("unmeasured: missing acquisition metadata")
+        return reading
+    reading.polarity = _polarity(event, acquisition)
+    if reading.polarity is None:
+        reading.reasons.append("unmeasured: missing sealed alternative")
+        return reading
+    reading.slot = True
+    return reading
+
+
+def _poison_duplicates(readings: list[_Reading]) -> None:
+    by_event: dict[str, list[_Reading]] = {}
+    by_verification: dict[str, list[_Reading]] = {}
+    by_correlation: dict[tuple[str, str, str, str], list[_Reading]] = {}
+    for reading in readings:
+        event = reading.event
+        if event is None:
+            continue
+        event_id = event.raw.get("event_id")
+        if isinstance(event_id, str):
+            by_event.setdefault(event_id, []).append(reading)
+        if event.kind != VERIFICATION_OUTCOME_KIND:
+            continue
+        data = event.data
+        verification_id = data.get("verification_id")
+        if isinstance(verification_id, str):
+            by_verification.setdefault(verification_id, []).append(reading)
+        protocol_id = data.get("protocol_id")
+        attempt_id = data.get("attempt_id")
+        verifier_id = data.get("verifier_id")
+        verifier_version = data.get("verifier_version")
+        if (
+            isinstance(protocol_id, str)
+            and isinstance(attempt_id, str)
+            and isinstance(verifier_id, str)
+            and isinstance(verifier_version, str)
+        ):
+            key = (protocol_id, attempt_id, verifier_id, verifier_version)
+            by_correlation.setdefault(key, []).append(reading)
+
+    def poison(group: list[_Reading], reason: str) -> None:
+        if len(group) < 2:
+            return
+        for reading in group:
+            reading.slot = False
+            if reason not in reading.reasons:
+                reading.reasons.append(reason)
+
+    for group in by_event.values():
+        poison(group, "duplicate event_id")
+    for group in by_verification.values():
+        poison(group, "duplicate verification_id")
+    for group in by_correlation.values():
+        poison(group, "duplicate correlation key")
+
+
+def _structurally_distinct(left: _Reading, right: _Reading) -> tuple[bool, str]:
+    if left.channel == right.channel:
+        return False, "same acquisition_channel"
+    if left.observation_anchor == right.observation_anchor:
+        return False, "same observation_anchor"
+    if left.roots is None or right.roots is None:
+        return False, "unmeasured: unknown derivation roots"
+    if left.roots & right.roots:
+        return False, "shared derivation roots"
+    if left.conclusion_id != right.conclusion_id or left.contract != right.contract:
+        return False, "different conclusion or contract"
+    return True, ""
+
+
+def _alternative(polarity: str) -> str:
+    _, _, rest = polarity.partition(":")
+    return rest
+
+
+def consilience_status(
+    conn: sqlite3.Connection, decision_id: str
+) -> dict[str, object]:
+    """Classify a decision's immutable evidence refs without a second evidence store."""
+    ordered = _events_from_conn(conn)
+    consumer: Event | None = None
+    planning: dict[str, object] | None = None
+    for event in ordered:
+        record = decision_protocol_data(event)
+        if record is not None and record.get("decision_id") == decision_id:
+            consumer = event
+            planning = record
+            break
+    if consumer is None or planning is None:
+        raise ProjectionError(f"decision {decision_id!r} is not in the projection")
+    evidence_refs = planning.get("evidence_refs")
+    if not isinstance(evidence_refs, list):
+        raise ProjectionError(f"decision {decision_id!r} has no evidence_refs")
+
+    readings = [
+        _classify_reading(reference, ordered, consumer) for reference in evidence_refs
+    ]
+    _poison_duplicates(readings)
+
+    slots = [reading for reading in readings if reading.slot]
+    pair_reasons: list[str] = []
+    disagreed: tuple[_Reading, _Reading] | None = None
+    converged: tuple[_Reading, _Reading] | None = None
+    for index, left in enumerate(slots):
+        for right in slots[index + 1 :]:
+            distinct, reason = _structurally_distinct(left, right)
+            if not distinct:
+                pair_reasons.append(reason)
+                continue
+            if left.polarity == right.polarity:
+                if converged is None:
+                    converged = (left, right)
+                continue
+            if (
+                left.polarity is not None
+                and right.polarity is not None
+                and _alternative(left.polarity) == _alternative(right.polarity)
+            ):
+                if disagreed is None:
+                    disagreed = (left, right)
+                continue
+            pair_reasons.append("different alternatives")
+
+    qualifying: tuple[_Reading, _Reading] | None
+    if disagreed is not None:
+        status = "disagreed"
+        qualifying = disagreed
+        summary = ["opposed structural anchors"]
+    elif converged is not None:
+        status = "converged"
+        qualifying = converged
+        summary = ["qualifying pair"]
+    else:
+        qualifying = None
+        unmeasured = any(
+            any(marker in reason for marker in _UNMEASURED_REASONS)
+            for reading in readings
+            for reason in reading.reasons
+        )
+        if unmeasured:
+            status = "unmeasured"
+            summary = ["unmeasured: missing or unknown acquisition metadata"]
+        else:
+            status = "insufficient"
+            summary = ["no qualifying pair"]
+
+    qualifying_refs = (
+        [qualifying[0].ref, qualifying[1].ref] if qualifying is not None else []
+    )
+    selected = {id(item) for item in qualifying} if qualifying is not None else set()
+    non_qualifying_refs = [
+        {"ref": reading.ref, "reasons": list(reading.reasons)}
+        for reading in readings
+        if id(reading) not in selected
+    ]
+    reasons = list(summary)
+    reasons.extend(pair_reasons)
+    for reading in readings:
+        reasons.extend(reading.reasons)
+    unique_reasons: list[str] = []
+    seen: set[str] = set()
+    for reason in reasons:
+        if reason in seen:
+            continue
+        seen.add(reason)
+        unique_reasons.append(reason)
+    return {
+        "status": status,
+        "qualifying_refs": qualifying_refs,
+        "non_qualifying_refs": non_qualifying_refs,
+        "reasons": unique_reasons,
+    }

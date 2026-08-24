@@ -123,6 +123,31 @@ KNOWLEDGE_STATUSES = frozenset({"ok", "unavailable", "not_configured"})
 VERIFICATION_STATUSES = frozenset(
     {"completed", "error", "timeout", "refused", "not_run"}
 )
+ACQUISITION_CHANNELS = frozenset(
+    {
+        "artefact_execution",
+        "browser_observation",
+        "primary_source_retrieval",
+        "novel_corpus_observation",
+    }
+)
+_VERIFICATION_ACQUISITION_CHANNELS = frozenset(
+    {"artefact_execution", "browser_observation"}
+)
+_KNOWLEDGE_ACQUISITION_CHANNELS = frozenset(
+    {"primary_source_retrieval", "novel_corpus_observation"}
+)
+ACQUISITION_STANCES = frozenset({"supports", "opposes"})
+ACQUISITION_SOURCE_STATUSES = frozenset({"FULL", "ABS"})
+BROWSER_RETAINED_EVIDENCE = frozenset(
+    {
+        "screenshot",
+        "accessibility_tree",
+        "dom_runtime",
+        "console_network",
+        "interaction_receipt",
+    }
+)
 RECORD_CAPTURED_KIND = "record.captured"
 RECORD_CAPTURED_FIELDS = frozenset(
     {
@@ -402,6 +427,7 @@ def validate(event: object) -> EventPayload:
     _check_budget_contract(event)
     _check_usage_contract(event)
     _check_knowledge_contract(event)
+    _check_acquisition_contract(event)
     _check_capability_gap_contract(event)
     _check_intent_contract(event)
     _check_attempt_identity(event)
@@ -844,6 +870,159 @@ def _check_knowledge_contract(event: EventPayload) -> None:
         raise EventError(
             f"{KNOWLEDGE_RETRIEVED_KIND} with status {status!r} must not carry content_digest"
         )
+
+
+def _canonical_token(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
+        raise EventError(f"{field} must be canonical printable text")
+    if not value.isprintable():
+        raise EventError(f"{field} must be canonical printable text")
+    return value
+
+
+def _hex64(value: object, field: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise EventError(f"{field} must be 64 lowercase hex characters")
+    return value
+
+
+def _check_derivation_roots(value: object) -> None:
+    if value == "unknown":
+        return
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(
+            not isinstance(item, str) or not item.strip() or item != item.strip()
+            for item in value
+        )
+    ):
+        raise EventError(
+            "acquisition.derivation_roots must be 'unknown' or a non-empty list "
+            "of canonical strings"
+        )
+
+
+def _check_acquisition_contract(event: EventPayload) -> None:
+    """ADR-0081: source-kind events may carry one validated acquisition channel."""
+    kind = event["event"]
+    if kind not in {VERIFICATION_OUTCOME_KIND, KNOWLEDGE_RETRIEVED_KIND}:
+        return
+    data = event["data"]
+    if "acquisition" not in data:
+        return
+    acquisition = data["acquisition"]
+    if not isinstance(acquisition, dict):
+        raise EventError("acquisition must be an object")
+    channel = acquisition.get("channel")
+    if channel not in ACQUISITION_CHANNELS:
+        raise EventError(
+            "acquisition.channel must be one of "
+            f"{sorted(ACQUISITION_CHANNELS)}, got {channel!r}"
+        )
+    if kind == VERIFICATION_OUTCOME_KIND and channel not in _VERIFICATION_ACQUISITION_CHANNELS:
+        raise EventError(
+            f"{VERIFICATION_OUTCOME_KIND} cannot carry acquisition.channel {channel!r}"
+        )
+    if kind == KNOWLEDGE_RETRIEVED_KIND and channel not in _KNOWLEDGE_ACQUISITION_CHANNELS:
+        raise EventError(
+            f"{KNOWLEDGE_RETRIEVED_KIND} cannot carry acquisition.channel {channel!r}"
+        )
+
+    common = {
+        "channel",
+        "observation_anchor",
+        "derivation_roots",
+        "conclusion_id",
+        "alternative",
+        "acceptance_contract_digest",
+    }
+    if channel == "artefact_execution":
+        expected = common | {"environment"}
+    elif channel == "browser_observation":
+        expected = common | {
+            "browser",
+            "browser_version",
+            "retained_evidence",
+            "retained_evidence_digest",
+        }
+    elif channel == "primary_source_retrieval":
+        expected = common | {
+            "proposition_id",
+            "stance",
+            "locator",
+            "verification_status",
+        }
+    else:
+        expected = common | {
+            "proposition_id",
+            "stance",
+            "locator",
+            "corpus_manifest_digest",
+            "provenance",
+            "selection_rule",
+            "assembled_context_digest",
+        }
+    actual = set(acquisition)
+    if actual != expected:
+        raise EventError(
+            f"acquisition fields for {channel} mismatch; "
+            f"missing {sorted(expected - actual)}, unexpected {sorted(actual - expected)}"
+        )
+
+    _canonical_token(acquisition["observation_anchor"], "acquisition.observation_anchor")
+    _canonical_token(acquisition["conclusion_id"], "acquisition.conclusion_id")
+    _canonical_token(acquisition["alternative"], "acquisition.alternative")
+    _hex64(
+        acquisition["acceptance_contract_digest"],
+        "acquisition.acceptance_contract_digest",
+    )
+    _check_derivation_roots(acquisition["derivation_roots"])
+
+    if channel == "artefact_execution":
+        _canonical_token(acquisition["environment"], "acquisition.environment")
+        return
+    if channel == "browser_observation":
+        _canonical_token(acquisition["browser"], "acquisition.browser")
+        _canonical_token(acquisition["browser_version"], "acquisition.browser_version")
+        retained = acquisition["retained_evidence"]
+        if retained not in BROWSER_RETAINED_EVIDENCE:
+            raise EventError(
+                "acquisition.retained_evidence must be one of "
+                f"{sorted(BROWSER_RETAINED_EVIDENCE)}, got {retained!r}"
+            )
+        _hex64(
+            acquisition["retained_evidence_digest"],
+            "acquisition.retained_evidence_digest",
+        )
+        return
+
+    _canonical_token(acquisition["proposition_id"], "acquisition.proposition_id")
+    stance = acquisition["stance"]
+    if stance not in ACQUISITION_STANCES:
+        raise EventError(
+            "acquisition.stance must be one of "
+            f"{sorted(ACQUISITION_STANCES)}, got {stance!r}"
+        )
+    _canonical_token(acquisition["locator"], "acquisition.locator")
+    if channel == "primary_source_retrieval":
+        status = acquisition["verification_status"]
+        if status not in ACQUISITION_SOURCE_STATUSES:
+            raise EventError(
+                "acquisition.verification_status must be one of "
+                f"{sorted(ACQUISITION_SOURCE_STATUSES)}, got {status!r}"
+            )
+        return
+    _hex64(
+        acquisition["corpus_manifest_digest"],
+        "acquisition.corpus_manifest_digest",
+    )
+    _canonical_token(acquisition["provenance"], "acquisition.provenance")
+    _canonical_token(acquisition["selection_rule"], "acquisition.selection_rule")
+    _hex64(
+        acquisition["assembled_context_digest"],
+        "acquisition.assembled_context_digest",
+    )
 
 
 def _check_capability_gap_contract(event: EventPayload) -> None:
