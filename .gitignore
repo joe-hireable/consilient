@@ -122,3 +122,16 @@ docs/10-research/experiments/*/results-*.json.lock
 # check_private_corpus.py found a content fingerprint in one of them; they are instance
 # data and must never be tracked. See .harness/STOP-PUBLISH.
 .harness/quarantine-*.md
+
+# Mutable harness state. MEASURED 24-25 August 2026: these are written continuously by the
+# driver, so tracking them made the main tree permanently dirty and the driver deferred every
+# merge with "N path(s) dirty in the main tree". Tracking them is also how .harness/plan-units.json
+# once silently lost a queued unit -- a git checkout restored an older copy of the file that
+# decides what gets dispatched. .harness/log/ was already ignored and never suffered either.
+# The files stay on disk; only the index stops carrying them. See unit Z04.
+.harness/driver-state.json
+.harness/driver-tick.lock
+.harness/*.lock
+.harness/build-loop.out
+.harness/build-loop.err
+.harness/board-snapshot.json
