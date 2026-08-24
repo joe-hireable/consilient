@@ -348,6 +348,23 @@ def _selection_receipt(selection: recall.Selection) -> dict[str, object]:
     }
 
 
+def _guard_privileged_selection(
+    selection: recall.Selection, events: Sequence[Event]
+) -> recall.Selection:
+    """Refuse an assembly whose candidate context still carries privileged fields."""
+    indexed = {recall._stable_id(event): event for event in events}
+    for event_id in selection.selected_event_ids:
+        event = indexed.get(event_id)
+        if event is None:
+            continue
+        reason = recall.privileged_omission_reason(event)
+        if reason is not None:
+            raise InstructionError(
+                f"privileged field omitted as {reason} reached instruction context"
+            )
+    return selection
+
+
 def _select_recall(
     events: Sequence[Event], *, query: str, limit_chars: int
 ) -> recall.Selection:
@@ -365,20 +382,26 @@ def _select_recall(
             ]
         )
         try:
-            return recall.select_events(
-                candidate,
-                query=query,
-                limit_chars=limit_chars,
-                scan_complete=window >= len(events),
-                shrink_to_receipt=True,
-            )
-        except ValueError:
-            if window <= 1:
-                return recall.select_events(
+            return _guard_privileged_selection(
+                recall.select_events(
                     candidate,
                     query=query,
                     limit_chars=limit_chars,
                     scan_complete=window >= len(events),
+                    shrink_to_receipt=True,
+                ),
+                candidate,
+            )
+        except ValueError:
+            if window <= 1:
+                return _guard_privileged_selection(
+                    recall.select_events(
+                        candidate,
+                        query=query,
+                        limit_chars=limit_chars,
+                        scan_complete=window >= len(events),
+                    ),
+                    candidate,
                 )
             window = max(1, window // 2)
 

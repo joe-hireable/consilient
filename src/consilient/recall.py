@@ -38,8 +38,44 @@ RECEIPT_BEGIN = f"<!-- {RECEIPT_MARKER}\n"
 RECEIPT_END = "\n-->"
 
 OMISSION_REASONS = frozenset(
-    {"irrelevant", "superseded", "permission", "context_bound", "corrupt"}
+    {
+        "irrelevant",
+        "superseded",
+        "permission",
+        "context_bound",
+        "corrupt",
+        "qualification",
+        "sentinel",
+        "card_private",
+    }
 )
+QUALIFICATION_FIELDS = promote.privileged_fields() | frozenset(
+    {
+        "qualification_batch_id",
+        "qualification_rule_digest",
+    }
+)
+SENTINEL_FIELDS = frozenset(
+    {
+        "sentinel_batch_id",
+        "sentinel_score",
+        "sentinel_items",
+        "sentinel_digest",
+        "drift_sentinel",
+    }
+)
+CARD_PRIVATE_FIELDS = frozenset(
+    {
+        "owner_card",
+        "proposal_card",
+        "card_text",
+        "card_sentences",
+        "privileged_owner_projection",
+        "before_behaviour",
+        "after_behaviour",
+    }
+)
+PRIVILEGED_FIELD_MARKERS = QUALIFICATION_FIELDS | SENTINEL_FIELDS | CARD_PRIVATE_FIELDS
 
 ALWAYS_INCLUDE_KINDS = frozenset(
     {
@@ -131,6 +167,30 @@ def _permission_denied(event: Event) -> bool:
     if event.kind != RECORD_CAPTURED_KIND:
         return False
     return event.data.get("retention_class") == "private"
+
+
+def _collect_keys(value: object) -> set[str]:
+    keys: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            keys.add(str(key))
+            keys.update(_collect_keys(item))
+    elif isinstance(value, list):
+        for item in value:
+            keys.update(_collect_keys(item))
+    return keys
+
+
+def privileged_omission_reason(event: Event) -> str | None:
+    """Name the non-content reason, or None when the event may enter candidate context."""
+    keys = _collect_keys(event.raw)
+    if keys & CARD_PRIVATE_FIELDS:
+        return "card_private"
+    if keys & SENTINEL_FIELDS:
+        return "sentinel"
+    if keys & QUALIFICATION_FIELDS:
+        return "qualification"
+    return None
 
 
 def _superseded_event_ids(events: Sequence[Event]) -> frozenset[str]:
@@ -325,16 +385,27 @@ def _compact_select_events(
     tokens = _query_tokens(query)
     ranks = _protection_ranks(events)
     superseded_ids = _superseded_event_ids(events)
-    candidates = [
-        (index, event, ranks[index])
-        for index, event in enumerate(events)
-        if _stable_id(event) not in superseded_ids
-        and not _permission_denied(event)
-        and (ranks[index] or _should_include(event, tokens))
-    ]
+    privileged_omissions: list[Omission] = []
+    candidates: list[tuple[int, Event, int]] = []
+    for index, event in enumerate(events):
+        if _stable_id(event) in superseded_ids or _permission_denied(event):
+            continue
+        reason = privileged_omission_reason(event)
+        if reason is not None:
+            privileged_omissions.append(
+                Omission(_stable_id(event), event.kind, reason, False)
+            )
+            continue
+        if ranks[index] or _should_include(event, tokens):
+            candidates.append((index, event, ranks[index]))
     if not candidates:
         return Selection(
-            _NO_MATCH_PACK[:limit_chars], (), _selected_digest(()), (), True, None
+            _NO_MATCH_PACK[:limit_chars],
+            (),
+            _selected_digest(()),
+            tuple(privileged_omissions),
+            True,
+            None,
         )
 
     kept = list(candidates)
@@ -358,7 +429,7 @@ def _compact_select_events(
         if not text.endswith("\n"):
             text += "\n"
         if len(text) <= limit_chars:
-            omissions = tuple(
+            omissions = tuple(privileged_omissions) + tuple(
                 Omission(_stable_id(event), event.kind, "context_bound", rank > 0)
                 for _, event, rank in sorted(removed, key=lambda item: item[0])
             )
@@ -367,7 +438,7 @@ def _compact_select_events(
                 tuple(_stable_id(event) for event in selected_events),
                 _selected_digest(selected_events),
                 omissions,
-                not omissions,
+                not removed,
                 continuation,
             )
         victim = min(
@@ -376,7 +447,7 @@ def _compact_select_events(
         removed.append(kept.pop(victim))
 
     continuation = _stable_id(max(removed, key=lambda item: (item[2], item[0]))[1])
-    omissions = tuple(
+    omissions = tuple(privileged_omissions) + tuple(
         Omission(_stable_id(event), event.kind, "context_bound", rank > 0)
         for _, event, rank in sorted(removed, key=lambda item: item[0])
     )
@@ -556,6 +627,10 @@ def _pack_with_receipt(
             continue
         if _permission_denied(event):
             omitted_entries.append(_Omitted(stable, "permission"))
+            continue
+        privileged = privileged_omission_reason(event)
+        if privileged is not None:
+            omitted_entries.append(_Omitted(stable, privileged))
             continue
         if ranks[index] or _should_include(event, tokens):
             all_candidates.append((index, event, ranks[index]))
@@ -741,14 +816,18 @@ def _selection_from_pack(events: Sequence[Event], text: str) -> Selection:
     raw_omitted = receipt.get("omitted")
     if isinstance(raw_omitted, list):
         for entry in raw_omitted:
-            if not isinstance(entry, dict) or entry.get("reason") != "context_bound":
+            if not isinstance(entry, dict):
                 continue
+            reason = entry.get("reason")
             event_id = entry.get("id")
             if not isinstance(event_id, str) or event_id not in indexed:
                 continue
             index, event, rank = indexed[event_id]
-            omissions.append(Omission(event_id, event.kind, "context_bound", rank > 0))
-            continuation_candidates.append((index, event, rank))
+            if reason == "context_bound":
+                omissions.append(Omission(event_id, event.kind, "context_bound", rank > 0))
+                continuation_candidates.append((index, event, rank))
+            elif reason in {"qualification", "sentinel", "card_private"}:
+                omissions.append(Omission(event_id, event.kind, reason, False))
 
     continuation = (
         _stable_id(
