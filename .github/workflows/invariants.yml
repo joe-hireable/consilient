@@ -59,6 +59,17 @@ jobs:
       - name: Generated document drift check
         if: ${{ !cancelled() }}
         run: python .github/scripts/check_generated_documents.py --check
+      - name: Relative link invariant check
+        if: ${{ !cancelled() }}
+        # C4 of docs/20-design/documentation-and-surfaces-plan-2026-08-23.md, and it ships
+        # BEFORE the file migration it exists to protect -- a gate added after the move
+        # cannot see what the move broke. The audit measured the live 404 at the end of the
+        # contributor path; five more broken source/target pairs were found when the check
+        # was first run over the whole tree, none of them in a file the unit owned, so they
+        # are pinned in KNOWN_BROKEN and that list may only shrink. `--self-test` first:
+        # the detector is exercised against a synthetic tree, so a green run means the
+        # links resolve rather than that the matcher stopped matching.
+        run: python .github/scripts/check_links.py --self-test
       - name: Rename safety invariant check
         if: ${{ !cancelled() }}
         run: python .github/scripts/check_rename_safety.py --check
