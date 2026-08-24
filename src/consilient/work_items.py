@@ -563,6 +563,11 @@ def _check_transport(value: object) -> dict[str, Any]:
     return {"authenticated": authenticated, "channel": channel.strip()}
 
 
+# A leaked secret hash is a bare 64-hex token. Delimited so an ordinary long hex blob inside a
+# larger word does not match, and so this pattern cannot trip on its own source text.
+_SECRET_DIGEST = re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{64}(?![0-9a-fA-F])")
+
+
 def _check_redactions(value: object) -> list[dict[str, str]]:
     if value is None:
         return []
@@ -851,7 +856,22 @@ def _check_turn_contract(data: dict[str, Any]) -> None:
     _check_transport(data.get("transport"))
     redactions = _check_redactions(data.get("redactions"))
     trajectory = json.dumps(data, ensure_ascii=False, sort_keys=True)
-    if "sha256" in trajectory.casefold() and redactions:
+    # MEASURED 24 August 2026, and the guard was exactly backwards. `and redactions` meant it
+    # fired only when the turn DECLARED redactions, and stayed silent when it declared none --
+    # so a credential in a turn with an empty redactions array was accepted and fsync'd into an
+    # append-only log that cannot afterwards be erased. Probed directly: secret-like text with
+    # no redactions was ACCEPTED; the same text with redactions was refused. The dangerous case
+    # was the one that passed. No test named this guard, which is why it survived.
+    #
+    # The conjunction was not gratuitous: the literal-marker test matches the STRING "sha256"
+    # anywhere in the serialised turn, so removing it outright would refuse any turn merely
+    # discussing hashing. Suppressing that noise is what silenced the guard. So the
+    # discriminator is sharpened rather than the condition flipped: a bare 64-hex digest is
+    # refused unconditionally, because that is what a leaked secret hash actually looks like,
+    # and every refusal the old rule made is preserved. Strictly stronger, never weaker.
+    if _SECRET_DIGEST.search(trajectory) or (
+        "sha256" in trajectory.casefold() and redactions
+    ):
         raise events.EventError("secret hashes must not be stored in conversation.turn")
     del conversation_id, turn_id, root_request_turn_id
 
