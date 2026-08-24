@@ -5,6 +5,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -326,6 +327,51 @@ def test_select_refuses_an_expired_grant() -> None:
         select_capabilities(inventory, _request(_wanted("tool", "pytest")))
 
 
+def test_select_refuses_a_grant_that_expired_a_minute_ago() -> None:
+    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    inventory = _inventory(
+        {
+            "kind": "tool",
+            "name": "pytest",
+            "available": True,
+            "provenance": ["probe:tool:pytest"],
+            "gate": _admitted_gate(expires_at=past),
+        }
+    )
+    with pytest.raises(CapabilityError, match=r"expired grant: tool:pytest"):
+        select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+
+
+def test_select_keeps_a_grant_that_expires_in_a_minute() -> None:
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=1)).isoformat()
+    inventory = _inventory(
+        {
+            "kind": "tool",
+            "name": "pytest",
+            "available": True,
+            "provenance": ["probe:tool:pytest"],
+            "gate": _admitted_gate(expires_at=soon),
+        }
+    )
+    result = select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+    assert [item["name"] for item in result["capabilities"]] == ["pytest"]
+
+
+def test_select_refuses_an_expired_grant_with_a_non_utc_offset() -> None:
+    # 2000-01-01 23:00 at +14h is 09:00 UTC the same day — long past.
+    inventory = _inventory(
+        {
+            "kind": "tool",
+            "name": "pytest",
+            "available": True,
+            "provenance": ["probe:tool:pytest"],
+            "gate": _admitted_gate(expires_at="2000-01-01T23:00:00+14:00"),
+        }
+    )
+    with pytest.raises(CapabilityError, match=r"expired grant: tool:pytest"):
+        select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+
+
 def test_malformed_inventory_row_names_its_index() -> None:
     inventory = _inventory(
         _available("tool", "pytest"),
@@ -334,6 +380,21 @@ def test_malformed_inventory_row_names_its_index() -> None:
             "name": "ruff",
             "available": "yes",
             "provenance": ["probe:tool:ruff"],
+        },
+    )
+    with pytest.raises(CapabilityError, match=r"inventory allowlist\[1\]"):
+        select_capabilities(inventory, _request())
+
+
+def test_malformed_gate_on_a_row_names_its_index() -> None:
+    inventory = _inventory(
+        _available("tool", "pytest"),
+        {
+            "kind": "tool",
+            "name": "ruff",
+            "available": True,
+            "provenance": ["probe:tool:ruff"],
+            "gate": {"state": "gated"},
         },
     )
     with pytest.raises(CapabilityError, match=r"inventory allowlist\[1\]"):

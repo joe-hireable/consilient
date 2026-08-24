@@ -396,7 +396,7 @@ def _grant_expired(gate: Gate) -> bool:
     if gate.expires_at is None:
         return False
     parsed = datetime.fromisoformat(gate.expires_at)
-    return parsed <= datetime.now(timezone.utc)
+    return parsed.astimezone(timezone.utc) <= datetime.now(timezone.utc)
 
 
 def _gate_record(gate: Gate) -> dict[str, object]:
