@@ -102,6 +102,33 @@ def self_heal(log) -> None:
     except OSError:
         pass
 
+    # THREE -- git long-path support. MEASURED 24 August 2026 and it silently stopped ALL
+    # verification. A review dispatch builds its isolated workspace by full-cloning into
+    # .harness/dispatch/<run-id>/workspace/full_clone/<run-id>/, and that prefix plus this
+    # repository's descriptive ADR filenames exceeds Windows MAX_PATH of 260 characters. The
+    # clone SUCCEEDS and the checkout FAILS -- "unable to create file ... Filename too long",
+    # then "fatal: unable to checkout working tree" -- so every review died at setup with an
+    # empty stdout and status=failed. Verified sat at 3 while 64 reviews were in flight, and
+    # nothing reported a cause, because from the driver's side a review that never started and
+    # a review that found nothing look identical.
+    #
+    # `core.longpaths` is inherited by fresh clones only from the GLOBAL config, which is why it
+    # is set there rather than in the repository. Proved by reproducing the exact failing path
+    # shape: with it set, the clone completes and the long-named ADR checks out.
+    try:
+        current = subprocess.run(
+            ["git", "config", "--global", "--get", "core.longpaths"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+        ).stdout.strip()
+        if current.lower() != "true":
+            subprocess.run(
+                ["git", "config", "--global", "core.longpaths", "true"],
+                capture_output=True, timeout=60,
+            )
+            log.write("loop: set git core.longpaths -- long paths were breaking every review clone" + chr(10))
+    except Exception:
+        pass
+
     for lock in (ROOT.parent.parent.parent / ".git" / "worktrees").glob("*/index.lock"):
         try:
             if time.time() - lock.stat().st_mtime < 120:
