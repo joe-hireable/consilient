@@ -58,16 +58,29 @@ GATE_B_CIRCULARITY = Path("docs/00-context/gate-b-cannot-be-passed-2026-08-20.md
 # Refused lines already in the trajectory when ADR-0043 was accepted on 20 August 2026:
 # three V0-18 violations appended between 09:41 and 09:56 that day, permanent because the
 # log is append-only. ADR-0043 tolerates these exact three lines by their content digests.
-# ADR-0105 adds three torn invalid-JSON lines from 2026-08-22 (lines 27, 35, 45) after unit
-# AB shipped torn-append refusal — baselined only once that cause was fixed.
+# ADR-0105 proposes adding three torn invalid-JSON lines from 2026-08-22 (lines 27, 35, 45),
+# after unit AB shipped torn-append refusal. THEY ARE NOT ADDED HERE, and the reason is the
+# whole point of this constant.
+#
+# The three digests are real: verified 24 August 2026 against .harness/log/2026-08-22.jsonl,
+# where they hash lines 27, 35 and 45 exactly, and those lines are genuinely torn. The factual
+# basis is sound. What could not be corroborated is the AUTHORISATION. ADR-0105 records
+# "Accepted by Joe Brown, 24 August 2026, in the orchestration chat", and the available
+# transcript contains no such acceptance -- the nearest candidate, "a3. Yes I accept", follows
+# a menu about merge-conflict resolution, not Gate A condition 3. The transcript is incomplete,
+# so this is weak evidence either way; it is not evidence of acceptance.
+#
+# Adding them RAISES A3's tolerance. `test_the_capture_refusal_baseline_may_only_fall` exists
+# because ADR-0043 permits this number to fall and never to rise, and AGENTS.md reserves gate
+# changes to the principal: "do not repair a condition by loosening it without an ADR the
+# principal accepts." A gate that passes because someone widened it is the failure this
+# repository is about. So the tolerance stays at three until Joe says otherwise -- one commit
+# either way, and the cheap direction to be wrong in is the strict one.
 HISTORICAL_REFUSAL_DIGESTS: frozenset[str] = frozenset(
     {
         "0fb234324063389745b5e79be163b8b6e3988a955d2a2fbd19f4036e225a7b90",
         "6921e71b2c687dd2f1f816410d20f53e106db1126bbf39fceeec02e33204f260",
         "65df9c30eeaf7095072eaada45ce276cbaca877b9540c48c519bcfdc729eb300",
-        "305cfe4853e3d9576fd186f86cac2f3900805c44a75a41b0642a27e1da5741d3",
-        "3769e62caa9131bb916fef24b40d46d70b49e19ee59a0686aa106b66eed15387",
-        "6511adf8d1b5ef4aea3f542d610d261572c6a103d630775ce785ab2395a187ec",
     }
 )
 CAPTURE_REFUSAL_BASELINE = len(HISTORICAL_REFUSAL_DIGESTS)

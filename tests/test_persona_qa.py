@@ -20,6 +20,34 @@ sys.modules["persona_qa"] = persona_qa
 _spec.loader.exec_module(persona_qa)
 
 
+def _present_as_mutated(
+    monkeypatch: pytest.MonkeyPatch, path: Path, old: str, new: str, count: int = -1
+) -> None:
+    """Make `path` read as mutated WITHOUT writing to the tracked tree.
+
+    These ratchets used to write the broken text to the real file and restore it in a
+    `finally`. A `finally` does not run when the process is killed, and on 24 August 2026
+    one of them was: `docs/00-context/getting-started.md` was found in the working tree
+    still carrying this test's own mutation string, `limits-removed.example.json`. That
+    turned the operator ratchet red and, worse, pointed any operator following
+    getting-started at an example file that does not exist. The suite runs under timeouts
+    and gets killed; a guard that corrupts the repository when it dies is a worse defect
+    than the one it guards, so the mutation now lives in memory and the file is never
+    written.
+    """
+    original = path.read_text(encoding="utf-8")
+    broken = original.replace(old, new) if count < 0 else original.replace(old, new, count)
+    assert broken != original, f"mutation {old!r} -> {new!r} changed nothing in {path.name}"
+    real_read_text = Path.read_text
+
+    def fake_read_text(self: Path, *args: object, **kwargs: object) -> str:
+        if self == path:
+            return broken
+        return real_read_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+
+
 def test_persona_specs_cover_all_named_personas() -> None:
     assert set(persona_qa.PERSONAS) == set(persona_qa.JOURNEYS)
 
@@ -85,44 +113,40 @@ def test_researcher_finds_script_when_present() -> None:
 def test_average_joe_ratchet_fails_when_four_commands_returns(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    path = ROOT / "docs/00-context/getting-started.md"
-    original = path.read_text(encoding="utf-8")
-    broken = original.replace("Six commands", "Four commands", 1)
-    path.write_text(broken, encoding="utf-8")
-    try:
-        result = persona_qa.journey_average_joe(ROOT)
-        assert result.finding is not None
-    finally:
-        path.write_text(original, encoding="utf-8")
-    assert persona_qa.journey_average_joe(ROOT).finding is None
+    _present_as_mutated(
+        monkeypatch,
+        ROOT / "docs/00-context/getting-started.md",
+        "Six commands",
+        "Four commands",
+        count=1,
+    )
+    result = persona_qa.journey_average_joe(ROOT)
+    assert result.finding is not None
 
 
 def test_contributor_ratchet_fails_when_stale_opening_returns(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    path = ROOT / "CONTRIBUTING.md"
-    original = path.read_text(encoding="utf-8")
-    broken = original.replace("Stage 3 is active", "pre-brainstorm and has no code yet", 1)
-    path.write_text(broken, encoding="utf-8")
-    try:
-        result = persona_qa.journey_contributor(ROOT)
-        assert result.finding is not None
-    finally:
-        path.write_text(original, encoding="utf-8")
-    assert persona_qa.journey_contributor(ROOT).finding is None
+    _present_as_mutated(
+        monkeypatch,
+        ROOT / "CONTRIBUTING.md",
+        "Stage 3 is active",
+        "pre-brainstorm and has no code yet",
+        count=1,
+    )
+    result = persona_qa.journey_contributor(ROOT)
+    assert result.finding is not None
 
 
 def test_operator_ratchet_fails_when_ceilings_undocumented(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    path = ROOT / "docs/00-context/getting-started.md"
-    original = path.read_text(encoding="utf-8")
-    broken = original.replace("limits.example.json", "limits-removed.example.json")
-    path.write_text(broken, encoding="utf-8")
-    try:
-        result = persona_qa.journey_operator(ROOT)
-        assert result.finding is not None
-        assert "undocumented" in result.stopped_at
-    finally:
-        path.write_text(original, encoding="utf-8")
-    assert persona_qa.journey_operator(ROOT).finding is None
+    _present_as_mutated(
+        monkeypatch,
+        ROOT / "docs/00-context/getting-started.md",
+        "limits.example.json",
+        "limits-removed.example.json",
+    )
+    result = persona_qa.journey_operator(ROOT)
+    assert result.finding is not None
+    assert "undocumented" in result.stopped_at

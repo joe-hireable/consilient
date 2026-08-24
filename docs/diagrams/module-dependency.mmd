@@ -1,6 +1,6 @@
 %% **Producer:** `scripts/build_diagrams.py`
 %% **Source:** `src/**/*.py`
-%% **Source SHA-256:** `a6e599b59965ed634578ba9c72316fd0cb5592a0c83ee1f4fe22ce77b90c7f5f`
+%% **Source SHA-256:** `25509ce33d9b122b4ca419dbcf3ad324e18b950b3dc98feb27dfde846a9640cd`
 %% **Do not hand-edit:** regenerate with `python scripts/build_diagrams.py`.
 
 flowchart LR
@@ -13,6 +13,8 @@ flowchart LR
   consilient_cli --> consilient_projection
   consilient_cli --> consilient_usage
   consilient_commit_gate --> consilient_coordination
+  consilient_coordination --> consilient_beta
+  consilient_coordination --> consilient_routing
   consilient_coordination --> consilient_work_items
   consilient_coordination --> consilient_events
   consilient_dashboard --> consilient_events
@@ -51,5 +53,5 @@ flowchart LR
   consilient_connectors_computer_use --> consilient_transport
   consilient_connectors_outbound --> consilient_events
   consilient_connectors_outbound --> consilient_transport
-  %% in-degree: consilient_events=20, consilient_beta=4, consilient_work_items=4, consilient_budget=3, consilient_projection=3, consilient_promote=3, consilient_transport=2, consilient_verification=2
+  %% in-degree: consilient_events=20, consilient_beta=5, consilient_work_items=4, consilient_budget=3, consilient_projection=3, consilient_promote=3, consilient_transport=2, consilient_verification=2
 

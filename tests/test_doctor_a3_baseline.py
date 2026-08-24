@@ -2,7 +2,55 @@
 
 ADR-0105 extends ADR-0043: three invalid JSON lines on 2026-08-22 (lines 27, 35,
 45) are permanent refusals written before unit AB shipped torn-append refusal.
-They join HISTORICAL_REFUSAL_DIGESTS so A3 measures new loss only.
+
+HALF OF THAT IS APPLIED, AND THE HALF THAT IS NOT IS DELIBERATE. 24 August 2026.
+
+Two things ADR-0105 conflates are separate acts, and only one of them is taken here:
+
+  * PINNING the incident — recording the exact file, line and digest of the three
+    torn lines so the quarantine cannot drift silently. Applied, enforced below by
+    `test_real_trajectory_rejections_still_match_the_pin`, and not in dispute.
+  * WIDENING the operational A3 tolerance — adding those digests to
+    `cli.HISTORICAL_REFUSAL_DIGESTS`, which raises the number of refusals Gate A
+    condition 3 forgives from three to six. NOT applied.
+
+`tests/test_v0_invariants.py::test_historical_refusal_digests_pin_real_log_rejections`
+already refuses this exact widening, in prose and in an assertion: "Their exact
+filename, line and digest belong here, NOT in the operational A3 tolerance", and it
+pins the tolerance to the 2026-08-20 rejections alone. That guard was written before
+ADR-0105 and anticipates it. Two tests in this file assert the opposite, so the suite
+could not be green with both as written.
+
+What was checked, 24 August 2026, rather than assumed:
+
+  * All six digests are real. Each hashes a genuine line of `.harness/log/`, verified
+    with the reader's own rule (`content_digest` is taken BEFORE `line.strip()`, so it
+    includes the trailing newline; hashing the stripped line matches nothing and briefly
+    made these look fabricated). The 22 August three pin lines 27, 35 and 45, and those
+    lines are genuinely torn.
+  * The contingency holds. Unit AB, "refuse a torn append and name the offset", is in
+    the tree: `events.py` now writes under a kernel-backed per-log lock, fsyncs, and
+    rolls back a partial line so it is never acknowledged. Its test passes.
+
+So the FACTS behind ADR-0105 are sound. What could not be corroborated is the
+AUTHORISATION. The ADR records "Accepted by Joe Brown, 24 August 2026, in the
+orchestration chat"; the available transcript contains no such acceptance, and the
+nearest candidate, "a3. Yes I accept", follows a menu about merge-conflict resolution
+rather than Gate A condition 3. The transcript is demonstrably incomplete, so this is
+weak evidence — it is simply not evidence OF acceptance.
+
+Widening A3 makes Gate A easier to pass. AGENTS.md reserves that to the principal:
+"do not repair a condition by loosening it without an ADR the principal accepts", and
+this repository's own history records a loosening filed under his signature that an
+audit later had to undo. Holding at three costs an overnight A3 failure and one commit
+to reverse; applying it on an uncorroborated signature would be the exact failure this
+project exists to detect, committed by the harness itself. The directions of error are
+not symmetric, so the strict one is held.
+
+TO RESOLVE: if Joe confirms he accepted ADR-0105, restore the three 2026-08-22 digests
+to `cli.HISTORICAL_REFUSAL_DIGESTS`, delete the `UNDECIDED` marker below, and update the
+guard in `test_v0_invariants.py` to cite ADR-0105. If he did not, ADR-0105's status is
+what needs correcting, and this file's two marked tests should go with it.
 """
 
 from __future__ import annotations
@@ -40,6 +88,16 @@ AUGUST_22_DIGESTS: frozenset[str] = frozenset(
 BASELINE_DIGESTS = AUGUST_20_DIGESTS | AUGUST_22_DIGESTS
 
 
+UNDECIDED = pytest.mark.skip(
+    reason=(
+        "ADR-0105's OPERATIONAL widening is not applied; awaiting the principal. "
+        "See the module docstring. The incident pin is intact and enforced by "
+        "test_real_trajectory_rejections_still_match_the_pin below."
+    )
+)
+
+
+@UNDECIDED
 def test_historical_refusal_digests_cover_both_baselines():
     """ADR-0043 pins three refusals from 2026-08-20; ADR-0105 adds three from 2026-08-22."""
     assert HISTORICAL_REFUSAL_DIGESTS == BASELINE_DIGESTS
@@ -49,6 +107,7 @@ def test_historical_refusal_digests_cover_both_baselines():
         assert digest in HISTORICAL_REFUSAL_DIGESTS
 
 
+@UNDECIDED
 def test_pinned_trajectory_rejections_match_operational_baseline():
     """Every pinned rejection digest must be in the operational tolerance, and no others."""
     pinned_digests = {digest for _file, _line, digest in PINNED_TRAJECTORY_REJECTIONS}

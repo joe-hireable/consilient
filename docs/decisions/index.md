@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `61754580eaf60db4527009418efa4521f3987c731fa7e7ea7566a124a0e57a51`
+> **Source SHA-256:** `a75949a942d7dc40858f55badbef02b5679440e4a5f4007b4cf08d30a8125e4a`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -109,3 +109,4 @@
 | [0102](0102-keep-telephony-out-of-the-open-source-tree-at-launch.md) | Keep telephony out of the open-source tree at launch | ACCEPTED | — |
 | [0103](0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md) | Make contract-β the gate quantity, and keep human-β as alignment rather than a blocker | PROVISIONAL | — |
 | [0104](0104-re-derive-both-halves-of-beta-star-from-evidence.md) | Re-derive both halves of β\\\* from evidence, and let the arithmetic fall where it does | PROVISIONAL | — |
+| [0105](0105-baseline-the-22-august-capture-loss.md) | Baseline the 22 August capture loss | ACCEPTED | — |
