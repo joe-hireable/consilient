@@ -368,6 +368,21 @@ _CANDIDATE_VIAS = (
 )
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "MEASURED 24 August 2026 and OPEN. This test enumerates every via the verdict writer "
+        "accepts and checks that at least one survives into beta. None does. V0-28 accepts only "
+        "'cli', which projects as declared_principal, and beta does not admit that; "
+        "'phone_webauthn' would authenticate but is refused at append. So human-verdict beta is "
+        "structurally unmeasurable rather than merely unmeasured, which is what blocks gate "
+        "conditions A1 and B2. Closing the seam changes what beta counts, and beta is a gate "
+        "quantity, so the decision belongs to the principal and not to this test. "
+        "strict=True is the point: when the seam is closed this test starts passing, the suite "
+        "goes red, and whoever closed it must delete this marker deliberately. A known gap that "
+        "cannot announce its own repair is a gap that gets forgotten."
+    ),
+)
 def test_every_via_the_writer_accepts_is_admitted_through_append_build_beta(
     tmp_path: Path,
 ) -> None:

@@ -1308,6 +1308,27 @@ def test_main_injects_one_fail_closed_task_capability_context(
                         "name": "pytest",
                         "available": True,
                         "provenance": ["probe:pytest"],
+                        # An entry with no gate defaults to "gated" and is refused, which is
+                        # what this test's own name asks for. Unit AF made that default real;
+                        # this fixture predates it and had been relying on absence meaning
+                        # permission. Declaring the grant is the honest repair -- relaxing the
+                        # check to admit an ungated entry would delete the guarantee instead.
+                        "gate": {
+                            "state": "admitted",
+                            "reason": "exact_grant",
+                            "grant_kind": "principal_authority",
+                            "authority_event": {
+                                "event_id": "evt-authority-1",
+                                "event_kind": "human.approval",
+                                "event_sha256": "b" * 64,
+                            },
+                            "decision_id": None,
+                            "recovery_proof_ref": None,
+                            "scope": [],
+                            "operations": [],
+                            "effect_classes": [],
+                            "expires_at": "2099-01-01T00:00:00+00:00",
+                        },
                     }
                 ]
             }
