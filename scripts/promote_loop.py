@@ -27,6 +27,9 @@ from typing import Sequence
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import proc_tree  # noqa: E402  (needs the path insert above)
 
 from consilient import beta as beta_mod  # noqa: E402
 from consilient.promote import (  # noqa: E402
@@ -74,29 +77,11 @@ json.dump({"ran": True, "outputs": outputs}, sys.stdout)
 """
 
 
-def _kill_process_tree(process: subprocess.Popen[str]) -> None:
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["taskkill", "/T", "/F", "/PID", str(process.pid)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=3,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-    else:
-        try:
-            getattr(os, "killpg")(process.pid, getattr(signal, "SIGKILL", 9))
-        except (OSError, ProcessLookupError):
-            pass
-    if process.poll() is None:
-        try:
-            process.kill()
-        except OSError:
-            pass
-
+def _kill_process_tree(
+    process: subprocess.Popen[str], job: object | None = None
+) -> None:
+    """Kill the candidate and every descendant. See scripts/proc_tree.py for why."""
+    proc_tree.kill_tree(process, job)
 
 def run_candidate(
     source: str, prompts: Sequence[str]
@@ -117,16 +102,18 @@ def run_candidate(
         ),
         start_new_session=os.name != "nt",
     )
+    job = proc_tree.assign_job(process)
     payload = json.dumps({"source": source, "prompts": list(prompts)})
     try:
         stdout, _ = process.communicate(payload, timeout=EXECUTION_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
-        _kill_process_tree(process)
+        _kill_process_tree(process, job)
         try:
             process.communicate(timeout=3)
         except subprocess.TimeoutExpired:
             pass
         return False, []
+    proc_tree.terminate_job(job)
     if process.returncode != 0:
         return False, []
     try:

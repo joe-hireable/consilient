@@ -1,0 +1,1747 @@
+{
+ "R01": {
+  "title": "finish the dependence-robust candidate ceiling",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/routing.py",
+   "tests/test_coordination.py",
+   "src/consilient/events.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/projection.py",
+   "src/consilient/beta.py",
+   "src/consilient/cli.py",
+   "tests/test_verdict_supply.py",
+   "src/consilient/effects.py",
+   "src/consilient/events.py"
+  ],
+  "commit": "fix(routing): finish the robust candidate ceiling",
+  "deps": []
+ },
+ "E01": {
+  "title": "finish replayable verification outcome records",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/projection.py",
+   "src/consilient/beta.py",
+   "src/consilient/cli.py",
+   "tests/test_verdict_supply.py",
+   "src/consilient/effects.py",
+   "src/consilient/events.py",
+   "tests/test_effect_contract.py",
+   "src/consilient/effects.py"
+  ],
+  "commit": "feat(evidence): complete verification outcome records",
+  "deps": [
+   "F03"
+  ]
+ },
+ "V01": {
+  "title": "project only authenticated human beta and quarantine bad joins",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/projection.py",
+   "src/consilient/beta.py",
+   "src/consilient/cli.py",
+   "tests/test_verdict_supply.py",
+   "src/consilient/effects.py",
+   "src/consilient/events.py",
+   "tests/test_effect_contract.py",
+   "src/consilient/effects.py",
+   "src/consilient/events.py",
+   "src/consilient/capabilities.py"
+  ],
+  "commit": "fix(beta): quarantine invalid verdict evidence",
+  "deps": [
+   "E01",
+   "F03"
+  ]
+ },
+ "A01": {
+  "title": "define the canonical effect contract",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "src/consilient/events.py",
+   "tests/test_effect_contract.py",
+   "src/consilient/effects.py",
+   "src/consilient/events.py",
+   "src/consilient/capabilities.py",
+   "tests/test_effect_admission.py",
+   "tests/test_capabilities.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py"
+  ],
+  "commit": "feat(effects): define canonical effect records",
+  "deps": []
+ },
+ "A02": {
+  "title": "derive gated capability admission and escalation",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "src/consilient/events.py",
+   "src/consilient/capabilities.py",
+   "tests/test_effect_admission.py",
+   "tests/test_capabilities.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_decision_protocol.py",
+   "tests/test_work_items.py",
+   "src/consilient/instructions.py"
+  ],
+  "commit": "feat(effects): derive gated effect admission",
+  "deps": [
+   "A01"
+  ]
+ },
+ "P01": {
+  "title": "bind the durable pre-action decision record",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_decision_protocol.py",
+   "tests/test_work_items.py",
+   "src/consilient/instructions.py",
+   "tests/test_instructions.py",
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "src/consilient/beta.py",
+   "src/consilient/verification.py"
+  ],
+  "commit": "feat(decisions): bind pre-action decision records",
+  "deps": [
+   "A02",
+   "F03"
+  ]
+ },
+ "P02": {
+  "title": "bind Better-Than-Best execution to the decision",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/instructions.py",
+   "tests/test_instructions.py",
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "src/consilient/beta.py",
+   "src/consilient/verification.py",
+   "tests/test_review_queue.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py"
+  ],
+  "commit": "feat(decisions): bind better-than-best execution",
+  "deps": [
+   "C01",
+   "D01",
+   "P01",
+   "T01"
+  ]
+ },
+ "Q01": {
+  "title": "freeze candidate exposure before verification",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "src/consilient/beta.py",
+   "src/consilient/verification.py",
+   "tests/test_review_queue.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "scripts/verdict.py",
+   "tests/test_review_card.py",
+   "tests/test_verdict_supply.py"
+  ],
+  "commit": "feat(review): freeze candidate exposure queues",
+  "deps": [
+   "E01",
+   "F03",
+   "V01"
+  ]
+ },
+ "Q02": {
+  "title": "reconcile invariant tests to quarantine semantics",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "tests/test_v0_invariants.py",
+   "tests/test_feedback.py",
+   "src/consilient/projection.py"
+  ],
+  "commit": "test(verdict): reconcile invariants to quarantine semantics",
+  "deps": []
+ },
+ "G01": {
+  "title": "project structural acquisition anchors",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "tests/test_consilience_gate.py"
+  ],
+  "commit": "feat(evidence): project structural acquisition anchors",
+  "deps": [
+   "E01",
+   "F03",
+   "P01",
+   "Q02"
+  ],
+  "note": "The earlier refusal was correct: plan extraction had appended A03/A04 paths to G01 and omitted Q02's explicit projection-path dependency. The claims now match the source plan's exact three paths, Q02 is done, and all declared dependencies are satisfied. Preserve the existing claimed-path worktree changes, inspect them before editing, and finish G01 rather than restarting it."
+ },
+ "A03": {
+  "title": "evaluate an isolated recovery proof",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "scripts/dispatch.py",
+   "tests/test_recovery_proof.py",
+   "src/consilient/effects.py",
+   "scripts/dispatch.py",
+   "tests/test_action_boundary.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/effects.py",
+   "tests/test_consilience_gate.py"
+  ],
+  "commit": "feat(effects): verify recovery in isolation",
+  "deps": [
+   "A02",
+   "F02",
+   "F03",
+   "P01"
+  ]
+ },
+ "A04": {
+  "title": "admit one fake effect atomically",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "scripts/dispatch.py",
+   "tests/test_action_boundary.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/effects.py",
+   "tests/test_consilience_gate.py",
+   "src/consilient_connectors/outbound.py",
+   "tests/test_outbound.py"
+  ],
+  "commit": "feat(effects): admit fake effects atomically",
+  "deps": [
+   "A03",
+   "F02",
+   "F03",
+   "P01",
+   "P02"
+  ]
+ },
+ "G02": {
+  "title": "evaluate consilience in report-only admission",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "tests/test_consilience_gate.py",
+   "src/consilient_connectors/outbound.py",
+   "tests/test_outbound.py",
+   "src/consilient_connectors/computer_use.py",
+   "tests/test_computer_use.py",
+   "scripts/dispatch.py",
+   ".github/scripts/check_effect_paths.py",
+   "tests/test_dispatch.py",
+   "tests/test_v0_invariants.py"
+  ],
+  "commit": "feat(consilience): report high-consequence anchor gaps",
+  "deps": [
+   "A04",
+   "G01"
+  ]
+ },
+ "A05": {
+  "title": "migrate outbound messaging to the boundary",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient_connectors/outbound.py",
+   "tests/test_outbound.py",
+   "src/consilient_connectors/computer_use.py",
+   "tests/test_computer_use.py",
+   "scripts/dispatch.py",
+   ".github/scripts/check_effect_paths.py",
+   "tests/test_dispatch.py",
+   "tests/test_v0_invariants.py"
+  ],
+  "commit": "feat(outbound): route sends through effect admission",
+  "deps": [
+   "A04"
+  ]
+ },
+ "A06": {
+  "title": "migrate computer use to the boundary",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient_connectors/computer_use.py",
+   "tests/test_computer_use.py",
+   "scripts/dispatch.py",
+   ".github/scripts/check_effect_paths.py",
+   "tests/test_dispatch.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_action_projection.py"
+  ],
+  "commit": "feat(browser): route actions through effect admission",
+  "deps": [
+   "A04"
+  ]
+ },
+ "A07": {
+  "title": "prove containment classification without live activation",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "scripts/dispatch.py",
+   ".github/scripts/check_effect_paths.py",
+   "tests/test_dispatch.py",
+   "tests/test_v0_invariants.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_action_projection.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_autonomy_friction.py"
+  ],
+  "commit": "feat(dispatch): refuse uncontained harness reach",
+  "deps": [
+   "A04",
+   "A05",
+   "A06"
+  ]
+ },
+ "A08": {
+  "title": "project complete action chains",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_action_projection.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_autonomy_friction.py",
+   "src/consilient/capabilities.py",
+   "src/consilient/work_items.py",
+   "src/consilient/instructions.py",
+   "tests/test_consilience_acquisition_contract.py"
+  ],
+  "commit": "feat(effects): project complete action chains",
+  "deps": [
+   "G01",
+   "G02"
+  ]
+ },
+ "A09": {
+  "title": "ratchet avoidable escalation friction",
+  "plan": "2026-08-22-evidence-decision-action-plan.md",
+  "claims": [
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_autonomy_friction.py",
+   "src/consilient/capabilities.py",
+   "src/consilient/work_items.py",
+   "src/consilient/instructions.py",
+   "tests/test_consilience_acquisition_contract.py",
+   "src/consilient/coordination.py",
+   "scripts/dispatch.py",
+   "tests/test_consilience_acquisition.py"
+  ],
+  "commit": "feat(dashboard): expose and ratchet escalation friction",
+  "deps": [
+   "A02",
+   "A08"
+  ]
+ },
+ "F01": {
+  "title": "durable single-event append",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "tests/test_event_durability.py",
+   "tests/test_budget.py",
+   "src/consilient/events.py",
+   "tests/test_event_transactions.py",
+   "src/consilient/events.py",
+   "tests/test_event_identity.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_conversation.py"
+  ],
+  "commit": "feat(events): make ordinary append durable and process-serialised",
+  "deps": []
+ },
+ "F02": {
+  "title": "atomic compare-and-append transaction",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "tests/test_event_transactions.py",
+   "src/consilient/events.py",
+   "tests/test_event_identity.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_conversation.py",
+   "tests/test_work_items.py",
+   "src/consilient/recall.py",
+   "src/consilient/instructions.py"
+  ],
+  "commit": "feat(events): add atomic transition append",
+  "deps": [
+   "F01"
+  ]
+ },
+ "F03": {
+  "title": "stable event identity and exact references",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "tests/test_event_identity.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_conversation.py",
+   "tests/test_work_items.py",
+   "src/consilient/recall.py",
+   "src/consilient/instructions.py",
+   "tests/test_recall.py",
+   "tests/test_instructions.py"
+  ],
+  "commit": "feat(events): bind stable event references",
+  "deps": [
+   "F02"
+  ]
+ },
+ "C01": {
+  "title": "conversation turn and committed-request contract",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_conversation.py",
+   "tests/test_work_items.py",
+   "src/consilient/recall.py",
+   "src/consilient/instructions.py",
+   "tests/test_recall.py",
+   "tests/test_instructions.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py"
+  ],
+  "commit": "feat(work): record immutable request commitments",
+  "deps": [
+   "F03"
+  ]
+ },
+ "C02": {
+  "title": "protected verbatim context for active commitments",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/recall.py",
+   "src/consilient/instructions.py",
+   "tests/test_recall.py",
+   "tests/test_instructions.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_organisation_plan.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py"
+  ],
+  "commit": "feat(recall): protect active commitment context",
+  "deps": [
+   "C01"
+  ]
+ },
+ "O01": {
+  "title": "frozen minimum-stream plan",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "tests/test_organisation_plan.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py",
+   "tests/test_native_work_items.py",
+   "tests/test_task_projection.py",
+   "src/consilient/coordination.py",
+   "scripts/dispatch.py"
+  ],
+  "commit": "feat(work): freeze minimum verifiable plan",
+  "deps": [
+   "C01",
+   "F03"
+  ]
+ },
+ "T01": {
+  "title": "native work-item graph and replay state",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py",
+   "tests/test_native_work_items.py"
+  ],
+  "commit": "feat(work): project evidence-bearing native items",
+  "deps": [
+   "O01"
+  ],
+  "note": "Your three previous attempts refused, and the refusals were right about the claim set and wrong about the blocker. Two of the three conditions you named are now answered.\n\nONE. The suite is GREEN as of 24 August 2026 (1,326 passed, 1 skipped). That condition holds.\n\nTWO. The claim set was over-declared: ten paths including events.py, projection.py, coordination.py and scripts/dispatch.py, which are the busiest files in this repository. It has been narrowed to work_items.py, projection.py and tests/test_native_work_items.py. tests/test_task_projection.py was removed because it has never existed. If you genuinely need a path outside that set, STOP and say which and why -- do not take it. The coordination and dispatch half is now T01B and is not yours.\n\nTHREE. You asked for a principal decision on ADR-0068. You do not need one. **PROVISIONAL means accepted for now** -- it is a decision resting on simulated or asserted evidence with a named killing experiment, and building against it is exactly what it is for. EXP-98 being unrun does not block work; it means the decision may later be reversed, and the trail of reversals is a feature of this repository rather than a reason to wait. Build against 0068 as written and record any place its guidance was ambiguous.\n\nYou release 22 downstream units -- more than any other unit in the plan. That is why this is worth un-jamming rather than leaving parked."
+ },
+ "T02": {
+  "title": "atomic readiness, claim and fencing",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/coordination.py",
+   "scripts/dispatch.py",
+   "tests/test_coordination.py",
+   "tests/test_dispatch.py",
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py",
+   "tests/test_work_item_closure.py",
+   "src/consilient/dashboard.py",
+   "tests/test_task_dashboard.py",
+   "src/consilient/work_items.py"
+  ],
+  "commit": "feat(coordination): claim ready native work atomically",
+  "deps": [
+   "T01"
+  ]
+ },
+ "T03": {
+  "title": "evidence-bound closure, conflict and invalidation",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py",
+   "tests/test_work_item_closure.py",
+   "src/consilient/dashboard.py",
+   "tests/test_task_dashboard.py",
+   "src/consilient/work_items.py",
+   "src/consilient/coordination.py",
+   "tests/test_delivery_intake.py",
+   "src/consilient/events.py",
+   "src/consilient/projection.py"
+  ],
+  "commit": "feat(work): require evidence for closure",
+  "deps": [
+   "E01",
+   "T01"
+  ]
+ },
+ "T04": {
+  "title": "truthful compact task view",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/dashboard.py",
+   "tests/test_task_dashboard.py",
+   "src/consilient/work_items.py",
+   "src/consilient/coordination.py",
+   "tests/test_delivery_intake.py",
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "tests/test_delivery_estimates.py",
+   "src/consilient/events.py",
+   "src/consilient/coordination.py"
+  ],
+  "commit": "feat(dashboard): show evidence-bearing task state",
+  "deps": [
+   "T03"
+  ]
+ },
+ "C03": {
+  "title": "DeliveryIntake and correction fencing",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/work_items.py",
+   "src/consilient/coordination.py",
+   "tests/test_delivery_intake.py",
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "tests/test_delivery_estimates.py",
+   "src/consilient/events.py",
+   "src/consilient/coordination.py",
+   "scripts/dispatch.py",
+   "tests/test_checkpoints.py"
+  ],
+  "commit": "feat(delivery): bind intake and correction revisions",
+  "deps": [
+   "C01",
+   "O01",
+   "T01",
+   "T02",
+   "T03"
+  ]
+ },
+ "D01": {
+  "title": "immutable delivery estimate and reforecast",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "tests/test_delivery_estimates.py",
+   "src/consilient/events.py",
+   "src/consilient/coordination.py",
+   "scripts/dispatch.py",
+   "tests/test_checkpoints.py",
+   "tests/test_dispatch.py",
+   "src/consilient/loop.py",
+   "scripts/run_loop.py"
+  ],
+  "commit": "feat(delivery): freeze estimate before work",
+  "deps": [
+   "O01"
+  ]
+ },
+ "D02": {
+  "title": "sealed checkpoint and stale-epoch refusal",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/coordination.py",
+   "scripts/dispatch.py",
+   "tests/test_checkpoints.py",
+   "tests/test_dispatch.py",
+   "src/consilient/loop.py",
+   "scripts/run_loop.py",
+   "tests/test_delivery_recovery.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py"
+  ],
+  "commit": "feat(delivery): seal attributed checkpoints",
+  "deps": [
+   "T02"
+  ]
+ },
+ "D03": {
+  "title": "restart from evidence, not process identity",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/loop.py",
+   "scripts/run_loop.py",
+   "tests/test_delivery_recovery.py",
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_delivery_outcome.py",
+   "src/consilient/transport.py",
+   "scripts/ingest_transport.py"
+  ],
+  "commit": "feat(loop): recover from sealed task checkpoints",
+  "deps": [
+   "D02",
+   "T03"
+  ]
+ },
+ "D04": {
+  "title": "honest start, exception and final delivery",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py",
+   "src/consilient/dashboard.py",
+   "tests/test_delivery_outcome.py",
+   "src/consilient/transport.py",
+   "scripts/ingest_transport.py",
+   "tests/test_conversation_intake.py",
+   "src/consilient/harness.py",
+   "tests/test_headroom.py"
+  ],
+  "commit": "feat(delivery): project honest finished outcomes",
+  "deps": [
+   "D01",
+   "D02",
+   "T03",
+   "T04"
+  ]
+ },
+ "C04": {
+  "title": "local one-sentence intake compiler",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/transport.py",
+   "scripts/ingest_transport.py",
+   "tests/test_conversation_intake.py",
+   "src/consilient/harness.py",
+   "tests/test_headroom.py",
+   "tests/test_model_pools.py",
+   "scripts/dispatch.py",
+   "tests/test_grok_arm.py",
+   "docs/00-context/grok-arm-2026-08-23.md"
+  ],
+  "commit": "feat(transport): compile local chat into sealed work",
+  "deps": [
+   "C01",
+   "C03",
+   "D01",
+   "D04",
+   "O01",
+   "T01"
+  ]
+ },
+ "F04": {
+  "title": "verify which Cursor models the vendor actually includes",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/harness.py",
+   "tests/test_headroom.py",
+   "tests/test_model_pools.py",
+   "scripts/dispatch.py",
+   "tests/test_grok_arm.py",
+   "docs/00-context/grok-arm-2026-08-23.md"
+  ],
+  "commit": "fix(routing): source every Cursor pool assignment or fail closed",
+  "deps": []
+ },
+ "F05": {
+  "title": "make the Grok arm usable, or retire it with evidence",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "scripts/dispatch.py",
+   "tests/test_grok_arm.py",
+   "docs/00-context/grok-arm-2026-08-23.md"
+  ],
+  "commit": "fix(dispatch): make the grok arm return work or retire it",
+  "deps": [
+   "F04"
+  ]
+ },
+ "H01": {
+  "title": "shared trusted human ingress",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "scripts/human_action_broker.py",
+   "tests/test_human_action_ingress.py",
+   "src/consilient/events.py",
+   "scripts/consent.py",
+   "scripts/verdict.py",
+   "tests/test_human_action_receipts.py",
+   "scripts/promote_loop.py",
+   "tests/test_promotion_authority.py",
+   "src/consilient/events.py"
+  ],
+  "commit": "feat(authority): add shared trusted human ingress",
+  "deps": [
+   "A07"
+  ]
+ },
+ "H02": {
+  "title": "central profiles plus consent and verdict integration",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "scripts/consent.py",
+   "scripts/verdict.py",
+   "tests/test_human_action_receipts.py",
+   "scripts/promote_loop.py",
+   "tests/test_promotion_authority.py",
+   "src/consilient/events.py",
+   "src/consilient/promote.py",
+   "tests/test_promote_contracts.py",
+   "src/consilient/promote.py"
+  ],
+  "commit": "feat(authority): validate protected action receipts",
+  "deps": [
+   "H01",
+   "Q01"
+  ]
+ },
+ "H03": {
+  "title": "promotion receipt integration",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "scripts/promote_loop.py",
+   "tests/test_promotion_authority.py",
+   "src/consilient/events.py",
+   "src/consilient/promote.py",
+   "tests/test_promote_contracts.py",
+   "src/consilient/promote.py",
+   "scripts/promote_loop.py",
+   "tests/test_promote_instrument.py",
+   "src/consilient/dashboard.py",
+   "src/consilient/recall.py"
+  ],
+  "commit": "feat(authority): bind promotion disposition receipts",
+  "deps": [
+   "H02",
+   "S03"
+  ]
+ },
+ "S01": {
+  "title": "immutable promoter policy and impact contract",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/promote.py",
+   "tests/test_promote_contracts.py",
+   "src/consilient/promote.py",
+   "scripts/promote_loop.py",
+   "tests/test_promote_instrument.py",
+   "src/consilient/dashboard.py",
+   "src/consilient/recall.py",
+   "src/consilient/instructions.py",
+   "tests/test_promote_card.py"
+  ],
+  "commit": "feat(promote): freeze impact contracts and safety floors",
+  "deps": []
+ },
+ "S02": {
+  "title": "sealed one-use evaluation and reversal proof",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/promote.py",
+   "scripts/promote_loop.py",
+   "tests/test_promote_instrument.py",
+   "src/consilient/dashboard.py",
+   "src/consilient/recall.py",
+   "src/consilient/instructions.py",
+   "tests/test_promote_card.py",
+   "src/consilient/commit_gate.py",
+   "scripts/commit_gate.py",
+   "src/consilient/promote.py"
+  ],
+  "commit": "feat(promote): seal one-use candidate evaluation",
+  "deps": []
+ },
+ "S03": {
+  "title": "deterministic owner card and privileged omissions",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/dashboard.py",
+   "src/consilient/recall.py",
+   "src/consilient/instructions.py",
+   "tests/test_promote_card.py",
+   "src/consilient/commit_gate.py",
+   "scripts/commit_gate.py",
+   "src/consilient/promote.py",
+   "tests/test_promote_commit_binding.py",
+   "src/consilient/events.py",
+   "src/consilient/promote.py"
+  ],
+  "commit": "feat(dashboard): render sealed promotion proposals",
+  "deps": [
+   "M03",
+   "S02"
+  ]
+ },
+ "S04": {
+  "title": "exact approval-to-commit binding",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/commit_gate.py",
+   "scripts/commit_gate.py",
+   "src/consilient/promote.py",
+   "tests/test_promote_commit_binding.py",
+   "src/consilient/events.py",
+   "src/consilient/promote.py",
+   "scripts/promote_loop.py",
+   "scripts/dispatch.py",
+   "src/consilient/instructions.py",
+   "tests/test_promote_activation.py"
+  ],
+  "commit": "feat(commit-gate): bind promotion approval to staged bytes",
+  "deps": [
+   "A07",
+   "H03",
+   "S02",
+   "S03"
+  ]
+ },
+ "S05": {
+  "title": "durable active-pointer transaction",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/promote.py",
+   "scripts/promote_loop.py",
+   "scripts/dispatch.py",
+   "src/consilient/instructions.py",
+   "tests/test_promote_activation.py",
+   "src/consilient/events.py",
+   "src/consilient/promote.py",
+   "scripts/promote_loop.py",
+   "scripts/run_loop.py"
+  ],
+  "commit": "feat(promote): make active-pointer changes durable",
+  "deps": [
+   "S04"
+  ]
+ },
+ "S06": {
+  "title": "exact rollback and drift controller",
+  "plan": "2026-08-22-human-self-improvement-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/promote.py",
+   "scripts/promote_loop.py",
+   "scripts/run_loop.py",
+   "tests/test_promote_rollback.py"
+  ],
+  "commit": "feat(promote): prove rollback on registered drift",
+  "deps": [
+   "S05"
+  ]
+ },
+ "M01": {
+  "title": "acknowledged immutable object capture",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   ".gitignore",
+   "src/consilient/events.py",
+   "src/consilient/records.py",
+   "tests/test_records.py",
+   "src/consilient/projection.py",
+   "tests/test_memory_projection.py",
+   "src/consilient/recall.py",
+   "scripts/recall.py",
+   "tests/test_recall_receipts.py",
+   "src/consilient/events.py"
+  ],
+  "commit": "feat(memory): capture immutable linked records",
+  "deps": [
+   "F03"
+  ]
+ },
+ "M02": {
+  "title": "temporal memory projection",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "src/consilient/projection.py",
+   "tests/test_memory_projection.py",
+   "src/consilient/recall.py",
+   "scripts/recall.py",
+   "tests/test_recall_receipts.py",
+   "src/consilient/events.py",
+   "src/consilient/capabilities.py",
+   "src/consilient/projection.py",
+   "scripts/capability_context.py",
+   "tests/test_capability_manifests.py"
+  ],
+  "commit": "feat(memory): project temporal record heads",
+  "deps": [
+   "M01"
+  ]
+ },
+ "M03": {
+  "title": "auditable bounded recall",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "src/consilient/recall.py",
+   "scripts/recall.py",
+   "tests/test_recall_receipts.py",
+   "src/consilient/events.py",
+   "src/consilient/capabilities.py",
+   "src/consilient/projection.py",
+   "scripts/capability_context.py",
+   "tests/test_capability_manifests.py",
+   "src/consilient/instructions.py",
+   "scripts/dispatch.py"
+  ],
+  "commit": "feat(recall): emit bounded recall receipts",
+  "deps": [
+   "M02"
+  ]
+ },
+ "M04": {
+  "title": "explicit active capability selection",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/capabilities.py",
+   "src/consilient/projection.py",
+   "scripts/capability_context.py",
+   "tests/test_capability_manifests.py",
+   "src/consilient/instructions.py",
+   "scripts/dispatch.py",
+   "tests/test_dispatch_memory.py",
+   "src/consilient/events.py",
+   "tests/test_model_change_records.py"
+  ],
+  "commit": "feat(capabilities): version explicit active manifests",
+  "deps": [
+   "M01",
+   "M02"
+  ]
+ },
+ "M05": {
+  "title": "reconstructable dispatch envelope",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "src/consilient/instructions.py",
+   "scripts/dispatch.py",
+   "tests/test_dispatch_memory.py",
+   "src/consilient/events.py",
+   "tests/test_model_change_records.py",
+   "scripts/build_decision_index.py",
+   "docs/decisions/index.md",
+   "tests/test_decision_index.py",
+   "docs/generated-manifest.json",
+   ".github/scripts/check_generated_documents.py"
+  ],
+  "commit": "feat(dispatch): bind reconstructable memory envelope",
+  "deps": [
+   "M04"
+  ]
+ },
+ "M06": {
+  "title": "model-change provenance record",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "src/consilient/events.py",
+   "tests/test_model_change_records.py",
+   "scripts/build_decision_index.py",
+   "docs/decisions/index.md",
+   "tests/test_decision_index.py",
+   "docs/generated-manifest.json",
+   ".github/scripts/check_generated_documents.py",
+   "scripts/build_requirements.py",
+   "docs/40-spec/requirements.md",
+   "tests/test_generated_documents.py"
+  ],
+  "commit": "feat(events): record model-state changes",
+  "deps": [
+   "M04"
+  ]
+ },
+ "L01": {
+  "title": "deterministic ADR index",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "scripts/build_decision_index.py",
+   "docs/decisions/index.md",
+   "tests/test_decision_index.py",
+   "docs/generated-manifest.json",
+   ".github/scripts/check_generated_documents.py",
+   "scripts/build_requirements.py",
+   "docs/40-spec/requirements.md",
+   "tests/test_generated_documents.py",
+   ".github/scripts/check_adr_trail.py",
+   "tests/test_adr_trail.py"
+  ],
+  "commit": "feat(docs): generate the ADR index",
+  "deps": []
+ },
+ "L02": {
+  "title": "executable generated-document manifest",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "docs/generated-manifest.json",
+   ".github/scripts/check_generated_documents.py",
+   "scripts/build_requirements.py",
+   "docs/40-spec/requirements.md",
+   "tests/test_generated_documents.py",
+   ".github/scripts/check_adr_trail.py",
+   "tests/test_adr_trail.py",
+   ".github/scripts/check_living_documents.py",
+   "tests/test_living_documents.py",
+   "docs/superpowers/specs/2026-08-22-action-surface.md"
+  ],
+  "commit": "feat(docs): check generated-document manifest",
+  "deps": [
+   "L01"
+  ]
+ },
+ "L03": {
+  "title": "append-only settled-record ratchet",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   ".github/scripts/check_adr_trail.py",
+   "tests/test_adr_trail.py",
+   ".github/scripts/check_living_documents.py",
+   "tests/test_living_documents.py",
+   "docs/superpowers/specs/2026-08-22-action-surface.md",
+   "docs/superpowers/specs/2026-08-22-autonomy-and-friction.md",
+   "docs/superpowers/specs/2026-08-22-chat-conversation.md",
+   "docs/superpowers/specs/2026-08-22-chat-delivery.md",
+   "docs/superpowers/specs/2026-08-22-consilience-gate.md",
+   "docs/superpowers/specs/2026-08-22-decision-protocol.md"
+  ],
+  "commit": "feat(docs): ratchet settled records append-only",
+  "deps": []
+ },
+ "L04": {
+  "title": "first admitted Class-W specification tranche",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   ".github/scripts/check_living_documents.py",
+   "tests/test_living_documents.py",
+   "docs/superpowers/specs/2026-08-22-action-surface.md",
+   "docs/superpowers/specs/2026-08-22-autonomy-and-friction.md",
+   "docs/superpowers/specs/2026-08-22-chat-conversation.md",
+   "docs/superpowers/specs/2026-08-22-chat-delivery.md",
+   "docs/superpowers/specs/2026-08-22-consilience-gate.md",
+   "docs/superpowers/specs/2026-08-22-decision-protocol.md",
+   "docs/superpowers/specs/2026-08-22-evidence-fusion.md",
+   "docs/superpowers/specs/2026-08-22-expertise-acquisition.md"
+  ],
+  "commit": "feat(docs): admit first written-spec tranche",
+  "deps": [
+   "L02"
+  ]
+ },
+ "L05": {
+  "title": "complete current Class-W specification tranche",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   "tests/test_living_document_inventory.py",
+   "docs/superpowers/specs/2026-08-22-living-documentation.md",
+   "docs/superpowers/specs/2026-08-22-memory-and-capability.md",
+   "docs/superpowers/specs/2026-08-22-model-lifecycle.md",
+   "docs/superpowers/specs/2026-08-22-observability-and-steering.md",
+   "docs/superpowers/specs/2026-08-22-portable-capability.md",
+   "docs/superpowers/specs/2026-08-22-self-improvement.md",
+   "docs/superpowers/specs/2026-08-22-squad-roles.md",
+   "docs/superpowers/specs/2026-08-22-task-management.md",
+   "docs/superpowers/specs/2026-08-22-verdict-supply.md"
+  ],
+  "commit": "docs(specs): admit remaining written-spec tranche",
+  "deps": [
+   "L04"
+  ]
+ },
+ "L06": {
+  "title": "CI enforcement for the admitted documentation surface",
+  "plan": "2026-08-22-memory-documentation-plan.md",
+  "claims": [
+   ".github/workflows/invariants.yml",
+   "tests/test_living_document_ci.py"
+  ],
+  "commit": "ci(docs): enforce admitted living documents",
+  "deps": [
+   "L02",
+   "L03",
+   "L05"
+  ]
+ },
+ "N00": {
+  "title": "cheap supervision floor: detect a dead dispatch from its artefact",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   ".harness/build_driver.py",
+   "scripts/dispatch.py",
+   "tests/test_supervision.py"
+  ],
+  "commit": "feat(supervision): detect a dead dispatch from its artefact",
+  "deps": []
+ },
+ "N03": {
+  "title": "short fencing-token leases replacing the one-hour claim",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   "src/consilient/coordination.py",
+   "tests/test_coordination.py"
+  ],
+  "commit": "feat(coordination): short fencing-token leases",
+  "deps": []
+ },
+ "N06": {
+  "title": "intent record with non-selection reasons and a starvation event",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   ".harness/build_driver.py",
+   "src/consilient/events.py",
+   "tests/test_intent.py"
+  ],
+  "commit": "feat(supervision): record intent and emit starvation",
+  "deps": []
+ },
+ "N01": {
+  "title": "expected record written before spawn; refuse a dispatch declaring no artefact",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   "scripts/dispatch.py",
+   "tests/test_supervision.py"
+  ],
+  "commit": "feat(supervision): require a declared progress artefact",
+  "deps": [
+   "N00"
+  ]
+ },
+ "N02": {
+  "title": "agent-written started line; absence within the window is a start failure",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   "scripts/dispatch.py",
+   "tests/test_supervision.py"
+  ],
+  "commit": "feat(supervision): start is agent-declared, not timer-inferred",
+  "deps": [
+   "N01"
+  ]
+ },
+ "N04": {
+  "title": "terminal record carries the uncommitted tracked paths it left behind",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   "scripts/dispatch.py",
+   "tests/test_supervision.py"
+  ],
+  "commit": "feat(supervision): terminal records stranded output",
+  "deps": [
+   "N01"
+  ]
+ },
+ "N07": {
+  "title": "single escalation emitter with a budget and mandatory fields",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   "src/consilient/events.py",
+   "tests/test_escalation.py"
+  ],
+  "commit": "feat(escalation): one emitter, budgeted, with required fields",
+  "deps": [
+   "N00",
+   "N06"
+  ]
+ },
+ "X01": {
+  "title": "measurement registration event and fail-closed projection join",
+  "plan": "docs/20-design/measurement-and-efficiency-2026-08-23.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/projection.py",
+   "tests/test_measurement.py"
+  ],
+  "commit": "feat(measurement): registration event and fail-closed join",
+  "deps": []
+ },
+ "X05": {
+  "title": "per-request timing record emitted in production, not only under test",
+  "plan": "docs/20-design/measurement-and-efficiency-2026-08-23.md",
+  "claims": [
+   "src/consilient/harness.py",
+   "scripts/dispatch.py",
+   "tests/test_request_records.py"
+  ],
+  "commit": "feat(telemetry): per-request timing record in production",
+  "deps": []
+ },
+ "X04": {
+  "title": "orchestrator overhead meter: direct versus routed at one, ten and a hundred",
+  "plan": "docs/20-design/measurement-and-efficiency-2026-08-23.md",
+  "claims": [
+   "scripts/bench_overhead.py",
+   "tests/test_bench_overhead.py"
+  ],
+  "commit": "feat(bench): orchestrator overhead meter",
+  "deps": []
+ },
+ "X02": {
+  "title": "measurement recorded check wired into CI with a self-test",
+  "plan": "docs/20-design/measurement-and-efficiency-2026-08-23.md",
+  "claims": [
+   ".github/scripts/check_measurement_recorded.py",
+   ".github/workflows/invariants.yml"
+  ],
+  "commit": "feat(ci): refuse an unregistered measurement",
+  "deps": [
+   "X01"
+  ]
+ },
+ "B01": {
+  "title": "disclosure is a required field in the outbound effect contract",
+  "plan": "docs/20-design/observability-steering-and-embodiment-2026-08-23.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "tests/test_effect_contract.py"
+  ],
+  "commit": "feat(outbound): require disclosure on every outbound effect",
+  "deps": []
+ },
+ "B03": {
+  "title": "reversibility classifier, with shell-and-egress as the irreversible class",
+  "plan": "docs/20-design/observability-steering-and-embodiment-2026-08-23.md",
+  "claims": [
+   "src/consilient/capabilities.py",
+   "tests/test_reversibility.py"
+  ],
+  "commit": "feat(capabilities): classify reversibility and refuse the unknown tool",
+  "deps": []
+ },
+ "B04": {
+  "title": "work-model deltas: grouping, blocked-with-reason, and scored soft edges",
+  "plan": "docs/20-design/observability-steering-and-embodiment-2026-08-23.md",
+  "claims": [
+   "src/consilient/work_items.py",
+   "src/consilient/projection.py",
+   "tests/test_work_items.py"
+  ],
+  "commit": "feat(work): group, block with a reason, and score soft edges",
+  "deps": []
+ },
+ "W01": {
+  "title": "finish wiring the living-document gates so deleting the step fails the suite",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   ".github/workflows/invariants.yml",
+   "tests/test_living_document_ci.py"
+  ],
+  "commit": "feat(ci): a deleted drift gate must fail the suite",
+  "deps": []
+ },
+ "W03": {
+  "title": "generated fact spine so no count is restated by hand",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   "scripts/build_project_facts.py",
+   "docs/project-facts.md",
+   "tests/test_generated_documents.py",
+   "docs/generated-manifest.json"
+  ],
+  "commit": "feat(docs): generate the fact spine",
+  "deps": [
+   "W01"
+  ],
+  "note": "The earlier refusal was correct: the source plan requires the fact spine to be manifest-registered, but extraction omitted docs/generated-manifest.json. That path is now claimed. Preserve and inspect the existing uncommitted generator, manifest and test changes before completing the unit."
+ },
+ "W07": {
+  "title": "link check, then split the context corpus and fix the contributor 404",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   ".github/scripts/check_links.py",
+   ".github/workflows/invariants.yml"
+  ],
+  "commit": "feat(docs): check links and repair the contributor path",
+  "deps": [
+   "W01"
+  ]
+ },
+ "K01": {
+  "title": "refuse a dispatch that can reach its own held-out contract",
+  "plan": "docs/decisions/0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md",
+  "claims": [
+   ".github/scripts/check_heldout_isolation.py",
+   "scripts/dispatch.py",
+   "tests/test_heldout_isolation.py"
+  ],
+  "commit": "feat(gate): refuse a dispatch that can read its own contract",
+  "deps": []
+ },
+ "K02": {
+  "title": "author the held-out contract from a different family before dispatch",
+  "plan": "docs/decisions/0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md",
+  "claims": [
+   "scripts/dispatch.py",
+   "tests/test_heldout_contract.py"
+  ],
+  "commit": "feat(gate): author a held-out contract from a different family",
+  "deps": [
+   "K01"
+  ]
+ },
+ "K03": {
+  "title": "admit contract-beta for the gate, kept separate from human-beta",
+  "plan": "docs/decisions/0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md",
+  "claims": [
+   "src/consilient/beta.py",
+   "tests/test_verdict_supply.py"
+  ],
+  "commit": "feat(beta): admit contract-beta for the gate",
+  "deps": [
+   "K02"
+  ]
+ },
+ "K04": {
+  "title": "gate A1 reads contract-beta and reports human-beta separately",
+  "plan": "docs/decisions/0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md",
+  "claims": [
+   "src/consilient/cli.py",
+   "tests/test_v0_invariants.py"
+  ],
+  "commit": "feat(gate): A1 reads contract-beta",
+  "deps": [
+   "K03"
+  ]
+ },
+ "Y01": {
+  "title": "conjoin admission flags with a manifest predicate so a caller cannot disable protection",
+  "plan": "docs/00-context/verification-of-the-twenty-2026-08-23.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "tests/test_effect_contract.py"
+  ],
+  "commit": "fix(effects): a caller-supplied flag may not disable admission protection",
+  "deps": []
+ },
+ "Y02": {
+  "title": "isolate a sealed-instrument candidate in its own process",
+  "plan": "docs/00-context/verification-of-the-twenty-2026-08-23.md",
+  "claims": [
+   "scripts/promote_loop.py",
+   "src/consilient/promote.py",
+   "tests/test_promote_instrument.py"
+  ],
+  "commit": "fix(promote): run a candidate in its own process, not the evaluator's",
+  "deps": []
+ },
+ "Y03": {
+  "title": "clear mypy --strict across the tree and gate it",
+  "plan": "docs/00-context/verification-of-the-twenty-2026-08-23.md",
+  "claims": [
+   "src/consilient/promote.py",
+   "src/consilient/projection.py",
+   ".github/workflows/invariants.yml"
+  ],
+  "commit": "fix(types): clear mypy --strict and keep it clear",
+  "deps": []
+ },
+ "Y04": {
+  "title": "project declared-principal verdicts honestly instead of dropping them silently",
+  "plan": "docs/00-context/verification-of-the-twenty-2026-08-23.md",
+  "claims": [
+   "src/consilient/projection.py",
+   "src/consilient/beta.py",
+   "tests/test_verdict_supply.py"
+  ],
+  "commit": "fix(beta): count and render excluded verdicts rather than hiding them",
+  "deps": []
+ },
+ "Y05": {
+  "title": "measure guard survival and report it; block only once the backlog is clear",
+  "plan": "docs/00-context/verification-of-the-twenty-2026-08-23.md",
+  "claims": [
+   ".github/scripts/check_guard_mutation.py",
+   ".github/workflows/invariants.yml",
+   "tests/test_guard_mutation.py"
+  ],
+  "commit": "feat(ci): measure guard survival, report-only until the backlog clears",
+  "deps": []
+ },
+ "Y06": {
+  "title": "derive a steering-free grammar constraint from the schema the caller already holds",
+  "plan": "docs/00-context/verification-of-the-twenty-2026-08-23.md",
+  "claims": [
+   "src/consilient/harness.py",
+   "tests/test_constrained_decoding.py"
+  ],
+  "commit": "feat(decoding): constrain generation from the declared schema",
+  "deps": []
+ },
+ "AA": {
+  "title": "make CI honest: run the guard gate, ban date-literal log paths, clear ruff",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   ".github/workflows/invariants.yml",
+   "tests/test_guard_mutation.py",
+   "pyproject.toml",
+   "mypy.ini"
+  ],
+  "commit": "fix(ci): run the guard gate and ban date-literal log paths",
+  "deps": []
+ },
+ "AB": {
+  "title": "refuse a torn append and name the offset",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "src/consilient/events.py",
+   "src/consilient/harness.py"
+  ],
+  "commit": "fix(events): refuse a torn append rather than gluing it",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AC": {
+  "title": "quarantine a duplicate record instead of raising, and surface rejection reasons",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "src/consilient/projection.py",
+   "src/consilient/cli.py",
+   "src/consilient/dashboard.py"
+  ],
+  "commit": "fix(projection): quarantine duplicates and surface rejection reasons",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AD": {
+  "title": "recompute the source turn digest where the turn texts actually arrive",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "src/consilient/work_items.py",
+   "tests/test_conversation.py"
+  ],
+  "commit": "fix(work): recompute the source turn digest in validate_transition",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AE": {
+  "title": "wire the observation predicate and delete the unreachable admission arms",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "src/consilient/effects.py",
+   "tests/test_effect_contract.py",
+   "tests/test_effect_admission.py"
+  ],
+  "commit": "fix(effects): wire the observation predicate and delete dead arms",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AF": {
+  "title": "refuse a capability entry whose gate is not admitted or whose grant expired",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "src/consilient/capabilities.py",
+   "tests/test_capabilities.py"
+  ],
+  "commit": "fix(capabilities): refuse an unadmitted or expired entry",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AG": {
+  "title": "delete the redefinitions shadowing the events imports",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "src/consilient/verification.py"
+  ],
+  "commit": "fix(verification): delete shadowing redefinitions",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AH": {
+  "title": "run a containment probe through the real execute path before scoring a candidate",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "src/consilient/promote.py",
+   "tests/test_promote_instrument.py",
+   "tests/test_budget.py"
+  ],
+  "commit": "fix(promote): probe containment through the real execute path",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AI": {
+  "title": "make the orchestrator's state atomic and parse the review verdict",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   ".harness/build_driver.py",
+   ".gitignore"
+  ],
+  "commit": "fix(driver): atomic state, parsed verdicts, no cherry-pick onto red",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AJ": {
+  "title": "release a claim on every path out of dispatch",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "scripts/dispatch.py",
+   "scripts/run_loop.py"
+  ],
+  "commit": "fix(dispatch): release the claim on every exit path",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AK": {
+  "title": "type-check the gate scripts and add a private-repo-name check",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   ".github/scripts/check_component_licences.py",
+   ".github/scripts/check_private_repo_names.py",
+   ".githooks/pre-push"
+  ],
+  "commit": "feat(ci): type-check gate scripts and check private repo names",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AL": {
+  "title": "generate every restated count instead of writing it by hand",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "scripts/build_counts.py",
+   "docs/40-spec/requirements-source.json",
+   "README.md",
+   "CLAUDE.md"
+  ],
+  "commit": "feat(docs): generate restated counts from the manifest",
+  "deps": [
+   "AA"
+  ]
+ },
+ "AM": {
+  "title": "enumerate every via the writer accepts, end to end through beta",
+  "plan": "docs/00-context/codebase-audit-2026-08-24.md",
+  "claims": [
+   "tests/test_verdict_supply.py"
+  ],
+  "commit": "test(beta): enumerate every accepted via end to end",
+  "deps": [
+   "AA"
+  ]
+ },
+ "T01B": {
+  "title": "claim ordering and serial-lane contract for dispatch",
+  "plan": "2026-08-22-foundation-task-delivery-plan.md",
+  "claims": [
+   "src/consilient/coordination.py",
+   "tests/test_coordination.py"
+  ],
+  "commit": "feat(coordination): order claims against the serial-lane contract",
+  "deps": []
+ },
+ "W04": {
+  "title": "restatement lint: refuse a count written by hand",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   ".github/scripts/check_restatement.py",
+   "tests/test_restatement.py"
+  ],
+  "commit": "feat(ci): refuse a restated count",
+  "deps": []
+ },
+ "W05": {
+  "title": "the end-state page a stranger can read",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   "docs/END-STATE.md"
+  ],
+  "commit": "docs: state what Consilient is when finished",
+  "deps": []
+ },
+ "W09": {
+  "title": "the human entry path: five guide pages and a citation file",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   "docs/05-guide/what-this-is.md",
+   "docs/05-guide/for-your-field.md",
+   "docs/05-guide/first-hour.md",
+   "docs/05-guide/how-this-is-funded.md",
+   "CITATION.cff"
+  ],
+  "commit": "docs: a reader's path from stranger to contributor",
+  "deps": []
+ },
+ "W10": {
+  "title": "first-run demo: a real beta with its interval in under a minute",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   "scripts/demo_trajectory.py",
+   "tests/test_demo_trajectory.py"
+  ],
+  "commit": "feat(demo): print a real beta from a bundled synthetic trajectory",
+  "deps": []
+ },
+ "W11": {
+  "title": "generate the diagrams from the code rather than drawing them",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   "scripts/build_diagrams.py",
+   "tests/test_build_diagrams.py"
+  ],
+  "commit": "feat(docs): generate diagrams from the tree",
+  "deps": []
+ },
+ "W12": {
+  "title": "the drawn diagrams: architecture and the gate pipeline",
+  "plan": "docs/20-design/documentation-and-surfaces-plan-2026-08-23.md",
+  "claims": [
+   "docs/diagrams/system-architecture.mmd",
+   "docs/diagrams/gate-pipeline.mmd"
+  ],
+  "commit": "docs: draw the architecture and gate diagrams",
+  "deps": [
+   "W11"
+  ]
+ },
+ "X06": {
+  "title": "the anchor set: 100 tasks per family, hashed, never committed readable",
+  "plan": "docs/20-design/measurement-and-efficiency-2026-08-23.md",
+  "claims": [
+   "scripts/build_anchor_set.py",
+   "tests/test_anchor_set.py"
+  ],
+  "commit": "feat(measure): build a hashed anchor set for drift detection",
+  "deps": []
+ },
+ "X03": {
+  "title": "spike: can inspect-ai drive a subscription-auth agent at all",
+  "plan": "docs/20-design/measurement-and-efficiency-2026-08-23.md",
+  "claims": [
+   "docs/10-research/experiments/inspect-auth-spike.md"
+  ],
+  "commit": "research: record whether inspect-ai can drive subscription auth",
+  "deps": [],
+  "note": "This is a SPIKE. Its output is a written answer, not code you keep. Try the cheapest thing that settles the question, record what you ran and what happened either way, and explicitly label anything you built as throwaway. **Do not commit a harness architecture on the strength of it** -- the measurement design says so in as many words, and a spike that quietly becomes infrastructure is how an unvalidated choice gets locked in."
+ },
+ "B06": {
+  "title": "voice cascade, local only, no telephony",
+  "plan": "docs/20-design/observability-steering-and-embodiment-2026-08-23.md",
+  "claims": [
+   "scripts/voice_cascade.py",
+   "tests/test_voice_cascade.py"
+  ],
+  "commit": "feat(voice): local speech cascade with no telephony",
+  "deps": [],
+  "note": "Local only. ADR-0102 keeps telephony out of the open-source tree entirely, so this unit must not import, configure or reach any telephony provider. Utterance to action, measured resident memory, and nothing that dials."
+ },
+ "B09": {
+  "title": "an adversarial suite over our own tool surface",
+  "plan": "docs/20-design/observability-steering-and-embodiment-2026-08-23.md",
+  "claims": [
+   "tests/test_tool_surface_adversarial.py"
+  ],
+  "commit": "test(security): adversarially exercise our own tool surface",
+  "deps": [],
+  "note": "The target is 0% on the irreversible set BY CONSTRUCTION -- not by testing until it passes. On the reversible set, report the honest residual and the utility cost rather than a number that flatters. A syntactic scan is not a security boundary: the sealed sandbox was escaped this week with __import__(\"sys\")._getframe() because its guard scanned only for import statements."
+ },
+ "CB1": {
+  "title": "derive a verdict's principal from its signature instead of its claim",
+  "plan": "docs/20-design/crowd-verdict-supply-2026-08-23.md",
+  "claims": [
+   "scripts/sign_verdict.py",
+   "tests/test_signed_verdict.py"
+  ],
+  "commit": "feat(verdict): derive the principal from an ssh signature",
+  "deps": [],
+  "note": "ADR-0080 records that events.py checks only that the declared actor equals the declared principal and the channel says cli, so **a local agent process can write a syntactically valid declared-principal verdict**. This closes that.\n\nUse `ssh-keygen -Y sign` and `-Y verify`, with the principal read from `-Y find-principals` and NEVER from a caller-supplied field. The project must hold no private key and no secret of any kind. A verdict must be verifiable years later by a third party from a clone alone -- if it is only verifiable by us, we could have fabricated it, which defeats the purpose."
+ },
+ "AN": {
+  "title": "make A2 decidable while the log is being written",
+  "plan": "docs/40-spec/v0-draft.md",
+  "claims": [
+   "src/consilient/cli.py",
+   "tests/test_doctor_a2_concurrent.py"
+  ],
+  "commit": "fix(doctor): decide A2 against a pinned prefix, not the live tail",
+  "deps": [],
+  "note": "MEASURED 24 Aug 2026. A2 is not failing because replay is broken -- replay reproduces exactly. It fails because `doctor` compares the persisted projection against a replay of the *live* log, and with ~20 agents appending, events land between the two reads. Observed in one sitting, same repository, minutes apart: FAIL ('canonical state diverged'), then UNKNOWN ('state covers N of M events'), then PASS -- the last only because the rebuild and the check happened in the same instant.\n\nSo the condition as written is decidable only on a quiet repository, and this repository is never quiet. A gate that reports three different verdicts for one unchanged history is measuring contention, not replay.\n\nFix it by deciding A2 against a **pinned prefix**: take the projection's own high-water mark, replay exactly that many events, and compare. Events appended after the mark are outside the comparison -- they are not evidence of divergence and must not be reported as such. A genuine mismatch inside the prefix must still FAIL, and an empty prefix must still be UNKNOWN (do not reintroduce the tautological pass repaired on 20 Aug 2026).\n\nThe test is the point of this unit: `tests/test_doctor_a2_concurrent.py` must append to the log *while* the check runs and assert the verdict is stable and correct. A test that only runs on a quiet log reproduces the bug it is meant to catch.\n\nDo NOT make A2 pass by widening what counts as identical. The divergence report is right in principle; the read window is what is wrong."
+ },
+ "AO": {
+  "title": "record the 22 August capture loss as baseline, once torn appends are refused",
+  "plan": "docs/decisions/index.md",
+  "claims": [
+   "docs/decisions/0105-baseline-the-22-august-capture-loss.md",
+   "src/consilient/cli.py",
+   "tests/test_doctor_a3_baseline.py"
+  ],
+  "commit": "docs(adr): baseline the 22 August capture loss, contingent on AB",
+  "deps": [
+   "AB"
+  ],
+  "note": "DECIDED by Joe, 24 Aug 2026. MEASURED same day: A3 is permanently unpassable as written. `pass` requires `run >= 7 AND new_refused == 0`. `run_start` walks backwards through consecutive capture days; 19-24 August are consecutive with no gap; three lines on 2026-08-22 (offsets 27, 35, 45) are invalid JSON, written by something that bypassed `append()`. Because the run never slides forward while capture continues daily, those three stay inside the window forever. The only way the current code passes is to STOP CAPTURING for a day, which resets run_start past the 22nd -- a capture gate you pass by breaking capture.\n\nWrite ADR-0105 recording those three digests as a known, permanent loss, exactly as ADR-0043 did for the original three, and add them to HISTORICAL_REFUSAL_DIGESTS. A3 then measures NEW loss going forward, which is what it is for.\n\n**This unit must not land before AB.** AB makes a torn append refuse and name its offset. Baselining a loss whose cause is still live turns A3 into a ratchet that absorbs every future corruption and detects nothing -- that is the objection Joe was shown and the reason for the dependency. State it plainly in the ADR's 'evidence against' section, along with the rule: the baseline may only ever absorb a loss whose cause has been fixed and whose fix has shipped.\n\nDo NOT widen A3, change its arithmetic, or make it a trailing window. The condition is right; the history under it is damaged."
+ },
+ "AP": {
+  "title": "run Gate B4 tickets against the public corpus and prove the trajectory shape counts",
+  "plan": "docs/40-spec/v0-draft.md",
+  "claims": [
+   "scripts/b4_tickets.py",
+   "tests/test_b4_tickets.py"
+  ],
+  "deps": [],
+  "commit": "feat(b4): run verified tickets against an independent public corpus",
+  "note": "DECIDED by Joe, 24 Aug 2026. Gate B4 needs 20 completed tickets on a repository other than this one. All four roots previously in `.harness/allowed-cwds.json` are FORKS of the two never-publish repositories -- verified 24 Aug by shared root commit, boolean only, no identifiers read or printed. The prohibition follows the history, so B4 evidence gathered on any of them could never be published, which defeats the point of a gate.\n\nPallets `itsdangerous` 2.2.0 is now cloned at `C:/Users/jpbpr/Repositories/itsdangerous`, checked out at the EXP-96 pin `096c8d4`, BSD-3-Clause, 8 source files, with its own independently authored pytest suite. It is allowlisted under ADR-0063. Independent authorship and an independent verification regime are exactly what ADR-0013 asks for, and it is publishable.\n\nRead `_foreign_tickets` in `src/consilient/cli.py` before writing anything -- it defines what counts, and most of this unit is conforming to it. Per ticket the trajectory needs an `attempt.outcome` carrying that repository, `verifier_accept: true` and a task or attempt_id, PLUS a matching `ticket.completed`. Both must go through `append()`; a line written directly to the file does not count, by design.\n\nScope of THIS unit: the runner plus **three** real tickets end to end, proving `consil doctor` moves B4 from 0 to 3. Do not attempt all twenty here. Tickets must be genuine work against that library verified by ITS suite, not this project's. A ticket whose test cannot fail has produced nothing.\n\nNever publish anything from the four fork roots. Nothing from this unit may read them."
+ }
+}

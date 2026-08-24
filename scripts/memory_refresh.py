@@ -18,6 +18,9 @@ from typing import Protocol
 
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import proc_tree  # noqa: E402  (needs the path insert above)
 SOURCE_ENV = "CONSILIENT_MEMPALACE_CONVERSATIONS"
 SOURCE_AREA = Path(".harness/training")
 COMMAND_TIMEOUT_S = 300.0
@@ -35,34 +38,9 @@ class SourceRefused(ValueError):
     """The episodic source was absent or outside the local instance boundary."""
 
 
-def _kill_tree(process: subprocess.Popen[bytes]) -> None:
+def _kill_tree(process: subprocess.Popen[bytes], job: object | None = None) -> None:
     """Kill the process and all descendants by the identity we started."""
-    if process.poll() is not None:
-        return
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["taskkill", "/T", "/F", "/PID", str(process.pid)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=KILL_TIMEOUT_S,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            pass
-    else:
-        try:
-            getattr(os, "killpg")(process.pid, getattr(signal, "SIGKILL", 9))
-        except (OSError, PermissionError, ProcessLookupError):
-            pass
-    if process.poll() is None:
-        try:
-            process.kill()
-        except (OSError, PermissionError, ProcessLookupError):
-            pass
-
+    proc_tree.kill_tree(process, job)
 
 def run_text(
     argv: list[str], *, cwd: Path, timeout_s: float
@@ -89,16 +67,19 @@ def run_text(
         except OSError as exc:
             return subprocess.CompletedProcess(argv, 127, "", f"could not start: {exc}")
 
+        job = proc_tree.assign_job(process)
         timed_out = False
         try:
             process.wait(timeout=timeout_s)
         except subprocess.TimeoutExpired:
             timed_out = True
-            _kill_tree(process)
+            _kill_tree(process, job)
             try:
                 process.wait(timeout=KILL_TIMEOUT_S)
             except subprocess.TimeoutExpired:
-                _kill_tree(process)
+                _kill_tree(process, job)
+        else:
+            proc_tree.terminate_job(job)
 
         stdout_file.seek(0)
         stderr_file.seek(0)

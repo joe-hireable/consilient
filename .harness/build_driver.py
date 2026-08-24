@@ -132,6 +132,15 @@ ARMS = [
 
 # cursor-agent serialises on an exclusive file lock in scripts/dispatch.py, so more than one
 # concurrent cursor dispatch does not run in parallel — it waits out the leash and fails.
+# MEASURED 24 Aug 2026. scripts/dispatch.py defaults to --max-turns 20 and the driver never
+# overrode it, so every grok dispatch died mid-orientation with "Error: max turns reached"
+# and exit 1 -- seven for seven, artefacts of 509B-2.3KB, nothing written. T01 alone gates 22
+# units and burned three attempts that way. Reproduced directly: the same prompt exits 0 under
+# a sufficient cap and 1 under a short one. Only grok and claude expose the flag; codex and
+# cursor ignore it, which is why the failure looked provider-specific. The LEASH bounds cost
+# here, not the turn count, so the cap should be generous enough never to be the binding limit.
+DEFAULT_TURNS = 150
+
 CURSOR_CONCURRENCY = 1
 
 
@@ -1057,6 +1066,8 @@ def main() -> int:
             str(rl),
             "--permissions",
             "bypass",
+            "--max-turns",
+            str(DEFAULT_TURNS),
         ]
         if rm:
             vargs += ["--model", rm]
@@ -1146,6 +1157,8 @@ def main() -> int:
             str(leash),
             "--permissions",
             "bypass",
+            "--max-turns",
+            str(unit.get("turns", DEFAULT_TURNS)),
         ]
         if model:
             args += ["--model", model]
@@ -1200,6 +1213,8 @@ def main() -> int:
             str(leash),
             "--permissions",
             "bypass",
+            "--max-turns",
+            str(DEFAULT_TURNS),
         ]
         if model:
             rargs += ["--model", model]

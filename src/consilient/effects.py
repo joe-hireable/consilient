@@ -580,21 +580,27 @@ class ProofObservation:
     observed_residuals: Sequence[str]
 
     def __post_init__(self) -> None:
-        for field in (
-            "start_state_digest",
-            "forward_state_digest",
-            "end_state_digest",
-            "enclosing_before_digest",
-            "enclosing_after_digest",
-            "expected_state_digest",
-            "sandbox_policy_digest",
-            "verifier_policy_digest",
-            "observed_verifier_policy_digest",
-            "observer_log_digest",
+        # Named pairs rather than getattr: the product tree bans dynamic attribute access
+        # because it defeats the AST scan that proves this tree cannot reach a shell, the
+        # network or a credential. A lock with a benign exception is not a lock.
+        for field, value in (
+            ("start_state_digest", self.start_state_digest),
+            ("forward_state_digest", self.forward_state_digest),
+            ("end_state_digest", self.end_state_digest),
+            ("enclosing_before_digest", self.enclosing_before_digest),
+            ("enclosing_after_digest", self.enclosing_after_digest),
+            ("expected_state_digest", self.expected_state_digest),
+            ("sandbox_policy_digest", self.sandbox_policy_digest),
+            ("verifier_policy_digest", self.verifier_policy_digest),
+            ("observed_verifier_policy_digest", self.observed_verifier_policy_digest),
+            ("observer_log_digest", self.observer_log_digest),
         ):
-            object.__setattr__(self, field, _digest(getattr(self, field), field))
-        for field in ("forward_status", "inverse_status"):
-            status = _text(getattr(self, field), field)
+            object.__setattr__(self, field, _digest(value, field))
+        for field, value in (
+            ("forward_status", self.forward_status),
+            ("inverse_status", self.inverse_status),
+        ):
+            status = _text(value, field)
             if status not in _PROOF_RUN_STATUSES:
                 raise EffectError(f"{field} must be one of {sorted(_PROOF_RUN_STATUSES)}")
             object.__setattr__(self, field, status)
