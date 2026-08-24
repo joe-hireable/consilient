@@ -24,6 +24,15 @@ CHECKER = ROOT / ".github" / "scripts" / "check_generated_documents.py"
 MANIFEST = ROOT / "docs" / "generated-manifest.json"
 BUILD_REQUIREMENTS = ROOT / "scripts" / "build_requirements.py"
 BUILD_DECISION_INDEX = ROOT / "scripts" / "build_decision_index.py"
+BUILD_PROJECT_FACTS = ROOT / "scripts" / "build_project_facts.py"
+PROJECT_FACTS_SOURCES = [
+    "docs/decisions/[0-9][0-9][0-9][0-9]-*.md",
+    "docs/10-research/experiment-register.md",
+    "docs/superpowers/specs/*.md",
+    "pyproject.toml",
+]
+PROJECT_FACTS_SOURCE_HEADER = ", ".join(PROJECT_FACTS_SOURCES)
+EXP_HEADING = re.compile(r"^#{2,4}\s*EXP-\d+", re.MULTILINE)
 
 
 def _install_checker(root: Path) -> Path:
@@ -129,6 +138,86 @@ def _write_requirements_fixture(root: Path) -> None:
         encoding="utf-8",
         errors="replace",
     )
+
+
+def _normalized_source_digest(root: Path, sources: list[str]) -> str:
+    digest = hashlib.sha256()
+    for pattern in sources:
+        if any(char in pattern for char in "[]*?"):
+            parent = root / Path(pattern).parent
+            paths = sorted(parent.glob(Path(pattern).name))
+        else:
+            paths = [root / pattern]
+        for path in paths:
+            relative = path.relative_to(root).as_posix()
+            file_digest = hashlib.sha256(
+                path.read_bytes().replace(b"\r\n", b"\n")
+            ).hexdigest()
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(file_digest.encode("ascii"))
+            digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _write_facts_sources(
+    root: Path,
+    *,
+    adrs: int = 2,
+    experiments: int = 3,
+    specs: int = 2,
+    version: str = "0.1.0",
+) -> None:
+    decisions = root / "docs" / "decisions"
+    decisions.mkdir(parents=True, exist_ok=True)
+    for index in range(1, adrs + 1):
+        (decisions / f"{index:04d}-item.md").write_text(
+            f"# {index:04d}. Item\n\n- **Status:** ACCEPTED\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    register = root / "docs" / "10-research" / "experiment-register.md"
+    register.parent.mkdir(parents=True, exist_ok=True)
+    headings = "\n\n".join(
+        f"### EXP-{index:02d} · Thing `READY`" for index in range(1, experiments + 1)
+    )
+    register.write_text(
+        "# Experiment register\n\n" + headings + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    spec_dir = root / "docs" / "superpowers" / "specs"
+    spec_dir.mkdir(parents=True, exist_ok=True)
+    for index in range(1, specs + 1):
+        (spec_dir / f"2026-08-22-spec-{index:02d}.md").write_text(
+            f"# Spec {index}\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    (root / "pyproject.toml").write_text(
+        f'[project]\nname = "consilient"\nversion = "{version}"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def _run_project_facts(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    script = _install_script(root, BUILD_PROJECT_FACTS)
+    return subprocess.run(
+        [sys.executable, str(script), *args],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def _fact_value(text: str, key: str) -> str:
+    match = re.search(rf"^## {re.escape(key)}\n+(.+)$", text, re.MULTILINE)
+    assert match is not None, f"missing generated fact {key}"
+    return match.group(1).strip()
 
 
 def _write_adr_fixture(root: Path) -> None:
@@ -340,7 +429,11 @@ def test_repository_manifest_matches_committed_generated_documents() -> None:
         pytest.skip("manifest not built yet")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     outputs = [entry["output"] for entry in manifest["entries"]]
-    assert outputs == ["docs/40-spec/requirements.md", "docs/decisions/index.md"]
+    assert outputs == [
+        "docs/40-spec/requirements.md",
+        "docs/decisions/index.md",
+        "docs/project-facts.md",
+    ]
 
 
 def test_unknown_argument_is_cli_misuse(tmp_path: Path) -> None:
@@ -412,3 +505,140 @@ def test_the_readme_counts_match_what_is_on_disk():
             f"README claims {claimed.group(1)} {what}; the tree holds {actual}. "
             "Correct the README — a number in public prose is a claim like any other."
         )
+
+
+def test_project_facts_header_matches_l01_contract_and_counts_match_disk(
+    tmp_path: Path,
+) -> None:
+    _write_facts_sources(tmp_path, adrs=2, experiments=3, specs=2, version="0.1.0")
+
+    run = _run_project_facts(tmp_path)
+
+    assert run.returncode == 0, run.stderr
+    rendered = (tmp_path / "docs" / "project-facts.md").read_text(encoding="utf-8")
+    digest = _normalized_source_digest(tmp_path, PROJECT_FACTS_SOURCES)
+    assert "> **Producer:** `scripts/build_project_facts.py`" in rendered
+    assert f"> **Source:** `{PROJECT_FACTS_SOURCE_HEADER}`" in rendered
+    assert f"> **Source SHA-256:** `{digest}`" in rendered
+    assert (
+        "> **Do not hand-edit:** regenerate with `python scripts/build_project_facts.py`."
+        in rendered
+    )
+    assert _fact_value(rendered, "adr_count") == "2"
+    assert _fact_value(rendered, "experiment_count") == "3"
+    assert _fact_value(rendered, "spec_count") == "2"
+    assert _fact_value(rendered, "version") == "0.1.0"
+
+
+def test_project_facts_check_detects_stale_output_without_writing(tmp_path: Path) -> None:
+    _write_facts_sources(tmp_path)
+    assert _run_project_facts(tmp_path).returncode == 0
+    target = tmp_path / "docs" / "project-facts.md"
+    stale = b"stale generated facts\n"
+    target.write_bytes(stale)
+
+    run = _run_project_facts(tmp_path, "--check")
+
+    assert run.returncode == 1
+    assert target.read_bytes() == stale
+
+
+def test_project_facts_second_build_is_byte_identical(tmp_path: Path) -> None:
+    _write_facts_sources(tmp_path)
+    first = _run_project_facts(tmp_path)
+    first_bytes = (tmp_path / "docs" / "project-facts.md").read_bytes()
+    checked = _run_project_facts(tmp_path, "--check")
+    second = _run_project_facts(tmp_path)
+
+    assert first.returncode == 0, first.stderr
+    assert checked.returncode == 0, checked.stderr
+    assert second.returncode == 0, second.stderr
+    assert (tmp_path / "docs" / "project-facts.md").read_bytes() == first_bytes
+
+
+def test_project_facts_unknown_argument_is_cli_misuse(tmp_path: Path) -> None:
+    _write_facts_sources(tmp_path)
+
+    run = _run_project_facts(tmp_path, "--unknown")
+
+    assert run.returncode == 2
+
+
+def test_project_facts_count_change_trips_check(tmp_path: Path) -> None:
+    _write_facts_sources(tmp_path, adrs=2, experiments=3, specs=2)
+    assert _run_project_facts(tmp_path).returncode == 0
+    (tmp_path / "docs" / "decisions" / "0003-item.md").write_text(
+        "# 0003. Item\n\n- **Status:** ACCEPTED\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    stale = _run_project_facts(tmp_path, "--check")
+    rebuilt = _run_project_facts(tmp_path)
+
+    assert stale.returncode == 1
+    assert rebuilt.returncode == 0, rebuilt.stderr
+    rendered = (tmp_path / "docs" / "project-facts.md").read_text(encoding="utf-8")
+    assert _fact_value(rendered, "adr_count") == "3"
+
+
+def test_checker_verifies_project_facts_entry(tmp_path: Path) -> None:
+    _write_facts_sources(tmp_path)
+    assert _run_project_facts(tmp_path).returncode == 0
+    _write_manifest(
+        tmp_path,
+        [
+            {
+                "output": "docs/project-facts.md",
+                "producer": "scripts/build_project_facts.py",
+                "check_args": ["--check"],
+                "sources": PROJECT_FACTS_SOURCES,
+                "header": {
+                    "producer": "scripts/build_project_facts.py",
+                    "source": PROJECT_FACTS_SOURCE_HEADER,
+                },
+            }
+        ],
+    )
+
+    run = _run_checker(tmp_path, "--check")
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "docs/project-facts.md" in run.stdout
+    assert "checked=1" in run.stdout
+    assert "adverse=0" in run.stdout
+
+
+def test_live_project_facts_counts_match_disk() -> None:
+    facts = ROOT / "docs" / "project-facts.md"
+    assert facts.is_file(), "docs/project-facts.md must be generated"
+    text = facts.read_text(encoding="utf-8")
+    adrs = len(list((ROOT / "docs" / "decisions").glob("[0-9][0-9][0-9][0-9]-*.md")))
+    register = (ROOT / "docs" / "10-research" / "experiment-register.md").read_text(
+        encoding="utf-8"
+    )
+    experiments = len(EXP_HEADING.findall(register))
+    specs = len(list((ROOT / "docs" / "superpowers" / "specs").glob("*.md")))
+    version = re.search(
+        r'^version\s*=\s*"([^"]+)"',
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+        re.MULTILINE,
+    )
+    assert version is not None
+    assert _fact_value(text, "adr_count") == str(adrs)
+    assert _fact_value(text, "experiment_count") == str(experiments)
+    assert _fact_value(text, "spec_count") == str(specs)
+    assert _fact_value(text, "version") == version.group(1)
+    run = subprocess.run(
+        [sys.executable, str(CHECKER), "--check"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "docs/project-facts.md" in run.stdout
+    assert "checked=3" in run.stdout
+    assert "adverse=0" in run.stdout
