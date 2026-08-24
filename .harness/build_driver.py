@@ -1251,6 +1251,27 @@ def main() -> int:
     # Bring back anything that finished in its own tree, then judge it.
     # Slots first, before anything below can return early. A held slot is capacity the queue cannot
     # use, and an idle unit produces no artefact to notice it by.
+    # A unit vanishing from the plan is silent, and it happened: the surfaces unit queued on
+    # 24 August 2026 was simply absent an hour later. Nothing in this repository WRITES
+    # plan-units.json -- it is read-only to every script -- so the loss came from a git
+    # operation restoring an older copy over a hand edit, during one of the cherry-picks and
+    # checkouts used to resolve merges. Queued work disappearing without a sound is worse than
+    # a merge conflict, because a conflict announces itself.
+    #
+    # This cannot prevent the loss; it makes it loud. The count is recorded each tick and a DROP
+    # is reported. It never blocks -- a unit legitimately removed by the principal is not an
+    # error -- but it will never again happen without a line in the log naming it.
+    seen_units = int(state.get("unit_count") or 0)
+    if seen_units and len(units) < seen_units:
+        missing = seen_units - len(units)
+        print(
+            f"driver: WARNING -- the plan lost {missing} unit(s) since the last tick "
+            f"({seen_units} -> {len(units)}). Nothing here writes plan-units.json, so this is a "
+            "git operation restoring an older copy over an edit. Check the last merge or "
+            "checkout before dispatching anything."
+        )
+    state["unit_count"] = len(units)
+
     reclaimed = reclaim_expired_slots(state)
     if reclaimed:
         print(
