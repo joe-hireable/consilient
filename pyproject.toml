@@ -49,3 +49,9 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+exclude = [".harness"]
+
+[tool.ruff.lint]
+extend-select = ["RUF100"]

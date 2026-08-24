@@ -47,6 +47,7 @@ jobs:
       # -- which is this repository's canonical failure, a chokepoint with no enforcement rule,
       # committed against its own enforcement machinery.
       - name: Guard mutation invariant check
+        if: ${{ !cancelled() }}
         # A green suite is not evidence that its guards work. The cross-family review of
         # 23 August 2026 found 14 of 19 units carrying at least one guard that could be
         # deleted with the unit's own suite still passing, and named a mutation run per

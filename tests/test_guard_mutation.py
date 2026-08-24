@@ -10,7 +10,9 @@ refusal and a real test.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -19,6 +21,55 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / ".github" / "scripts" / "check_guard_mutation.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "invariants.yml"
+PYPROJECT = ROOT / "pyproject.toml"
+MYPY_INI = ROOT / "mypy.ini"
+TESTS = ROOT / "tests"
+
+DATE_DERIVED_LOG_PATH = re.compile(r"""\bTS\s*\[\s*:?\s*10\s*\].*\.jsonl""")
+
+
+def _named_workflow_steps(workflow: str) -> list[tuple[str, str]]:
+    job = workflow.partition("jobs:")[2]
+    steps: list[tuple[str, str]] = []
+    for chunk in job.split("- name:")[1:]:
+        name, _, body = chunk.partition("\n")
+        steps.append((name.strip(), body))
+    return steps
+
+
+def _docstring_line_ranges(source: str) -> set[int]:
+    tree = ast.parse(source)
+    ranges: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)
+        ):
+            continue
+        if not hasattr(node, "body") or not node.body:
+            continue
+        doc_node = node.body[0]
+        if isinstance(doc_node, ast.Expr) and isinstance(doc_node.value, ast.Constant):
+            start = doc_node.lineno
+            end = doc_node.end_lineno or start
+            ranges.update(range(start, end + 1))
+    return ranges
+
+
+def _date_literal_log_path_violations(path: Path) -> list[str]:
+    source = path.read_text(encoding="utf-8")
+    lines = source.splitlines()
+    doc_lines = _docstring_line_ranges(source)
+    violations: list[str] = []
+    for lineno, line in enumerate(lines, start=1):
+        if lineno in doc_lines or line.lstrip().startswith("#"):
+            continue
+        if not DATE_DERIVED_LOG_PATH.search(line):
+            continue
+        window = lines[max(0, lineno - 2) : min(len(lines), lineno + 2)]
+        if any(".write_text(" in nearby for nearby in window):
+            continue
+        violations.append(f"{path.relative_to(ROOT)}:{lineno}: {line.strip()}")
+    return violations
 
 
 def _load():
@@ -119,4 +170,57 @@ def test_the_check_is_wired_into_ci():
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "check_guard_mutation.py --self-test" in workflow, (
         "the guard-mutation check is not invoked by the invariants workflow"
+    )
+
+
+def test_every_named_invariant_step_carries_if_not_cancelled():
+    """GitHub Actions skips later steps after the first failure unless they opt out."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    missing = [
+        name
+        for name, body in _named_workflow_steps(workflow)
+        if "!cancelled()" not in body
+    ]
+    assert not missing, (
+        "named invariant steps must carry `if: ${{ !cancelled() }}` so one red gate "
+        f"does not mask the rest: {missing}"
+    )
+
+
+def test_no_test_builds_a_daily_log_path_from_a_frozen_timestamp_slice():
+    """The midnight suite failure: API writes today's file, tests read a frozen TS date."""
+    violations: list[str] = []
+    for path in sorted(TESTS.rglob("*.py")):
+        if path.name == "test_guard_mutation.py":
+            continue
+        violations.extend(_date_literal_log_path_violations(path))
+    assert not violations, (
+        "tests must not name daily log files from a frozen TS timestamp slice; "
+        "read the directory instead:\n" + "\n".join(violations)
+    )
+
+
+def test_ruff_excludes_harness_instance_data():
+    import tomllib
+
+    config = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    exclude = config["tool"]["ruff"]["exclude"]
+    assert ".harness" in exclude, (
+        "instance trajectory data under .harness/ must not be linted as product code"
+    )
+
+
+def test_ruff_lint_selects_ruf100():
+    import tomllib
+
+    config = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    selected = config["tool"]["ruff"]["lint"]["extend-select"]
+    assert "RUF100" in selected, (
+        "unused `# noqa` comments must fail lint, not silently rot"
+    )
+
+
+def test_mypy_ini_targets_strict_mode():
+    assert "strict = True" in MYPY_INI.read_text(encoding="utf-8"), (
+        "mypy.ini must declare strict mode alongside pyproject's tested floor"
     )
