@@ -58,11 +58,16 @@ GATE_B_CIRCULARITY = Path("docs/00-context/gate-b-cannot-be-passed-2026-08-20.md
 # Refused lines already in the trajectory when ADR-0043 was accepted on 20 August 2026:
 # three V0-18 violations appended between 09:41 and 09:56 that day, permanent because the
 # log is append-only. ADR-0043 tolerates these exact three lines by their content digests.
+# ADR-0105 adds three torn invalid-JSON lines from 2026-08-22 (lines 27, 35, 45) after unit
+# AB shipped torn-append refusal — baselined only once that cause was fixed.
 HISTORICAL_REFUSAL_DIGESTS: frozenset[str] = frozenset(
     {
         "0fb234324063389745b5e79be163b8b6e3988a955d2a2fbd19f4036e225a7b90",
         "6921e71b2c687dd2f1f816410d20f53e106db1126bbf39fceeec02e33204f260",
         "65df9c30eeaf7095072eaada45ce276cbaca877b9540c48c519bcfdc729eb300",
+        "305cfe4853e3d9576fd186f86cac2f3900805c44a75a41b0642a27e1da5741d3",
+        "3769e62caa9131bb916fef24b40d46d70b49e19ee59a0686aa106b66eed15387",
+        "6511adf8d1b5ef4aea3f542d610d261572c6a103d630775ce785ab2395a187ec",
     }
 )
 CAPTURE_REFUSAL_BASELINE = len(HISTORICAL_REFUSAL_DIGESTS)
@@ -605,9 +610,9 @@ def _capture_condition(log: Path) -> CommandResult:
 
     A refusal is the opposite of loss. It is a line that IS in the record, named invalid,
     with its reason and line number, reported beside every figure derived from the log.
-    ADR-0043 tolerates the exact three historical baseline refusals on 2026-08-20 by
-    pinning their SHA-256 content digests. Any refusal whose digest is not in that baseline
-    is a new refusal and fails the gate.
+    ADR-0043 and ADR-0105 tolerate six recorded historical baseline refusals by pinning
+    their SHA-256 content digests (three from 2026-08-20, three from 2026-08-22). Any
+    refusal whose digest is not in that baseline is a new refusal and fails the gate.
 
     Misdated lines are not ratcheted. A timestamp that disagrees with its file is a live
     capture fault rather than a historical judgement, and it must still fail.
@@ -670,7 +675,7 @@ def _capture_condition(log: Path) -> CommandResult:
     if total_refused:
         reason += (
             f" The run carries {total_refused} refused line(s), of which "
-            f"{historical_refused} are the recorded historical baseline (ADR-0043) "
+            f"{historical_refused} are the recorded historical baseline (ADR-0043/0105) "
             f"and {new_refused} are new."
         )
     if stale:
