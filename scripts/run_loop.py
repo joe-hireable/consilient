@@ -196,6 +196,7 @@ def run(loop: Loop) -> dict[str, Any]:
         )
     with single_instance(loop):
         tick = loop_mod.resume(loop)
+        silent_ticks = 0
         while True:
             if loop.stop_file.exists():
                 return _stop(loop, tick, "a stop was requested")
@@ -219,6 +220,16 @@ def run(loop: Loop) -> dict[str, Any]:
             )
             result = execute(loop, tick)
             loop_mod.record(loop, loop_mod.TICK_FINISHED, tick, result)
+            if result["outcome"] == "silent":
+                silent_ticks += 1
+                if silent_ticks >= loop_mod.STALE_CYCLES:
+                    return _stop(
+                        loop,
+                        tick,
+                        f"{silent_ticks} consecutive silent ticks produced no bytes",
+                    )
+            else:
+                silent_ticks = 0
             if result["outcome"] == "killed":
                 return _stop(loop, tick, "a stop was requested mid-tick")
             if result["outcome"] == "refused":

@@ -1928,61 +1928,70 @@ def dispatch_one(
         now=now,
     )
 
-    run_dir = (runs_dir / run_id).resolve()
-    result = run_harness(
-        harness,
-        task=task,
-        cwd=cwd,
-        run_dir=run_dir,
-        timeout_s=timeout_s,
-        model=model,
-        run_id=run_id,
-        permissions=permissions,
-        log_dir=log_dir,
-        in_flight=in_flight,
-        in_flight_at_dispatch=len(live),
-        family=family,
-        pools=pools,
-        claim_run_id=run_id,
-        max_turns=max_turns,
-        max_tokens=max_tokens,
-    )
-    if result.request_timing is not None:
-        record_request(
+    claim_released: bool | str = False
+    dispatch_raised = False
+    try:
+        run_dir = (runs_dir / run_id).resolve()
+        result = run_harness(
+            harness,
+            task=task,
+            cwd=cwd,
+            run_dir=run_dir,
+            timeout_s=timeout_s,
+            model=model,
+            run_id=run_id,
+            permissions=permissions,
+            log_dir=log_dir,
+            in_flight=in_flight,
+            in_flight_at_dispatch=len(live),
+            family=family,
+            pools=pools,
+            claim_run_id=run_id,
+            max_turns=max_turns,
+            max_tokens=max_tokens,
+        )
+        if result.request_timing is not None:
+            record_request(
+                log_dir,
+                ts=now_ts(),
+                run_id=result.run_id,
+                harness_id=harness.id,
+                timing=result.request_timing,
+            )
+        recorded = record_outcome(
             log_dir,
             ts=now_ts(),
             run_id=result.run_id,
-            harness_id=harness.id,
-            timing=result.request_timing,
+            task=task,
+            cwd=str(cwd),
+            harness=harness,
+            status=parse_status(result.status),
+            reason=result.reason,
+            exit_code=result.exit_code,
+            artefact_bytes=result.artefact_bytes,
+            diff_bytes=result.diff_bytes,
+            timed_out=result.timed_out,
+            duration_s=result.duration_s,
+            command=result.command,
         )
-    recorded = record_outcome(
-        log_dir,
-        ts=now_ts(),
-        run_id=result.run_id,
-        task=task,
-        cwd=str(cwd),
-        harness=harness,
-        status=parse_status(result.status),
-        reason=result.reason,
-        exit_code=result.exit_code,
-        artefact_bytes=result.artefact_bytes,
-        diff_bytes=result.diff_bytes,
-        timed_out=result.timed_out,
-        duration_s=result.duration_s,
-        command=result.command,
-    )
-    record_dispatch_error(log_dir, result)
-    _harvest_quietly(log_dir, runs_dir)
-    # Three release paths and any one suffices: this completion, the outcome event
-    # above (live_claims treats a terminal dispatch event as a release), or the claim's
-    # own expiry. A close failure therefore degrades to the other two, never to a hang.
-    try:
-        coordination.close_claim(log_dir, run_id=run_id)
-        claim_released: bool | str = True
-    except EventError as exc:
-        claim_released = (
-            f"close failed ({exc}); expiry and the outcome event release it"
-        )
+        record_dispatch_error(log_dir, result)
+        _harvest_quietly(log_dir, runs_dir)
+    except BaseException:
+        dispatch_raised = True
+        raise
+    finally:
+        # Completion, the terminal outcome event, and expiry are independent releases.
+        try:
+            coordination.close_claim(log_dir, run_id=run_id)
+            claim_released = True
+        except EventError as exc:
+            if not dispatch_raised:
+                claim_released = (
+                    f"close failed ({exc}); expiry and the outcome event release it"
+                )
+        except BaseException:
+            if not dispatch_raised:
+                raise
     payload = {
         "status": result.status,
         "selected": decision.reason,
@@ -2093,85 +2102,97 @@ def dispatch_fanout(
         now=now,
     )
 
-    results: list[RunResult] = []
-    for harness in (decision.first, decision.second):
-        child_id = make_run_id(now_ts(), task, harness.id)
-        result = run_harness(
-            harness,
-            task=task,
-            cwd=cwd,
-            run_dir=(runs_dir / child_id).resolve(),
-            timeout_s=timeout_s,
-            model=model if harness.id == "cursor-composer" else None,
-            run_id=child_id,
-            permissions=permissions,
-            log_dir=log_dir,
-            in_flight=in_flight,
-            in_flight_at_dispatch=len(live),
-            family=family,
-            pools=pools,
-            # The claim covering both children is the parent's, so the badge the
-            # pre-commit gate checks against is the parent's run id.
-            claim_run_id=run_id,
-            max_turns=max_turns,
-            max_tokens=max_tokens,
-        )
-        if result.request_timing is not None:
-            record_request(
+    claim_released: bool | str = False
+    dispatch_raised = False
+    try:
+        results: list[RunResult] = []
+        for harness in (decision.first, decision.second):
+            child_id = make_run_id(now_ts(), task, harness.id)
+            result = run_harness(
+                harness,
+                task=task,
+                cwd=cwd,
+                run_dir=(runs_dir / child_id).resolve(),
+                timeout_s=timeout_s,
+                model=model if harness.id == "cursor-composer" else None,
+                run_id=child_id,
+                permissions=permissions,
+                log_dir=log_dir,
+                in_flight=in_flight,
+                in_flight_at_dispatch=len(live),
+                family=family,
+                pools=pools,
+                # The claim covering both children is the parent's, so the badge the
+                # pre-commit gate checks against is the parent's run id.
+                claim_run_id=run_id,
+                max_turns=max_turns,
+                max_tokens=max_tokens,
+            )
+            if result.request_timing is not None:
+                record_request(
+                    log_dir,
+                    ts=now_ts(),
+                    run_id=result.run_id,
+                    harness_id=harness.id,
+                    timing=result.request_timing,
+                )
+            record_outcome(
                 log_dir,
                 ts=now_ts(),
                 run_id=result.run_id,
-                harness_id=harness.id,
-                timing=result.request_timing,
+                task=task,
+                cwd=str(cwd),
+                harness=harness,
+                status=parse_status(result.status),
+                reason=result.reason,
+                exit_code=result.exit_code,
+                artefact_bytes=result.artefact_bytes,
+                diff_bytes=result.diff_bytes,
+                timed_out=result.timed_out,
+                duration_s=result.duration_s,
+                command=result.command,
             )
-        record_outcome(
+            record_dispatch_error(log_dir, result)
+            results.append(result)
+
+        first, second = results
+        verdict = judge_fanout(
+            first.stdout,
+            second.stdout,
+            first.status == "ok",
+            second.status == "ok",
+        )
+        recorded = record_fanout(
             log_dir,
             ts=now_ts(),
-            run_id=result.run_id,
+            run_id=run_id,
             task=task,
             cwd=str(cwd),
-            harness=harness,
-            status=parse_status(result.status),
-            reason=result.reason,
-            exit_code=result.exit_code,
-            artefact_bytes=result.artefact_bytes,
-            diff_bytes=result.diff_bytes,
-            timed_out=result.timed_out,
-            duration_s=result.duration_s,
-            command=result.command,
+            first=decision.first,
+            second=decision.second,
+            first_status=parse_status(first.status),
+            second_status=parse_status(second.status),
+            verdict=verdict,
+            first_run_id=first.run_id,
+            second_run_id=second.run_id,
         )
-        record_dispatch_error(log_dir, result)
-        results.append(result)
-
-    first, second = results
-    verdict = judge_fanout(
-        first.stdout,
-        second.stdout,
-        first.status == "ok",
-        second.status == "ok",
-    )
-    recorded = record_fanout(
-        log_dir,
-        ts=now_ts(),
-        run_id=run_id,
-        task=task,
-        cwd=str(cwd),
-        first=decision.first,
-        second=decision.second,
-        first_status=parse_status(first.status),
-        second_status=parse_status(second.status),
-        verdict=verdict,
-        first_run_id=first.run_id,
-        second_run_id=second.run_id,
-    )
-    _harvest_quietly(log_dir, runs_dir)
-    # As in dispatch_one: completion, the terminal fanout event, and expiry are three
-    # independent release paths; any one suffices.
-    try:
-        coordination.close_claim(log_dir, run_id=run_id)
-        claim_released: bool | str = True
-    except EventError as exc:
-        claim_released = f"close failed ({exc}); expiry and the fanout event release it"
+        _harvest_quietly(log_dir, runs_dir)
+    except BaseException:
+        dispatch_raised = True
+        raise
+    finally:
+        # Completion, the terminal fanout event, and expiry are independent releases.
+        try:
+            coordination.close_claim(log_dir, run_id=run_id)
+            claim_released = True
+        except EventError as exc:
+            if not dispatch_raised:
+                claim_released = (
+                    f"close failed ({exc}); expiry and the fanout event release it"
+                )
+        except BaseException:
+            if not dispatch_raised:
+                raise
     payload = {
         "status": verdict,
         "verdict": verdict,
