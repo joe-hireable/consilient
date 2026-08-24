@@ -1069,6 +1069,9 @@ class StartFailure:
     The action is never termination — §3 defaults to diagnosis, because killing is the
     irreversible half and the expensive production failure is a watchdog that acts on
     live work.
+
+    A start failure does not consume a work attempt: an infrastructure death is
+    not evidence about the work (F-05 / F-13).
     """
 
     run_id: str
@@ -1078,6 +1081,7 @@ class StartFailure:
     observed_s: float
     observed_bytes: int
     action: str
+    consumes_attempt: bool = False
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -1088,7 +1092,121 @@ class StartFailure:
             "observed_s": self.observed_s,
             "observed_bytes": self.observed_bytes,
             "action": self.action,
+            "consumes_attempt": self.consumes_attempt,
         }
+
+
+@dataclass(frozen=True)
+class Stall:
+    """A dispatch that declared start and then produced no further progress.
+
+    The started line is s6's notification, not a health signal. Treating it as
+    healthy is startsecs by another name. [cited, skarnet.org/software/s6]
+    """
+
+    run_id: str
+    harness: str | None
+    signal: str
+    threshold_s: int
+    observed_s: float
+    action: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "harness": self.harness,
+            "signal": self.signal,
+            "threshold_s": self.threshold_s,
+            "observed_s": self.observed_s,
+            "action": self.action,
+        }
+
+
+def _dispatch_record_path(runs_dir: Path, run_id: str) -> Path:
+    return runs_dir / f"{run_id}.json"
+
+
+def _load_dispatch_record(runs_dir: Path, run_id: str) -> dict[str, object]:
+    path = _dispatch_record_path(runs_dir, run_id)
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def _store_dispatch_field(
+    runs_dir: Path, run_id: str, field: str, value: object
+) -> Path:
+    path = _dispatch_record_path(runs_dir, run_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _load_dispatch_record(runs_dir, run_id)
+    payload[field] = value
+    encoded = json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(encoded, encoding="utf-8")
+    os.replace(tmp, path)
+    return path
+
+
+def started_line_in(run_dir: Path, artefact: str) -> str | None:
+    """First non-empty line the agent wrote to the declared path, or None.
+
+    Dispatcher-written names never count: they are evidence we asked, not
+    that anything answered. [measured, N00]
+    """
+    artefact = str(artefact).strip()
+    if not artefact:
+        return None
+    name = Path(artefact.replace("\\", "/")).name.casefold()
+    if name in _DISPATCHER_WRITTEN:
+        return None
+    try:
+        root = run_dir.resolve()
+        path = (run_dir / artefact).resolve()
+        path.relative_to(root)
+    except (OSError, ValueError):
+        return None
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def write_started(
+    runs_dir: Path, run_id: str, *, now: datetime
+) -> Path | None:
+    """Write `started` only when the agent has appended a line to the declared path.
+
+    BU-2 / N02. Surviving a timer is not a start. The wrapper observes the
+    line; it does not invent one. s6's notification-fd is the incumbent and
+    is mandatory. [cited, skarnet.org/software/s6/servicedir.html]
+    """
+    record = _load_dispatch_record(runs_dir, run_id)
+    expected = record.get("expected")
+    if not isinstance(expected, dict):
+        return None
+    artefact = expected.get("artefact")
+    if not isinstance(artefact, str) or not artefact.strip():
+        return None
+    existing = record.get("started")
+    if isinstance(existing, dict) and str(existing.get("line") or "").strip():
+        return _dispatch_record_path(runs_dir, run_id)
+    line = started_line_in(runs_dir / run_id, artefact)
+    if line is None:
+        return None
+    started = {
+        "run_id": run_id,
+        "artefact": artefact,
+        "line": line,
+        "at": now.astimezone(timezone.utc).isoformat(),
+    }
+    return _store_dispatch_field(runs_dir, run_id, "started", started)
 
 
 def artefact_bytes_in(run_dir: Path) -> int:
@@ -1145,15 +1263,16 @@ def start_failures(
     that had logged its own clean exit was marked failed from a stale liveness signal:
     the terminal record outranks this check, rather than racing it.
 
-    The progress test is Hadoop's disjunction — a task is stalled when it neither
-    reads an input, writes an output, nor updates its status string — over the three
-    artefacts this repository already produces: the child's transcript, the working
-    tree it is editing, and the commits it has landed. All three are needed, and that
-    is measured rather than feared: the first version of this function was run against
-    the live trajectory on 23 August 2026 and flagged six open dispatches, one of them
-    the alive-and-working run that wrote it. A `claude -p` child writes nothing to its
-    transcript until it exits, so the transcript is a terminal signal, not a progress
-    one. [measured]
+    When an `expected` record exists (N01), start is the agent-written line on the
+    declared path (N02). Surviving the window is not a start. Bytes on some other
+    file, including the wrapper transcript, do not substitute. A start failure
+    never consumes a work attempt.
+
+    Without `expected`, the N00 floor remains: Hadoop's disjunction over the child's
+    transcript, the working tree, and the commits it has landed. That path exists
+    because the first version of this function was run against the live trajectory
+    on 23 August 2026 and flagged six open dispatches, one of them the
+    alive-and-working run that wrote it. [measured]
 
     Returns records. It terminates nothing, releases nothing and repairs nothing.
     """
@@ -1161,6 +1280,40 @@ def start_failures(
     for claim in sorted(claims, key=lambda item: item.run_id):
         opened = datetime.fromisoformat(claim.opened_at).astimezone(timezone.utc)
         age_s = (now.astimezone(timezone.utc) - opened).total_seconds()
+        record = _load_dispatch_record(runs_dir, claim.run_id)
+        expected = record.get("expected")
+        if isinstance(expected, dict):
+            artefact = expected.get("artefact")
+            try:
+                window = int(expected.get("start_window_s", start_window_s))
+            except (TypeError, ValueError):
+                window = start_window_s
+            if age_s < window:
+                continue
+            started = record.get("started")
+            declared = isinstance(artefact, str) and artefact.strip()
+            notified = (
+                isinstance(started, dict)
+                and bool(str(started.get("line") or "").strip())
+            ) or (
+                declared
+                and started_line_in(runs_dir / claim.run_id, str(artefact)) is not None
+            )
+            if notified:
+                continue
+            found.append(
+                StartFailure(
+                    run_id=claim.run_id,
+                    harness=claim.harness,
+                    signal="no started line within the start window",
+                    threshold_s=window,
+                    observed_s=round(age_s, 2),
+                    observed_bytes=0,
+                    action="diagnose",
+                    consumes_attempt=False,
+                )
+            )
+            continue
         if age_s < start_window_s:
             continue
         observed = artefact_bytes_in(runs_dir / claim.run_id)
@@ -1179,6 +1332,85 @@ def start_failures(
                 threshold_s=start_window_s,
                 observed_s=round(age_s, 2),
                 observed_bytes=observed,
+                action="diagnose",
+                consumes_attempt=False,
+            )
+        )
+    return tuple(found)
+
+
+def _nonempty_line_count(run_dir: Path, artefact: str) -> int:
+    artefact = str(artefact).strip()
+    if not artefact:
+        return 0
+    try:
+        root = run_dir.resolve()
+        path = (run_dir / artefact).resolve()
+        path.relative_to(root)
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return 0
+    return sum(1 for raw in text.splitlines() if raw.strip())
+
+
+def _progressed_after_start(
+    claim: coordination.Claim, runs_dir: Path, artefact: str
+) -> bool:
+    if _nonempty_line_count(runs_dir / claim.run_id, artefact) > 1:
+        return True
+    tree = Path(claim.cwd) if claim.cwd else None
+    if tree is None:
+        return False
+    return git_diff_bytes(tree) > 0 or committed_since(tree, claim.opened_at)
+
+
+def stall_failures(
+    claims: tuple[coordination.Claim, ...],
+    *,
+    runs_dir: Path,
+    now: datetime,
+) -> tuple[Stall, ...]:
+    """Open dispatches that notified start and then produced nothing further.
+
+    The started line answers "did it start?", not "is it healthy?". A hang
+    after notification is `stalled`, never `started`-and-healthy.
+    """
+    found: list[Stall] = []
+    for claim in sorted(claims, key=lambda item: item.run_id):
+        opened = datetime.fromisoformat(claim.opened_at).astimezone(timezone.utc)
+        age_s = (now.astimezone(timezone.utc) - opened).total_seconds()
+        record = _load_dispatch_record(runs_dir, claim.run_id)
+        expected = record.get("expected")
+        if not isinstance(expected, dict):
+            continue
+        artefact = expected.get("artefact")
+        if not isinstance(artefact, str) or not artefact.strip():
+            continue
+        started = record.get("started")
+        line = (
+            str(started.get("line") or "").strip()
+            if isinstance(started, dict)
+            else ""
+        )
+        if not line:
+            observed = started_line_in(runs_dir / claim.run_id, artefact)
+            if observed is None:
+                continue
+        try:
+            deadline = int(expected.get("progress_deadline_s"))
+        except (TypeError, ValueError):
+            continue
+        if age_s < deadline:
+            continue
+        if _progressed_after_start(claim, runs_dir, artefact):
+            continue
+        found.append(
+            Stall(
+                run_id=claim.run_id,
+                harness=claim.harness,
+                signal="no progress after started",
+                threshold_s=deadline,
+                observed_s=round(age_s, 2),
                 action="diagnose",
             )
         )
@@ -1609,6 +1841,7 @@ def run_harness(
             stdout_path=str(stdout_path),
             stderr_path=str(stderr_path),
         )
+    write_started(run_dir.parent, run_id, now=datetime.now(timezone.utc))
     stdout = _read(stdout_path)
     stderr = _read(stderr_path)
     artefact_bytes = len(stdout.encode("utf-8")) + len(stderr.encode("utf-8"))
@@ -1719,6 +1952,17 @@ def _print_human(payload: dict[str, object]) -> None:
                 f"threshold {row.get('threshold_s')}s, observed "
                 f"{row.get('observed_s')}s and {row.get('observed_bytes')} bytes; "
                 f"action {row.get('action')}"
+            )
+    stalled = payload.get("stalled")
+    if isinstance(stalled, list):
+        print(f"stalled: {len(stalled)}")
+        for row in stalled:
+            if not isinstance(row, dict):
+                continue
+            print(
+                f"  {row.get('run_id')} ({row.get('harness')}): {row.get('signal')}; "
+                f"threshold {row.get('threshold_s')}s, observed "
+                f"{row.get('observed_s')}s; action {row.get('action')}"
             )
     command = payload.get("command")
     if isinstance(command, list) and command:
@@ -1931,16 +2175,20 @@ def supervise(*, log_dir: Path, runs_dir: Path, as_json: bool) -> int:
         emit({"status": "refused", "reason": f"trajectory unreadable: {exc}"}, as_json)
         return 2
     live = coordination.live_claims(events, now=now)
+    for claim in live:
+        write_started(runs_dir, claim.run_id, now=now)
     failures = start_failures(live, runs_dir=runs_dir, now=now)
+    stalls = stall_failures(live, runs_dir=runs_dir, now=now)
     emit(
         {
             "status": "supervised",
             "open_dispatches": len(live),
             "start_failed": [item.as_dict() for item in failures],
+            "stalled": [item.as_dict() for item in stalls],
         },
         as_json,
     )
-    return 1 if failures else 0
+    return 1 if failures or stalls else 0
 
 
 def _exit_for(status: str) -> int:
