@@ -18,6 +18,7 @@ State lives in .harness/driver-state.json.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -974,6 +975,37 @@ def ready(uid, unit, done, units):
     return True
 
 
+TICK_LOCK = ROOT / ".harness" / "driver-tick.lock"
+
+
+def hold_tick_lock():
+    """One tick at a time, or the suite runs against itself.
+
+    MEASURED 24 August 2026: two build_driver processes were ticking concurrently -- the
+    saturation agent's loop and an orchestrator's -- and nine pytest processes were live at
+    once. The suite went from 432s to 961s purely on contention, and since a unit only retires
+    on a green suite, both ticks were paying double to do the same work more slowly. Nothing
+    guarded against it; the driver had no notion that another copy of itself might exist.
+
+    Returns the held handle, or None when another tick owns it. Never blocks: a queued tick is
+    a tick doing nothing useful, and the caller should simply exit and let the holder finish.
+    """
+    handle = TICK_LOCK.open("a+b")
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
 def main() -> int:
     units = load(UNITS, {})
     state = load(STATE, {"done": [], "attempts": {}})
@@ -1309,4 +1341,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    _lock = hold_tick_lock()
+    if _lock is None:
+        print("driver: another tick holds the lock; exiting rather than competing for the suite")
+        raise SystemExit(0)
+    try:
+        raise SystemExit(main())
+    finally:
+        _lock.close()
