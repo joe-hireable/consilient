@@ -310,6 +310,61 @@ def rebase_worktree(uid: str, path: pathlib.Path) -> bool:
 # unit legitimately spends time reading before it writes; the measured idle cases sat at 43 minutes
 # with zero bytes produced.
 PROGRESS_SILENCE_S = 1800
+CRLF = bytes((13, 10))
+NL = bytes((10,))
+
+
+def run_dir_progress(uid: str, started: float) -> float:
+    """Newest streaming artefact for `uid`'s live run, as an mtime. 0.0 if none found.
+
+    MEASURED 24 August 2026, and it cost the most expensive unit in the plan. Reclamation
+    judged silence from `briefs-driver/<UID>.out`, but `scripts/dispatch.py` writes that file
+    ONCE, AT COMPLETION -- so a healthy run and a dead one are byte-identical for the whole of
+    a run's life, and any unit taking longer than PROGRESS_SILENCE_S was declared silent while
+    working. The slot was freed, the unit re-dispatched, and the new dispatch then refused
+    against the claim still held by its own earlier run. T01 -- which gates 22 units -- was
+    reclaimed and cannibalised exactly that way, and the run it collided with went on to write
+    over a megabyte of output afterwards.
+
+    The streaming artefacts are `stdout.txt` and `stderr.txt` inside the run directory; some
+    harnesses write progress only to stderr, so both count. Runs are matched to units by exact
+    brief content, because the driver does not learn the run id until the run ends -- which is
+    the same reason the old check reached for the wrong file.
+    """
+    try:
+        # Newlines are normalised before comparing: the driver writes its briefs CRLF on this
+        # machine and dispatch.py composes the run brief LF, so a raw comparison never matches.
+        # That is the same CRLF trap that made the generated-documents gate pass locally and
+        # fail on a clean checkout.
+        want = (BRIEFS / (uid + ".md")).read_bytes().replace(CRLF, NL)[:400]
+    except OSError:
+        return 0.0
+    if not want:
+        return 0.0
+    newest = 0.0
+    try:
+        candidates = list(RUNS.iterdir())
+    except OSError:
+        return 0.0
+    for d in candidates:
+        if not d.is_dir() or d.name == "briefs-driver":
+            continue
+        try:
+            brief = d / "brief.md"
+            if brief.stat().st_mtime < started - 120:
+                continue
+            if want not in brief.read_bytes().replace(CRLF, NL):
+                continue
+        except OSError:
+            continue
+        for name in ("stdout.txt", "stderr.txt"):
+            try:
+                f = d / name
+                if f.exists():
+                    newest = max(newest, f.stat().st_mtime)
+            except OSError:
+                pass
+    return newest
 
 
 def reclaim_expired_slots(state: dict) -> list[str]:
@@ -355,6 +410,9 @@ def reclaim_expired_slots(state: dict) -> list[str]:
                     newest = max(newest, out.stat().st_mtime)
             except OSError:
                 pass
+        # The completion artefact above tells us nothing while a run is in progress, so the
+        # streaming ones decide. Without this the driver reclaims its own healthy work.
+        newest = max(newest, run_dir_progress(uid, started))
         if newest and now - newest > PROGRESS_SILENCE_S:
             stale = True
 

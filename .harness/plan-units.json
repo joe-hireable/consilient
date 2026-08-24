@@ -1743,5 +1743,18 @@
   "deps": [],
   "commit": "feat(b4): run verified tickets against an independent public corpus",
   "note": "DECIDED by Joe, 24 Aug 2026. Gate B4 needs 20 completed tickets on a repository other than this one. All four roots previously in `.harness/allowed-cwds.json` are FORKS of the two never-publish repositories -- verified 24 Aug by shared root commit, boolean only, no identifiers read or printed. The prohibition follows the history, so B4 evidence gathered on any of them could never be published, which defeats the point of a gate.\n\nPallets `itsdangerous` 2.2.0 is now cloned at `C:/Users/jpbpr/Repositories/itsdangerous`, checked out at the EXP-96 pin `096c8d4`, BSD-3-Clause, 8 source files, with its own independently authored pytest suite. It is allowlisted under ADR-0063. Independent authorship and an independent verification regime are exactly what ADR-0013 asks for, and it is publishable.\n\nRead `_foreign_tickets` in `src/consilient/cli.py` before writing anything -- it defines what counts, and most of this unit is conforming to it. Per ticket the trajectory needs an `attempt.outcome` carrying that repository, `verifier_accept: true` and a task or attempt_id, PLUS a matching `ticket.completed`. Both must go through `append()`; a line written directly to the file does not count, by design.\n\nScope of THIS unit: the runner plus **three** real tickets end to end, proving `consil doctor` moves B4 from 0 to 3. Do not attempt all twenty here. Tickets must be genuine work against that library verified by ITS suite, not this project's. A ticket whose test cannot fail has produced nothing.\n\nNever publish anything from the four fork roots. Nothing from this unit may read them."
+ },
+ "AQ": {
+  "title": "release the claims of a dispatch that never started",
+  "plan": "docs/20-design/supervision-escalation-and-sessions-2026-08-23.md",
+  "claims": [
+   "src/consilient/coordination.py",
+   "tests/test_start_failed_release.py"
+  ],
+  "commit": "fix(coordination): release claims held by a run that never started",
+  "deps": [
+   "N00"
+  ],
+  "note": "MEASURED 24 Aug 2026. N00 gave us detection: the driver reports START_FAILED when a run writes no artefact inside the start window. Nothing releases what that run claimed, so its paths stay locked for the full hour. Observed in one tick: two dispatches died at startup (0 bytes after 509s and 432s) and their claims then refused T01 and AA -- T01 being the unit that gates 22 others. The hour was spent twice over on runs that were never alive.\n\n`close_claim(log, run_id=...)` already exists and is properly attributed to DISPATCH_ACTOR; `live_claims` already treats a terminal dispatch event as a release. The missing half is calling it.\n\n**The hazard is the whole of this unit.** Releasing the claim of a run that is merely SLOW, rather than dead, admits two agents to one path -- exactly what the claim exists to prevent, and a far worse outcome than an hour's delay. So a release must be justified by evidence the process is gone, not by absence of an artefact. Establish liveness properly: map the run to its process and confirm it is not running, and refuse to release when liveness cannot be determined. Fail closed.\n\nDo NOT shorten the claim expiry to paper over this, and do NOT release on artefact silence alone. A silent process holding a lock and a dead one look identical from the artefact; that is the whole difficulty and the reason this is its own unit."
  }
 }
