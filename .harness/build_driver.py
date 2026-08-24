@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -1091,6 +1092,28 @@ def main() -> int:
     import time as _time_m
 
     conflicts = state.setdefault("conflicts", {})
+    # MEASURED 24 August 2026. A conflict was recorded once and never re-tested, but HEAD moves
+    # every tick, so a cherry-pick that collided an hour ago usually applies cleanly later. Of 23
+    # units reported as unmergeable, SIXTEEN were stale rather than genuine -- they had been
+    # waiting on a collision that no longer existed, and each was holding a resolver slot for it.
+    # Re-testing is cheap (`git merge-tree` writes nothing) and it is the difference between a
+    # queue that drains and one that only grows.
+    for _uid, _why in sorted(list(conflicts.items())):
+        _m = re.search(r"cherry-picking ([0-9a-f]{7,40})", _why or "")
+        if not _m:
+            continue
+        _sha = _m.group(1)
+        if sh(["git", "merge-base", "--is-ancestor", _sha, "HEAD"]).returncode == 0:
+            conflicts.pop(_uid, None)
+            print(f"driver: {_uid} conflict cleared -- already in the tree")
+            continue
+        if sh(["git", "merge-tree", "--write-tree", "--name-only", "HEAD", _sha]).stdout.count(
+            "CONFLICT"
+        ) == 0:
+            conflicts.pop(_uid, None)
+            if _uid in state.setdefault("resolve_dispatched", []):
+                state["resolve_dispatched"].remove(_uid)
+            print(f"driver: {_uid} conflict was stale -- it merges cleanly against current HEAD")
     _now_m = _time_m.time()
     _dispatchers_alive = live_dispatchers()
     # Every unmerged worktree, not just the in-flight ones. A unit that finished, dropped out of
