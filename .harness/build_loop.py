@@ -27,6 +27,7 @@ Creating .harness/STOP-LOOP still stops it cleanly after the current tick, which
 option and the one to prefer -- a tick killed mid-suite leaves a worktree half-judged.
 """
 
+import os
 import subprocess
 import sys
 import time
@@ -36,6 +37,41 @@ ROOT = Path(__file__).resolve().parent.parent
 STOP = ROOT / ".harness" / "STOP-LOOP"
 LOG = ROOT / ".harness" / "build-loop.log"
 INTERVAL_S = 45
+
+
+LOOP_LOCK = ROOT / ".harness" / "build-loop.lock"
+
+
+def hold_loop_lock():
+    """One loop at a time, so the scheduler may retry as often as it likes.
+
+    MEASURED 24 August 2026: the loop died twice without writing an exception -- 41 ticks, then
+    the process simply ended, with an empty stderr and the per-tick handler never firing. It was
+    killed or died outside the guarded region, and both times the build stopped dead until
+    somebody noticed. A loop whose liveness depends on nothing ever killing it is not resilient;
+    it is lucky.
+
+    The scheduled task now fires every few minutes instead of once. This lock makes that safe:
+    if a loop is already running the new invocation exits immediately, and if the previous one
+    died the new one takes over within one scheduling interval. That is crash-only recovery --
+    the restart path is the ONLY path, so it is exercised constantly and cannot rot.
+
+    Returns the held handle, or None when another loop owns it.
+    """
+    handle = LOOP_LOCK.open("a+b")
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
 
 
 def main() -> int:
@@ -68,4 +104,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    _lock = hold_loop_lock()
+    if _lock is None:
+        raise SystemExit(0)
+    try:
+        raise SystemExit(main())
+    finally:
+        _lock.close()
