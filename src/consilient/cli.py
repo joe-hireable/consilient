@@ -98,6 +98,8 @@ EXP01_BETA = re.compile(
 CRITIC_BETA = re.compile(
     r"critic-beta-measured:\s*([0-9.]+)\s*\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]"
 )
+
+
 def trajectory_state(log: Path) -> TrajectoryState:
     """Distinguish a missing log directory from one that exists but holds no events."""
     resolved = log.resolve()
@@ -156,9 +158,7 @@ def _trajectory_line(result: CommandResult) -> str:
     path = str(traj.get("path", ""))
     state = traj.get("state")
     if state == "empty":
-        return (
-            f"trajectory: {path} (empty — zero events recorded here, not a missing directory)"
-        )
+        return f"trajectory: {path} (empty — zero events recorded here, not a missing directory)"
     if state == "present":
         return f"trajectory: {path}"
     return f"trajectory: {path}" if path else ""
@@ -222,6 +222,59 @@ def cmd_usage(args: argparse.Namespace) -> CommandResult:
     return snapshot
 
 
+def _projection_workspace(log: Path) -> Path | None:
+    """The workspace `projection.build` infers from a live `.harness/log` directory."""
+    if log.name == "log" and log.parent.name == ".harness":
+        return log.parent.parent
+    return None
+
+
+def _copy_event_prefix(src: Path, dest: Path, count: int) -> None:
+    """Copy the log prefix that produced `count` projected events, including refusals.
+
+    Later lines are outside the high-water mark. Copying original file text, rather than
+    re-serializing accepted events, keeps rejected lines in the prefix so the digest
+    covers the same quarantine the projection had.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    remaining = count
+    for path in sorted(src.glob("*.jsonl")):
+        if remaining <= 0:
+            break
+        file_events, _rejected = events_mod.read(path)
+        if remaining >= len(file_events):
+            shutil.copy2(path, dest / path.name)
+            remaining -= len(file_events)
+            continue
+        cutoff = file_events[remaining - 1].line
+        if cutoff is None:
+            shutil.copy2(path, dest / path.name)
+            break
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines(keepends=True)
+        (dest / path.name).write_text("".join(lines[:cutoff]), encoding="utf-8")
+        remaining = 0
+
+
+def _digest_of_pinned_prefix(
+    log: Path, count: int, workspace: Path | None, scratch: Path
+) -> str:
+    """Rebuild a throwaway projection of the first `count` events and digest it."""
+    if scratch.exists():
+        shutil.rmtree(scratch)
+    try:
+        prefix_log = scratch / "log"
+        prefix_db = scratch / "state.db"
+        _copy_event_prefix(log, prefix_log, count)
+        conn = projection.build(prefix_log, prefix_db, workspace=workspace)
+        try:
+            return projection.state_digest(conn)
+        finally:
+            conn.close()
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
 def cmd_replay(args: argparse.Namespace) -> CommandResult:
     """Compare the state on disk against a rebuild from the log. Gate A condition 2.
 
@@ -235,6 +288,11 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
     The comparison now has a subject: whatever state was already on disk. Where there is
     none, `compared` is False and `identical` is None, because a check that did not run
     must not report a pass.
+
+    Gate A2 decides against a pinned prefix: the projection's own event count is the
+    high-water mark, and only those events are replayed for identity. Events appended
+    after the mark are not evidence of divergence. The `replay` command still reports
+    `stale` when the live log is longer, so a behind projection remains visible.
     """
     log, db = Path(args.log), Path(args.db)
 
@@ -244,13 +302,26 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
         existing = sqlite3.connect(db)
         try:
             prior = projection.state_digest(existing)
-            projected = existing.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+            projected = int(
+                existing.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+            )
         except sqlite3.DatabaseError as exc:
             raise EventError(
                 f"state at {db} is not a readable database: {exc}"
             ) from exc
         finally:
             existing.close()
+
+    prefix_identical: bool | None = None
+    if prior is not None and projected is not None:
+        if projected == 0:
+            prefix_identical = True
+        else:
+            scratch = db.parent / (db.stem + "-a2-prefix")
+            prefix_digest = _digest_of_pinned_prefix(
+                log, projected, _projection_workspace(log), scratch
+            )
+            prefix_identical = prefix_digest == prior
 
     read_events, rejected = read_all(log)
     events = len(read_events)
@@ -287,6 +358,8 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
         "preserved_stale_state": preserved,
         "compared": compared,
         "identical": (prior == digest) if compared else None,
+        "prefix_events": projected,
+        "prefix_identical": prefix_identical,
         "quarantined": [
             {"path": r.path, "line": r.line, "reason": r.reason} for r in rejected
         ],
@@ -464,7 +537,7 @@ def _experiment_conditions() -> tuple[CommandResult, CommandResult, CommandResul
 
 
 def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResult:
-    """Gate A condition 2. A comparison over zero events is not a pass.
+    """Gate A condition 2, decided against the projection's own high-water mark.
 
     A1's repair gave `replay` a subject -- whatever state was already on disk -- instead of
     comparing two rebuilds. But every state on disk was itself written by a rebuild from the
@@ -474,24 +547,24 @@ def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResu
     canonical state is identical." A gate condition satisfied by an empty comparison is A1
     one invocation further out.
 
-    An empty trajectory is now `unknown` -- the status for a check that did not run --
-    rather than `pass`. Divergence still fails and a non-empty identical comparison still
-    passes, so the condition is unchanged wherever there is anything to compare.
+    An empty prefix is `unknown` -- the status for a check that did not run -- rather than
+    `pass`. A genuine mismatch inside the prefix still fails. Events appended after the
+    mark are outside the comparison: they are not evidence of divergence. Measured 24
+    August 2026: with ~20 agents appending, doctor reported FAIL, then UNKNOWN, then PASS
+    for one unchanged history, because it compared the persisted projection against a
+    later live tail.
     """
-    identical = replay["identical"]
-    events = replay["events"]
     evidence = (f"{log.as_posix()}/*.jsonl", db.as_posix())
-    if identical is None:
-        reason = (
-            f"State covers {replay['events_projected']} of {replay['events']} events; not compared."
-            if replay["stale"]
-            else "No prior projection existed; replay was not compared."
+    prefix_events = replay["prefix_events"]
+    prefix_identical = replay["prefix_identical"]
+    if prefix_identical is None:
+        return _condition(
+            "A2",
+            "unknown",
+            "No prior projection existed; replay was not compared.",
+            *evidence,
         )
-        return _condition("A2", "unknown", reason, *evidence)
-    if not identical:
-        reason = f"Compared {events} events; canonical state diverged."
-        return _condition("A2", "fail", reason, *evidence)
-    if events == 0:
+    if prefix_events == 0:
         return _condition(
             "A2",
             "unknown",
@@ -499,7 +572,10 @@ def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResu
             "replay. Capture at least one event before this condition means anything.",
             *evidence,
         )
-    reason = f"Compared {events} events; canonical state is identical."
+    if not prefix_identical:
+        reason = f"Compared {prefix_events} events; canonical state diverged."
+        return _condition("A2", "fail", reason, *evidence)
+    reason = f"Compared {prefix_events} events; canonical state is identical."
     return _condition("A2", "pass", reason, *evidence)
 
 
@@ -938,13 +1014,15 @@ def render(command: str, result: CommandResult) -> str:
         if relational_q:
             extras.append(f"relational quarantine: {relational_q} row(s)")
             for row in result.get("relational_quarantine", []):
-                extras.append(
-                    f"  {row['path']}:{row['line']}  {row['reason']}"
-                )
+                extras.append(f"  {row['path']}:{row['line']}  {row['reason']}")
         sampling = result.get("sampling_unconditioned", False)
         extras.append(
             "sampling_unconditioned: "
-            + ("true (projection-derived)" if sampling else "false (projection-derived)")
+            + (
+                "true (projection-derived)"
+                if sampling
+                else "false (projection-derived)"
+            )
         )
         extras.append(f"oracle caveat: {result.get('caveat', '')}")
         traj = _trajectory_line(result)
