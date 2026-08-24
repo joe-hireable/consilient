@@ -194,11 +194,48 @@ def sh(args, **kw):
     )
 
 
+def save_state(state: dict) -> None:
+    """Write driver state atomically. Never truncate the only record of what is in flight.
+
+    MEASURED 24 August 2026. This was three bare `STATE.write_text(json.dumps(...))` calls --
+    truncate, then write, with no temp file, no fsync and no lock -- while `load()` swallowed
+    every exception and returned `{"done": [], "attempts": {}}`. A power cut or a kill during
+    that window therefore leaves a torn file that reads as NOTHING DONE AND NOTHING IN FLIGHT,
+    and the next tick re-dispatches every unit at attempt zero against live claims held by
+    still-running agents. The file is the only record of what is running; it was the least
+    durable thing in the repository.
+
+    Temp-and-rename makes the swap atomic: a reader sees the old file or the new one, never a
+    half. fsync before rename means the content is on disk before the name points at it.
+    """
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STATE.with_suffix(".json.tmp")
+    payload = json.dumps(state, indent=1)
+    with tmp.open("w", encoding="utf-8") as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(tmp, STATE)
+
+
 def load(path, default):
+    """Read JSON state. A CORRUPT file is fatal; a missing one is the default.
+
+    Returning the default on a parse error is what made a torn write catastrophic rather than
+    merely annoying: an unreadable driver-state read as "nothing done, nothing in flight" and
+    the next tick re-dispatched everything. Absence and corruption are different facts and only
+    one of them is safe to paper over.
+    """
+    if not path.exists():
+        return default
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return default
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(
+            f"driver: {path} is unreadable ({exc}). Refusing to continue: treating this as an "
+            f"empty state would re-dispatch every unit against live claims. Inspect it, or move "
+            f"it aside deliberately if you accept losing the record of what is running."
+        ) from exc
 
 
 def live_dispatchers() -> int:
@@ -1049,6 +1086,20 @@ def main() -> int:
     units = load(UNITS, {})
     state = load(STATE, {"done": [], "attempts": {}})
     done = set(state.get("done", []))
+    # A unit merged BY HAND cannot be retired by commit match: the merge commit is not the sha
+    # the plan recorded, so the driver re-tries the original, conflicts, and re-opens a unit whose
+    # work is already in the tree. T01 -- which gates 22 units -- was re-opened three times that
+    # way on 24 August 2026, each time undoing a retirement recorded minutes earlier.
+    # `force_done` is the durable override: it is applied every tick, so it survives a concurrent
+    # tick overwriting the file, which a one-off edit to `done` does not.
+    forced = [u for u in state.get("force_done", []) if u in units]
+    for uid in forced:
+        done.add(uid)
+        state.setdefault("done", [])
+        if uid not in state["done"]:
+            state["done"].append(uid)
+        state.get("conflicts", {}).pop(uid, None)
+        state.get("in_flight", {}).pop(uid, None)
 
     # Retire anything that landed since the last tick, whether we dispatched it or not.
     # Bring back anything that finished in its own tree, then judge it.
@@ -1232,7 +1283,7 @@ def main() -> int:
 
     if live >= MAX_CONCURRENT:
         print(f"driver: {live} dispatchers live at the cap; holding")
-        STATE.write_text(json.dumps(state, indent=1), encoding="utf-8")
+        save_state(state)
         return 0
 
     attempts = state.setdefault("attempts", {})
@@ -1285,7 +1336,7 @@ def main() -> int:
 
     if not candidates:
         print(f"driver: every unit is done or exhausted ({len(done)}/{len(units)})")
-        STATE.write_text(json.dumps(state, indent=1), encoding="utf-8")
+        save_state(state)
         return 0
 
     launched = 0
@@ -1399,7 +1450,7 @@ def main() -> int:
     if published:
         print(f"driver: {published}")
 
-    STATE.write_text(json.dumps(state, indent=1), encoding="utf-8")
+    save_state(state)
     return 0
 
 
