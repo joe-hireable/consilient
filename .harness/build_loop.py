@@ -74,6 +74,57 @@ def hold_loop_lock():
     return handle
 
 
+def self_heal(log) -> None:
+    """Repair the two faults that stop everything and that nothing else notices.
+
+    Both were fixed by hand repeatedly on 24 August 2026, which means both would recur
+    unattended. An orchestrator that needs a human to clear its own blockers is not unattended.
+
+    ONE -- a WSL-launched agent writing `core.worktree` into the SHARED .git/config, pointing at
+    a /mnt/c path. That single line makes EVERY git command in the main repository fail, so no
+    merge, no publish and no status works. It recurred THREE times within one hour. `git config
+    --unset` cannot repair it, because git cannot read the config far enough to act -- the line
+    must be deleted textually. The repository already scrubs GIT_* environment variables for
+    exactly this hazard; writing the config file bypasses that entirely.
+
+    TWO -- a stale index.lock left by a killed git process. Held with NO live git process, it
+    blocks every write indefinitely. The liveness test matters: removing a lock a live process
+    holds would corrupt that operation, so this only acts when no git is running at all, and
+    only when the lock has been untouched for two minutes.
+    """
+    main_config = ROOT.parent.parent.parent / ".git" / "config"
+    try:
+        text = main_config.read_text(encoding="utf-8")
+        if "/mnt/c" in text:
+            kept = [ln for ln in text.split(chr(10)) if "/mnt/c" not in ln]
+            main_config.write_text(chr(10).join(kept), encoding="utf-8")
+            log.write("loop: repaired .git/config -- a WSL path had broken every git command" + chr(10))
+    except OSError:
+        pass
+
+    for lock in (ROOT.parent.parent.parent / ".git" / "worktrees").glob("*/index.lock"):
+        try:
+            if time.time() - lock.stat().st_mtime < 120:
+                continue
+        except OSError:
+            continue
+        try:
+            alive = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "(Get-Process git -ErrorAction SilentlyContinue | Measure-Object).Count"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+            ).stdout.strip()
+        except Exception:
+            continue
+        if alive not in ("", "0"):
+            continue
+        try:
+            lock.unlink()
+            log.write(f"loop: removed a stale {lock.name} -- no git process was holding it" + chr(10))
+        except OSError:
+            pass
+
+
 def main() -> int:
     tick = 0
     while not STOP.exists():
