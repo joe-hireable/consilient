@@ -1392,10 +1392,29 @@ def main() -> int:
 
     # A review process owns the output until it exits. Once none is live, consume every receipt;
     # malformed, stale and failed output are explicit check errors and will be retried.
-    if live_dispatchers() == 0:
-        for uid in sorted(list(state.setdefault("review_dispatched", []))):
-            outcome = consume_review_verdict(state, uid, units[uid])
-            print(f"driver: review of {uid} consumed as {outcome}")
+    # Consume a receipt when THAT REVIEW has finished, not when the whole system is idle.
+    #
+    # MEASURED 24 August 2026, and this is why nothing was ever verified. The condition was
+    # `live_dispatchers() == 0`, which is true only when NOTHING at all is running. This driver
+    # exists to saturate -- 24 units in flight is normal -- so that state effectively never
+    # arrives, and valid verdicts queued indefinitely. B01 returned a well-formed SOUND receipt
+    # whose artefact identity bound correctly against both the expectation and the unit's current
+    # artefact, and it still could not retire, because something unrelated was running.
+    #
+    # `scripts/dispatch.py` writes `<uid>-verify.out` ONCE, AT COMPLETION -- the same property
+    # that made the tail-only parser fail is what makes this safe. A non-empty artefact means
+    # that review's process has written its final report and let go of the file. A torn read
+    # fails json.loads, becomes a check_error, and is retried, so the race fails closed.
+    for uid in sorted(list(state.setdefault("review_dispatched", []))):
+        receipt = BRIEFS / f"{uid}-verify.out"
+        try:
+            finished = receipt.stat().st_size > 0
+        except OSError:
+            finished = False
+        if not finished:
+            continue
+        outcome = consume_review_verdict(state, uid, units[uid])
+        print(f"driver: review of {uid} consumed as {outcome}")
     done = retired_units(state, units)
     built = set(state.setdefault("built", []))
     state["done"] = sorted(done)
