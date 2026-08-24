@@ -1515,8 +1515,23 @@ def main() -> int:
     ]
     candidates.sort(key=lambda u: (PHASE.get(u[0], 9), u))
 
-    blocked = [u for u in candidates if not ready(u, units[u], done, units)]
-    startable = [u for u in candidates if ready(u, units[u], done, units)]
+    # A dependency is satisfied when its code is IN THE TREE, not when it has been verified.
+    # AV correctly made RETIREMENT require a consumed SOUND verdict, but the same set was also
+    # gating what may START, and those are different questions: a dependent needs the code to
+    # exist so it can build against it, whereas verification decides whether the work is sound
+    # enough to ship. MEASURED 24 August 2026, immediately after AV landed: 45 units merged, 0
+    # retired, and TWENTY units whose dependencies were all present could not start -- including
+    # P02, T02 and T03, which is the entire critical path. The build had stopped behind review
+    # throughput.
+    #
+    # This is a relaxation and it is named as one. The risk it accepts: a unit may build on a
+    # dependency later judged DEFECTIVE. That risk is bounded because the dependent is itself
+    # reviewed, and because review runs in parallel rather than after. What is NOT relaxed is
+    # retirement or publication -- both still require the identity-bound SOUND verdict, which is
+    # where the beta discipline actually bites.
+    landed = done | set(state.setdefault("built", []))
+    blocked = [u for u in candidates if not ready(u, units[u], landed, units)]
+    startable = [u for u in candidates if ready(u, units[u], landed, units)]
     # Spend slots on whatever releases the most work, not on whatever sorts first.
     # Downstream count is the right default and a bad rule for one case: a unit that unblocks
     # nothing but improves the QUALITY of everything -- the cross-family verdict parser is the
