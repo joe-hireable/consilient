@@ -623,10 +623,11 @@ def _quarantine_relational(
 
 
 def _verdict_auth_status(data: dict[str, object]) -> str:
+    """`ssh_sig` is authenticated; a cli principal is only declared, never admitted."""
     via = data.get("via")
     principal = data.get("principal")
     normalized_via = via.strip().casefold() if isinstance(via, str) else None
-    if normalized_via == "phone_webauthn":
+    if normalized_via == "ssh_sig":
         return "authenticated"
     if normalized_via == "cli" and isinstance(principal, str) and principal.strip():
         return "declared_principal"
