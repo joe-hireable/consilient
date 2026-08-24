@@ -299,7 +299,10 @@ def test_every_assembly_is_recorded_with_the_identity_of_every_layer(tmp_path: P
         data["recall"]["selected_digest"]
         == hashlib.sha256(canonical(selected).encode("utf-8")).hexdigest()
     )
-    assert data["recall"]["omitted"] == []
+    # The receipt records a digest and a count, not the omission list -- inlining the list is
+    # what took the trajectory to 40 MB (see tests/test_selection_receipt_size.py).
+    assert data["recall"]["omitted_count"] == 0
+    assert data["recall"]["omitted_digest"] == instructions._omitted_digest([])
     assert data["recall"]["context_complete"] is True
     assert data["recall"]["continuation"] is None
     assert data["adapted"]["status"] == INERT
@@ -340,12 +343,20 @@ def test_overflow_metadata_points_to_omitted_protected_event_and_reconstructs(
     recall_data = event["data"]["recall"]
     assert recall_data["context_complete"] is False
     assert recall_data["continuation"] == {"event_id": protected["event_id"]}
+    # WHICH events were omitted is asserted against the selection, because the recorded
+    # receipt now carries only a digest of that set. The behaviour is unchanged and still
+    # checked; what moved is where it is read from. The digest is then pinned against the
+    # same omissions, so the log still discriminates a different omission set.
     assert {
         "event_id": protected["event_id"],
         "event_kind": "review.recorded",
         "reason": "context_bound",
         "protected": True,
-    } in recall_data["omitted"]
+    } in instructions._omission_rows(assembly.recall_selection)
+    assert recall_data["omitted_digest"] == instructions._omitted_digest(
+        instructions._omission_rows(assembly.recall_selection)
+    )
+    assert recall_data["omitted_count"] >= 1
     assert str(protected["event_id"]) in assembly.recall_pack
 
     result = reconstruct(tmp_path, skills, assembly.sha256)

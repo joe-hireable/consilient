@@ -513,19 +513,53 @@ def _source_digest(events: Sequence[Event]) -> str:
     return promote.digest("\n".join(canonical(event.raw) for event in events))
 
 
+# The omission list used to be inlined here in full, and it is what made the trajectory grow
+# faster every day. MEASURED 24 August 2026: .harness/log/ went 21,137 -> 166,465 -> 792,359 ->
+# 1,069,904 -> 5,865,602 -> 40,771,519 bytes across six days. The list grows with the log, so
+# each `instructions.assembled` event is larger than the last, so the log grows faster, so the
+# next event is larger again. One sampled event was 85,442 B of which `data.recall.omitted` was
+# 84,603 B -- 99%, 454 entries -- while `selected_event_ids` was EMPTY.
+#
+# That is not a tidiness problem. Dozens of concurrent dispatchers then collide on Windows
+# byte-range locks over a 40 MB file, and `could not be read after 6 attempts: observed access
+# denial` became the commonest crash signature in driver state, with single units dying that way
+# 77 and 78 times. The compounding receipt stopped the build lane.
+#
+# A digest keeps the audit property and drops the bytes: `verify` compares through this same
+# function, so a replay that produces a different omission set produces a different digest. What
+# is lost is the ability to read WHICH events were omitted straight out of the log; that is a
+# real cost, accepted, because the alternative is a log nothing can read at all.
+_OMISSION_FIELDS = ("event_id", "event_kind", "reason", "protected")
+
+
+def _omission_rows(selection: recall.Selection) -> list[dict[str, object]]:
+    # Written out rather than via getattr: `getattr` is in FORBIDDEN_CALLS for this package
+    # (tests/test_budget.py), because dynamic attribute access is a capability escape hatch.
+    return [
+        {
+            "event_id": omission.event_id,
+            "event_kind": omission.event_kind,
+            "reason": omission.reason,
+            "protected": omission.protected,
+        }
+        for omission in selection.omissions
+    ]
+
+
+def _omitted_digest(rows: Sequence[Mapping[str, object]]) -> str:
+    """Digest the omission set. Key order cannot matter -- `canonical` sorts."""
+    return promote.digest(
+        canonical({"omitted": [{k: row.get(k) for k in _OMISSION_FIELDS} for row in rows]})
+    )
+
+
 def _selection_receipt(selection: recall.Selection) -> dict[str, object]:
+    rows = _omission_rows(selection)
     return {
         "selected_event_ids": list(selection.selected_event_ids),
         "selected_digest": selection.selected_digest,
-        "omitted": [
-            {
-                "event_id": omission.event_id,
-                "event_kind": omission.event_kind,
-                "reason": omission.reason,
-                "protected": omission.protected,
-            }
-            for omission in selection.omissions
-        ],
+        "omitted_count": len(rows),
+        "omitted_digest": _omitted_digest(rows),
         "context_complete": selection.context_complete,
         "continuation": (
             {"event_id": selection.continuation_event_id}
@@ -533,6 +567,37 @@ def _selection_receipt(selection: recall.Selection) -> dict[str, object]:
             else None
         ),
     }
+
+
+_RECEIPT_FIELDS = (
+    "selected_event_ids",
+    "selected_digest",
+    "omitted_count",
+    "omitted_digest",
+    "context_complete",
+    "continuation",
+)
+
+
+def _recorded_selection_receipt(recall_data: Mapping[str, object]) -> dict[str, object]:
+    """Read a recorded receipt in the current shape OR the pre-24-August fat-list shape.
+
+    Events already written carry the full `omitted` list and must keep verifying, so an old
+    record is folded forward by digesting the list it stored. Both sides then route through
+    `_omitted_digest`, which is what preserves the property: a different omission set still
+    produces a different digest, whichever shape it was recorded in.
+    """
+    data = {field: recall_data.get(field) for field in _RECEIPT_FIELDS}
+    if recall_data.get("omitted_digest") is None and "omitted" in recall_data:
+        legacy = recall_data.get("omitted")
+        rows = (
+            [row for row in legacy if isinstance(row, Mapping)]
+            if isinstance(legacy, list)
+            else []
+        )
+        data["omitted_count"] = len(rows)
+        data["omitted_digest"] = _omitted_digest(rows)
+    return data
 
 
 def _guard_privileged_selection(
@@ -967,23 +1032,8 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
                 )
             elif any(
                 key in recall_data
-                for key in (
-                    "selected_event_ids",
-                    "selected_digest",
-                    "omitted",
-                    "context_complete",
-                    "continuation",
-                )
-            ) and _selection_receipt(selection) != {
-                key: recall_data.get(key)
-                for key in (
-                    "selected_event_ids",
-                    "selected_digest",
-                    "omitted",
-                    "context_complete",
-                    "continuation",
-                )
-            }:
+                for key in (*_RECEIPT_FIELDS, "omitted")
+            ) and _selection_receipt(selection) != _recorded_selection_receipt(recall_data):
                 reports.append(
                     LayerReport(
                         "recall",
