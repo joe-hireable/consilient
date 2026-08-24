@@ -77,9 +77,7 @@ _AUTONOMOUS_ADMISSION_CLASSES = frozenset(
         "recoverable_mutation",
     }
 )
-_PROTECTED_ADMISSION_CLASSES = frozenset(
-    {"protected_covered", "protected_uncovered"}
-)
+_PROTECTED_ADMISSION_CLASSES = frozenset({"protected_covered", "protected_uncovered"})
 _DECISION_PROTOCOL_MARKERS = frozenset(
     {
         "decision_id",
@@ -407,7 +405,9 @@ def validate(event: object) -> EventPayload:
     try:
         stamped = datetime.fromisoformat(event["ts"])
     except ValueError as exc:
-        raise EventError(f"ts is not a valid calendar timestamp: {event['ts']!r}") from exc
+        raise EventError(
+            f"ts is not a valid calendar timestamp: {event['ts']!r}"
+        ) from exc
     if stamped.tzinfo is None or stamped.utcoffset() is None:
         raise EventError(f"ts must carry an explicit offset, got {event['ts']!r}")
     try:
@@ -461,7 +461,10 @@ def validate(event: object) -> EventPayload:
 def _check_uuid4(value: object, field: str) -> None:
     if (
         not isinstance(value, str)
-        or re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", value)
+        or re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+            value,
+        )
         is None
     ):
         raise EventError(f"{field} must be lower-case hyphenated UUIDv4 text")
@@ -524,7 +527,9 @@ def _check_record_contract(event: EventPayload) -> None:
         or isinstance(byte_count, bool)
         or byte_count < 0
     ):
-        raise EventError(f"{RECORD_CAPTURED_KIND} byte_count must be a non-negative integer")
+        raise EventError(
+            f"{RECORD_CAPTURED_KIND} byte_count must be a non-negative integer"
+        )
 
     media_type = data["media_type"]
     if (
@@ -536,9 +541,7 @@ def _check_record_contract(event: EventPayload) -> None:
         )
 
     locator = data["object_locator"]
-    expected_locator = (
-        f".harness/objects/sha256/{digest[:2]}/{digest[2:]}"
-    )
+    expected_locator = f".harness/objects/sha256/{digest[:2]}/{digest[2:]}"
     if locator != expected_locator:
         raise EventError(
             f"{RECORD_CAPTURED_KIND} object_locator must be the canonical repository-relative "
@@ -626,18 +629,24 @@ def _decimal_field(
     value = data.get(field)
     if not isinstance(value, str):
         qualifier = "positive" if positive else "non-negative"
-        raise EventError(f"{kind} must carry {field} as a finite {qualifier} Decimal string")
+        raise EventError(
+            f"{kind} must carry {field} as a finite {qualifier} Decimal string"
+        )
     try:
         amount = Decimal(value)
     except InvalidOperation as exc:
         raise EventError(f"{kind} carries invalid {field} {value!r}") from exc
     if not amount.is_finite():
         qualifier = "positive" if positive else "non-negative"
-        raise EventError(f"{kind} must carry {field} as a finite {qualifier} Decimal string")
+        raise EventError(
+            f"{kind} must carry {field} as a finite {qualifier} Decimal string"
+        )
     valid_sign = amount > 0 if positive else amount >= 0
     if not valid_sign:
         qualifier = "positive" if positive else "non-negative"
-        raise EventError(f"{kind} must carry {field} as a finite {qualifier} Decimal string")
+        raise EventError(
+            f"{kind} must carry {field} as a finite {qualifier} Decimal string"
+        )
 
 
 def _check_budget_contract(event: EventPayload) -> None:
@@ -657,7 +666,9 @@ def _check_budget_contract(event: EventPayload) -> None:
                 f"{kind} must be attributed to declared writer {BUDGET_STATE_ACTOR!r}"
             )
         if datetime.fromisoformat(event["ts"]).utcoffset() != timedelta(0):
-            raise EventError(f"{kind} ts must use UTC so trajectory order is unambiguous")
+            raise EventError(
+                f"{kind} ts must use UTC so trajectory order is unambiguous"
+            )
         _decimal_field(kind, data, "weekly_spent", positive=False)
         _decimal_field(kind, data, "monthly_spent", positive=False)
         observed_at = data.get("observed_at")
@@ -702,7 +713,9 @@ def _check_budget_contract(event: EventPayload) -> None:
     try:
         state_observed.astimezone(timezone.utc)
     except (OverflowError, ValueError) as exc:
-        raise EventError(f"{kind} state_observed_at cannot be normalised to UTC") from exc
+        raise EventError(
+            f"{kind} state_observed_at cannot be normalised to UTC"
+        ) from exc
     run_id = data.get("run_id")
     if not isinstance(run_id, str) or not run_id.strip():
         raise EventError(f"{kind} must carry a non-empty string run_id")
@@ -736,7 +749,9 @@ def _check_usage_contract(event: EventPayload) -> None:
             f"{USAGE_KIND} must be attributed to declared writer {USAGE_ACTOR!r}"
         )
     if datetime.fromisoformat(event["ts"]).utcoffset() != timedelta(0):
-        raise EventError(f"{USAGE_KIND} ts must use UTC so trajectory order is unambiguous")
+        raise EventError(
+            f"{USAGE_KIND} ts must use UTC so trajectory order is unambiguous"
+        )
 
     data = event["data"]
     for field in ("provider", "detail"):
@@ -834,10 +849,19 @@ def _check_knowledge_contract(event: EventPayload) -> None:
             f"{KNOWLEDGE_RETRIEVED_KIND} must be attributed to {KNOWLEDGE_ACTOR!r}"
         )
     data = event["data"]
-    for field in ("source_id", "source_url", "licence", "category", "retrieved_at", "status"):
+    for field in (
+        "source_id",
+        "source_url",
+        "licence",
+        "category",
+        "retrieved_at",
+        "status",
+    ):
         value = data.get(field)
         if not isinstance(value, str) or not value.strip():
-            raise EventError(f"{KNOWLEDGE_RETRIEVED_KIND} must carry a non-empty string {field}")
+            raise EventError(
+                f"{KNOWLEDGE_RETRIEVED_KIND} must carry a non-empty string {field}"
+            )
     status = data["status"]
     if status not in KNOWLEDGE_STATUSES:
         raise EventError(
@@ -851,7 +875,9 @@ def _check_knowledge_contract(event: EventPayload) -> None:
         )
     if status == "ok":
         if not isinstance(data.get("uri"), str) or not data["uri"].strip():
-            raise EventError(f"{KNOWLEDGE_RETRIEVED_KIND} with status 'ok' must carry uri")
+            raise EventError(
+                f"{KNOWLEDGE_RETRIEVED_KIND} with status 'ok' must carry uri"
+            )
         digest = data.get("content_digest")
         if not isinstance(digest, str) or len(digest) != 64:
             raise EventError(
@@ -922,11 +948,17 @@ def _check_acquisition_contract(event: EventPayload) -> None:
             "acquisition.channel must be one of "
             f"{sorted(ACQUISITION_CHANNELS)}, got {channel!r}"
         )
-    if kind == VERIFICATION_OUTCOME_KIND and channel not in _VERIFICATION_ACQUISITION_CHANNELS:
+    if (
+        kind == VERIFICATION_OUTCOME_KIND
+        and channel not in _VERIFICATION_ACQUISITION_CHANNELS
+    ):
         raise EventError(
             f"{VERIFICATION_OUTCOME_KIND} cannot carry acquisition.channel {channel!r}"
         )
-    if kind == KNOWLEDGE_RETRIEVED_KIND and channel not in _KNOWLEDGE_ACQUISITION_CHANNELS:
+    if (
+        kind == KNOWLEDGE_RETRIEVED_KIND
+        and channel not in _KNOWLEDGE_ACQUISITION_CHANNELS
+    ):
         raise EventError(
             f"{KNOWLEDGE_RETRIEVED_KIND} cannot carry acquisition.channel {channel!r}"
         )
@@ -972,7 +1004,9 @@ def _check_acquisition_contract(event: EventPayload) -> None:
             f"missing {sorted(expected - actual)}, unexpected {sorted(actual - expected)}"
         )
 
-    _canonical_token(acquisition["observation_anchor"], "acquisition.observation_anchor")
+    _canonical_token(
+        acquisition["observation_anchor"], "acquisition.observation_anchor"
+    )
     _canonical_token(acquisition["conclusion_id"], "acquisition.conclusion_id")
     _canonical_token(acquisition["alternative"], "acquisition.alternative")
     _hex64(
@@ -1035,7 +1069,9 @@ def _check_capability_gap_contract(event: EventPayload) -> None:
     for field in ("asked", "attempted", "detail", "repair", "run_id", "source"):
         value = data.get(field)
         if not isinstance(value, str) or not value.strip():
-            raise EventError(f"{CAPABILITY_GAP_KIND} must carry a non-empty string {field}")
+            raise EventError(
+                f"{CAPABILITY_GAP_KIND} must carry a non-empty string {field}"
+            )
     failure = data.get("failure")
     if failure not in GAP_FAILURES:
         raise EventError(
@@ -1297,10 +1333,14 @@ def _check_dispatch_contract(event: EventPayload) -> None:
     if event["event"].startswith("dispatch.") and not isinstance(
         event["data"].get("supervised"), bool
     ):
-        raise EventError("dispatch events must record supervised as a boolean (ADR-0039)")
+        raise EventError(
+            "dispatch events must record supervised as a boolean (ADR-0039)"
+        )
     status = event["data"].get("status")
-    if event["event"] in ("dispatch.outcome", "dispatch.refused") and status is not None and (
-        not isinstance(status, str) or status not in DISPATCH_STATUSES
+    if (
+        event["event"] in ("dispatch.outcome", "dispatch.refused")
+        and status is not None
+        and (not isinstance(status, str) or status not in DISPATCH_STATUSES)
     ):
         raise EventError(f"unknown dispatch status {status!r}")
 
@@ -1332,7 +1372,9 @@ def _check_measurement_contract(event: EventPayload) -> None:
         return
     fixture = data.get("fixture")
     if not isinstance(fixture, str) or not fixture.strip():
-        raise EventError(f"{MEASUREMENT_RESULT_KIND} must carry a non-empty string fixture")
+        raise EventError(
+            f"{MEASUREMENT_RESULT_KIND} must carry a non-empty string fixture"
+        )
 
 
 def _check_promote_contract(event: EventPayload) -> None:
@@ -1350,7 +1392,10 @@ def _check_promote_contract(event: EventPayload) -> None:
         if not isinstance(experiment_id, str) or not experiment_id.strip():
             raise EventError(f"{kind} must carry a non-empty experiment_id")
         digest_value = data.get("registration_digest")
-        if not isinstance(digest_value, str) or DIGEST_RE.fullmatch(digest_value) is None:
+        if (
+            not isinstance(digest_value, str)
+            or DIGEST_RE.fullmatch(digest_value) is None
+        ):
             raise EventError(
                 f"{kind} must carry registration_digest as a lowercase SHA-256 digest"
             )
@@ -1358,7 +1403,10 @@ def _check_promote_contract(event: EventPayload) -> None:
         if not isinstance(contract, dict):
             raise EventError(f"{kind} must carry contract as an object")
         on_other = contract.get("on_other")
-        if not isinstance(on_other, str) or on_other.strip().casefold() != CANONICAL_ON_OTHER:
+        if (
+            not isinstance(on_other, str)
+            or on_other.strip().casefold() != CANONICAL_ON_OTHER
+        ):
             raise EventError(
                 f"{kind} contract.on_other cannot be weakened; must be {CANONICAL_ON_OTHER!r}"
             )
@@ -1368,9 +1416,7 @@ def _check_promote_contract(event: EventPayload) -> None:
             raise EventError(f"{kind} must carry receipt_kind promoter_beta")
         n_rejected = data.get("n_human_rejected")
         if not isinstance(n_rejected, int) or n_rejected < 30:
-            raise EventError(
-                f"{kind} must carry n_human_rejected as an integer >= 30"
-            )
+            raise EventError(f"{kind} must carry n_human_rejected as an integer >= 30")
         for field in (
             "qualification_rule_digest",
             "decision_surface_digest",
@@ -1542,7 +1588,9 @@ def _check_review_queue_contract(event: EventPayload) -> None:
         if int(data["stream_cap"]) != 90:
             raise EventError(f"{REVIEW_QUEUE_OPENED_KIND} stream_cap is fixed at 90")
         if int(data["exp105_prefix_n"]) != 30:
-            raise EventError(f"{REVIEW_QUEUE_OPENED_KIND} exp105_prefix_n is fixed at 30")
+            raise EventError(
+                f"{REVIEW_QUEUE_OPENED_KIND} exp105_prefix_n is fixed at 30"
+            )
         if data["selector"] != "first_matching_trajectory_order":
             raise EventError(
                 f"{REVIEW_QUEUE_OPENED_KIND} selector must be "
@@ -1550,7 +1598,10 @@ def _check_review_queue_contract(event: EventPayload) -> None:
             )
         for field in ("verifier_contract_digest", "eligible_universe_digest"):
             digest = data[field]
-            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            if (
+                not isinstance(digest, str)
+                or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+            ):
                 raise EventError(
                     f"{REVIEW_QUEUE_OPENED_KIND} {field} must be 64 lowercase hex characters"
                 )
@@ -1610,7 +1661,10 @@ def _check_review_queue_contract(event: EventPayload) -> None:
             )
         for field in ("start_token", "artefact_sha256", "verifier_contract_digest"):
             digest = data[field]
-            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            if (
+                not isinstance(digest, str)
+                or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+            ):
                 raise EventError(
                     f"{CANDIDATE_EXPOSED_KIND} {field} must be 64 lowercase hex characters"
                 )
@@ -1647,7 +1701,10 @@ def _check_review_queue_contract(event: EventPayload) -> None:
             "presentation_digest",
         ):
             digest = data[field]
-            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            if (
+                not isinstance(digest, str)
+                or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+            ):
                 raise EventError(
                     f"{REVIEW_PRESENTATION_FROZEN_KIND} {field} must be 64 lowercase hex "
                     "characters"
@@ -1778,7 +1835,9 @@ def _check_visibility_contract(event: EventPayload) -> None:
         overrides = data.get("overrides")
         if overrides is not None:
             if not isinstance(overrides, dict):
-                raise EventError(f"{VISIBILITY_CHANGE_KIND}.overrides must be an object")
+                raise EventError(
+                    f"{VISIBILITY_CHANGE_KIND}.overrides must be an object"
+                )
             for kind_name, override_level in overrides.items():
                 if not isinstance(kind_name, str) or not kind_name.strip():
                     raise EventError("override keys must be non-empty event kinds")
@@ -1804,14 +1863,18 @@ def _decision_text(value: object, field: str) -> str:
 def _decision_digest(value: object, field: str) -> str:
     text = _decision_text(value, field)
     if re.fullmatch(r"[0-9a-f]{64}", text) is None:
-        raise EventError(f"decision protocol {field} must be a lower-case SHA-256 digest")
+        raise EventError(
+            f"decision protocol {field} must be a lower-case SHA-256 digest"
+        )
     return text
 
 
 def _check_exact_event_reference(reference: object, field: str) -> None:
     required = {"event_id", "event_kind", "event_sha256"}
     if not isinstance(reference, dict) or set(reference) != required:
-        raise EventError(f"decision protocol {field} must be an exact F03 event reference")
+        raise EventError(
+            f"decision protocol {field} must be an exact F03 event reference"
+        )
     _check_event_id(reference["event_id"])
     _decision_text(reference["event_kind"], f"{field}.event_kind")
     _decision_digest(reference["event_sha256"], f"{field}.event_sha256")
@@ -1892,7 +1955,9 @@ def _check_alternatives(data: EventPayload) -> None:
         )
     rule_refs = only_admissible["rule_refs"]
     if not isinstance(rule_refs, list) or not rule_refs:
-        raise EventError("decision protocol only_admissible.rule_refs must be non-empty")
+        raise EventError(
+            "decision protocol only_admissible.rule_refs must be non-empty"
+        )
     for index, rule_ref in enumerate(rule_refs):
         _decision_text(rule_ref, f"only_admissible.rule_refs[{index}]")
 
@@ -1925,7 +1990,9 @@ def _check_protocol(value: object) -> str:
         "wrong_costs_more",
     }
     if not isinstance(threshold, dict) or set(threshold) != threshold_fields:
-        raise EventError("decision protocol threshold must carry its three versioned inputs")
+        raise EventError(
+            "decision protocol threshold must carry its three versioned inputs"
+        )
     _decision_text(threshold["version"], "protocol.threshold.version")
     tri_states = {"true", "false", "unknown"}
     states = []
@@ -1937,9 +2004,13 @@ def _check_protocol(value: object) -> str:
             )
         states.append(state)
     if status == "not_warranted" and "false" not in states:
-        raise EventError("decision protocol not_warranted requires a false threshold input")
+        raise EventError(
+            "decision protocol not_warranted requires a false threshold input"
+        )
     if status == "completed" and "false" in states:
-        raise EventError("decision protocol completed cannot carry a false threshold input")
+        raise EventError(
+            "decision protocol completed cannot carry a false threshold input"
+        )
     for field in completion & set(value):
         _check_exact_event_reference(value[field], f"protocol.{field}")
     return cast(str, status)
@@ -1958,7 +2029,9 @@ def _check_binding(value: object, *, protected_proposal: bool) -> str:
     )
     if admission not in admitted:
         label = "protected proposal" if protected_proposal else "autonomous decision"
-        raise EventError(f"decision protocol admission {admission!r} is invalid for {label}")
+        raise EventError(
+            f"decision protocol admission {admission!r} is invalid for {label}"
+        )
 
     execution_fields = {
         "kind",
@@ -2044,13 +2117,9 @@ def _check_planning_record(
         raise EventError("decision protocol evidence_refs must be a non-empty array")
     for index, evidence_ref in enumerate(evidence_refs):
         _check_exact_event_reference(evidence_ref, f"evidence_refs[{index}]")
-    _decision_digest(
-        data["acceptance_contract_digest"], "acceptance_contract_digest"
-    )
+    _decision_digest(data["acceptance_contract_digest"], "acceptance_contract_digest")
     protocol_status = _check_protocol(data["protocol"])
-    admission = _check_binding(
-        data["binding"], protected_proposal=protected_proposal
-    )
+    admission = _check_binding(data["binding"], protected_proposal=protected_proposal)
     expected_level = (
         "full"
         if admission in _PROTECTED_ADMISSION_CLASSES or protocol_status == "completed"
@@ -2335,9 +2404,7 @@ def _write_all(fd: int, data: bytes) -> None:
                 f"could not write the event line; the append is not acknowledged: {exc}"
             ) from exc
         if written <= 0:
-            raise EventError(
-                "a write made no progress; the append is not acknowledged"
-            )
+            raise EventError("a write made no progress; the append is not acknowledged")
         view = view[written:]
 
 
@@ -2603,7 +2670,9 @@ def _validate_decision_relations(
                             f"first-party event: {exc}"
                         ) from exc
                     if not isinstance(authority, Event):
-                        raise EventError("protected proposal authority cannot be legacy/unmeasured")
+                        raise EventError(
+                            "protected proposal authority cannot be legacy/unmeasured"
+                        )
                     authority_data = authority.data
                     if authority_data.get("human_decision") not in HUMAN_ONLY:
                         raise EventError(
@@ -2720,8 +2789,7 @@ def append_transaction(
     dates = {candidate["ts"][:10] for candidate in checked}
     if len(dates) != 1:
         raise EventError(
-            "one transaction writes one log; the candidates span dates "
-            f"{sorted(dates)}"
+            f"one transaction writes one log; the candidates span dates {sorted(dates)}"
         )
     return _transaction(
         log_dir / f"{next(iter(dates))}.jsonl", checked, transition_validator
@@ -2752,6 +2820,48 @@ def append(path: Path, event: EventPayload) -> EventPayload:
 # rather than hanging it.
 _READ_RETRIES = 6
 _READ_BACKOFF = 0.04
+
+
+def _retry_sleep(attempt: int) -> None:
+    """Back off with FULL JITTER, not in lockstep.
+
+    The backoff above was exact -- every waiter slept 40 ms, then 80, then 160, on the same
+    schedule. That is fine for one reader and pathological for twenty, which is what this
+    repository actually runs: roughly twenty concurrent agents share one append-only trajectory,
+    and on Windows a writer denies every reader while it holds the file. Evict twenty readers at
+    once and they all retry at the same instants, so they collide again at every step, and the
+    ~2.5 s budget then fails CLOSED -- correctly, but globally, because a refused read fails the
+    suite, and a failed suite blocks retirement, merging and publication together.
+
+    MEASURED 24 August 2026: `could not be read after 6 attempts: observed access denial` was the
+    commonest crash signature in driver state, with single units dying this way 77 and 78 times,
+    which stopped the build lane outright.
+
+    Full jitter -- sleep(uniform(0, base * 2**attempt)) -- is the standard remedy and the one
+    Brooker measures as best-in-class for reducing both contention and total work: "Exponential
+    Backoff And Jitter", AWS Architecture Blog, 4 March 2015. It keeps the same ceiling and
+    spreads the waiters across it, so the herd stops arriving together.
+
+    The retry COUNT and the budget are deliberately unchanged. Raising either would widen the
+    window a bad read can hide in without decorrelating anything, and the refusal is correct
+    fail-closed behaviour -- a reader that silently returned a partial trajectory would be far
+    worse than one that stops.
+
+    NO PRNG. The obvious spelling is `random.uniform`, and `random` is not in this package's
+    import allowlist (`tests/test_budget.py::PRODUCT_IMPORTS`). That allowlist is a capability
+    boundary with a written justification per entry, and widening it so a fix compiles is the
+    move it exists to refuse -- so the spread is drawn from primitives already permitted. The
+    process id decorrelates ACROSS processes, which is the whole problem here, and the monotonic
+    clock decorrelates across attempts within one. Multiplying the pid by a large odd constant
+    scatters neighbouring pids, which arrive in blocks when a driver launches its dispatchers.
+    """
+    jittered_sleep(_READ_BACKOFF * (2**attempt))
+
+
+def jittered_sleep(ceiling: float) -> None:
+    """Sleep somewhere in [0, ceiling). The one jitter rule, shared by every retry site."""
+    spread = ((os.getpid() * 2654435761) ^ time.perf_counter_ns()) % 1_000_003 / 1_000_003
+    time.sleep(ceiling * spread)
 
 
 def _classify_lines(
@@ -2809,7 +2919,7 @@ def read(path: Path) -> tuple[list[Event], list[Rejection]]:
                 return _classify_lines(str(path), fh)
         except PermissionError as exc:
             last = exc
-            time.sleep(_READ_BACKOFF * (2**attempt))
+            _retry_sleep(attempt)
     raise EventError(
         f"{path} could not be read after {_READ_RETRIES} attempts: observed access denial "
         f"({last}); it may be held by another process. The trajectory is never partially "
@@ -2915,7 +3025,9 @@ def resolve_reference(
     if not isinstance(kind, str) or not kind:
         raise EventError("event reference must carry event_kind as a non-empty string")
     if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
-        raise EventError("event reference must carry event_sha256 as 64 lower-case hex characters")
+        raise EventError(
+            "event reference must carry event_sha256 as 64 lower-case hex characters"
+        )
 
     ordered = tuple(events)
     event_id = reference.get("event_id")
@@ -2939,12 +3051,20 @@ def resolve_reference(
     target = matching[0]
     if before is not None:
         try:
-            before_index = next(index for index, event in enumerate(ordered) if event is before)
+            before_index = next(
+                index for index, event in enumerate(ordered) if event is before
+            )
         except StopIteration as exc:
-            raise EventError("reference consumer is absent from trajectory order") from exc
-        target_index = next(index for index, event in enumerate(ordered) if event is target)
+            raise EventError(
+                "reference consumer is absent from trajectory order"
+            ) from exc
+        target_index = next(
+            index for index, event in enumerate(ordered) if event is target
+        )
         if target_index >= before_index:
-            raise EventError(f"event reference {event_id!r} is not earlier than its consumer")
+            raise EventError(
+                f"event reference {event_id!r} is not earlier than its consumer"
+            )
     if target.kind != kind:
         raise EventError(f"event reference {event_id!r} has mismatched event_kind")
     if event_sha256(target.raw) != digest:
@@ -3004,7 +3124,7 @@ def bypassed(directory: Path) -> list[tuple[str, int]]:
                         "trajectory is never partially reported -- refusing rather than "
                         "continuing against an incomplete history."
                     ) from exc
-                time.sleep(_READ_BACKOFF * (2**attempt))
+                _retry_sleep(attempt)
         with path.open(encoding="utf-8") as fh:
             for number, line in enumerate(fh, start=1):
                 line = line.rstrip("\n")
@@ -3090,9 +3210,13 @@ def _check_estimate_analogue(value: object) -> list[dict[str, str]]:
     for index, item in enumerate(value):
         if not isinstance(item, dict):
             raise EventError(f"analogue_ids[{index}] must be an object")
-        event_id = _estimate_text(item.get("event_id"), f"analogue_ids[{index}].event_id")
+        event_id = _estimate_text(
+            item.get("event_id"), f"analogue_ids[{index}].event_id"
+        )
         _check_uuid4(event_id, f"analogue_ids[{index}].event_id")
-        event_kind = _estimate_text(item.get("event_kind"), f"analogue_ids[{index}].event_kind")
+        event_kind = _estimate_text(
+            item.get("event_kind"), f"analogue_ids[{index}].event_kind"
+        )
         event_digest = _estimate_digest_field(
             item.get("event_sha256"), f"analogue_ids[{index}].event_sha256"
         )
@@ -3113,7 +3237,9 @@ def _check_stream_bounds(value: object) -> list[dict[str, object]]:
     for index, item in enumerate(value):
         if not isinstance(item, dict):
             raise EventError(f"stream_bounds[{index}] must be an object")
-        stream_id = _estimate_text(item.get("stream_id"), f"stream_bounds[{index}].stream_id")
+        stream_id = _estimate_text(
+            item.get("stream_id"), f"stream_bounds[{index}].stream_id"
+        )
         earliest_s = _estimate_non_negative_int(
             item.get("earliest_s"), f"stream_bounds[{index}].earliest_s"
         )
@@ -3131,12 +3257,10 @@ def _check_stream_bounds(value: object) -> list[dict[str, object]]:
 
 
 def estimate_digest(data: Mapping[str, object]) -> str:
-    payload = {
-        key: value
-        for key, value in data.items()
-        if key != "estimate_digest"
-    }
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    payload = {key: value for key, value in data.items() if key != "estimate_digest"}
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
@@ -3174,7 +3298,9 @@ def _check_delivery_estimate_contract(event: EventPayload) -> None:
         if predecessor is not None:
             raise EventError("revision zero must not carry predecessor_estimate_id")
         if original != data["estimate_id"]:
-            raise EventError("revision zero original_estimate_id must equal estimate_id")
+            raise EventError(
+                "revision zero original_estimate_id must equal estimate_id"
+            )
         if data.get("cause") is not None:
             raise EventError("revision zero must not carry cause")
         if data["notice_preceded_upper_bound"] is not False:
@@ -3200,7 +3326,11 @@ def _check_delivery_estimate_contract(event: EventPayload) -> None:
     _estimate_text(data["evidence_class"], "evidence_class")
     _check_estimate_analogue(data["analogue_ids"])
     sample_size = data["sample_size"]
-    if not isinstance(sample_size, int) or isinstance(sample_size, bool) or sample_size < 0:
+    if (
+        not isinstance(sample_size, int)
+        or isinstance(sample_size, bool)
+        or sample_size < 0
+    ):
         raise EventError("sample_size must be a non-negative integer")
     _estimate_text(data["method"], "method")
     _check_stream_bounds(data["stream_bounds"])
@@ -3218,7 +3348,9 @@ def _check_delivery_estimate_contract(event: EventPayload) -> None:
         raise EventError("estimate_digest does not match the frozen estimate")
 
 
-def _cohort_matches(candidate: Mapping[str, object], cohort_key: Mapping[str, str]) -> bool:
+def _cohort_matches(
+    candidate: Mapping[str, object], cohort_key: Mapping[str, str]
+) -> bool:
     cohort = candidate.get("estimate_cohort")
     if not isinstance(cohort, dict):
         return False
@@ -3274,10 +3406,10 @@ def _nearest_rank_percentile(values: list[float], percentile: float) -> float:
 
 
 def _schedule_stream_bounds(
-  plan: Mapping[str, object],
-  *,
-  lower_s: int,
-  upper_s: int,
+    plan: Mapping[str, object],
+    *,
+    lower_s: int,
+    upper_s: int,
 ) -> list[dict[str, object]]:
     streams = cast(list[dict[str, object]], plan["streams"])
     return [
@@ -3358,7 +3490,9 @@ def derive_delivery_estimate(
         "analogue_ids": analogue_ids,
         "sample_size": len(completed_durations),
         "method": method,
-        "stream_bounds": _schedule_stream_bounds(plan, lower_s=lower_s, upper_s=upper_s),
+        "stream_bounds": _schedule_stream_bounds(
+            plan, lower_s=lower_s, upper_s=upper_s
+        ),
         "resource_snapshot_digest": resource_snapshot_digest,
         "checkpoint_interval_s": checkpoint_interval_s,
         "recovery_allowance_s": recovery_allowance_s,
@@ -3454,9 +3588,13 @@ def _validate_delivery_estimate_transition(
         tip = tips.get(delivery_id)
         original = rev0.get(delivery_id)
         if tip is None or original is None:
-            raise EventError("delivery.estimate revision zero must exist before reforecast")
+            raise EventError(
+                "delivery.estimate revision zero must exist before reforecast"
+            )
         if tip.get("estimate_id") != predecessor_id:
-            raise EventError("predecessor_estimate_id must reference the latest estimate")
+            raise EventError(
+                "predecessor_estimate_id must reference the latest estimate"
+            )
         if data.get("original_estimate_id") != original.get("estimate_id"):
             raise EventError("original_estimate_id must reference revision zero")
 
@@ -3511,7 +3649,9 @@ def _queue_opened(prefix: tuple[Event, ...]) -> Event | None:
     if not opened:
         return None
     if len(opened) > 1:
-        raise EventError("only one review.queue.opened event is permitted per trajectory")
+        raise EventError(
+            "only one review.queue.opened event is permitted per trajectory"
+        )
     return opened[0]
 
 
@@ -3530,7 +3670,8 @@ def _validate_candidate_exposed_transition(
     prior = [
         event
         for event in prefix
-        if event.kind == CANDIDATE_EXPOSED_KIND and event.data.get("queue_id") == queue_id
+        if event.kind == CANDIDATE_EXPOSED_KIND
+        and event.data.get("queue_id") == queue_id
     ]
     next_ordinal = len(prior) + 1
     for candidate in candidates:

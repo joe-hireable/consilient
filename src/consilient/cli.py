@@ -16,7 +16,6 @@ import re
 import shutil
 import sqlite3
 import sys
-import time
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -29,6 +28,7 @@ from . import budget
 from . import projection
 from . import usage as usage_mod
 from .events import EventError, append, read_all
+from .events import jittered_sleep as _jittered_sleep
 
 # Each CLI command has a different nested JSON result shape. Any is confined to this
 # rendering boundary, where the command selects the corresponding schema before access.
@@ -903,7 +903,11 @@ def cmd_doctor(args: argparse.Namespace) -> CommandResult:
                     f"{_DB_BUSY_RETRIES} attempts; close any process using it, "
                     "then run consil doctor again"
                 ) from exc
-            time.sleep(_DB_BUSY_BACKOFF * (2**attempt))
+            # Full jitter, for the same reason as events._retry_sleep: the SQLite state
+            # database is contended by the same ~20 concurrent agents, and a lockstep retry
+            # schedule makes every evicted waiter collide again at every step. Shared helper,
+            # so there is one jitter rule rather than two that can drift apart.
+            _jittered_sleep(_DB_BUSY_BACKOFF * (2**attempt))
     if replay is None:  # pragma: no cover - the loop either breaks or raises
         raise EventError(f"state database at {db} could not be read")
     a1, b1, b2 = _experiment_conditions()
