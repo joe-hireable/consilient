@@ -26,7 +26,30 @@ def _inventory(*items: dict[str, object]) -> dict[str, object]:
     return {"allowlist": list(items)}
 
 
-def _gate_payload() -> dict[str, object]:
+def _authority_event() -> dict[str, object]:
+    return {
+        "event_id": "evt-authority-1",
+        "event_kind": "human.approval",
+        "event_sha256": "b" * 64,
+    }
+
+
+def _admitted_gate(*, expires_at: str | None = "2099-01-01T00:00:00+00:00") -> dict[str, object]:
+    return {
+        "state": "admitted",
+        "reason": "exact_grant",
+        "grant_kind": "principal_authority",
+        "authority_event": _authority_event(),
+        "decision_id": None,
+        "recovery_proof_ref": None,
+        "scope": [],
+        "operations": [],
+        "effect_classes": [],
+        "expires_at": expires_at,
+    }
+
+
+def _gated_gate() -> dict[str, object]:
     gate = default_gate()
     return {
         "state": gate.state,
@@ -53,6 +76,7 @@ def _available(
         "name": name,
         "available": True,
         "provenance": provenance or [f"probe:{kind}:{name}"],
+        "gate": _admitted_gate(),
     }
 
 
@@ -68,7 +92,7 @@ def _selected(
         "name": name,
         "provenance": provenance,
         "reason": reason,
-        "gate": _gate_payload(),
+        "gate": _admitted_gate(),
     }
 
 
@@ -261,29 +285,59 @@ def test_script_emits_the_same_portable_json_without_network(tmp_path: Path) -> 
     assert set(json.loads(completed.stdout)) == {"schema_version", "capabilities"}
 
 
-def test_inventory_accepts_explicit_gate_object() -> None:
+def test_select_refuses_a_gated_inventory_entry() -> None:
     inventory = _inventory(
         {
             "kind": "tool",
             "name": "pytest",
             "available": True,
             "provenance": ["probe:tool:pytest"],
-            "gate": {
-                "state": "gated",
-                "reason": "no_matching_grant",
-                "grant_kind": None,
-                "authority_event": None,
-                "decision_id": None,
-                "recovery_proof_ref": None,
-                "scope": [],
-                "operations": [],
-                "effect_classes": [],
-                "expires_at": None,
-            },
+            "gate": _gated_gate(),
         }
     )
-    result = select_capabilities(inventory, _request(_wanted("tool", "pytest")))
-    assert result["capabilities"][0]["gate"]["state"] == "gated"
+    with pytest.raises(CapabilityError, match=r"gated capability: tool:pytest"):
+        select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+
+
+def test_select_refuses_an_entry_whose_gate_is_synthesised_as_gated() -> None:
+    inventory = _inventory(
+        {
+            "kind": "tool",
+            "name": "pytest",
+            "available": True,
+            "provenance": ["probe:tool:pytest"],
+        }
+    )
+    with pytest.raises(CapabilityError, match=r"gated capability: tool:pytest"):
+        select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+
+
+def test_select_refuses_an_expired_grant() -> None:
+    inventory = _inventory(
+        {
+            "kind": "tool",
+            "name": "pytest",
+            "available": True,
+            "provenance": ["probe:tool:pytest"],
+            "gate": _admitted_gate(expires_at="2000-01-01T00:00:00+00:00"),
+        }
+    )
+    with pytest.raises(CapabilityError, match=r"expired grant: tool:pytest"):
+        select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+
+
+def test_malformed_inventory_row_names_its_index() -> None:
+    inventory = _inventory(
+        _available("tool", "pytest"),
+        {
+            "kind": "tool",
+            "name": "ruff",
+            "available": "yes",
+            "provenance": ["probe:tool:ruff"],
+        },
+    )
+    with pytest.raises(CapabilityError, match=r"inventory allowlist\[1\]"):
+        select_capabilities(inventory, _request())
 
 
 def test_policy_module_is_pure_stdlib_policy() -> None:

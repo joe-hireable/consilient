@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 CapabilityKind = Literal["tool", "mcp", "skill", "plugin", "connection"]
@@ -312,9 +312,10 @@ def _parse_gate(value: object, label: str) -> Gate:
     )
 
 
-def parse_inventory_entry(value: object) -> CapabilityEntry:
+def parse_inventory_entry(
+    value: object, label: str = "inventory allowlist entry"
+) -> CapabilityEntry:
     """Parse one inventory allowlist row, synthesising a gated default when gate is absent."""
-    label = "inventory allowlist entry"
     record = _object(value, label)
     allowed_keys = frozenset({"kind", "name", "available", "provenance", "gate"})
     actual = frozenset(record)
@@ -346,7 +347,7 @@ def _inventory(value: object) -> tuple[_InventoryItem, ...]:
     seen: set[tuple[CapabilityKind, str]] = set()
     for index, value_item in enumerate(records):
         label = f"inventory allowlist[{index}]"
-        entry = parse_inventory_entry(value_item)
+        entry = parse_inventory_entry(value_item, label)
         identity = (entry.kind, entry.name.casefold())
         if identity in seen:
             raise CapabilityError(
@@ -391,6 +392,13 @@ def _task_request(value: object) -> tuple[_RequestedItem, ...]:
     return tuple(items)
 
 
+def _grant_expired(gate: Gate) -> bool:
+    if gate.expires_at is None:
+        return False
+    parsed = datetime.fromisoformat(gate.expires_at)
+    return parsed <= datetime.now(timezone.utc)
+
+
 def _gate_record(gate: Gate) -> dict[str, object]:
     record: dict[str, object] = {
         "state": gate.state,
@@ -408,7 +416,7 @@ def _gate_record(gate: Gate) -> dict[str, object]:
 
 
 def select_capabilities(inventory: object, task_request: object) -> dict[str, object]:
-    """Select only requested, available allowlist entries and explain every choice."""
+    """Select only requested, available, admitted, unexpired allowlist entries."""
 
     allowed = {(item.kind, item.name): item for item in _inventory(inventory)}
     requested = sorted(
@@ -422,6 +430,10 @@ def select_capabilities(inventory: object, task_request: object) -> dict[str, ob
             raise CapabilityError(f"unknown capability: {wanted.kind}:{wanted.name}")
         if not item.available:
             raise CapabilityError(f"unavailable capability: {wanted.kind}:{wanted.name}")
+        if item.gate.state != "admitted":
+            raise CapabilityError(f"gated capability: {wanted.kind}:{wanted.name}")
+        if _grant_expired(item.gate):
+            raise CapabilityError(f"expired grant: {wanted.kind}:{wanted.name}")
         selected.append(
             {
                 "kind": item.kind,
