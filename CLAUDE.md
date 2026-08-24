@@ -10,7 +10,9 @@ Read it. This file adds session-start guidance only.
 **Stage 3 was entered on 20 August 2026** by Joe, under ADR-0039, which reserves entry to
 the principal. Routing, blocking and orchestration behaviour may now be built and run. The
 repository holds the observe-only increment in `src/consilient/`, experimental adapters,
-research instruments, CI invariants, 45 ADRs and 47 registered experiments.
+research instruments, CI invariants, <!-- BEGIN GENERATED: scripts/build_counts.py#inventory -->
+102 ADRs and 113 registered experiments
+<!-- END GENERATED: scripts/build_counts.py#inventory -->.
 
 **Entering the stage is not passing the gates**, and the distinction is the whole of your job
 here. `consil doctor` reports `routing_orchestration_enabled: false` and will keep doing so

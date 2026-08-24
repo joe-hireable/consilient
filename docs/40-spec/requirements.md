@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_requirements.py`
 > **Source:** `docs/40-spec/requirements-source.json`
-> **Source SHA-256:** `34d3807c7743ebf068d73b9cdde75ede33f36f8e42f538e009af89715f459122`
+> **Source SHA-256:** `7883d00d714a871f2f0cd89f0b5c41316d7109e6534de3475a698f59fbcba959`
 > **Do not hand-edit:** regenerate with `python scripts/build_requirements.py`.
 
 > **Provenance warning, 21 August 2026. Read this before citing anything below.**
@@ -31,7 +31,7 @@
 code as built. Regenerate with `python scripts/build_requirements.py`; verify with
 `--check`. **Do not hand-edit.**
 
-**36 requirements. 0 met · 26 partial · 2 substrate only · 8 absent.** [measured]
+**36 requirements. 0 met · 27 partial · 1 substrate only · 8 absent.** [measured]
 
 **Status meanings.** *Met* — implemented and enforced by a test that can fail. *Partial* —
 some of it works. *Substrate only* — the machinery exists but nothing uses it, which is the
@@ -186,7 +186,7 @@ effort: small
 
 THE ONE MECHANICAL PART T
 
-### R05 — SUBSTRATE ONLY
+### R05 — PARTIAL
 
 > Never cite a [SNIP] or [2ND] source publicly.
 
@@ -194,9 +194,9 @@ THE ONE MECHANICAL PART T
 
 **he asked more than once** · effort: small
 
-**Gap.** There is no executable checker for citation depth — no `.github/scripts/check_source_depth.py` or equivalent, no release_check.py gate, no pre-push step, no CI step, no test. Enforcement is entirely a prose instruction that a human or a dispatched agent must remember, in four separate documents, and the pre-publication-gate skill openly records the enforcement mechanism as "you". The single concrete check that was written (RELEASE-PLAN.md:319-322) is PowerShell-only, depends on `rg` being installed, and points at a `$release_root` placeholder path that does not exist — the exact defect release_check.py's own docstring says it was built to fix, for every other item on that checklist but this
+**Gap.** The checker exists and can fail, but it is not a step in `.github/workflows/invariants.yml`, so everyday CI does not run it. `scripts/release_check.py` is the only product gate that invokes `.github/scripts/check_source_depth.py`. The three publication drafts still carry [SNIP] markers and `tests/test_source_depth.py::test_the_checker_fails_the_current_drafts` asserts that — they are not releasable. The checker cannot judge whether an [ABS] citation claims only what its abstract states; that half stays with the reviewer. The PowerShell line in RELEASE-PLAN.md is no longer the enforcement path.
 
-**Evidence.** [measured] Substrate exists and is populated: `.agents/skills/citing-sources/SKILL.md:14-19` defines [FULL]/[ABS]/[SNIP]/[2ND]; the three publication drafts apply per-citation depth markers — `docs/50-publications/P1-proxy.md` 38, `P2-guards.md` 26, `P3-echo.md` 21 (85 total, counted via `grep -oE '
+**Evidence.** [measured] Checker: `.github/scripts/check_source_depth.py` (`--self-test`, default scan of `docs/50-publications/*.md` and `README.md`). Tests that can fail: `tests/test_source_depth.py` (`test_snip_and_2nd_citations_fail`, `test_the_checker_fails_the_current_drafts`). Wired: `scripts/release_check.py` source-depth gate. Not wired: no `invariants.yml` step. Skill definition remains `.agents/skills/citing-sources/SKILL.md`.
 
 ### R06 — PARTIAL
 
