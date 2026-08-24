@@ -2367,6 +2367,24 @@ def _fsync_directory(directory: Path) -> None:
             os.close(fd)
 
 
+def _fsync_parent_before_acknowledgement(path: Path) -> None:
+    """Synchronise the log's directory before any writer acknowledges its line.
+
+    A file's first directory entry may have been created by another process whose
+    directory fsync failed. Every writer therefore retries the directory sync
+    while holding the per-log lock; sampling ``path.exists()`` cannot prove that
+    a prior process made the entry durable.
+    """
+    try:
+        _fsync_directory(path.parent)
+    except OSError as exc:
+        raise EventError(
+            f"the line is written and fsynced but the directory entry of "
+            f"{path.name!r} could not be fsynced; the append is not "
+            f"acknowledged: {exc}"
+        ) from exc
+
+
 def _rollback(fd: int, offset: int) -> None:
     """Best-effort removal of a failed append's bytes. If the truncate itself fails,
     the torn bytes stay and `read()` quarantines them as a rejection — a partial
@@ -2387,7 +2405,6 @@ def _write_validated(path: Path, event: EventPayload) -> EventPayload:
             )
     _check_clock(event)
     path.parent.mkdir(parents=True, exist_ok=True)
-    created = not path.exists()
     line = (canonical(event) + "\n").encode("utf-8")
     fd = os.open(path, _TRANSACTION_OPEN_FLAGS)
     try:
@@ -2402,6 +2419,7 @@ def _write_validated(path: Path, event: EventPayload) -> EventPayload:
                 # so a failed fsync rolls back before any later line can be
                 # acknowledged over a non-durable earlier one.
                 _fsync_file(fd)
+                _fsync_parent_before_acknowledgement(path)
             except EventError:
                 _rollback(fd, offset)
                 raise
@@ -2409,15 +2427,6 @@ def _write_validated(path: Path, event: EventPayload) -> EventPayload:
             _unlock_file(fd)
     finally:
         os.close(fd)
-    if created:
-        try:
-            _fsync_directory(path.parent)
-        except OSError as exc:
-            raise EventError(
-                f"the line is written and fsynced but the directory entry of "
-                f"{path.name!r} could not be fsynced; the append is not "
-                f"acknowledged: {exc}"
-            ) from exc
     return event
 
 
@@ -2639,7 +2648,6 @@ def _transaction(
     for candidate in candidates:
         _check_clock(candidate)
     path.parent.mkdir(parents=True, exist_ok=True)
-    created = not path.exists()
     fd = os.open(path, _TRANSACTION_OPEN_FLAGS)
     try:
         _lock_file(fd)
@@ -2672,6 +2680,7 @@ def _transaction(
                 # earlier acknowledged line, and a failed fsync rolls back
                 # before any later line can be acknowledged over it.
                 _fsync_file(fd)
+                _fsync_parent_before_acknowledgement(path)
             except EventError:
                 _rollback(fd, offset)
                 raise
@@ -2679,15 +2688,6 @@ def _transaction(
             _unlock_file(fd)
     finally:
         os.close(fd)
-    if created:
-        try:
-            _fsync_directory(path.parent)
-        except OSError as exc:
-            raise EventError(
-                f"the batch is written and fsynced but the directory entry of "
-                f"{path.name!r} could not be fsynced; the transaction is not "
-                f"acknowledged: {exc}"
-            ) from exc
     return list(candidates)
 
 

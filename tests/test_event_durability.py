@@ -266,11 +266,114 @@ def test_first_file_creation_fsyncs_the_directory_where_the_platform_exposes_it(
     assert calls == [log.parent], "the first append to a file must fsync its directory"
 
     append(log, ev(data={"marker": "second"}))
-    assert calls == [log.parent], "an append to an existing file re-fsyncs no directory"
+    assert calls == [log.parent, log.parent], (
+        "every acknowledgement must establish directory durability while holding the log lock"
+    )
 
     events, rejected = read(log)
     assert not rejected
     assert [event.data["marker"] for event in events] == ["first", "second"]
+
+
+def test_later_append_retries_directory_durability_after_the_initial_attempt_fails(
+    tmp_path, monkeypatch
+):
+    """A later writer must not acknowledge a file whose creation was not durable."""
+    calls = 0
+
+    def fail_once(directory: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected initial directory fsync failure")
+
+    monkeypatch.setattr(events_mod, "_fsync_directory", fail_once)
+    log = tmp_path / "retry-directory.jsonl"
+
+    with pytest.raises(EventError, match="directory entry"):
+        append(log, ev(data={"marker": "unacknowledged"}))
+
+    append(log, ev(data={"marker": "acknowledged"}))
+    assert calls == 2, "a later append must retry directory durability before returning"
+
+
+def test_later_transaction_retries_directory_durability_after_the_initial_attempt_fails(
+    tmp_path, monkeypatch
+):
+    """The F02 transaction path has the same first-file acknowledgement rule."""
+    calls = 0
+
+    def fail_once(directory: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected initial directory fsync failure")
+
+    monkeypatch.setattr(events_mod, "_fsync_directory", fail_once)
+    candidate = ev(event="test.durability.transaction", data={"marker": "unacknowledged"})
+
+    with pytest.raises(EventError, match="directory entry"):
+        events_mod.append_transaction(tmp_path, [candidate], lambda _p, _r, _c: None)
+
+    events_mod.append_transaction(
+        tmp_path,
+        [ev(event="test.durability.transaction", data={"marker": "acknowledged"})],
+        lambda _p, _r, _c: None,
+    )
+    assert calls == 2, "a later transaction must retry directory durability before returning"
+
+
+def test_follower_cannot_acknowledge_while_creator_directory_sync_is_pending(
+    tmp_path, monkeypatch
+):
+    """Directory durability stays inside the per-log lock for every acknowledgement."""
+    directory_sync_started = threading.Event()
+    release_directory_sync = threading.Event()
+    follower_attempting_append = threading.Event()
+    follower_returned = threading.Event()
+    calls_lock = threading.Lock()
+    calls = 0
+    outcomes: dict[str, object] = {}
+
+    def block_creator(directory: Path) -> None:
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+            first = calls == 1
+        if first:
+            directory_sync_started.set()
+            assert release_directory_sync.wait(10), "test did not release creator directory sync"
+
+    def write(name: str, marker: str) -> None:
+        try:
+            if name == "follower":
+                follower_attempting_append.set()
+            append(tmp_path / "contended-directory.jsonl", ev(data={"marker": marker}))
+            outcomes[name] = "ok"
+        except Exception as exc:
+            outcomes[name] = exc
+        finally:
+            if name == "follower":
+                follower_returned.set()
+
+    monkeypatch.setattr(events_mod, "_fsync_directory", block_creator)
+    creator = threading.Thread(target=write, args=("creator", "first"))
+    follower = threading.Thread(target=write, args=("follower", "second"))
+    creator.start()
+    try:
+        assert directory_sync_started.wait(5), "creator never reached directory sync"
+        follower.start()
+        assert follower_attempting_append.wait(5), "follower never attempted append"
+        assert not follower_returned.wait(0.5), (
+            "follower acknowledged while the creator's directory sync was pending"
+        )
+    finally:
+        release_directory_sync.set()
+        creator.join(timeout=10)
+        follower.join(timeout=10)
+
+    assert not creator.is_alive() and not follower.is_alive()
+    assert outcomes == {"creator": "ok", "follower": "ok"}
 
 
 def test_a_directory_fsync_failure_is_an_error_and_never_a_partial_line(
@@ -295,6 +398,18 @@ def test_an_acknowledged_append_is_immediately_rereadable(tmp_path):
     events, rejected = read(log)
     assert not rejected
     assert [event.raw for event in events] == [record]
+
+
+def test_a_torn_prefix_refuses_a_later_append_without_writing_new_bytes(tmp_path):
+    log = tmp_path / "torn-prefix.jsonl"
+    log.write_bytes((canonical(ev(data={"marker": "before"})) + "\n{").encode("utf-8"))
+    before = log.read_bytes()
+
+    with pytest.raises(EventError, match="torn line"):
+        append(log, ev(data={"marker": "after"}))
+
+    assert log.read_bytes() == before
+
 
 def test_a_reader_survives_a_concurrent_writer_holding_the_file(tmp_path, monkeypatch):
     """Windows denies a reader while a writer holds the path; the read must retry, not die.
