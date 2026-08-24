@@ -375,6 +375,35 @@ def run_dir_progress(uid: str, started: float) -> float:
     return newest
 
 
+def downstream_count(uid: str, units: dict) -> int:
+    """How many units are transitively waiting on `uid`.
+
+    MEASURED 24 August 2026. Startable units were ordered by phase letter and then
+    ALPHABETICALLY, so with a bounded number of slots the driver spent them on whatever sorted
+    first rather than on whatever released the most work. P02 gates 13 units and A04 another 12
+    behind it; both sort after a dozen leaf units whose completion frees nothing. T01 sat unbuilt
+    for a day while holding 22 units, for the same reason among others.
+
+    Ordering by transitive dependents is the standard critical-path heuristic and it costs one
+    graph walk per tick. It is a heuristic, not an optimum -- unit durations are unknown, so this
+    cannot be a true critical path -- but "release the most work first" beats "release whatever
+    is alphabetically first" without needing to estimate anything.
+    """
+    children: dict[str, set[str]] = {}
+    for node, spec in units.items():
+        for dep in spec.get("deps", []):
+            children.setdefault(dep, set()).add(node)
+    seen: set[str] = set()
+    stack = list(children.get(uid, ()))
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend(children.get(node, ()))
+    return len(seen)
+
+
 def reclaim_expired_slots(state: dict) -> list[str]:
     """Free slots whose leash has run out, before anything can return early.
 
@@ -1251,6 +1280,8 @@ def main() -> int:
 
     blocked = [u for u in candidates if not ready(u, units[u], done, units)]
     startable = [u for u in candidates if ready(u, units[u], done, units)]
+    # Spend slots on whatever releases the most work, not on whatever sorts first.
+    startable.sort(key=lambda u: (-downstream_count(u, units), PHASE.get(u[0], 9), u))
 
     if not candidates:
         print(f"driver: every unit is done or exhausted ({len(done)}/{len(units)})")
