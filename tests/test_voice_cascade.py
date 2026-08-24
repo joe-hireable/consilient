@@ -8,6 +8,7 @@ and the 2 GB criterion is decided by measurement rather than by declared weights
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -330,8 +331,60 @@ def test_the_orchestrator_is_outside_the_cascade_budget() -> None:
     assert {stage.role for stage in vc.CASCADE} == {"vad", "endpoint", "asr", "tts"}
 
 
-def test_main_reports_without_touching_a_model() -> None:
+def test_main_reports_without_touching_a_model(capsys: pytest.CaptureFixture[str]) -> None:
+    """Verify by artefact: a zero exit with no JSON would not prove a report."""
     assert vc.main(["--report"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["budget"]["evidence"] == "projected"
+    assert payload["adoption_refusals"]
+    assert "refused" in str(payload["telephony"]).casefold()
+    assert {stage["role"] for stage in payload["stages"]} == {
+        "vad",
+        "endpoint",
+        "asr",
+        "tts",
+    }
+
+
+def test_the_gpu_reading_queries_memory_used_not_total(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The 2 GB criterion is a used-memory delta, not the card's total VRAM."""
+    seen: dict[str, list[str]] = {}
+
+    class Completed:
+        stdout = "1536\n"
+
+    def fake_run(argv: list[str], **kwargs: object) -> Completed:
+        seen["argv"] = list(argv)
+        return Completed()
+
+    monkeypatch.setattr(vc.subprocess, "run", fake_run)
+    assert vc.nvidia_used_bytes() == 1536 * 1024 * 1024
+    assert "--query-gpu=memory.used" in seen["argv"]
+
+
+def test_nvidia_used_bytes_is_none_when_the_binary_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(argv: object, **kwargs: object) -> object:
+        raise FileNotFoundError("nvidia-smi")
+
+    monkeypatch.setattr(vc.subprocess, "run", fake_run)
+    assert vc.nvidia_used_bytes() is None
+
+
+def test_cc_by_is_not_refused_as_copyleft() -> None:
+    """Parakeet's CC-BY-4.0 needs a recorded decision; it is not share-alike."""
+    stage = next(item for item in vc.CASCADE if item.role == "asr")
+    record = [
+        {
+            "name": stage.component,
+            "licence": "CC-BY-4.0",
+            "status": "supplied",
+            "verified": "2026-08-24",
+        }
+    ]
+    refusals = vc.adoption_refusals((stage,), record)
+    assert not any("copyleft" in refusal for refusal in refusals)
 
 
 @pytest.mark.parametrize("role", ["vad", "endpoint", "asr", "tts"])
