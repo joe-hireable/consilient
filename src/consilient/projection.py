@@ -222,6 +222,14 @@ CREATE TABLE IF NOT EXISTS work_items (
     inform_scores   TEXT,
     payload         TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS native_work_items (
+    ticket      TEXT NOT NULL,
+    revision    INTEGER NOT NULL,
+    state       TEXT NOT NULL,
+    blockers    TEXT NOT NULL,
+    PRIMARY KEY (ticket, revision)
+);
 """
 
 class ProjectionError(RuntimeError):
@@ -686,6 +694,7 @@ def _apply(
             _apply_work_item_state(conn, position, event)
         elif event.kind == "work_item.completed":
             _apply_work_item_completed(conn, position, event)
+    _apply_native_work_items(conn, events)
 
 
 def _work_item_row(
@@ -818,6 +827,63 @@ def work_item_groups(conn: sqlite3.Connection) -> dict[str, list[dict[str, objec
             }
         )
     return grouped
+
+
+def _apply_native_work_items(conn: sqlite3.Connection, events: list[Event]) -> None:
+    """Project native work-item readiness without interpreting legacy dispatch claims."""
+    items: dict[tuple[str, int], dict[str, object]] = {}
+    attempts: set[tuple[str, int]] = set()
+    paused: set[tuple[str, int]] = set()
+    for event in events:
+        data = event.data
+        key_data = (data.get("ticket"), data.get("revision"))
+        if not isinstance(key_data[0], str) or not isinstance(key_data[1], int):
+            continue
+        key = cast(tuple[str, int], key_data)
+        if event.kind == "work_item.opened" and data.get("item_schema") == "native.v1":
+            items[key] = data
+        elif event.kind == "work_item.attempted" and key in items:
+            attempts.add(key)
+        elif event.kind == "work_item.commitment_paused" and key in items:
+            paused.add(key)
+
+    for key in sorted(items):
+        item = items[key]
+        blockers: list[str] = []
+        if key in paused:
+            blockers.append("commitment_paused")
+        dependencies = cast(list[dict[str, object]], item["dependencies"])
+        for dependency in dependencies:
+            blocker = f"dependency:{dependency['ticket']}@{dependency['revision']}"
+            blockers.append(blocker)
+        blockers.sort()
+        state = "blocked" if blockers else "active" if key in attempts else "ready"
+        conn.execute(
+            "INSERT INTO native_work_items (ticket, revision, state, blockers)"
+            " VALUES (?, ?, ?, ?)",
+            (
+                key[0],
+                key[1],
+                state,
+                json.dumps(blockers, separators=(",", ":")),
+            ),
+        )
+
+
+def native_work_item_rows(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    """Return canonical native work-item state for replay and rendering."""
+    return [
+        {
+            "ticket": row[0],
+            "revision": row[1],
+            "state": row[2],
+            "blockers": json.loads(row[3]),
+        }
+        for row in conn.execute(
+            "SELECT ticket, revision, state, blockers"
+            " FROM native_work_items ORDER BY ticket, revision"
+        )
+    ]
 
 
 def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:

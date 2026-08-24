@@ -51,6 +51,8 @@ WORK_STATE_DEFINITIONS: dict[str, dict[str, str]] = {
 }
 INFORM_EFFECTS = frozenset({"duration", "quality"})
 KINDS = frozenset({OPENED, COMMENT, COMPLETED, COMMITTED, STATE})
+NATIVE_ATTEMPTED = "work_item.attempted"
+NATIVE_COMMITMENT_PAUSED = "work_item.commitment_paused"
 TURN_ROLES = frozenset({"user", "assistant", "system"})
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _NATIVE_CLOSURE_FIELDS = frozenset(
@@ -221,6 +223,17 @@ def _positive_int(value: object, field: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise events.EventError(f"{field} must be a positive integer")
     return value
+
+
+def _timestamp(value: object, field: str) -> str:
+    text = _text(value, field)
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise events.EventError(f"{field} must be an RFC3339 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise events.EventError(f"{field} must carry an explicit offset")
+    return text
 
 
 def _string_list(value: object, field: str) -> list[str]:
@@ -629,6 +642,111 @@ def _check_verifier_contracts(value: object) -> list[dict[str, str]]:
     return parsed
 
 
+def _check_native_dependencies(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        raise events.EventError("dependencies must be an array")
+    dependencies: list[dict[str, object]] = []
+    seen: set[tuple[str, int]] = set()
+    for index, dependency in enumerate(value):
+        if not isinstance(dependency, dict):
+            raise events.EventError(f"dependencies[{index}] must be an object")
+        ticket = _text(dependency.get("ticket"), f"dependencies[{index}].ticket")
+        revision = _positive_int(
+            dependency.get("revision"), f"dependencies[{index}].revision"
+        )
+        key = (ticket, revision)
+        if key in seen:
+            raise events.EventError("native dependencies must be unique")
+        seen.add(key)
+        dependencies.append(
+            {
+                "ticket": ticket,
+                "revision": revision,
+                "handoff_contract_digest": _digest(
+                    dependency.get("handoff_contract_digest"),
+                    f"dependencies[{index}].handoff_contract_digest",
+                ),
+            }
+        )
+    return dependencies
+
+
+def _check_exposure_contract(value: object) -> None:
+    if not isinstance(value, dict):
+        raise events.EventError("exposure_contract must be an object")
+    _text(value.get("key"), "exposure_contract.key")
+    epsilon = value.get("epsilon")
+    if (
+        not isinstance(epsilon, (int, float))
+        or isinstance(epsilon, bool)
+        or not 0 <= epsilon <= 1
+    ):
+        raise events.EventError(
+            "exposure_contract.epsilon must be a number from 0 to 1"
+        )
+    _text(value.get("rule"), "exposure_contract.rule")
+    _text(value.get("beta_version"), "exposure_contract.beta_version")
+    n_max = value.get("n_max")
+    if not isinstance(n_max, int) or isinstance(n_max, bool) or n_max < 0:
+        raise events.EventError(
+            "exposure_contract.n_max must be a non-negative integer"
+        )
+
+
+def _check_native_item(data: Mapping[str, object]) -> None:
+    _positive_int(data.get("revision"), "revision")
+    _text(data.get("plan_id"), "plan_id")
+    _digest(data.get("plan_digest"), "plan_digest")
+    _text(data.get("stream_id"), "stream_id")
+    _text(data.get("goal_text"), "goal_text")
+    _digest(data.get("success_digest"), "success_digest")
+    _check_incumbent(data.get("incumbent"))
+    _check_deliverable_contract(data.get("deliverable_contract"))
+    _text(data.get("accountable"), "accountable")
+    _check_authority_ref(data.get("authority_ref"))
+    _check_verifier_contracts(data.get("verifier_contracts"))
+    _check_native_dependencies(data.get("dependencies"))
+    _string_list(data.get("owned_paths"), "owned_paths")
+    _text(data.get("budget_ref"), "budget_ref")
+    _timestamp(data.get("expires_at"), "expires_at")
+    _check_exposure_contract(data.get("exposure_contract"))
+    composition = data.get("composition")
+    if not isinstance(composition, dict) or not composition:
+        raise events.EventError("composition must be a non-empty object")
+
+
+def _check_native_attempt(data: Mapping[str, object]) -> None:
+    _text(data.get("ticket"), "ticket")
+    _positive_int(data.get("revision"), "revision")
+    _digest(data.get("plan_digest"), "plan_digest")
+    for field in (
+        "attempt_id",
+        "run_id",
+        "harness",
+        "model",
+        "family",
+        "pool",
+        "exposure_state",
+    ):
+        _text(data.get(field), field)
+    _string_list(data.get("claimed_paths"), "claimed_paths")
+    _digest(data.get("capability_context_digest"), "capability_context_digest")
+    for field in ("opened_at", "expires_at"):
+        _timestamp(data.get(field), field)
+    _positive_int(data.get("candidate_ordinal"), "candidate_ordinal")
+    bindings = data.get("predecessor_bindings")
+    if not isinstance(bindings, list):
+        raise events.EventError("predecessor_bindings must be an array")
+
+
+def _check_native_pause(data: Mapping[str, object]) -> None:
+    _text(data.get("ticket"), "ticket")
+    _positive_int(data.get("revision"), "revision")
+    _digest(data.get("plan_digest"), "plan_digest")
+    if data.get("cause") != "commitment_paused":
+        raise events.EventError("native pause cause must be commitment_paused")
+
+
 def _check_authority_ref(value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise events.EventError("commitment authority_ref must be an object")
@@ -763,6 +881,12 @@ def check_event_contract(event: events.EventPayload) -> None:
     if kind == PLAN_FROZEN:
         _check_plan_contract(data)
         return
+    if kind == NATIVE_ATTEMPTED:
+        _check_native_attempt(data)
+        return
+    if kind == NATIVE_COMMITMENT_PAUSED:
+        _check_native_pause(data)
+        return
     if kind not in KINDS:
         return
     ticket = data.get("ticket")
@@ -785,9 +909,7 @@ def check_event_contract(event: events.EventPayload) -> None:
             _text(data.get("opened_at"), "dispatch claim opened_at")
             _text(data.get("expires_at"), "dispatch claim expires_at")
         elif schema == NATIVE_SCHEMA:
-            raise events.EventError(
-                "native.v1 work_item.opened is not admitted until task-management activation"
-            )
+            _check_native_item(data)
         elif schema == WORK_MODEL_SCHEMA:
             _check_work_model_opened(data)
         elif schema is not None:
@@ -979,6 +1101,91 @@ def open_item(
     return _append(log, OPENED, actor, data)
 
 
+def open_native_item(
+    log: Path,
+    item: Mapping[str, object],
+    *,
+    actor: str = DEFAULT_ACTOR,
+    ts: str | None = None,
+) -> events.EventPayload:
+    """Append one frozen native work item through the authoritative writer."""
+    data = dict(item)
+    data["item_schema"] = NATIVE_SCHEMA
+    return _append(log, OPENED, actor, data, ts=ts)
+
+
+def record_native_attempt(
+    log: Path,
+    *,
+    ticket: str,
+    revision: int,
+    plan_digest: str,
+    attempt_id: str,
+    run_id: str,
+    claimed_paths: list[str],
+    opened_at: str,
+    expires_at: str,
+    harness: str,
+    model: str,
+    family: str,
+    pool: str,
+    capability_context_digest: str,
+    candidate_ordinal: int,
+    exposure_state: str,
+    predecessor_bindings: list[dict[str, object]],
+    actor: str = DEFAULT_ACTOR,
+    ts: str | None = None,
+) -> events.EventPayload:
+    return _append(
+        log,
+        NATIVE_ATTEMPTED,
+        actor,
+        {
+            "ticket": ticket,
+            "revision": revision,
+            "plan_digest": plan_digest,
+            "attempt_id": attempt_id,
+            "run_id": run_id,
+            "claimed_paths": claimed_paths,
+            "opened_at": opened_at,
+            "expires_at": expires_at,
+            "harness": harness,
+            "model": model,
+            "family": family,
+            "pool": pool,
+            "capability_context_digest": capability_context_digest,
+            "candidate_ordinal": candidate_ordinal,
+            "exposure_state": exposure_state,
+            "predecessor_bindings": predecessor_bindings,
+        },
+        ts=ts,
+    )
+
+
+def pause_native_item(
+    log: Path,
+    *,
+    ticket: str,
+    revision: int,
+    plan_digest: str,
+    cause: str,
+    actor: str = DEFAULT_ACTOR,
+    ts: str | None = None,
+) -> events.EventPayload:
+    return _append(
+        log,
+        NATIVE_COMMITMENT_PAUSED,
+        actor,
+        {
+            "ticket": ticket,
+            "revision": revision,
+            "plan_digest": plan_digest,
+            "cause": cause,
+        },
+        ts=ts,
+    )
+
+
 def comment(
     log: Path,
     *,
@@ -1127,6 +1334,77 @@ def _source_turns_authenticated(
     return True
 
 
+def _validate_native_plan_binding(
+    item: Mapping[str, object],
+    plans_by_digest: Mapping[str, Mapping[str, Any]],
+    native_by_ticket: Mapping[tuple[str, int], Mapping[str, Any]],
+) -> None:
+    digest = cast(str, item["plan_digest"])
+    plan = plans_by_digest.get(digest)
+    if plan is None or plan.get("plan_id") != item["plan_id"]:
+        raise events.EventError("native item requires a matching frozen plan")
+    streams = cast(list[dict[str, Any]], plan["streams"])
+    _validate_plan_graph(
+        streams, integration_owner=cast(str | None, plan.get("integration_owner"))
+    )
+    stream = next(
+        (
+            candidate
+            for candidate in streams
+            if candidate["stream_id"] == item["stream_id"]
+        ),
+        None,
+    )
+    if stream is None:
+        raise events.EventError("native item stream is absent from its frozen plan")
+    for field in (
+        "deliverable_contract",
+        "accountable",
+        "verifier_contracts",
+        "owned_paths",
+        "composition",
+    ):
+        if item[field] != stream[field]:
+            raise events.EventError(
+                f"native item {field} does not match its frozen stream"
+            )
+    dependencies = cast(list[dict[str, Any]], item["dependencies"])
+    expected = cast(list[dict[str, Any]], stream["dependencies"])
+    if len(dependencies) != len(expected):
+        raise events.EventError(
+            "native item dependencies do not match its frozen stream"
+        )
+    for dependency, expected_dependency in zip(dependencies, expected, strict=True):
+        predecessor = native_by_ticket.get(
+            (cast(str, dependency["ticket"]), cast(int, dependency["revision"]))
+        )
+        if predecessor is None:
+            raise events.EventError("native item has a missing predecessor")
+        if (
+            predecessor.get("plan_digest") != digest
+            or predecessor.get("stream_id") != expected_dependency["stream_id"]
+            or dependency["revision"] != expected_dependency["revision"]
+            or dependency["handoff_contract_digest"]
+            != expected_dependency["handoff_contract_digest"]
+        ):
+            raise events.EventError(
+                "native item dependency does not match its frozen plan"
+            )
+        predecessor_stream = next(
+            candidate
+            for candidate in streams
+            if candidate["stream_id"] == predecessor["stream_id"]
+        )
+        if (
+            predecessor_stream["handoff_contract"]["digest"]
+            != dependency["handoff_contract_digest"]
+            or not predecessor_stream["verifier_contracts"]
+        ):
+            raise events.EventError(
+                "native item dependency has no matching hand-off verifier"
+            )
+
+
 def validate_transition(
     prefix: Sequence[object],
     rejections: Sequence[object],
@@ -1138,9 +1416,11 @@ def validate_transition(
     commitment_tips: dict[str, dict[str, Any]] = {}
     plan_seen: set[tuple[str, int]] = set()
     plan_tips: dict[str, dict[str, Any]] = {}
+    plans_by_digest: dict[str, dict[str, Any]] = {}
     opened_by_ticket: dict[str, dict[str, Any]] = {}
     work_model_informs: dict[str, list[dict[str, object]]] = {}
     work_model_state: dict[str, dict[str, Any]] = {}
+    native_by_ticket: dict[tuple[str, int], dict[str, Any]] = {}
 
     for item in prefix:
         raw = _event_mapping(item)
@@ -1163,6 +1443,7 @@ def validate_transition(
             revision = cast(int, data["revision"])
             plan_seen.add((plan_id, revision))
             plan_tips[plan_id] = data
+            plans_by_digest[cast(str, data["plan_digest"])] = data
         elif kind == OPENED:
             ticket = cast(str, data["ticket"])
             opened_by_ticket[ticket] = data
@@ -1171,6 +1452,8 @@ def validate_transition(
                     list[dict[str, object]], data.get("informs", [])
                 )
                 work_model_state[ticket] = data
+            if _opened_schema(data) == NATIVE_SCHEMA:
+                native_by_ticket[(ticket, cast(int, data["revision"]))] = data
         elif kind == STATE:
             ticket = cast(str, data["ticket"])
             if ticket not in opened_by_ticket:
@@ -1279,6 +1562,7 @@ def validate_transition(
                         "outcome-aware plan edits are refused at the central writer"
                     )
             plan_tips[plan_id] = data
+            plans_by_digest[cast(str, data["plan_digest"])] = data
         elif kind == COMPLETED:
             ticket = cast(str, data["ticket"])
             opened = opened_by_ticket.get(ticket)
@@ -1309,6 +1593,12 @@ def validate_transition(
                     list[dict[str, object]], data.get("informs", [])
                 )
                 work_model_state[ticket] = data
+            if _opened_schema(data) == NATIVE_SCHEMA:
+                native_key = (ticket, cast(int, data["revision"]))
+                if native_key in native_by_ticket:
+                    raise events.EventError("native work-item revision already exists")
+                _validate_native_plan_binding(data, plans_by_digest, native_by_ticket)
+                native_by_ticket[native_key] = data
         elif kind == STATE:
             ticket = cast(str, data["ticket"])
             if ticket not in opened_by_ticket:
@@ -1316,11 +1606,42 @@ def validate_transition(
                     f"work_item.state references unknown ticket {ticket!r}"
                 )
             work_model_state[ticket] = data
+        elif kind == NATIVE_ATTEMPTED:
+            native_key = (cast(str, data["ticket"]), cast(int, data["revision"]))
+            opened = native_by_ticket.get(native_key)
+            if opened is None:
+                raise events.EventError("native attempt requires an opened native item")
+            if data["plan_digest"] != opened["plan_digest"]:
+                raise events.EventError(
+                    "native attempt plan_digest does not match its item"
+                )
+            if data["claimed_paths"] != opened["owned_paths"]:
+                raise events.EventError(
+                    "native attempt claimed_paths do not match owned_paths"
+                )
+        elif kind == NATIVE_COMMITMENT_PAUSED:
+            native_key = (cast(str, data["ticket"]), cast(int, data["revision"]))
+            opened = native_by_ticket.get(native_key)
+            if opened is None:
+                raise events.EventError("native pause requires an opened native item")
+            if data["plan_digest"] != opened["plan_digest"]:
+                raise events.EventError(
+                    "native pause plan_digest does not match its item"
+                )
 
 
 def _register_transition_validator() -> None:
     events.register_transition_validator(
-        (TURN, COMMITTED, PLAN_FROZEN, OPENED, STATE, COMPLETED),
+        (
+            TURN,
+            COMMITTED,
+            PLAN_FROZEN,
+            OPENED,
+            STATE,
+            COMPLETED,
+            NATIVE_ATTEMPTED,
+            NATIVE_COMMITMENT_PAUSED,
+        ),
         validate_transition,
     )
 
