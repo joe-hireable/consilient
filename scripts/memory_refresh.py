@@ -8,7 +8,6 @@ global agent-history directory or treats repository code as conversation data.
 from __future__ import annotations
 
 import os
-import signal
 import subprocess
 import sys
 import tempfile

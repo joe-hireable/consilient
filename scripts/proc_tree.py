@@ -23,9 +23,10 @@ import subprocess
 KILL_TIMEOUT_S = 10.0
 _KILL_ON_JOB_CLOSE = 0x2000
 _EXTENDED_LIMIT_INFORMATION = 9
+_Popen = subprocess.Popen[str] | subprocess.Popen[bytes]
 
 
-def assign_job(process: subprocess.Popen) -> object | None:
+def assign_job(process: _Popen) -> object | None:
     """Put `process` in a kill-on-close job so its whole tree dies in one call."""
     if os.name != "nt":
         return None
@@ -68,7 +69,7 @@ def assign_job(process: subprocess.Popen) -> object | None:
                 ("PeakJobMemoryUsed", ctypes.c_size_t),
             ]
 
-        job = k32.CreateJobObjectW(None, None)
+        job: object = k32.CreateJobObjectW(None, None)
         if not job:
             return None
         info = _Extended()
@@ -78,7 +79,7 @@ def assign_job(process: subprocess.Popen) -> object | None:
         ):
             k32.CloseHandle(job)
             return None
-        if not k32.AssignProcessToJobObject(job, int(process._handle)):
+        if not k32.AssignProcessToJobObject(job, int(getattr(process, "_handle"))):
             k32.CloseHandle(job)
             return None
         return job
@@ -101,7 +102,7 @@ def terminate_job(job: object | None) -> bool:
         return False
 
 
-def kill_tree(process: subprocess.Popen, job: object | None = None) -> None:
+def kill_tree(process: _Popen, job: object | None = None) -> None:
     """Kill the process and all descendants by the identity we started."""
     if process.poll() is not None:
         terminate_job(job)
@@ -123,7 +124,7 @@ def kill_tree(process: subprocess.Popen, job: object | None = None) -> None:
             pass
     else:
         try:
-            os.killpg(process.pid, getattr(signal, "SIGKILL", 9))
+            getattr(os, "killpg")(process.pid, getattr(signal, "SIGKILL", 9))
         except (OSError, PermissionError, ProcessLookupError):
             pass
     if process.poll() is None:
