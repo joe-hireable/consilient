@@ -652,7 +652,7 @@ def _check_commitment_contract(data: dict[str, Any]) -> None:
     commitment_id = _text(data.get("commitment_id"), "commitment_id")
     revision = _positive_int(data.get("revision"), "revision")
     _text(data.get("conversation_id"), "conversation_id")
-    source_turn_ids = _string_list(data.get("source_turn_ids"), "source_turn_ids")
+    _string_list(data.get("source_turn_ids"), "source_turn_ids")
     _digest(data.get("source_turn_digest"), "source_turn_digest")
     _text(data.get("request_text"), "request_text")
     _text(data.get("goal_text"), "goal_text")
@@ -1229,11 +1229,23 @@ def validate_transition(
             if (
                 isinstance(authority, dict)
                 and authority.get("kind") == "principal_required"
-                and not _source_turns_authenticated(data, turns)
             ):
-                raise events.EventError(
-                    "protected commitments require authenticated source turns"
-                )
+                if not _source_turns_authenticated(data, turns):
+                    raise events.EventError(
+                        "protected commitments require authenticated source turns"
+                    )
+                conversation_id = cast(str, data["conversation_id"])
+                source_turn_ids = cast(list[str], data["source_turn_ids"])
+                texts_by_turn = {
+                    turn_id: cast(str, turns[f"{conversation_id}:{turn_id}"]["text"])
+                    for turn_id in source_turn_ids
+                }
+                if data.get("source_turn_digest") != source_turn_digest(
+                    conversation_id, source_turn_ids, texts_by_turn
+                ):
+                    raise events.EventError(
+                        "source_turn_digest does not match the source turns"
+                    )
             commitment_tips[commitment_id] = data
         elif kind == PLAN_FROZEN:
             plan_id = cast(str, data["plan_id"])

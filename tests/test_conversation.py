@@ -32,6 +32,7 @@ def _turn_event(
     text: str = "Add conversation commitments",
     authenticated: bool = True,
     redactions: list[dict[str, str]] | None = None,
+    ts: str = TS,
 ) -> dict[str, object]:
     data: dict[str, object] = {
         "conversation_id": CONVERSATION_ID,
@@ -45,7 +46,7 @@ def _turn_event(
         data["redactions"] = redactions
     return {
         "v": SCHEMA_VERSION,
-        "ts": TS,
+        "ts": ts,
         "event": work_items.TURN,
         "actor": "consilient.intake",
         "data": data,
@@ -182,6 +183,61 @@ def test_generic_append_and_helper_agree_on_commitment_validation(tmp_path):
     bad = _committed_event(dict(contract, commitment_digest="0" * 64))
     with pytest.raises(EventError, match="commitment_digest"):
         append(log / f"{_now()[:10]}.jsonl", bad)
+
+
+def test_principal_commitment_refuses_reordered_source_turn_ids(tmp_path):
+    log = tmp_path / "log"
+    append(log / f"{_now()[:10]}.jsonl", _turn_event(ts=_now()))
+    append(
+        log / f"{_now()[:10]}.jsonl",
+        _turn_event(turn_id="turn-002", text="A second request", ts=_now()),
+    )
+    contract = _minimal_contract(
+        authority_ref={"kind": "principal_required", "reserved": ["external_exposure"]},
+        reserved_decisions=["external_exposure"],
+    )
+    contract["source_turn_digest"] = work_items.source_turn_digest(
+        CONVERSATION_ID,
+        [TURN_ID, "turn-002"],
+        {TURN_ID: "Add conversation commitments", "turn-002": "A second request"},
+    )
+    contract["source_turn_ids"] = ["turn-002", TURN_ID]
+    contract["commitment_digest"] = work_items.commitment_digest(contract)
+
+    with pytest.raises(EventError, match="source_turn_digest"):
+        append(log / f"{_now()[:10]}.jsonl", _committed_event(contract))
+
+
+def test_principal_commitment_refuses_forged_source_turn_digest(tmp_path):
+    log = tmp_path / "log"
+    append(log / f"{_now()[:10]}.jsonl", _turn_event(ts=_now()))
+    contract = _minimal_contract(
+        authority_ref={"kind": "principal_required", "reserved": ["external_exposure"]},
+        reserved_decisions=["external_exposure"],
+    )
+    contract["source_turn_digest"] = "0" * 64
+    contract["commitment_digest"] = work_items.commitment_digest(contract)
+
+    with pytest.raises(EventError, match="source_turn_digest"):
+        append(log / f"{_now()[:10]}.jsonl", _committed_event(contract))
+
+
+def test_principal_commitment_refuses_digest_over_invented_turn_text(tmp_path):
+    log = tmp_path / "log"
+    append(log / f"{_now()[:10]}.jsonl", _turn_event(ts=_now()))
+    contract = _minimal_contract(
+        authority_ref={"kind": "principal_required", "reserved": ["external_exposure"]},
+        reserved_decisions=["external_exposure"],
+    )
+    contract["source_turn_digest"] = work_items.source_turn_digest(
+        CONVERSATION_ID,
+        [TURN_ID],
+        {TURN_ID: "invented authoritative text"},
+    )
+    contract["commitment_digest"] = work_items.commitment_digest(contract)
+
+    with pytest.raises(EventError, match="source_turn_digest"):
+        append(log / f"{_now()[:10]}.jsonl", _committed_event(contract))
 
 
 def test_duplicate_commitment_revision_is_refused(tmp_path):
