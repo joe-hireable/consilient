@@ -2860,7 +2860,9 @@ def _retry_sleep(attempt: int) -> None:
 
 def jittered_sleep(ceiling: float) -> None:
     """Sleep somewhere in [0, ceiling). The one jitter rule, shared by every retry site."""
-    spread = ((os.getpid() * 2654435761) ^ time.perf_counter_ns()) % 1_000_003 / 1_000_003
+    spread = (
+        ((os.getpid() * 2654435761) ^ time.perf_counter_ns()) % 1_000_003 / 1_000_003
+    )
     time.sleep(ceiling * spread)
 
 
@@ -3111,10 +3113,31 @@ def bypassed(directory: Path) -> list[tuple[str, int]]:
         # it. Same bound, same backoff, and the same refusal to report a partial trajectory:
         # after the last attempt it raises rather than returning a short list, because a
         # bypass check that silently sees fewer lines reports fewer bypasses.
+        # The retry used to guard a zero-byte PROBE -- `probe.read(0)` -- and then break, after
+        # which the real read happened in a second, unguarded `open`. That is check-then-act: a
+        # writer can take the file between the probe succeeding and the read starting, and even
+        # a perfect probe says nothing about the open that follows it. So the retry was
+        # decorative, and the read it was written to protect still raised a raw PermissionError
+        # straight through this function. MEASURED 24 August 2026, failing the suite from a live
+        # trajectory that twelve consecutive manual reads had just read cleanly.
+        #
+        # The work now happens INSIDE the retry, and results accumulate into a local list that
+        # only joins `out` once the whole file has been read. A retry after a partial read must
+        # not report the lines it already saw twice.
         for attempt in range(_READ_RETRIES):
+            found: list[tuple[str, int]] = []
             try:
-                with path.open(encoding="utf-8") as probe:
-                    probe.read(0)
+                with path.open(encoding="utf-8") as fh:
+                    for number, line in enumerate(fh, start=1):
+                        line = line.rstrip("\n")
+                        if not line.strip():
+                            continue
+                        try:
+                            if canonical(json.loads(line)) != line:
+                                found.append((str(path), number))
+                        except json.JSONDecodeError:
+                            found.append((str(path), number))
+                out.extend(found)
                 break
             except PermissionError as exc:
                 if attempt == _READ_RETRIES - 1:
@@ -3125,16 +3148,6 @@ def bypassed(directory: Path) -> list[tuple[str, int]]:
                         "continuing against an incomplete history."
                     ) from exc
                 _retry_sleep(attempt)
-        with path.open(encoding="utf-8") as fh:
-            for number, line in enumerate(fh, start=1):
-                line = line.rstrip("\n")
-                if not line.strip():
-                    continue
-                try:
-                    if canonical(json.loads(line)) != line:
-                        out.append((str(path), number))
-                except json.JSONDecodeError:
-                    out.append((str(path), number))
     return out
 
 

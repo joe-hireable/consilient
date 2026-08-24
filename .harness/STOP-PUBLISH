@@ -1,0 +1,33 @@
+HELD 24 August 2026, ~23:45, by the orchestrator. Do not remove without reading this.
+
+REASON: private-corpus content is in the commits that would be pushed.
+
+`.github/scripts/check_private_corpus.py` fails on a tracked file at
+.harness/quarantine-wiring-plan-1906.md:5 -- one content fingerprint matching a private
+corpus. The file is a 40 KB working document that was never meant to be tracked. It entered
+the repository in commit d2b4bdd, through an over-broad `git add` by this orchestrator, the
+same one that swept in src/mine.py, src/x.py and docs/theirs.md.
+
+WHY A REMOVAL COMMIT IS NOT ENOUGH: d2b4bdd is one of the ~116 commits ahead of public, and
+those commits have never been pushed. Untracking the file cleans the TREE, so the gate would
+pass, but the blob stays reachable in the published HISTORY. AGENTS.md is flat: contents and
+excerpts from the private corpora may never be committed here or included in anything
+published from here. A gate that passes while the history still carries the content is
+exactly the kind of false accept this project exists to measure.
+
+WHY THIS IS NOT MINE TO DECIDE: the fix is to rewrite unpushed local history. That is not a
+force-push -- public/main has never seen these commits -- but it rewrites a branch that ~70
+unit worktrees are built on, which would disrupt every in-flight unit. The alternatives are
+to publish a subset, or to accept the history and repair the boundary another way. Those are
+the principal's calls, not the orchestrator's, and publishing is the one action here that
+cannot be undone.
+
+TO RELEASE: delete this file. Publication resumes on the next tick, so only do it once the
+private content is out of the history of everything that would be pushed -- verify with
+`python .github/scripts/check_private_corpus.py` AND by checking the commits, not just the
+tree.
+
+Note also: this gate's own failure message still says "Aggregate measured metrics and the
+repository names are permitted". That is the carve-out Joe REJECTED on 23 August 2026. The
+message is stale relative to AGENTS.md and should be corrected; it does not affect this
+finding, which is a content excerpt either way.

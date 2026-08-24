@@ -117,3 +117,8 @@ docs/10-research/experiments/*/results-*.json.lock
 # put every nested worktree into the repository. They are working directories with
 # their own git state and they are never repository content.
 .harness/unit-worktrees/
+
+# Working documents that quote the private corpora. Untracked 24 Aug 2026 after
+# check_private_corpus.py found a content fingerprint in one of them; they are instance
+# data and must never be tracked. See .harness/STOP-PUBLISH.
+.harness/quarantine-*.md

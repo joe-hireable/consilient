@@ -1070,6 +1070,47 @@ TORN_APPEND_LOCATIONS: frozenset[tuple[str, int]] = frozenset(
 )
 
 
+
+def _read_live_trajectory(log):
+    """Read the repository's own trajectory, or skip if it is momentarily unreadable.
+
+    These ratchets check the LIVE log while as many as 36 dispatchers append to it, and on
+    Windows a writer denies every reader for as long as it holds the file.
+
+    MEASURED 24 August 2026: reads of the 46 MB trajectory take 0.55-0.81s and succeeded 12
+    times out of 12 in a quiet moment, but a write burst during one suite run produced four
+    simultaneous failures in tests that had passed twice within the hour.
+
+    An access denial is INFRASTRUCTURE, not evidence -- the same distinction the driver already
+    makes for a crashed dispatch (F-05: "an infrastructure death is not evidence about the
+    work"). Failing here is a false alarm about drift, and it is an expensive one, because a red
+    suite blocks retirement, merging and publication at the same time.
+
+    This skips ONLY on a denial. A trajectory that reads cleanly and HAS drifted still fails,
+    which is the whole point of these ratchets, and a denial that persists shows up as a skip
+    in every run rather than passing quietly.
+    """
+    return _against_live_trajectory(read_all, log)
+
+
+def _against_live_trajectory(read, *args, **kwargs):
+    """Run a read of the live trajectory, skipping only if it was denied access.
+
+    Any denial reaching here has ALREADY exhausted the six jittered retries inside `events`,
+    so this is not a second retry budget -- it is the decision about what an exhausted one
+    means for a ratchet that is checking drift.
+    """
+    try:
+        return read(*args, **kwargs)
+    except EventError as exc:
+        if "observed access denial" not in str(exc):
+            raise
+        pytest.skip(
+            "the live trajectory was held by another process while this ratchet read it; "
+            f"that is contention, not drift: {exc}"
+        )
+
+
 def test_no_new_event_may_bypass_append(tmp_path):
     """A ratchet on the real trajectory, not a fixture.
 
@@ -1088,7 +1129,10 @@ def test_no_new_event_may_bypass_append(tmp_path):
     log = Path(".harness/log")
     if not log.exists():  # pragma: no cover - repository-only check
         pytest.skip("no repository trajectory in this checkout")
-    bypassed = {(Path(path).name, line) for path, line in events_mod.bypassed(log)}
+    bypassed = {
+        (Path(path).name, line)
+        for path, line in _against_live_trajectory(events_mod.bypassed, log)
+    }
     assert TORN_APPEND_LOCATIONS <= bypassed, "the pinned torn-append incident changed"
     assert len(bypassed - TORN_APPEND_LOCATIONS) <= 92, (
         "a new event bypassed append(); write it with `consil record`"
@@ -2658,7 +2702,7 @@ def test_capture_health_records_what_it_found(tmp_path, monkeypatch):
 
     assert module.main() == 0
 
-    events, rejected = read_all(log)
+    events, rejected = _read_live_trajectory(log)
     assert not rejected
     recorded = [event for event in events if event.kind == module.CHECK_KIND]
     assert len(recorded) == 1
@@ -2994,7 +3038,7 @@ def test_historical_refusal_digests_pin_real_log_rejections():
         pytest.skip("historical repository trajectory is not present in this checkout")
     real = {
         (Path(rejection.path).name, rejection.line, rejection.content_digest)
-        for rejection in read_all(log)[1]
+        for rejection in _read_live_trajectory(log)[1]
     }
     assert real == PINNED_TRAJECTORY_REJECTIONS, (
         "the trajectory's exact rejection set changed; inspect the quarantine before "
@@ -3450,7 +3494,14 @@ def test_doctor_exits_zero_when_every_gate_passes(tmp_path, capsys, monkeypatch)
         "cmd_doctor",
         lambda args: {"gates": {}, "routing_orchestration_enabled": True},
     )
-    assert main(["--json", "doctor"]) == 0
+    # Pointed at an empty tmp log rather than the repository's own. `cmd_doctor` is stubbed, so
+    # the live trajectory is incidental to what this asserts -- but `main` still opens it, and
+    # on 24 August 2026 a write burst from ~36 concurrent dispatchers made that read fail and
+    # took this test red for a reason it does not test. The mapping from payload to exit code
+    # is the subject; isolate it.
+    log = tmp_path / "log"
+    log.mkdir()
+    assert main(["--json", "--log", str(log), "doctor"]) == 0
     assert json.loads(capsys.readouterr().out)["routing_orchestration_enabled"] is True
 
 
@@ -3705,7 +3756,7 @@ def _wait_for(predicate, seconds=60):
 
 
 def _loop_events(log, kind=None):
-    events, rejected = read_all(log)
+    events, rejected = _read_live_trajectory(log)
     assert not rejected, [r.reason for r in rejected]
     return [e for e in events if kind is None or e.kind == kind]
 
@@ -5061,7 +5112,7 @@ def test_verdict_script_preserves_order_checks_and_declared_principal_beta_exclu
     assert module.main(["reject", "fix pagination", "--checks", "pass", *common]) == 0
     assert module.main(["accept", "retry backoff", "--checks", "fail", *common]) == 0
 
-    events, rejected = read_all(log)
+    events, rejected = _read_live_trajectory(log)
     assert not rejected, [r.reason for r in rejected]
     recorded = set()
     for event in events:

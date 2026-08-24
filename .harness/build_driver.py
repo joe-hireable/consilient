@@ -752,11 +752,22 @@ def publish_if_ready(state: dict, green: bool | None) -> str:
     if not ahead or ahead == "0":
         return ""
     # Reuse the tick's existing suite result. Running it again here doubled the tick to past ten
-    # minutes and starved the scheduler of the thing it exists to do. `green` is None when the tick
-    # never needed to compute it, in which case there is nothing newly retired and nothing new to
-    # publish either, so holding is correct rather than merely cheap.
+    # minutes and starved the scheduler of the thing it exists to do.
+    #
+    # But `green is None` used to RETURN here, on the reasoning that "there is nothing newly
+    # retired and nothing new to publish either". That premise is false and the measurement says
+    # so: on 24 August 2026 this printed "publish held: 112 commit(s) ready, suite not evaluated
+    # this tick" on tick after tick, while `ahead` climbed 109 -> 110 -> 112. Commits reach HEAD
+    # by paths that have nothing to do with unit registration -- merges, conflict resolutions and
+    # the orchestrator's own fixes -- so a tick can have plenty to publish and still never touch
+    # the registration loop that happens to compute `green`.
+    #
+    # Publication was therefore gated on an unrelated side effect, and public sat hours behind
+    # for want of a suite run nobody had asked for. Evaluate it here when, and only when, there
+    # is something to push. That is still at most one suite run per tick, because a tick that
+    # already computed `green` reuses it.
     if green is None:
-        return f"publish held: {ahead} commit(s) ready, suite not evaluated this tick"
+        green = suite_green()
     if not green:
         return f"publish held: {ahead} commit(s) ready, suite not green"
     gates = [
