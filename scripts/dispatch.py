@@ -38,6 +38,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -117,6 +118,11 @@ DEFAULT_TIMEOUT_S = 600
 DEFAULT_MAX_TURNS = 20
 DEFAULT_MAX_TOKENS = 100_000
 DEFAULT_CURSOR_MODEL = "composer-2.5"
+# How long a cursor launch holds the shared-config lock, and how long a waiter tries.
+# The settle window covers cursor-agent reading its config; the timeout is bounded so a
+# waiter fails in minutes rather than burning an hour-long leash.
+CURSOR_START_SETTLE_S = 20.0
+CURSOR_START_LOCK_TIMEOUT_S = 420.0
 GIT_ENV = {
     key: value for key, value in os.environ.items() if not key.startswith("GIT_")
 }
@@ -603,8 +609,13 @@ def run_process(
     stderr_path: Path,
     timeout_s: int,
     env: dict[str, str] | None = None,
+    on_started: Callable[[], None] | None = None,
 ) -> tuple[int | None, bool, float, StreamTiming | None]:
-    """Run argv, writing output to files (not pipes), and kill the process tree on timeout."""
+    """Run argv, writing output to files (not pipes), and kill the process tree on timeout.
+
+    `on_started` runs once the child is spawned and its readers are attached. It exists so a
+    caller holding a startup lock can release it without holding for the whole run.
+    """
     cwd = cwd.resolve()
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
     stderr_path.parent.mkdir(parents=True, exist_ok=True)
@@ -644,6 +655,8 @@ def run_process(
     )
     stdout_thread.start()
     stderr_thread.start()
+    if on_started is not None:
+        on_started()
     try:
         process.wait(timeout=timeout_s)
     except subprocess.TimeoutExpired:
@@ -1341,7 +1354,37 @@ def run_harness(
             env[f"GROK_CLAUDE_{surface}_ENABLED"] = "false"
     try:
         if harness.id == "cursor-composer":
-            with ExclusiveFileLock(DEFAULT_CURSOR_LOCK, timeout_s=float(timeout_s)):
+            # MEASURED 24 August 2026. This lock used to wrap the ENTIRE run for the full
+            # leash, so exactly one cursor dispatch could execute per hour and every extra
+            # burned its whole leash before failing with "cursor-agent lock held". Three units
+            # lost an hour each to it, build_driver had to cap concurrent cursor slots at one,
+            # and the principal's Cursor quota sat at 4% used while other arms were saturated.
+            #
+            # What it protects is `~/.cursor/cli-config.json`, which holds preferences and no
+            # credentials, and which had not been written for THREE DAYS across dozens of
+            # dispatches. The race is real but it is confined to start-up, when the config is
+            # read; an hour-long exclusive hold to guard a file written perhaps weekly is a
+            # scope error, not a safety measure.
+            #
+            # So the lock now covers start-up only: acquire, spawn, let the child settle, then
+            # release and let it run alongside others. Waiters fail fast rather than burning a
+            # leash. Deleting the lock outright is still wrong -- a corrupted cli-config.json
+            # would break every cursor dispatch at once.
+            lock = ExclusiveFileLock(
+                DEFAULT_CURSOR_LOCK, timeout_s=CURSOR_START_LOCK_TIMEOUT_S
+            )
+            lock.__enter__()
+            released = False
+
+            def _release_after_start() -> None:
+                nonlocal released
+                if released:
+                    return
+                time.sleep(CURSOR_START_SETTLE_S)
+                released = True
+                lock.__exit__(None, None, None)
+
+            try:
                 code, timed_out, duration, stream_timing = run_process(
                     argv,
                     cwd=cwd,
@@ -1349,7 +1392,10 @@ def run_harness(
                     stderr_path=stderr_path,
                     timeout_s=timeout_s,
                     env=env,
+                    on_started=_release_after_start,
                 )
+            finally:
+                _release_after_start()
         else:
             code, timed_out, duration, stream_timing = run_process(
                 argv,

@@ -119,15 +119,20 @@ ORDER = [
 # selection needs the anthropic family to exist, or a cross-family review of cursor or codex work
 # has one fewer family to draw from.
 ARMS = [
-    ("cursor-composer", "composer-2.5", 3600),
+    # The principal's routing, 24 August 2026: Cursor Grok 4.6 High Fast, Composer 2.5,
+    # Codex and SuperGrok Heavy, all of which have quota to spare. Claude is deliberately
+    # absent -- it is orchestrating, not building.
+    ("cursor-composer", "cursor-grok-4.6-high-fast", 3600),
     ("codex", None, 3600),
-    ("grok", None, 3600),
-    ("cursor-composer", "cursor-grok-4.6-high", 3600),
-    ("codex", None, 3600),
-    ("grok", None, 3600),
     ("cursor-composer", "composer-2.5-fast", 3600),
     ("grok", None, 3600),
-    ("cursor-composer", "cursor-grok-4.6-medium", 3600),
+    ("cursor-composer", "cursor-grok-4.6-high-fast", 3600),
+    ("codex", None, 3600),
+    ("cursor-composer", "composer-2.5", 3600),
+    ("grok", None, 3600),
+    ("cursor-composer", "cursor-grok-4.6-medium-fast", 3600),
+    ("codex", None, 3600),
+    ("cursor-composer", "cursor-grok-4.6-high-fast", 3600),
     ("codex", None, 3600),
 ]
 
@@ -143,7 +148,7 @@ ARMS = [
 # here, not the turn count, so the cap should be generous enough never to be the binding limit.
 DEFAULT_TURNS = 150
 
-CURSOR_CONCURRENCY = 1
+CURSOR_CONCURRENCY = 6  # startup-scoped lock since 24 Aug; runs overlap after ~20s settle
 
 
 def pick_arm(index: int, state: dict) -> tuple:
