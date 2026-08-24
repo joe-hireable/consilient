@@ -1,5 +1,11 @@
 #!/usr/bin/env python
-"""Emit a vendor-neutral capability context from an allowlist and task request."""
+"""Emit a vendor-neutral capability context from an inventory and task request.
+
+Schema-v1 allowlists stay explicitly unmeasured and never become an active
+manifest version. Versioned manifests are selected only when the request names
+identities or execution-contract keys; the JSON then includes selected_manifests
+with evidence_class and permission/trust boundaries.
+"""
 
 from __future__ import annotations
 

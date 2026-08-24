@@ -25,6 +25,7 @@ from typing import cast
 from . import events as events_mod
 from .events import (
     CANDIDATE_EXPOSED_KIND,
+    CAPABILITY_VERSIONED_KIND,
     DELIVERY_ESTIMATE_KIND,
     EventError,
     KNOWLEDGE_RETRIEVED_KIND,
@@ -57,6 +58,7 @@ VERSION_KEY = "version"
 HANDLERS: frozenset[str] = frozenset(
     {
         CANDIDATE_EXPOSED_KIND,
+        CAPABILITY_VERSIONED_KIND,
         DELIVERY_ESTIMATE_KIND,
         MEASUREMENT_REGISTERED_KIND,
         MEASUREMENT_RESULT_KIND,
@@ -266,6 +268,39 @@ CREATE TABLE IF NOT EXISTS native_work_items (
     state       TEXT NOT NULL,
     blockers    TEXT NOT NULL,
     PRIMARY KEY (ticket, revision)
+);
+CREATE TABLE IF NOT EXISTS capability_versions (
+    position                INTEGER NOT NULL,
+    event_id                TEXT NOT NULL PRIMARY KEY,
+    event_sha256            TEXT NOT NULL,
+    identity                TEXT NOT NULL,
+    version_digest          TEXT NOT NULL,
+    content_digest          TEXT NOT NULL,
+    execution_contract_key  TEXT NOT NULL,
+    destination_class       TEXT NOT NULL,
+    status                  TEXT NOT NULL,
+    evidence_class          TEXT NOT NULL,
+    permission_boundary     TEXT NOT NULL,
+    trust_boundary          TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS capability_heads (
+    execution_contract_key  TEXT NOT NULL,
+    destination_class       TEXT NOT NULL,
+    event_id                TEXT NOT NULL,
+    identity                TEXT NOT NULL,
+    version_digest          TEXT NOT NULL,
+    status                  TEXT NOT NULL,
+    evidence_class          TEXT NOT NULL,
+    permission_boundary     TEXT NOT NULL,
+    trust_boundary          TEXT NOT NULL,
+    PRIMARY KEY (execution_contract_key, destination_class)
+);
+CREATE TABLE IF NOT EXISTS capability_conflicts (
+    execution_contract_key  TEXT NOT NULL,
+    destination_class       TEXT NOT NULL,
+    identity                TEXT NOT NULL,
+    event_ids               TEXT NOT NULL,
+    PRIMARY KEY (execution_contract_key, destination_class)
 );
 """
 
@@ -815,6 +850,8 @@ def _apply(
                 _apply_work_item_state(conn, position, event)
             elif event.kind == "work_item.completed":
                 _apply_work_item_completed(conn, position, event)
+            elif event.kind == CAPABILITY_VERSIONED_KIND:
+                _apply_capability_versioned(conn, position, event)
         except sqlite3.IntegrityError as exc:
             _quarantine_relational(
                 conn,
@@ -1021,6 +1058,148 @@ def native_work_item_rows(conn: sqlite3.Connection) -> list[dict[str, object]]:
             " FROM native_work_items ORDER BY ticket, revision"
         )
     ]
+
+
+def _capability_row(event: Event) -> dict[str, object]:
+    data = event.data
+    return {
+        "event_id": event.raw["event_id"],
+        "event_sha256": _event_sha256(event.raw),
+        "identity": data["identity"],
+        "version_digest": data["version_digest"],
+        "content_digest": data["content_digest"],
+        "execution_contract_key": data["execution_contract_key"],
+        "destination_class": data["destination_class"],
+        "status": data["status"],
+        "evidence_class": data["evidence_class"],
+        "permission_boundary": data["permission_boundary"],
+        "trust_boundary": data["trust_boundary"],
+    }
+
+
+def _apply_capability_versioned(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
+    row = _capability_row(event)
+    conn.execute(
+        "INSERT INTO capability_versions (position, event_id, event_sha256, identity,"
+        " version_digest, content_digest, execution_contract_key, destination_class,"
+        " status, evidence_class, permission_boundary, trust_boundary)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            position,
+            row["event_id"],
+            row["event_sha256"],
+            row["identity"],
+            row["version_digest"],
+            row["content_digest"],
+            row["execution_contract_key"],
+            row["destination_class"],
+            row["status"],
+            row["evidence_class"],
+            row["permission_boundary"],
+            row["trust_boundary"],
+        ),
+    )
+    if row["status"] != "active":
+        return
+    key = (row["execution_contract_key"], row["destination_class"])
+    existing_conflict = conn.execute(
+        "SELECT event_ids FROM capability_conflicts"
+        " WHERE execution_contract_key = ? AND destination_class = ?",
+        key,
+    ).fetchone()
+    existing_head = conn.execute(
+        "SELECT event_id FROM capability_heads"
+        " WHERE execution_contract_key = ? AND destination_class = ?",
+        key,
+    ).fetchone()
+    if existing_conflict is not None:
+        event_ids = json.loads(existing_conflict[0])
+        event_ids.append(row["event_id"])
+        conn.execute(
+            "UPDATE capability_conflicts SET event_ids = ?"
+            " WHERE execution_contract_key = ? AND destination_class = ?",
+            (
+                json.dumps(event_ids, separators=(",", ":")),
+                key[0],
+                key[1],
+            ),
+        )
+        return
+    if existing_head is not None:
+        conn.execute(
+            "DELETE FROM capability_heads"
+            " WHERE execution_contract_key = ? AND destination_class = ?",
+            key,
+        )
+        conn.execute(
+            "INSERT INTO capability_conflicts (execution_contract_key, destination_class,"
+            " identity, event_ids) VALUES (?, ?, ?, ?)",
+            (
+                key[0],
+                key[1],
+                row["identity"],
+                json.dumps([existing_head[0], row["event_id"]], separators=(",", ":")),
+            ),
+        )
+        return
+    conn.execute(
+        "INSERT INTO capability_heads (execution_contract_key, destination_class, event_id,"
+        " identity, version_digest, status, evidence_class, permission_boundary,"
+        " trust_boundary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            row["execution_contract_key"],
+            row["destination_class"],
+            row["event_id"],
+            row["identity"],
+            row["version_digest"],
+            row["status"],
+            row["evidence_class"],
+            row["permission_boundary"],
+            row["trust_boundary"],
+        ),
+    )
+
+
+def capability_versions(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    conn.row_factory = sqlite3.Row
+    return [
+        dict(row)
+        for row in conn.execute(
+            "SELECT event_id, event_sha256, identity, version_digest, content_digest,"
+            " execution_contract_key, destination_class, status, evidence_class,"
+            " permission_boundary, trust_boundary FROM capability_versions"
+            " ORDER BY position, event_id"
+        )
+    ]
+
+
+def capability_heads(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    conn.row_factory = sqlite3.Row
+    return [
+        dict(row)
+        for row in conn.execute(
+            "SELECT event_id, identity, version_digest, execution_contract_key,"
+            " destination_class, status, evidence_class, permission_boundary,"
+            " trust_boundary FROM capability_heads"
+            " ORDER BY execution_contract_key, destination_class, event_id"
+        )
+    ]
+
+
+def capability_conflicts(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    conn.row_factory = sqlite3.Row
+    rows: list[dict[str, object]] = []
+    for row in conn.execute(
+        "SELECT execution_contract_key, destination_class, identity, event_ids"
+        " FROM capability_conflicts"
+        " ORDER BY execution_contract_key, destination_class"
+    ):
+        item = dict(row)
+        item["event_ids"] = json.loads(cast(str, item["event_ids"]))
+        rows.append(item)
+    return rows
 
 
 def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:

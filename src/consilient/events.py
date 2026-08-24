@@ -167,6 +167,41 @@ RECORD_CAPTURED_FIELDS = frozenset(
 RECORD_KIND_ALIASES = frozenset(
     {"record.capture", "record_captured", "records.captured"}
 )
+CAPABILITY_VERSIONED_KIND = "capability.versioned"
+CAPABILITY_VERSIONED_FIELDS = frozenset(
+    {
+        "authored_run",
+        "content_digest",
+        "destination_class",
+        "duplicate_of",
+        "evidence_class",
+        "execution_contract_key",
+        "expires_at",
+        "identity",
+        "interface",
+        "licence",
+        "permission_boundary",
+        "privacy_class",
+        "purpose",
+        "recheck_at",
+        "source_object",
+        "status",
+        "supersedes",
+        "trust_boundary",
+        "verifier_semantics",
+        "version_digest",
+    }
+)
+CAPABILITY_KIND_ALIASES = frozenset(
+    {"capability.version", "capability_versioned", "capabilities.versioned"}
+)
+CAPABILITY_MANIFEST_KINDS = frozenset(
+    {"tool", "mcp", "skill", "plugin", "connection"}
+)
+CAPABILITY_MANIFEST_STATUSES = frozenset(
+    {"active", "inactive", "expired", "superseded", "duplicate", "unmeasured"}
+)
+_HEX = frozenset("0123456789abcdef")
 CAPABILITY_GAP_KIND = "capability.gap"
 GAP_FAILURES = frozenset({"failed", "silent", "refused", "not_implemented"})
 GAP_CLOSURES = frozenset({"retry", "escalate"})
@@ -376,6 +411,236 @@ class Event:
         return cast(EventPayload, self.raw["data"])
 
 
+def _canonical_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+
+def _digest_json(value: object) -> str:
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def parse_capability_identity(value: object) -> tuple[str, str]:
+    if not isinstance(value, str) or value.count(":") != 1:
+        raise EventError("identity must be a kind:name string")
+    kind, name = value.split(":", 1)
+    if kind not in CAPABILITY_MANIFEST_KINDS:
+        raise EventError(f"identity kind must be one of {sorted(CAPABILITY_MANIFEST_KINDS)!r}")
+    if not name or any(character.isspace() or not character.isprintable() for character in name):
+        raise EventError("identity name must be a non-empty identifier without whitespace")
+    return kind, name
+
+
+def _content_payload(fields: dict[str, object]) -> dict[str, object]:
+    return {
+        "authored_run": fields["authored_run"],
+        "destination_class": fields["destination_class"],
+        "duplicate_of": fields["duplicate_of"],
+        "evidence_class": fields["evidence_class"],
+        "expires_at": fields["expires_at"],
+        "identity": fields["identity"],
+        "interface": fields["interface"],
+        "licence": fields["licence"],
+        "permission_boundary": fields["permission_boundary"],
+        "privacy_class": fields["privacy_class"],
+        "purpose": fields["purpose"],
+        "recheck_at": fields["recheck_at"],
+        "source_object": fields["source_object"],
+        "supersedes": fields["supersedes"],
+        "trust_boundary": fields["trust_boundary"],
+        "verifier_semantics": fields["verifier_semantics"],
+    }
+
+
+def content_digest(fields: dict[str, object]) -> str:
+    return _digest_json(_content_payload(fields))
+
+
+def execution_contract_key(fields: dict[str, object]) -> str:
+    kind, _name = parse_capability_identity(fields["identity"])
+    return _digest_json(
+        {
+            "interface": fields["interface"],
+            "kind": kind,
+            "permission_boundary": fields["permission_boundary"],
+            "purpose": fields["purpose"],
+            "trust_boundary": fields["trust_boundary"],
+            "verifier_semantics": fields["verifier_semantics"],
+        }
+    )
+
+
+def version_digest(fields: dict[str, object]) -> str:
+    payload = _content_payload(fields)
+    payload["content_digest"] = fields.get("content_digest") or content_digest(fields)
+    payload["execution_contract_key"] = fields.get("execution_contract_key") or execution_contract_key(
+        fields
+    )
+    payload["status"] = fields["status"]
+    return _digest_json(payload)
+
+
+def canonical_manifest(manifest: CapabilityManifest) -> str:
+    return _canonical_json(manifest.to_mapping())
+
+
+@dataclass(frozen=True)
+class CapabilityManifest:
+    """One versioned capability, addressed by identity and immutable digests."""
+
+    identity: str
+    kind: str
+    name: str
+    source_object: dict[str, object]
+    authored_run: str
+    licence: str
+    privacy_class: str
+    purpose: str
+    interface: dict[str, object]
+    permission_boundary: str
+    trust_boundary: str
+    verifier_semantics: str
+    evidence_class: str
+    status: str
+    destination_class: str
+    duplicate_of: dict[str, object] | None
+    supersedes: dict[str, object] | None
+    expires_at: str | None
+    recheck_at: str | None
+    content_digest: str
+    execution_contract_key: str
+    version_digest: str
+
+    def to_mapping(self) -> dict[str, object]:
+        return {
+            "authored_run": self.authored_run,
+            "content_digest": self.content_digest,
+            "destination_class": self.destination_class,
+            "duplicate_of": self.duplicate_of,
+            "evidence_class": self.evidence_class,
+            "execution_contract_key": self.execution_contract_key,
+            "expires_at": self.expires_at,
+            "identity": self.identity,
+            "interface": self.interface,
+            "licence": self.licence,
+            "permission_boundary": self.permission_boundary,
+            "privacy_class": self.privacy_class,
+            "purpose": self.purpose,
+            "recheck_at": self.recheck_at,
+            "source_object": self.source_object,
+            "status": self.status,
+            "supersedes": self.supersedes,
+            "trust_boundary": self.trust_boundary,
+            "verifier_semantics": self.verifier_semantics,
+            "version_digest": self.version_digest,
+        }
+
+    @classmethod
+    def from_mapping(cls, value: object) -> CapabilityManifest:
+        if not isinstance(value, dict):
+            raise EventError("capability manifest must be an object")
+        record: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise EventError("capability manifest keys must be strings")
+            record[key] = item
+        kind, name = parse_capability_identity(record.get("identity"))
+        status = record.get("status")
+        if status not in CAPABILITY_MANIFEST_STATUSES:
+            raise EventError(
+                f"status must be one of {sorted(CAPABILITY_MANIFEST_STATUSES)!r}"
+            )
+
+        def text(field: str) -> str:
+            raw = record.get(field)
+            if not isinstance(raw, str) or not raw or raw != raw.strip() or not raw.isprintable():
+                raise EventError(f"{field} must be non-empty printable text")
+            return raw
+
+        def nullable_text(field: str) -> str | None:
+            raw = record.get(field)
+            if raw is None:
+                return None
+            return text(field)
+
+        def mapping(field: str) -> dict[str, object]:
+            raw = record.get(field)
+            if not isinstance(raw, dict):
+                raise EventError(f"{field} must be an object")
+            return raw
+
+        def nullable_mapping(field: str) -> dict[str, object] | None:
+            raw = record.get(field)
+            if raw is None:
+                return None
+            return mapping(field)
+
+        payload: dict[str, object] = {
+            "authored_run": text("authored_run"),
+            "destination_class": text("destination_class"),
+            "duplicate_of": nullable_mapping("duplicate_of"),
+            "evidence_class": text("evidence_class"),
+            "expires_at": nullable_text("expires_at"),
+            "identity": f"{kind}:{name}",
+            "interface": mapping("interface"),
+            "licence": text("licence"),
+            "permission_boundary": text("permission_boundary"),
+            "privacy_class": text("privacy_class"),
+            "purpose": text("purpose"),
+            "recheck_at": nullable_text("recheck_at"),
+            "source_object": mapping("source_object"),
+            "status": status,
+            "supersedes": nullable_mapping("supersedes"),
+            "trust_boundary": text("trust_boundary"),
+            "verifier_semantics": text("verifier_semantics"),
+        }
+        expected_content = content_digest(payload)
+        expected_contract = execution_contract_key(payload)
+        payload["content_digest"] = expected_content
+        payload["execution_contract_key"] = expected_contract
+        expected_version = version_digest(payload)
+        if "content_digest" in record and record["content_digest"] != expected_content:
+            raise EventError("content_digest does not match canonical content")
+        if (
+            "execution_contract_key" in record
+            and record["execution_contract_key"] != expected_contract
+        ):
+            raise EventError("execution_contract_key does not match canonical contract")
+        if "version_digest" in record:
+            digest = record["version_digest"]
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in _HEX for character in digest)
+            ):
+                raise EventError("version_digest must be 64 lowercase hexadecimal characters")
+            if digest != expected_version:
+                raise EventError("version_digest does not match canonical version")
+        return cls(
+            identity=str(payload["identity"]),
+            kind=kind,
+            name=name,
+            source_object=mapping("source_object"),
+            authored_run=str(payload["authored_run"]),
+            licence=str(payload["licence"]),
+            privacy_class=str(payload["privacy_class"]),
+            purpose=str(payload["purpose"]),
+            interface=mapping("interface"),
+            permission_boundary=str(payload["permission_boundary"]),
+            trust_boundary=str(payload["trust_boundary"]),
+            verifier_semantics=str(payload["verifier_semantics"]),
+            evidence_class=str(payload["evidence_class"]),
+            status=str(status),
+            destination_class=str(payload["destination_class"]),
+            duplicate_of=nullable_mapping("duplicate_of"),
+            supersedes=nullable_mapping("supersedes"),
+            expires_at=payload["expires_at"] if payload["expires_at"] is None else str(payload["expires_at"]),
+            recheck_at=payload["recheck_at"] if payload["recheck_at"] is None else str(payload["recheck_at"]),
+            content_digest=expected_content,
+            execution_contract_key=expected_contract,
+            version_digest=expected_version,
+        )
+
+
 # A transition validator is pure: it receives the accepted prefix and the
 # rejections exactly as they stand under the per-log lock, plus the validated
 # candidates, and refuses by raising EventError. It performs no I/O of its own.
@@ -426,6 +691,7 @@ def validate(event: object) -> EventPayload:
         _check_event_id(event["event_id"])
 
     _check_record_contract(event)
+    _check_capability_versioned_contract(event)
     _check_budget_contract(event)
     _check_usage_contract(event)
     _check_knowledge_contract(event)
@@ -605,22 +871,91 @@ def _record_timestamp(value: object, field: str) -> datetime:
         ) from exc
 
 
-def _check_record_reference(reference: object, relation: str) -> None:
+def _check_event_reference(
+    reference: object, owner: str, relation: str, expected_kind: str
+) -> dict[str, str]:
     fields = {"event_id", "event_kind", "event_sha256"}
     if not isinstance(reference, dict) or set(reference) != fields:
-        raise EventError(
-            f"{RECORD_CAPTURED_KIND} {relation} entries must be exact F03 event references"
-        )
+        raise EventError(f"{owner} {relation} must be an exact F03 event reference")
     _check_event_id(reference["event_id"])
-    if reference["event_kind"] != RECORD_CAPTURED_KIND:
-        raise EventError(
-            f"{RECORD_CAPTURED_KIND} {relation} may reference only record.captured events"
-        )
+    if reference["event_kind"] != expected_kind:
+        raise EventError(f"{owner} {relation} must reference {expected_kind} events")
     digest = reference["event_sha256"]
     if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise EventError(
-            f"{RECORD_CAPTURED_KIND} {relation} event_sha256 must be 64 lower-case hex characters"
+            f"{owner} {relation} event_sha256 must be 64 lower-case hex characters"
         )
+    return {
+        "event_id": reference["event_id"],
+        "event_kind": reference["event_kind"],
+        "event_sha256": digest,
+    }
+
+
+def _check_record_reference(reference: object, relation: str) -> None:
+    _check_event_reference(reference, RECORD_CAPTURED_KIND, relation, RECORD_CAPTURED_KIND)
+
+
+def _check_capability_versioned_contract(event: EventPayload) -> None:
+    """M04: one exact capability.versioned contract at the F02/F03 writer."""
+    kind = event["event"]
+    if kind != CAPABILITY_VERSIONED_KIND:
+        if kind in CAPABILITY_KIND_ALIASES:
+            raise EventError(
+                f"capability event kind must be {CAPABILITY_VERSIONED_KIND!r}; aliases are not accepted"
+            )
+        return
+
+    data = event["data"]
+    actual = set(data)
+    if actual != CAPABILITY_VERSIONED_FIELDS:
+        missing = sorted(CAPABILITY_VERSIONED_FIELDS - actual)
+        unexpected = sorted(actual - CAPABILITY_VERSIONED_FIELDS)
+        detail = []
+        if missing:
+            detail.append(f"missing {missing}")
+        if unexpected:
+            detail.append(f"unexpected {unexpected}")
+        raise EventError(
+            f"{CAPABILITY_VERSIONED_KIND} body fields are fixed: {'; '.join(detail)}"
+        )
+
+    try:
+        CapabilityManifest.from_mapping(data)
+    except EventError as exc:
+        raise EventError(f"{CAPABILITY_VERSIONED_KIND} {exc}") from exc
+
+    _check_event_reference(
+        data["source_object"],
+        CAPABILITY_VERSIONED_KIND,
+        "source_object",
+        RECORD_CAPTURED_KIND,
+    )
+    duplicate_of = data["duplicate_of"]
+    supersedes = data["supersedes"]
+    if duplicate_of is not None:
+        _check_event_reference(
+            duplicate_of,
+            CAPABILITY_VERSIONED_KIND,
+            "duplicate_of",
+            CAPABILITY_VERSIONED_KIND,
+        )
+    if supersedes is not None:
+        _check_event_reference(
+            supersedes,
+            CAPABILITY_VERSIONED_KIND,
+            "supersedes",
+            CAPABILITY_VERSIONED_KIND,
+        )
+    if duplicate_of is not None and supersedes is not None:
+        raise EventError(
+            f"{CAPABILITY_VERSIONED_KIND} duplicate_of and supersedes cannot both be set"
+        )
+    event_id = event.get("event_id")
+    for relation in ("duplicate_of", "supersedes", "source_object"):
+        reference = data[relation]
+        if isinstance(reference, dict) and reference.get("event_id") == event_id:
+            raise EventError(f"{CAPABILITY_VERSIONED_KIND} {relation} cannot reference itself")
 
 
 def _decimal_field(
@@ -2603,6 +2938,54 @@ def _planning_references(record: EventPayload) -> Iterator[tuple[str, object]]:
         yield "supersedes", record["supersedes"]
 
 
+def _validate_capability_versioned_links(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    """Resolve source and lineage edges against the locked accepted prefix.
+
+    resolve_reference returns the string 'unmeasured' for a schema-v1 row identified
+    only by kind and content hash. The reference schema already refuses a capability
+    edge without an event_id, so that string cannot arrive here today; the isinstance
+    guards below keep the refusal fail-closed if that schema is ever loosened.
+    """
+    for candidate in candidates:
+        if candidate["event"] != CAPABILITY_VERSIONED_KIND:
+            continue
+        data = candidate["data"]
+        try:
+            resolved = resolve_reference(data["source_object"], prefix)
+        except EventError as exc:
+            raise EventError(
+                f"{CAPABILITY_VERSIONED_KIND} source_object must reference an exact earlier "
+                f"record.captured event: {exc}"
+            ) from exc
+        if not isinstance(resolved, Event) or resolved.kind != RECORD_CAPTURED_KIND:
+            raise EventError(
+                f"{CAPABILITY_VERSIONED_KIND} source_object must reference a record.captured event"
+            )
+        for relation in ("duplicate_of", "supersedes"):
+            reference = data[relation]
+            if reference is None:
+                continue
+            if reference["event_id"] == candidate["event_id"]:
+                raise EventError(
+                    f"{CAPABILITY_VERSIONED_KIND} {relation} cannot reference itself"
+                )
+            try:
+                target = resolve_reference(reference, prefix)
+            except EventError as exc:
+                raise EventError(
+                    f"{CAPABILITY_VERSIONED_KIND} {relation} must reference an exact earlier "
+                    f"capability.versioned event: {exc}"
+                ) from exc
+            if not isinstance(target, Event) or target.kind != CAPABILITY_VERSIONED_KIND:
+                raise EventError(
+                    f"{CAPABILITY_VERSIONED_KIND} {relation} must reference capability.versioned"
+                )
+
+
 def _validate_decision_relations(
     prefix: tuple[Event, ...],
     _rejections: tuple[Rejection, ...],
@@ -2693,6 +3076,7 @@ def _validate_decision_relations(
 
 
 register_transition_validator((RECORD_CAPTURED_KIND,), _validate_record_relations)
+register_transition_validator((CAPABILITY_VERSIONED_KIND,), _validate_capability_versioned_links)
 register_transition_validator(
     (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT), _validate_effect_receipt_chain
 )

@@ -71,6 +71,31 @@ class CapabilityError(ValueError):
     """The inventory or task request cannot produce a safe capability context."""
 
 
+def parse_identity(value: object) -> tuple[CapabilityKind, str]:
+    """Accept one `kind:name` spelling with a known kind and a whitespace-free name."""
+    if not isinstance(value, str) or value.count(":") != 1:
+        raise CapabilityError("identity must be a kind:name string")
+    kind_text, name = value.split(":", 1)
+    if kind_text not in _KINDS:
+        raise CapabilityError(
+            f"identity kind must be one of {list(CAPABILITY_KINDS)!r}"
+        )
+    return _kind(kind_text, "identity"), _name(name, "identity")
+
+
+_HEX64 = frozenset("0123456789abcdef")
+
+
+def _hex_digest(value: object, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in _HEX64 for character in value)
+    ):
+        raise CapabilityError(f"{label} must be 64 lowercase hexadecimal characters")
+    return value
+
+
 @dataclass(frozen=True)
 class Gate:
     """Technical reach and current admission are separate from availability."""
@@ -167,9 +192,13 @@ def _name(value: object, label: str) -> str:
     if (
         not isinstance(value, str)
         or not value
-        or any(character.isspace() or not character.isprintable() for character in value)
+        or any(
+            character.isspace() or not character.isprintable() for character in value
+        )
     ):
-        raise CapabilityError(f"{label} name must be a non-empty identifier without whitespace")
+        raise CapabilityError(
+            f"{label} name must be a non-empty identifier without whitespace"
+        )
     return value
 
 
@@ -194,7 +223,9 @@ def _provenance(value: object, label: str) -> tuple[str, ...]:
     values = _array(value, label)
     if not values:
         raise CapabilityError(f"{label} must contain at least one record id")
-    records = tuple(_text(item, f"{label}[{index}]") for index, item in enumerate(values))
+    records = tuple(
+        _text(item, f"{label}[{index}]") for index, item in enumerate(values)
+    )
     if len(records) != len(set(records)):
         raise CapabilityError(f"{label} contains duplicate record ids")
     return tuple(sorted(records))
@@ -209,13 +240,17 @@ def _nullable_reference(value: object, label: str) -> object | None:
     _text(record["event_kind"], f"{label}.event_kind")
     digest = _text(record["event_sha256"], f"{label}.event_sha256")
     if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
-        raise CapabilityError(f"{label}.event_sha256 must be 64 lowercase hexadecimal characters")
+        raise CapabilityError(
+            f"{label}.event_sha256 must be 64 lowercase hexadecimal characters"
+        )
     return record
 
 
 def _string_list(value: object, label: str) -> tuple[str, ...]:
     items = _array(value, label)
-    records = tuple(_text(item, f"{label}[{index}]") for index, item in enumerate(items))
+    records = tuple(
+        _text(item, f"{label}[{index}]") for index, item in enumerate(items)
+    )
     if len(records) != len(set(records)):
         raise CapabilityError(f"{label} contains duplicate entries")
     return records
@@ -275,7 +310,9 @@ def _parse_gate(value: object, label: str) -> Gate:
     state = _gate_state(record["state"], f"{label}.state")
     reason = _text(record["reason"], f"{label}.reason")
     grant_kind = _grant_kind(record["grant_kind"], f"{label}.grant_kind")
-    authority_event = _nullable_reference(record["authority_event"], f"{label}.authority_event")
+    authority_event = _nullable_reference(
+        record["authority_event"], f"{label}.authority_event"
+    )
     decision_id = _nullable_text(record["decision_id"], f"{label}.decision_id")
     recovery_proof_ref = _nullable_reference(
         record["recovery_proof_ref"], f"{label}.recovery_proof_ref"
@@ -320,7 +357,9 @@ def parse_inventory_entry(
     allowed_keys = frozenset({"kind", "name", "available", "provenance", "gate"})
     actual = frozenset(record)
     if not actual <= allowed_keys or "kind" not in actual or "name" not in actual:
-        raise CapabilityError(f"{label} keys must be a subset of {sorted(allowed_keys)!r}")
+        raise CapabilityError(
+            f"{label} keys must be a subset of {sorted(allowed_keys)!r}"
+        )
     if "available" not in actual or "provenance" not in actual:
         raise CapabilityError(f"{label} requires available and provenance")
     kind = _kind(record["kind"], label)
@@ -329,7 +368,11 @@ def parse_inventory_entry(
     if not isinstance(available, bool):
         raise CapabilityError(f"{label} available must be a boolean")
     provenance = _provenance(record["provenance"], f"{label} provenance")
-    gate = _parse_gate(record["gate"], f"{label} gate") if "gate" in record else default_gate()
+    gate = (
+        _parse_gate(record["gate"], f"{label} gate")
+        if "gate" in record
+        else default_gate()
+    )
     return CapabilityEntry(
         kind=kind,
         name=name,
@@ -339,9 +382,33 @@ def parse_inventory_entry(
     )
 
 
-def _inventory(value: object) -> tuple[_InventoryItem, ...]:
+def _allowed_keys(
+    record: dict[str, object],
+    required: frozenset[str],
+    allowed: frozenset[str],
+    label: str,
+) -> None:
+    actual = frozenset(record)
+    if not required <= actual or not actual <= allowed:
+        raise CapabilityError(
+            f"{label} keys must include {sorted(required)!r} and stay within {sorted(allowed)!r}; "
+            f"got {sorted(actual)!r}"
+        )
+
+
+def _inventory_document(value: object) -> dict[str, object]:
     document = _object(value, "inventory")
-    _keys(document, frozenset({"allowlist"}), "inventory")
+    _allowed_keys(
+        document,
+        frozenset({"allowlist"}),
+        frozenset({"allowlist", "conflicts", "heads", "manifests"}),
+        "inventory",
+    )
+    return document
+
+
+def _inventory(value: object) -> tuple[_InventoryItem, ...]:
+    document = _inventory_document(value)
     records = _array(document["allowlist"], "inventory allowlist")
     items: list[_InventoryItem] = []
     seen: set[tuple[CapabilityKind, str]] = set()
@@ -366,9 +433,26 @@ def _inventory(value: object) -> tuple[_InventoryItem, ...]:
     return tuple(items)
 
 
-def _task_request(value: object) -> tuple[_RequestedItem, ...]:
+def _task_document(value: object) -> dict[str, object]:
     document = _object(value, "task request")
-    _keys(document, frozenset({"capabilities"}), "task request")
+    _allowed_keys(
+        document,
+        frozenset({"capabilities"}),
+        frozenset(
+            {
+                "capabilities",
+                "destination_class",
+                "execution_contract_keys",
+                "identities",
+            }
+        ),
+        "task request",
+    )
+    return document
+
+
+def _task_request(value: object) -> tuple[_RequestedItem, ...]:
+    document = _task_document(value)
     records = _array(document["capabilities"], "task request capabilities")
     items: list[_RequestedItem] = []
     seen: set[tuple[CapabilityKind, str]] = set()
@@ -380,7 +464,9 @@ def _task_request(value: object) -> tuple[_RequestedItem, ...]:
         name = _name(record["name"], label)
         identity = (kind, name.casefold())
         if identity in seen:
-            raise CapabilityError(f"duplicate or ambiguous requested capability: {kind}:{name}")
+            raise CapabilityError(
+                f"duplicate or ambiguous requested capability: {kind}:{name}"
+            )
         seen.add(identity)
         items.append(
             _RequestedItem(
@@ -415,12 +501,191 @@ def _gate_record(gate: Gate) -> dict[str, object]:
     return record
 
 
+def _row_object(value: object, label: str) -> dict[str, object]:
+    return _object(value, label)
+
+
+def _manifest_selection(row: dict[str, object]) -> dict[str, object]:
+    return {
+        "destination_class": row["destination_class"],
+        "evidence_class": row.get("evidence_class"),
+        "execution_contract_key": row["execution_contract_key"],
+        "identity": row["identity"],
+        "manifest_event_id": row.get("event_id") or row.get("manifest_event_id"),
+        "permission_boundary": row.get("permission_boundary"),
+        "status": row["status"],
+        "trust_boundary": row.get("trust_boundary"),
+        "version_digest": row["version_digest"],
+    }
+
+
+def retrieve_manifest(
+    inventory: object, *, identity: str, version_digest: str
+) -> dict[str, object]:
+    """Return one stored manifest version, including inactive predecessors."""
+    document = _inventory_document(inventory)
+    parse_identity(identity)
+    digest = _hex_digest(version_digest, "version_digest")
+    for index, value in enumerate(
+        _array(document.get("manifests", []), "inventory manifests")
+    ):
+        row = _row_object(value, f"inventory manifests[{index}]")
+        if row.get("identity") == identity and row.get("version_digest") == digest:
+            return dict(row)
+    raise CapabilityError(f"unknown capability manifest: {identity}@{digest}")
+
+
+def _select_manifests(
+    document: dict[str, object], request: dict[str, object]
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    identities = request.get("identities")
+    contract_keys = request.get("execution_contract_keys")
+    destination = request.get("destination_class")
+    if identities is None and contract_keys is None:
+        return [], [], []
+    wanted_identities = (
+        [
+            _text(item, f"identities[{index}]")
+            for index, item in enumerate(_array(identities, "identities"))
+        ]
+        if identities is not None
+        else []
+    )
+    wanted_keys = (
+        [
+            _hex_digest(item, f"execution_contract_keys[{index}]")
+            for index, item in enumerate(
+                _array(contract_keys, "execution_contract_keys")
+            )
+        ]
+        if contract_keys is not None
+        else []
+    )
+    if destination is not None:
+        destination = _text(destination, "destination_class")
+    for identity in wanted_identities:
+        parse_identity(identity)
+
+    heads = [
+        _row_object(item, f"inventory heads[{index}]")
+        for index, item in enumerate(
+            _array(document.get("heads", []), "inventory heads")
+        )
+    ]
+    conflicts = [
+        _row_object(item, f"inventory conflicts[{index}]")
+        for index, item in enumerate(
+            _array(document.get("conflicts", []), "inventory conflicts")
+        )
+    ]
+    manifests = [
+        _row_object(item, f"inventory manifests[{index}]")
+        for index, item in enumerate(
+            _array(document.get("manifests", []), "inventory manifests")
+        )
+    ]
+    selected: list[dict[str, object]] = []
+    refusals: list[dict[str, object]] = []
+    omissions: list[dict[str, object]] = []
+
+    def _identity_contract_keys(identity: str) -> tuple[set[str], set[str]]:
+        keys: set[str] = set()
+        event_ids: set[str] = set()
+        for row in manifests:
+            if row.get("identity") != identity:
+                continue
+            contract = row.get("execution_contract_key")
+            if isinstance(contract, str):
+                keys.add(contract)
+            event_id = row.get("event_id")
+            if isinstance(event_id, str):
+                event_ids.add(event_id)
+        return keys, event_ids
+
+    def matching_conflicts(
+        identity: str | None, key: str | None
+    ) -> list[dict[str, object]]:
+        found: list[dict[str, object]] = []
+        identity_keys: set[str] = set()
+        identity_event_ids: set[str] = set()
+        if identity is not None:
+            identity_keys, identity_event_ids = _identity_contract_keys(identity)
+        for conflict in conflicts:
+            if (
+                destination is not None
+                and conflict.get("destination_class") != destination
+            ):
+                continue
+            contract = conflict.get("execution_contract_key")
+            event_ids = conflict.get("event_ids")
+            involved = set(event_ids) if isinstance(event_ids, list) else set()
+            if key is not None:
+                if contract != key:
+                    continue
+            elif identity is not None:
+                if (
+                    contract not in identity_keys
+                    and conflict.get("identity") != identity
+                    and not identity_event_ids.intersection(involved)
+                ):
+                    continue
+            else:
+                continue
+            found.append(conflict)
+        return found
+
+    for identity in wanted_identities:
+        hits = matching_conflicts(identity, None)
+        if hits:
+            refusals.append({"identity": identity, "reason": "active-head conflict"})
+            continue
+        matches = [
+            head
+            for head in heads
+            if head.get("identity") == identity
+            and head.get("status") == "active"
+            and (destination is None or head.get("destination_class") == destination)
+        ]
+        if len(matches) == 1:
+            selected.append(_manifest_selection(matches[0]))
+        else:
+            omissions.append(
+                {"identity": identity, "reason": "no selectable active head"}
+            )
+
+    for key in wanted_keys:
+        hits = matching_conflicts(None, key)
+        if hits:
+            refusals.append(
+                {"execution_contract_key": key, "reason": "active-head conflict"}
+            )
+            continue
+        matches = [
+            head
+            for head in heads
+            if head.get("execution_contract_key") == key
+            and head.get("status") == "active"
+            and (destination is None or head.get("destination_class") == destination)
+        ]
+        if len(matches) == 1:
+            row = _manifest_selection(matches[0])
+            if row not in selected:
+                selected.append(row)
+        else:
+            omissions.append(
+                {"execution_contract_key": key, "reason": "no selectable active head"}
+            )
+    return selected, refusals, omissions
+
+
 def select_capabilities(inventory: object, task_request: object) -> dict[str, object]:
     """Select only requested, available, admitted, unexpired allowlist entries."""
 
-    allowed = {(item.kind, item.name): item for item in _inventory(inventory)}
+    inventory_body = _inventory_document(inventory)
+    allowed = {(item.kind, item.name): item for item in _inventory(inventory_body)}
+    request = _task_document(task_request)
     requested = sorted(
-        _task_request(task_request),
+        _task_request(request),
         key=lambda item: (_KIND_ORDER[item.kind], item.name.casefold(), item.name),
     )
     selected: list[dict[str, object]] = []
@@ -429,7 +694,9 @@ def select_capabilities(inventory: object, task_request: object) -> dict[str, ob
         if item is None:
             raise CapabilityError(f"unknown capability: {wanted.kind}:{wanted.name}")
         if not item.available:
-            raise CapabilityError(f"unavailable capability: {wanted.kind}:{wanted.name}")
+            raise CapabilityError(
+                f"unavailable capability: {wanted.kind}:{wanted.name}"
+            )
         if item.gate.state != "admitted":
             raise CapabilityError(f"gated capability: {wanted.kind}:{wanted.name}")
         if _grant_expired(item.gate):
@@ -443,7 +710,24 @@ def select_capabilities(inventory: object, task_request: object) -> dict[str, ob
                 "gate": _gate_record(item.gate),
             }
         )
-    return {"schema_version": SCHEMA_VERSION, "capabilities": selected}
+    selected_manifests, refusals, omissions = _select_manifests(inventory_body, request)
+    result: dict[str, object] = {
+        "schema_version": SCHEMA_VERSION,
+        "capabilities": selected,
+    }
+    if (
+        "conflicts" in inventory_body
+        or "destination_class" in request
+        or "execution_contract_keys" in request
+        or "heads" in inventory_body
+        or "identities" in request
+        or "manifests" in inventory_body
+    ):
+        result["inventory_status"] = "unmeasured"
+        result["omissions"] = omissions
+        result["refusals"] = refusals
+        result["selected_manifests"] = selected_manifests
+    return result
 
 
 def classify_reversibility(

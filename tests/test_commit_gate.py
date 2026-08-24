@@ -323,6 +323,17 @@ def test_a_dead_agents_claim_releases_the_gate_by_the_clock(tmp_path):
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    # GIT_* is scrubbed because `git -C <dir>` does NOT win against an inherited GIT_DIR or
+    # GIT_WORK_TREE -- those override cwd, which is the whole reason the gate scripts carry a
+    # GIT_ENV scrub of their own. Without this, `_repo` below resolves to whatever repository
+    # the environment names, and `_stage` then writes its fixtures into THAT tree.
+    #
+    # MEASURED 24-25 August 2026: `src/mine.py`, `src/x.py` and `docs/theirs.md` -- files whose
+    # contents are the literal string "content of src/mine.py" -- appeared in the real working
+    # tree three times. `src/mine.py` is not valid Python, so scripts/build_diagrams.py refused
+    # the entire repository and took the suite red with it, which blocks retirement, merging
+    # and publication together. The first time, they were committed.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     return subprocess.run(
         ["git", "-C", str(root), *args],
         capture_output=True,
@@ -330,6 +341,7 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         errors="replace",
         check=False,
+        env=env,
     )
 
 
@@ -338,7 +350,17 @@ def _repo(tmp_path: Path) -> Path:
     repo.mkdir()
     assert _git(repo, "init", "-q").returncode == 0
     top = _git(repo, "rev-parse", "--show-toplevel").stdout.strip()
-    return Path(top).resolve()
+    resolved = Path(top).resolve()
+    # The fixtures below WRITE to whatever this returns. If it ever resolves outside the
+    # pytest temp directory, the tests are editing a real repository, and every caller of
+    # `_stage` becomes a source of untracked rubbish in someone's working tree. Fail loudly
+    # here rather than quietly corrupting it -- this is the check that was missing.
+    assert resolved.is_relative_to(tmp_path.resolve()), (
+        f"the fixture repository resolved to {resolved}, outside the pytest tmp dir "
+        f"{tmp_path}. An inherited GIT_DIR/GIT_WORK_TREE overrides `git -C`, so these "
+        "fixtures would be written into a real repository."
+    )
+    return resolved
 
 
 def _stage(repo: Path, relative: str) -> None:
