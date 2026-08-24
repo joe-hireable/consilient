@@ -1230,9 +1230,20 @@ def main() -> int:
     # identity-bound review receipts, so none can substitute for current evidence.
     done = retired_units(state, units)
     built = set(state.setdefault("built", []))
-    for uid in state.get("done", []):
-        if uid not in done and uid in units and committed(uid, units[uid]):
+    # Register EVERY unit whose plan commit is in the tree, not only those a previous `done`
+    # list happened to name. `committed()` prefix-matches the subject the plan specifies and
+    # already tolerates a hand-merge suffix, so it recognises work however it arrived -- merged
+    # by the driver, cherry-picked by hand, or landed under a second sha after a unit was built
+    # twice.
+    #
+    # MEASURED 24 August 2026: SEVENTEEN units had their plan commit in HEAD while the driver
+    # recorded them as neither built nor retired. Each one blocked its dependents and was
+    # eligible to be dispatched again, so the queue was paying twice for work already in the
+    # tree. The check existed and was simply pointed at the wrong set.
+    for uid, unit in units.items():
+        if uid not in done and uid not in built and committed(uid, unit):
             built.add(uid)
+            state.get("conflicts", {}).pop(uid, None)
     state["done"] = sorted(done)
     state["built"] = sorted(built)
 
