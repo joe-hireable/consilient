@@ -11,8 +11,7 @@
    "src/consilient/beta.py",
    "src/consilient/cli.py",
    "tests/test_verdict_supply.py",
-   "src/consilient/effects.py",
-   "src/consilient/events.py"
+   "src/consilient/effects.py"
   ],
   "commit": "fix(routing): finish the robust candidate ceiling",
   "deps": []
@@ -28,9 +27,7 @@
    "src/consilient/cli.py",
    "tests/test_verdict_supply.py",
    "src/consilient/effects.py",
-   "src/consilient/events.py",
-   "tests/test_effect_contract.py",
-   "src/consilient/effects.py"
+   "tests/test_effect_contract.py"
   ],
   "commit": "feat(evidence): complete verification outcome records",
   "deps": [
@@ -48,8 +45,6 @@
    "src/consilient/effects.py",
    "src/consilient/events.py",
    "tests/test_effect_contract.py",
-   "src/consilient/effects.py",
-   "src/consilient/events.py",
    "src/consilient/capabilities.py"
   ],
   "commit": "fix(beta): quarantine invalid verdict evidence",
@@ -65,12 +60,9 @@
    "src/consilient/effects.py",
    "src/consilient/events.py",
    "tests/test_effect_contract.py",
-   "src/consilient/effects.py",
-   "src/consilient/events.py",
    "src/consilient/capabilities.py",
    "tests/test_effect_admission.py",
    "tests/test_capabilities.py",
-   "src/consilient/events.py",
    "src/consilient/work_items.py"
   ],
   "commit": "feat(effects): define canonical effect records",
@@ -85,7 +77,6 @@
    "src/consilient/capabilities.py",
    "tests/test_effect_admission.py",
    "tests/test_capabilities.py",
-   "src/consilient/events.py",
    "src/consilient/work_items.py",
    "tests/test_decision_protocol.py",
    "tests/test_work_items.py",
@@ -106,7 +97,6 @@
    "tests/test_work_items.py",
    "src/consilient/instructions.py",
    "tests/test_instructions.py",
-   "src/consilient/events.py",
    "src/consilient/projection.py",
    "src/consilient/beta.py",
    "src/consilient/verification.py"
@@ -123,14 +113,8 @@
   "claims": [
    "src/consilient/instructions.py",
    "tests/test_instructions.py",
-   "src/consilient/events.py",
-   "src/consilient/projection.py",
-   "src/consilient/beta.py",
-   "src/consilient/verification.py",
-   "tests/test_review_queue.py",
-   "tests/test_v0_invariants.py",
-   "src/consilient/projection.py",
-   "src/consilient/dashboard.py"
+   "CONTRIBUTING.md",
+   "docs/00-context/getting-started.md"
   ],
   "commit": "feat(decisions): bind better-than-best execution",
   "deps": [
@@ -138,7 +122,8 @@
    "D01",
    "P01",
    "T01"
-  ]
+  ],
+  "note": "MEASURED 24 August 2026, and this is why your last two dispatches stalled without landing.\n\nYOUR CLAIM SET WAS OVER-DECLARED: ten paths including events.py, projection.py (listed TWICE), beta.py, verification.py, dashboard.py and test_v0_invariants.py -- the most contended files in this repository. A unit claiming those collides with everything at merge and blocks other units from starting. Your worktree shows you are actually touching instructions.py and test_instructions.py, and nothing else. The claim set is now narrowed to what you are really building. If you genuinely need a path outside it, STOP and say which and why -- do not take it.\n\nYOUR WORK IS NOT LOST. Your worktree holds 666 uncommitted lines across instructions.py and test_instructions.py. Continue from it rather than starting again.\n\nCOMMIT EARLY AND OFTEN. Both previous runs hit the one-hour leash with everything uncommitted. A dispatch that times out having committed nothing produces nothing, while one that commits as it goes keeps every finished piece -- unit AV timed out today and still landed, because it had committed. Do not save the commit for the end.\n\nYOU GATE 13 UNITS, more than anything else now startable. That is why this is worth un-jamming rather than leaving parked."
  },
  "Q01": {
   "title": "freeze candidate exposure before verification",
@@ -150,7 +135,6 @@
    "src/consilient/verification.py",
    "tests/test_review_queue.py",
    "tests/test_v0_invariants.py",
-   "src/consilient/projection.py",
    "src/consilient/dashboard.py",
    "scripts/verdict.py",
    "tests/test_review_card.py",
@@ -198,11 +182,8 @@
    "src/consilient/effects.py",
    "scripts/dispatch.py",
    "tests/test_recovery_proof.py",
-   "src/consilient/effects.py",
-   "scripts/dispatch.py",
    "tests/test_action_boundary.py",
    "tests/test_v0_invariants.py",
-   "src/consilient/effects.py",
    "tests/test_consilience_gate.py"
   ],
   "commit": "feat(effects): verify recovery in isolation",
@@ -221,7 +202,6 @@
    "scripts/dispatch.py",
    "tests/test_action_boundary.py",
    "tests/test_v0_invariants.py",
-   "src/consilient/effects.py",
    "tests/test_consilience_gate.py",
    "src/consilient_connectors/outbound.py",
    "tests/test_outbound.py"
@@ -304,8 +284,6 @@
    "src/consilient/projection.py",
    "src/consilient/dashboard.py",
    "tests/test_action_projection.py",
-   "src/consilient/projection.py",
-   "src/consilient/dashboard.py",
    "tests/test_autonomy_friction.py"
   ],
   "commit": "feat(dispatch): refuse uncontained harness reach",
@@ -322,8 +300,6 @@
    "src/consilient/projection.py",
    "src/consilient/dashboard.py",
    "tests/test_action_projection.py",
-   "src/consilient/projection.py",
-   "src/consilient/dashboard.py",
    "tests/test_autonomy_friction.py",
    "src/consilient/capabilities.py",
    "src/consilient/work_items.py",
@@ -364,11 +340,8 @@
    "src/consilient/events.py",
    "tests/test_event_durability.py",
    "tests/test_budget.py",
-   "src/consilient/events.py",
    "tests/test_event_transactions.py",
-   "src/consilient/events.py",
    "tests/test_event_identity.py",
-   "src/consilient/events.py",
    "src/consilient/work_items.py",
    "tests/test_conversation.py"
   ],
@@ -381,9 +354,7 @@
   "claims": [
    "src/consilient/events.py",
    "tests/test_event_transactions.py",
-   "src/consilient/events.py",
    "tests/test_event_identity.py",
-   "src/consilient/events.py",
    "src/consilient/work_items.py",
    "tests/test_conversation.py",
    "tests/test_work_items.py",
@@ -401,7 +372,6 @@
   "claims": [
    "src/consilient/events.py",
    "tests/test_event_identity.py",
-   "src/consilient/events.py",
    "src/consilient/work_items.py",
    "tests/test_conversation.py",
    "tests/test_work_items.py",
@@ -426,9 +396,7 @@
    "src/consilient/recall.py",
    "src/consilient/instructions.py",
    "tests/test_recall.py",
-   "tests/test_instructions.py",
-   "src/consilient/events.py",
-   "src/consilient/work_items.py"
+   "tests/test_instructions.py"
   ],
   "commit": "feat(work): record immutable request commitments",
   "deps": [
@@ -446,8 +414,6 @@
    "src/consilient/events.py",
    "src/consilient/work_items.py",
    "tests/test_organisation_plan.py",
-   "src/consilient/events.py",
-   "src/consilient/work_items.py",
    "src/consilient/projection.py"
   ],
   "commit": "feat(recall): protect active commitment context",
@@ -462,8 +428,6 @@
    "src/consilient/events.py",
    "src/consilient/work_items.py",
    "tests/test_organisation_plan.py",
-   "src/consilient/events.py",
-   "src/consilient/work_items.py",
    "src/consilient/projection.py",
    "tests/test_native_work_items.py",
    "tests/test_task_projection.py",
@@ -502,8 +466,7 @@
    "src/consilient/projection.py",
    "tests/test_work_item_closure.py",
    "src/consilient/dashboard.py",
-   "tests/test_task_dashboard.py",
-   "src/consilient/work_items.py"
+   "tests/test_task_dashboard.py"
   ],
   "commit": "feat(coordination): claim ready native work atomically",
   "deps": [
@@ -519,11 +482,9 @@
    "tests/test_work_item_closure.py",
    "src/consilient/dashboard.py",
    "tests/test_task_dashboard.py",
-   "src/consilient/work_items.py",
    "src/consilient/coordination.py",
    "tests/test_delivery_intake.py",
-   "src/consilient/events.py",
-   "src/consilient/projection.py"
+   "src/consilient/events.py"
   ],
   "commit": "feat(work): require evidence for closure",
   "deps": [
@@ -542,9 +503,7 @@
    "tests/test_delivery_intake.py",
    "src/consilient/events.py",
    "src/consilient/projection.py",
-   "tests/test_delivery_estimates.py",
-   "src/consilient/events.py",
-   "src/consilient/coordination.py"
+   "tests/test_delivery_estimates.py"
   ],
   "commit": "feat(dashboard): show evidence-bearing task state",
   "deps": [
@@ -561,8 +520,6 @@
    "src/consilient/events.py",
    "src/consilient/projection.py",
    "tests/test_delivery_estimates.py",
-   "src/consilient/events.py",
-   "src/consilient/coordination.py",
    "scripts/dispatch.py",
    "tests/test_checkpoints.py"
   ],
@@ -582,7 +539,6 @@
    "src/consilient/events.py",
    "src/consilient/projection.py",
    "tests/test_delivery_estimates.py",
-   "src/consilient/events.py",
    "src/consilient/coordination.py",
    "scripts/dispatch.py",
    "tests/test_checkpoints.py",
@@ -607,7 +563,6 @@
    "src/consilient/loop.py",
    "scripts/run_loop.py",
    "tests/test_delivery_recovery.py",
-   "src/consilient/events.py",
    "src/consilient/work_items.py"
   ],
   "commit": "feat(delivery): seal attributed checkpoints",
@@ -717,13 +672,11 @@
    "src/consilient/events.py",
    "scripts/human_action_broker.py",
    "tests/test_human_action_ingress.py",
-   "src/consilient/events.py",
    "scripts/consent.py",
    "scripts/verdict.py",
    "tests/test_human_action_receipts.py",
    "scripts/promote_loop.py",
-   "tests/test_promotion_authority.py",
-   "src/consilient/events.py"
+   "tests/test_promotion_authority.py"
   ],
   "commit": "feat(authority): add shared trusted human ingress",
   "deps": [
@@ -740,10 +693,8 @@
    "tests/test_human_action_receipts.py",
    "scripts/promote_loop.py",
    "tests/test_promotion_authority.py",
-   "src/consilient/events.py",
    "src/consilient/promote.py",
-   "tests/test_promote_contracts.py",
-   "src/consilient/promote.py"
+   "tests/test_promote_contracts.py"
   ],
   "commit": "feat(authority): validate protected action receipts",
   "deps": [
@@ -760,8 +711,6 @@
    "src/consilient/events.py",
    "src/consilient/promote.py",
    "tests/test_promote_contracts.py",
-   "src/consilient/promote.py",
-   "scripts/promote_loop.py",
    "tests/test_promote_instrument.py",
    "src/consilient/dashboard.py",
    "src/consilient/recall.py"
@@ -779,7 +728,6 @@
    "src/consilient/events.py",
    "src/consilient/promote.py",
    "tests/test_promote_contracts.py",
-   "src/consilient/promote.py",
    "scripts/promote_loop.py",
    "tests/test_promote_instrument.py",
    "src/consilient/dashboard.py",
@@ -802,8 +750,7 @@
    "src/consilient/instructions.py",
    "tests/test_promote_card.py",
    "src/consilient/commit_gate.py",
-   "scripts/commit_gate.py",
-   "src/consilient/promote.py"
+   "scripts/commit_gate.py"
   ],
   "commit": "feat(promote): seal one-use candidate evaluation",
   "deps": []
@@ -820,8 +767,7 @@
    "scripts/commit_gate.py",
    "src/consilient/promote.py",
    "tests/test_promote_commit_binding.py",
-   "src/consilient/events.py",
-   "src/consilient/promote.py"
+   "src/consilient/events.py"
   ],
   "commit": "feat(dashboard): render sealed promotion proposals",
   "deps": [
@@ -838,7 +784,6 @@
    "src/consilient/promote.py",
    "tests/test_promote_commit_binding.py",
    "src/consilient/events.py",
-   "src/consilient/promote.py",
    "scripts/promote_loop.py",
    "scripts/dispatch.py",
    "src/consilient/instructions.py",
@@ -862,9 +807,6 @@
    "scripts/dispatch.py",
    "src/consilient/instructions.py",
    "tests/test_promote_activation.py",
-   "src/consilient/events.py",
-   "src/consilient/promote.py",
-   "scripts/promote_loop.py",
    "scripts/run_loop.py"
   ],
   "commit": "feat(promote): make active-pointer changes durable",
@@ -899,8 +841,7 @@
    "tests/test_memory_projection.py",
    "src/consilient/recall.py",
    "scripts/recall.py",
-   "tests/test_recall_receipts.py",
-   "src/consilient/events.py"
+   "tests/test_recall_receipts.py"
   ],
   "commit": "feat(memory): capture immutable linked records",
   "deps": [
@@ -918,7 +859,6 @@
    "tests/test_recall_receipts.py",
    "src/consilient/events.py",
    "src/consilient/capabilities.py",
-   "src/consilient/projection.py",
    "scripts/capability_context.py",
    "tests/test_capability_manifests.py"
   ],
@@ -959,7 +899,6 @@
    "src/consilient/instructions.py",
    "scripts/dispatch.py",
    "tests/test_dispatch_memory.py",
-   "src/consilient/events.py",
    "tests/test_model_change_records.py"
   ],
   "commit": "feat(capabilities): version explicit active manifests",
@@ -1806,5 +1745,16 @@
   "commit": "fix(driver): consume the review verdict and block retirement on a bad one",
   "note": "MEASURED 24 August 2026, and this is the most beta-adverse defect in the build.\n\nThe driver dispatches a cross-family review for every built unit -- a DIFFERENT MODEL FAMILY from the builder, which is the only genuinely different class of evidence in the whole pipeline -- writes the reviewer's output to `<uid>-verify.out`, and then NEVER READS IT. `state[\"verified\"]` is read at build_driver.py:1138 and :1142 and initialised at :1082, and NOTHING WRITES A UNIT INTO IT. The 19 entries currently there came from a hand-run review on 23 Aug, not from the pipeline.\n\nSo every review is dispatched, billed against the principal's quota, and discarded. The system performs consilience and throws away the result. Per CONSILIENCE.md the whole project rests on convergence from a different class of facts being a TEST -- a test whose outcome is never read is not a test, and a unit marked done on the builder's say-so alone is exactly the echo this repository exists to refuse.\n\nWhat to build: parse `<uid>-verify.out` for a structured verdict, record it in `state[\"verified\"]` and in the TRAJECTORY, and make a unit's retirement depend on it. A SOUND verdict retires the unit. A verdict finding blocking defects must PREVENT retirement and put the unit back for repair with the findings attached.\n\nRequire the reviewer to emit a machine-readable verdict; do not regex prose for the word 'sound'. An unparseable verdict is NOT a pass -- fail closed, because the whole point is that the absence of evidence stopped being treated as evidence.\n\nEvidence for how strict this should be: the one hand-run cross-family review of 19 units found 0 sound, 5 blocking and 68 surviving findings, and 14 of 19 carried a guard that could be deleted with the suite still green. Reviewed is not sound, and the pipeline currently cannot tell the difference.\n\nDo NOT make the verdict advisory-only to keep throughput up. Throughput through an unmeasured filter is the thing being sold here, and it is worth less than nothing.\n\nPRIORITY 25, set deliberately on 24 August 2026. This unit unblocks nothing, so ordering by downstream impact would dispatch it last. That is backwards: it does not release work, it makes every unit already released trustworthy. Until it lands, 'done' means one model said so.",
   "priority": 25
+ },
+ "AW": {
+  "title": "record loop-engineering as the bar for the orchestration layer, and say honestly what is left",
+  "plan": "docs/10-research/literature-review.md",
+  "claims": [
+   "docs/10-research/bar-loop-engineering-2026-08-24.md"
+  ],
+  "deps": [],
+  "priority": 8,
+  "commit": "research(bar): loop-engineering as the incumbent for the orchestration layer",
+  "note": "The principal surfaced https://github.com/cobusgreyling/loop-engineering on 24 August 2026. MEASURED from the GitHub API the same day: 10,633 stars, 1,460 forks, 16 open issues, MIT, created 2026-06-09, pushed 2026-08-24. It is active, real, and substantial.\n\nWHY THIS MATTERS AND WHY IT IS UNCOMFORTABLE. Principle 9 says find the bar before claiming to beat it, and this project has already published a superlative that was false. This repository is the closest incumbent yet found to what `.harness/build_driver.py` does: worktree isolation, sub-agents with maker/checker splits, scheduled automation, skills, MCP connectors, cost observability, and starters for Grok, Claude Code, Codex and Opencode -- THE SAME HARNESSES CONSILIENT DISPATCHES TO. Its `loop-audit` emits a Loop Readiness Score out of 100 and its failure catalogue names 'infinite fix loops, verifier theater, token burn'.\n\n'Verifier theater' is close enough to this project's thesis that the overlap must be established properly rather than waved away.\n\nWHAT TO ESTABLISH, with evidence and not by assertion:\n- Read the actual repository and the published docs. Enumerate loop-audit's scoring dimensions exactly, and the full failure catalogue with its mitigations.\n- The load-bearing question: does anything there measure the rate at which a check ACCEPTS A BAD ARTEFACT? A preliminary read suggests loop-audit scores whether a verifier EXISTS ('verifier skill / maker-checker' is a checkbox) rather than how often it is WRONG, and that those are different quantities. CONFIRM OR REFUTE THAT. If they do measure false acceptance, say so plainly -- that is a finding worth far more than a comfortable one.\n- Map their primitives against ours honestly, in both directions. Name what they do better. Measured 24 Aug: we lost most of a day to defects they may already have solved -- stale conflicts never re-tested, units built twice and retried for ever, orchestration state in a non-atomic JSON file, a turn cap killing runs silently.\n- Then the principal's actual question: ADOPT AND CONTRIBUTE UPSTREAM, or take inspiration and keep building. Give ONE recommendation with its strongest objection. MIT and an active maintainer make adoption genuinely viable; note that their CLI is npm-published while this project is deliberately stdlib-only Python with ZERO runtime dependencies, and that adding a dependency is an ask-first decision under AGENTS.md.\n\nRecord it as a re-checkable bar with the date and the numbers, because an incumbent moves and a bar beaten in August and never re-measured is a bar you have stopped clearing.\n\nDo NOT add a dependency, do not vendor their code, and do not open anything upstream. This unit produces a document and a recommendation."
  }
 }
