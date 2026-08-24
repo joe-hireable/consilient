@@ -28,7 +28,7 @@ GRANT_KINDS: tuple[GrantKind, ...] = (
 # Rewind classes from Claude Code's documented limits: 1 tool-mediated and
 # snapshotted; 2 shell; 3 subagent-delegated; 4 external. Shell that can reach
 # the network or a credential is class 4; only proven default-deny egress
-# downgrades to 2. Unknown tools are class 4.
+# downgrades to 2. Unknown tools, and unknown effect classes, are class 4.
 ReversibilityClass = Literal[1, 2, 3, 4]
 ToolFamily = Literal["file", "shell", "subagent", "external"]
 REGISTERED_TOOLS: dict[tuple[str, str], ToolFamily] = {
@@ -45,16 +45,17 @@ REGISTERED_TOOLS: dict[tuple[str, str], ToolFamily] = {
     ("mcp", "filesystem"): "file",
     ("connection", "github"): "external",
 }
-_OUTWARD_EFFECTS = frozenset(
-    {
-        "network.call",
-        "message.send",
-        "content.publish",
-        "external.change",
-        "money.commit",
-        "authority.change",
-    }
-)
+# The three effect classes whose reach stays inside the admitted root, so the
+# tool family decides the class. Named as the contained set rather than as an
+# outward denylist, so that an effect class this module has never heard of — a
+# new one in effects.EFFECT_CLASSES, a misspelt one, or embodiment's own
+# `physical.actuate` — is class 4 by default. A denylist fails open on exactly
+# the effects that matter most. `process.run` is contained but not reversible:
+# terminating a process is containment, not undo, which is why the file family
+# rejects it and only a proven-sandboxed shell carries it at class 2.
+# Source: docs/superpowers/specs/2026-08-22-action-surface.md, class-level
+# reversibility table and its least-recoverable-atom rule. [cited]
+LOCALLY_CONTAINED_EFFECTS = frozenset({"data.read", "file.change", "process.run"})
 
 _KINDS = frozenset(CAPABILITY_KINDS)
 _KIND_ORDER: dict[CapabilityKind, int] = {
@@ -441,13 +442,14 @@ def classify_reversibility(
     default_deny_egress_proven: bool = False,
     credential_reach: bool = False,
 ) -> ReversibilityClass:
-    """Return rewind class 1–4; unknown or egress-capable shell is 4."""
+    """Return rewind class 1-4; an unknown tool, an unknown effect class or an
+    egress-capable shell is 4."""
 
     family = REGISTERED_TOOLS.get((kind, name))
     if family is None:
         return 4
     declared = frozenset(effect_classes)
-    if declared & _OUTWARD_EFFECTS:
+    if declared - LOCALLY_CONTAINED_EFFECTS:
         return 4
     if family == "shell":
         if credential_reach or not default_deny_egress_proven:
