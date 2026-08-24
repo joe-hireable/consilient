@@ -29,7 +29,6 @@ import os
 import re
 import sys
 import time
-import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -2985,6 +2984,27 @@ def bypassed(directory: Path) -> list[tuple[str, int]]:
     """
     out: list[tuple[str, int]] = []
     for path in sorted(directory.glob("*.jsonl")):
+        # MEASURED 24 August 2026. Windows denies a reader while a writer holds the file, and
+        # roughly twenty agents append here continuously, so this raised PermissionError and
+        # failed the suite -- which then blocked retirement, merging and publication at once.
+        # `read()` above already retries for exactly this reason; this path was written without
+        # it. Same bound, same backoff, and the same refusal to report a partial trajectory:
+        # after the last attempt it raises rather than returning a short list, because a
+        # bypass check that silently sees fewer lines reports fewer bypasses.
+        for attempt in range(_READ_RETRIES):
+            try:
+                with path.open(encoding="utf-8") as probe:
+                    probe.read(0)
+                break
+            except PermissionError as exc:
+                if attempt == _READ_RETRIES - 1:
+                    raise EventError(
+                        f"{path} could not be read after {_READ_RETRIES} attempts: observed "
+                        f"access denial ({exc}); it may be held by another process. The "
+                        "trajectory is never partially reported -- refusing rather than "
+                        "continuing against an incomplete history."
+                    ) from exc
+                time.sleep(_READ_BACKOFF * (2**attempt))
         with path.open(encoding="utf-8") as fh:
             for number, line in enumerate(fh, start=1):
                 line = line.rstrip("\n")
