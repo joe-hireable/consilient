@@ -407,3 +407,81 @@ def test_cpu_below_clock_resolution_is_flagged_not_reported_as_zero(bench):
         concurrencies=(1,),
     )
     assert honest["by_concurrency"]["1"]["cpu_below_clock_resolution"] is False
+
+
+# --- The two defects found on 24 August 2026, each with the check that stops it ---
+#
+# 1. `rss_kb_per_stream` still falls as ~1/N on the default in-process hooks, because
+#    the marginal numerator is per-cell fixed cost. A per-stream figure that shrinks
+#    when N rises is a fixed cost divided by N, and cannot be read against the 96 kB
+#    target. It is now flagged in the payload rather than left to be misread.
+# 2. The module docstring carried a figure ("ClawRouters 18 ms behind") that neither
+#    named source states. Every citation in this module now declares its verification
+#    flag and its retrieval date, so a figure cannot be attributed without a fetch.
+
+CITATION_FLAGS = ("FULL", "ABS", "SNIP", "2ND")
+
+
+def test_rss_fixed_cost_over_n_is_flagged_not_silently_divided(bench):
+    """Constant cell growth over a swept N is fixed cost, and must say so."""
+    report = bench.run_meter(
+        hooks=_hooks(bench, rss_kb=1600.0, baseline_rss_kb=0.0),
+        min_samples=1,
+        n_runs=3,
+        concurrencies=(1, 10, 100),
+    )
+    means = {
+        n: cell["rss_kb_per_stream"]["mean"]
+        for n, cell in report["by_concurrency"].items()
+    }
+    assert means["100"] * 2.0 < means["1"], means
+    assert report["rss_fixed_cost_dominates"] is True
+
+
+def test_rss_flag_is_false_when_the_cost_is_genuinely_per_stream(bench):
+    """A cell whose growth scales with N reports a flat per-stream figure, no flag."""
+    per_stream = {str(n): {"rss_kb_per_stream": {"mean": 80.0}} for n in (1, 10, 100)}
+    assert bench.rss_fixed_cost_dominates(per_stream) is False
+
+    fixed = {str(n): {"rss_kb_per_stream": {"mean": 1600.0 / n}} for n in (1, 10, 100)}
+    assert bench.rss_fixed_cost_dominates(fixed) is True
+
+    # One concurrency cannot show a slope, so it cannot claim one either.
+    assert (
+        bench.rss_fixed_cost_dominates({"1": {"rss_kb_per_stream": {"mean": 9.0}}})
+        is False
+    )
+
+
+def test_default_meter_reports_the_rss_flag(bench):
+    """The flag is derived from the payload on every run, not only under injection."""
+    report = bench.run_meter(min_samples=1, n_runs=2, concurrencies=(1, 10))
+    assert isinstance(report["rss_fixed_cost_dominates"], bool)
+
+
+def test_every_citation_carries_a_verification_flag_and_a_retrieval_date(bench):
+    """`citing-sources`: a source is fetched and dated, or it is not `[cited]` here.
+
+    The defect this replaces attributed "ClawRouters 18 ms behind" to two sources,
+    neither of which states it. A flag forces the fetch that would have caught it.
+    """
+    doc = bench.__doc__ or ""
+    citations = [
+        line for line in doc.splitlines() if "[cited:" in line or "[cited," in line
+    ]
+    assert citations, "the bar is recorded in the docstring or it is not recorded"
+    for line in citations:
+        tail = doc[doc.index(line) :]
+        window = tail[: tail.index("]") + 1] if "]" in tail else tail
+        assert any(flag in window for flag in CITATION_FLAGS), (
+            f"citation without a verification flag: {window!r}"
+        )
+        assert "retrieved" in window.lower(), (
+            f"citation without a retrieval date: {window!r}"
+        )
+
+
+def test_withdrawn_figure_is_not_reintroduced(bench):
+    """The specific unsupported number, named so its return is a test failure."""
+    doc = bench.__doc__ or ""
+    assert "18 ms" not in doc or "withdrawn" in doc.lower()
