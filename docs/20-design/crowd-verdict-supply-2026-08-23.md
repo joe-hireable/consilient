@@ -25,6 +25,25 @@ section and is 10% of the corpus by construction.
 
 ---
 
+## Decision, 24 August 2026
+
+**Joe chose option (a): build the signing subset only.**
+
+What is built: `ssh-keygen -Y` signature identity, with a verdict's principal **derived from the
+signature** rather than declared by the caller. That closes the hole ADR-0080 recorded, where a
+local agent process can write a syntactically valid declared-principal verdict. It is worth doing
+whether or not a contributor ever arrives, because the forgeable boundary exists today. Dispatched
+as unit CB1.
+
+What is NOT built, and should not be started without a new decision: WebAuthn relying-party
+hosting, expertise verification, Dawid-Skene rater fusion, gold-item seeding, Sybil resistance, and
+the contributor-facing probe surface. The specification argues against each of them at this stage
+and the argument holds: the gate they would feed was retired the same day they were proposed, and
+there is no crowd — 495 commits, one human author.
+
+**The condition that would reopen this:** actual contributors. Not a release, not interest —
+people submitting verdicts. Until then the remaining units are documented and unbuilt.
+
 # Specification: `crowd_panel_beta` — a public verdict-supply channel that never gates
 
 British English throughout. Every claim tagged `[measured]` (read from this tree), `[cited]` (published source), `[simulated]` (arithmetic I or another agent ran), `[asserted]` (judgement, no evidence).
