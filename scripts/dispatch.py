@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import shlex
@@ -34,12 +35,11 @@ import sys
 import tempfile
 import time
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -107,6 +107,7 @@ DEFAULT_PERMISSIONS = ROOT / ".harness" / "permissions.json"
 DEFAULT_ALLOWED_CWDS = ROOT / ".harness" / "allowed-cwds.json"
 DEFAULT_CURSOR_LOCK = ROOT / ".harness" / "cursor-agent.lock"
 DEFAULT_SKILLS = ROOT / ".agents" / "skills"
+HELDOUT_ISOLATION_CHECKER = ROOT / ".github" / "scripts" / "check_heldout_isolation.py"
 CURSOR_WSL_BINARY = Path("/home/jpbpr/.local/bin/cursor-agent")
 GROK_CANDIDATES = (
     Path.home() / ".grok" / "bin" / "grok.exe",
@@ -153,6 +154,18 @@ class RunResult:
     stdout_path: str
     stderr_path: str
     request_timing: object | None = None
+
+
+def heldout_contract_refusal(contract: str) -> str:
+    spec = importlib.util.spec_from_file_location(
+        "check_heldout_isolation", HELDOUT_ISOLATION_CHECKER
+    )
+    if spec is None or spec.loader is None:
+        return "held-out isolation checker is unavailable; refusing before child launch"
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+    refusal_reason = cast(Callable[[str], str], checker.refusal_reason)
+    return refusal_reason(contract)
 
 
 def record_dispatch_error(log_dir: Path, result: RunResult) -> None:
@@ -2441,6 +2454,10 @@ def build_parser() -> argparse.ArgumentParser:
         "dispatch claiming an overlapping path is refused. Claims are trajectory events "
         "with an expiry (timeout + grace), so a crashed dispatcher cannot hold one.",
     )
+    parser.add_argument(
+        "--heldout-contract",
+        help="held-out contract path; refused until dispatch gains real isolation",
+    )
     parser.add_argument("--timeout", type=positive_int, default=DEFAULT_TIMEOUT_S)
     parser.add_argument("--max-turns", type=positive_int, default=DEFAULT_MAX_TURNS)
     parser.add_argument("--max-tokens", type=positive_int, default=DEFAULT_MAX_TOKENS)
@@ -2480,6 +2497,15 @@ def main(argv: list[str] | None = None) -> int:
             runs_dir=Path(args.runs).resolve(),
             as_json=args.json,
         )
+    if args.heldout_contract is not None:
+        emit(
+            {
+                "status": "refused",
+                "reason": heldout_contract_refusal(args.heldout_contract),
+            },
+            args.json,
+        )
+        return 2
     try:
         cwd = resolve_cwd(args.cwd)
     except ValueError as exc:
