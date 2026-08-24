@@ -349,6 +349,81 @@ def test_from_connection_honours_sampling_unconditioned_argument(
     conn.close()
 
 
+# Closed candidate vocabulary this repository already names as a verdict channel.
+# Infinite strings cannot be enumerated; these are every via the writer, the
+# projection, ADR-0041 transports, ADR-0080, or crowd-verdict-supply U3 has named.
+_CANDIDATE_VIAS = (
+    "cli",
+    " CLI ",
+    "Cli",
+    "phone_webauthn",
+    "ssh_sig",
+    "slack",
+    "sms",
+    "email",
+    "webhook",
+    "twilio",
+    "gmail",
+    "unknown",
+)
+
+
+def test_every_via_the_writer_accepts_is_admitted_through_append_build_beta(
+    tmp_path: Path,
+) -> None:
+    """AM / T34: every via append accepts must survive build into beta admission.
+
+    Lands red while V0-28 accepts only ``cli`` and ``_verdict_auth_status``
+    authenticates only ``phone_webauthn``. That disagreement is the β seam.
+    """
+    log_dir = tmp_path / "log"
+    db = tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    accepted: list[tuple[str, str]] = []
+    for index, via in enumerate(_CANDIDATE_VIAS):
+        attempt = f"seam-{index:03d}"
+        append(path, _outcome(attempt, f"task-{index}", True))
+        try:
+            append(path, _verdict(attempt, "reject", via=via))
+        except events_mod.EventError:
+            continue
+        accepted.append((attempt, via))
+
+    assert accepted, (
+        "the candidate vocabulary named no via the writer accepts; "
+        "the enumerator is incomplete, not the seam"
+    )
+
+    conn = projection.build(log_dir, db)
+    by_attempt = {
+        str(attempt_id): {
+            "estimand_kind": estimand,
+            "auth_status": auth,
+        }
+        for attempt_id, estimand, auth in conn.execute(
+            "SELECT attempt_id, estimand_kind, auth_status FROM outcomes"
+        )
+    }
+    admitted_vias = [
+        via
+        for attempt, via in accepted
+        if beta_mod.admits_human_beta_row(by_attempt.get(attempt, {}))
+    ]
+    beta_result = beta_mod.from_connection(conn)
+    conn.close()
+
+    accepted_vias = [via for _, via in accepted]
+    assert admitted_vias, (
+        f"writer accepted {accepted_vias!r}; beta admitted none "
+        f"(n_rejected={beta_result.n_rejected}). The seam: V0-28 accepts only "
+        "cli, which projects as declared_principal; phone_webauthn would "
+        "authenticate and is refused at append."
+    )
+    assert beta_result.n_rejected >= 1
+
+
 def test_missing_component_join_quarantined_when_verification_exists(
     tmp_path: Path,
 ) -> None:
