@@ -236,11 +236,11 @@ That is expected, not a fault: the harness refuses metered calls until **you** c
 shape to an instance file the repository never tracks:
 
 ```powershell
-Copy-Item .harness\limits.example.json .harness\limits.json
+Copy-Item .harness\limits-removed.example.json .harness\limits.json
 # edit .harness\limits.json with your numbers — never commit it
 ```
 
-`[measured]` `.harness/limits.example.json` is tracked; `.harness/limits.json` is gitignored.
+`[measured]` `.harness/limits-removed.example.json` is tracked; `.harness/limits.json` is gitignored.
 Until you create the instance file, `ceilings: NONE` is the honest report.
 
 ---

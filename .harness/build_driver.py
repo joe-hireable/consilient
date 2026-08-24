@@ -1429,10 +1429,23 @@ def main() -> int:
         if _subject and sh(
             ["git", "log", "--format=%H", "--fixed-strings", "--grep", _subject, "HEAD"]
         ).stdout.split():
+            # Record it as BUILT, not force_done. MEASURED 24 August 2026: force_done is written
+            # here and read nowhere -- `done` is derived from consumed review receipts alone --
+            # so the conflict was popped and then RE-ADDED by the merge loop later in the same
+            # tick, which still had the unit in `mergeable`. Eight units cycled that way
+            # indefinitely. `built` is the set the merge loop actually skips, and it is the
+            # honest description: the work IS in the tree, it simply has not been verified.
+            #
+            # This also reconciles two detectors that disagreed by construction. `committed()`
+            # prefix-matches the subject the PLAN specifies; this loop matches the subject the
+            # cherry-picked COMMIT carries. Six of eight units had landed under a subject the
+            # agent chose rather than the one the plan named -- AT's plan says "admit ssh-signed
+            # verdicts", it landed as "recognise signed ssh_sig verdicts as authenticated" -- so
+            # committed() said no while this loop said yes. Only this loop was right.
             conflicts.pop(_uid, None)
-            state.setdefault("force_done", [])
-            if _uid not in state["force_done"]:
-                state["force_done"].append(_uid)
+            state.setdefault("built", [])
+            if _uid not in state["built"]:
+                state["built"].append(_uid)
             if _uid in state.setdefault("resolve_dispatched", []):
                 state["resolve_dispatched"].remove(_uid)
             print(

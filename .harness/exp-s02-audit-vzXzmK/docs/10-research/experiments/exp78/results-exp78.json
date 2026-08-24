@@ -1,0 +1,517 @@
+{
+  "experiment": "EXP-78",
+  "complete": false,
+  "verdict": "insufficient_evidence",
+  "n_candidates": 48,
+  "n_true_defect": 24,
+  "n_equivalent": 24,
+  "n_unclassifiable": 0,
+  "operator_families": [
+    "comparison",
+    "boolean_logical",
+    "binary_arithmetic",
+    "unary",
+    "constant_literal",
+    "statement"
+  ],
+  "production": {
+    "verdict": "insufficient_evidence",
+    "n": 24,
+    "false_accepts": 0,
+    "point": null,
+    "interval": null
+  },
+  "counterfactual": {
+    "verdict": "insufficient_evidence",
+    "n": 24,
+    "false_accepts": 0,
+    "point": null,
+    "interval": null
+  },
+  "live_beta_verdict": "insufficient_data",
+  "live_beta_n_rejected": 0,
+  "routing_orchestration_enabled_touched": false,
+  "loop_open": false,
+  "rows": [
+    {
+      "id": "helpful",
+      "family": "parent",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "harmful",
+      "family": "goodhart",
+      "class": "true_defect",
+      "training": 0.6,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-0",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-1",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-2",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-3",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-4",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-5",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-6",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-7",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-comparison-8",
+      "family": "comparison",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-boolean_logical-9",
+      "family": "boolean_logical",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-10",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-11",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.2,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-12",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-13",
+      "family": "binary_arithmetic",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-14",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.2,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-15",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-16",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.2,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-17",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.2,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-18",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.2,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-19",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-20",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.2,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-binary_arithmetic-21",
+      "family": "binary_arithmetic",
+      "class": "true_defect",
+      "training": 0.2,
+      "heldout": 0.2,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-unary-22",
+      "family": "unary",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-unary-23",
+      "family": "unary",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-unary-24",
+      "family": "unary",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-unary-25",
+      "family": "unary",
+      "class": "true_defect",
+      "training": 0.0,
+      "heldout": 0.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-26",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-27",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-28",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-29",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-30",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-31",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-32",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-33",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-34",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-35",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-36",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-37",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-38",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-39",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-40",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-41",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-42",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-43",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-44",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    },
+    {
+      "id": "mut-constant_literal-45",
+      "family": "constant_literal",
+      "class": "equivalent",
+      "training": 1.0,
+      "heldout": 1.0,
+      "ran": true,
+      "production": "disabled",
+      "counterfactual": "beta_above_threshold"
+    }
+  ]
+}
