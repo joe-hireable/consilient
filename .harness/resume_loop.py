@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 STATE = ROOT / ".harness" / "driver-state.json"
 STOP = ROOT / ".harness" / "STOP-LOOP"
 LOG = ROOT / ".harness" / "resume-loop.log"
-FORCE_DONE = ["T01", "AM"]
+FORCE_DONE = ["T01", "AM", "A03", "AD", "AH", "G01", "N00", "Q01", "X05", "Y02"]
 
 
 def loop_alive() -> bool:

@@ -1187,6 +1187,26 @@ def main() -> int:
             conflicts.pop(_uid, None)
             print(f"driver: {_uid} conflict cleared -- already in the tree")
             continue
+        # A unit dispatched twice -- a retry after its slot was reclaimed -- builds twice. One
+        # attempt merges and the driver goes on retrying the OTHER sha for ever, because work is
+        # identified here by commit id rather than by what the commit says. MEASURED 24 August
+        # 2026: NINE of twelve units reported as unmergeable had already landed under a different
+        # sha with an identical subject, including T01, which gates 22 units and had been
+        # "blocked" for hours on a merge that had already happened.
+        _subject = sh(["git", "log", "-1", "--format=%s", _sha]).stdout.strip()
+        if _subject and sh(
+            ["git", "log", "--format=%H", "--fixed-strings", "--grep", _subject, "HEAD"]
+        ).stdout.split():
+            conflicts.pop(_uid, None)
+            state.setdefault("force_done", [])
+            if _uid not in state["force_done"]:
+                state["force_done"].append(_uid)
+            if _uid in state.setdefault("resolve_dispatched", []):
+                state["resolve_dispatched"].remove(_uid)
+            print(
+                f"driver: {_uid} already landed under another sha ({_subject[:48]!r}); retiring"
+            )
+            continue
         if sh(["git", "merge-tree", "--write-tree", "--name-only", "HEAD", _sha]).stdout.count(
             "CONFLICT"
         ) == 0:
