@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import importlib.util
 import json
 import os
@@ -14,10 +13,17 @@ from pathlib import Path
 import pytest
 
 from consilient.promote import (
+    CONTAINMENT_DENIED,
+    CONTAINMENT_PROBE_SOURCE,
+    CONTAINMENT_SOCKET_ESCAPED,
+    CONTAINMENT_SOCKET_PROMPT,
+    CONTAINMENT_WRITE_ESCAPED,
+    CONTAINMENT_WRITE_PROMPT,
     AdverseTable,
     CandidateInstrumentView,
     EvaluationPackage,
     EvaluationRefusal,
+    ExecuteFn,
     LineageRegistry,
     SealedManifest,
     candidate_visible,
@@ -103,6 +109,20 @@ def _adverse(**overrides: int) -> AdverseTable:
     return AdverseTable(**base)
 
 
+def _contained_execute(
+    source: str, prompts: list[str]
+) -> tuple[bool, list[str | None]]:
+    """Test double: report the probe denied, then run the candidate for real.
+
+    A sandbox that actually blocked socket bind and out-of-scratch write would
+    return these denials from the probe payload itself. This double stands in
+    for that sandbox so scoring tests can still exercise the sealed instrument.
+    """
+    if source == CONTAINMENT_PROBE_SOURCE:
+        return True, [CONTAINMENT_DENIED] * len(prompts)
+    return _run_candidate(source, prompts)
+
+
 def _evaluate(
     manifest: SealedManifest,
     *,
@@ -113,12 +133,13 @@ def _evaluate(
     contained: bool = True,
     scratch_preimage: str = "scratch-before",
     scratch_postimage: str = "scratch-before",
+    execute: ExecuteFn | None = None,
 ) -> EvaluationPackage | EvaluationRefusal:
     return evaluate_sealed(
         manifest,
         candidate_source=candidate,
         baseline_source=baseline,
-        execute=_run_candidate,
+        execute=_contained_execute if execute is None else execute,
         registry=registry or LineageRegistry(),
         adverse=adverse or _adverse(),
         contained=contained,
@@ -360,6 +381,82 @@ def test_uncontained_real_candidate_records_candidate_unexecutable():
     assert result.reason == "candidate_unexecutable"
 
 
+def test_claimed_containment_does_not_skip_the_execute_probe():
+    """A caller-supplied contained=True is not evidence. The probe is."""
+    seen: list[tuple[str, tuple[str, ...]]] = []
+
+    def execute(source: str, prompts: list[str]) -> tuple[bool, list[str | None]]:
+        seen.append((source, tuple(prompts)))
+        return True, [CONTAINMENT_DENIED] * len(prompts)
+
+    manifest = _manifest()
+    result = _evaluate(
+        manifest,
+        candidate=_exp78("helpful.py"),
+        baseline=_exp78("solver.py"),
+        execute=execute,
+        contained=True,
+    )
+    assert seen, "evaluate_sealed never called execute"
+    assert seen[0][0] == CONTAINMENT_PROBE_SOURCE
+    assert seen[0][1] == (CONTAINMENT_SOCKET_PROMPT, CONTAINMENT_WRITE_PROMPT)
+    assert isinstance(result, EvaluationPackage)
+
+
+def test_socket_escape_through_execute_is_candidate_unexecutable():
+    def execute(source: str, prompts: list[str]) -> tuple[bool, list[str | None]]:
+        if list(prompts) == [CONTAINMENT_SOCKET_PROMPT, CONTAINMENT_WRITE_PROMPT]:
+            return True, [CONTAINMENT_SOCKET_ESCAPED, CONTAINMENT_DENIED]
+        raise AssertionError("scored a candidate after a socket escape")
+
+    manifest = _manifest()
+    result = _evaluate(
+        manifest,
+        candidate=_exp78("helpful.py"),
+        baseline=_exp78("solver.py"),
+        execute=execute,
+        contained=True,
+    )
+    assert isinstance(result, EvaluationRefusal)
+    assert result.reason == "candidate_unexecutable"
+
+
+def test_out_of_scratch_write_through_execute_is_candidate_unexecutable():
+    def execute(source: str, prompts: list[str]) -> tuple[bool, list[str | None]]:
+        if list(prompts) == [CONTAINMENT_SOCKET_PROMPT, CONTAINMENT_WRITE_PROMPT]:
+            return True, [CONTAINMENT_DENIED, CONTAINMENT_WRITE_ESCAPED]
+        raise AssertionError("scored a candidate after an out-of-scratch write")
+
+    manifest = _manifest()
+    result = _evaluate(
+        manifest,
+        candidate=_exp78("helpful.py"),
+        baseline=_exp78("solver.py"),
+        execute=execute,
+        contained=True,
+    )
+    assert isinstance(result, EvaluationRefusal)
+    assert result.reason == "candidate_unexecutable"
+
+
+def test_real_execute_path_escape_is_candidate_unexecutable():
+    """The isolated child can still bind a socket and write outside scratch.
+
+    That is the measured residual after Y02 process isolation. Scoring through
+    that path is a false accept of an uncontained candidate.
+    """
+    manifest = _manifest()
+    result = _evaluate(
+        manifest,
+        candidate=_exp78("helpful.py"),
+        baseline=_exp78("solver.py"),
+        execute=_run_candidate,
+        contained=True,
+    )
+    assert isinstance(result, EvaluationRefusal)
+    assert result.reason == "candidate_unexecutable"
+
+
 def test_record_evaluation_appends_without_activation_fields(tmp_path: Path):
     manifest = _manifest()
     package = _evaluate(
@@ -408,11 +505,10 @@ def test_promote_loop_evaluate_only_runs_scratch_reversal(tmp_path: Path):
         timeout=30,
         check=False,
     )
-    assert completed.returncode == 0, completed.stderr
+    assert completed.returncode == 2, completed.stderr
     payload = json.loads(completed.stdout)
-    assert payload["action"] == "evaluated"
-    assert payload["qualification_accept"] is True
-    assert payload["reversal_match"] is True
+    assert payload["action"] == "refused"
+    assert payload["reason"] == "candidate_unexecutable"
     assert payload["applied"] is False
     assert payload["activated"] is False
     assert marker.read_text(encoding="utf-8") == "parent"
@@ -452,5 +548,5 @@ def test_promote_loop_goodhart_refuses_without_mutating_scratch(tmp_path: Path):
     assert completed.returncode == 2, completed.stderr
     payload = json.loads(completed.stdout)
     assert payload["action"] == "refused"
-    assert payload["reason"] == "goodhart_improvement"
+    assert payload["reason"] == "candidate_unexecutable"
     assert marker.read_text(encoding="utf-8") == "parent"

@@ -877,3 +877,39 @@ def test_refuse_only_ast_guard_has_a_failing_negative_control(source):
 def test_product_tree_ast_guard_has_a_failing_negative_control(source):
     with pytest.raises(AssertionError, match="forbidden capability"):
         assert_refuse_only(source, product_module=True)
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "import socket\nsocket.socket().bind(('127.0.0.1', 0))",
+        "from socket import socket as bound\nbound().listen(1)",
+        "import subprocess\nsubprocess.Popen(['python'])",
+        "from urllib.request import urlopen\nurlopen('https://example.invalid')",
+        "import ftplib\nftplib.FTP('example.invalid')",
+        "import webbrowser\nwebbrowser.open('https://example.invalid')",
+    ),
+)
+def test_containment_escape_capabilities_fail_the_product_ast_guard(source):
+    """Six probes: the sealed-instrument escapes must not be product imports."""
+    with pytest.raises(AssertionError, match="forbidden capability"):
+        assert_refuse_only(source, product_module=True)
+
+
+def test_promote_containment_probe_is_a_payload_string_not_a_product_import():
+    source = Path("src/consilient/promote.py").read_text(encoding="utf-8")
+    assert_refuse_only(source, product_module=True)
+    tree = ast.parse(source)
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    assert "socket" not in imported
+    assert "subprocess" not in imported
+    assert "tempfile" not in imported
+    from consilient.promote import CONTAINMENT_PROBE_SOURCE
+
+    assert '__import__("socket")' in CONTAINMENT_PROBE_SOURCE
+    assert "write_outside_scratch" in CONTAINMENT_PROBE_SOURCE

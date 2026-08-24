@@ -928,6 +928,67 @@ def _batch_is_retired(
 
 ExecuteFn = Callable[[str, Sequence[str]], tuple[bool, Sequence[str | None]]]
 
+CONTAINMENT_SOCKET_PROMPT = "containment.socket.bind"
+CONTAINMENT_WRITE_PROMPT = "containment.fs.write_outside_scratch"
+CONTAINMENT_DENIED = "denied"
+CONTAINMENT_SOCKET_ESCAPED = "escaped:socket-bound"
+CONTAINMENT_WRITE_ESCAPED = "escaped:write-outside-scratch"
+
+# Executed through the same `execute` callable as the candidate. A contained
+# path returns CONTAINMENT_DENIED for both prompts; a socket bind or a write
+# outside scratch returns the matching escaped sentinel. This is a payload,
+# not a product import: src/consilient stays AST-locked.
+CONTAINMENT_PROBE_SOURCE = f"""\
+def solve(prompt):
+    if prompt == {CONTAINMENT_SOCKET_PROMPT!r}:
+        try:
+            sock = __import__("socket").socket()
+            try:
+                sock.bind(("127.0.0.1", 0))
+                sock.getsockname()
+            finally:
+                sock.close()
+            return {CONTAINMENT_SOCKET_ESCAPED!r}
+        except OSError:
+            return {CONTAINMENT_DENIED!r}
+    if prompt == {CONTAINMENT_WRITE_PROMPT!r}:
+        os_mod = __import__("os")
+        tempfile_mod = __import__("tempfile")
+        path = os_mod.path.join(
+            tempfile_mod.gettempdir(),
+            "consilient-promote-escape-probe",
+        )
+        try:
+            handle = open(path, "w", encoding="utf-8")
+            try:
+                handle.write("escaped")
+            finally:
+                handle.close()
+            if not os_mod.path.isfile(path):
+                return {CONTAINMENT_DENIED!r}
+            return {CONTAINMENT_WRITE_ESCAPED!r}
+        except OSError:
+            return {CONTAINMENT_DENIED!r}
+        finally:
+            try:
+                os_mod.remove(path)
+            except OSError:
+                pass
+    return {CONTAINMENT_DENIED!r}
+"""
+
+
+def execute_path_is_contained(execute: ExecuteFn) -> bool:
+    """True only when the execute path denied socket bind and out-of-scratch write."""
+    ran, outputs = execute(
+        CONTAINMENT_PROBE_SOURCE,
+        (CONTAINMENT_SOCKET_PROMPT, CONTAINMENT_WRITE_PROMPT),
+    )
+    if not ran or len(outputs) != 2:
+        return False
+    socket_out, write_out = outputs
+    return socket_out == CONTAINMENT_DENIED and write_out == CONTAINMENT_DENIED
+
 
 def _execute_and_score(
     execute: ExecuteFn,
@@ -975,6 +1036,8 @@ def evaluate_sealed(
         return EvaluationRefusal(INSTRUMENT_UNSEALED, detail=",".join(forbidden))
     if scratch_postimage_digest != scratch_preimage_digest:
         return EvaluationRefusal(REVERSAL_MISMATCH)
+    if not execute_path_is_contained(execute):
+        return EvaluationRefusal(CANDIDATE_UNEXECUTABLE)
 
     ran_before, development_before = _execute_and_score(
         execute, baseline_source, manifest.development_tasks
