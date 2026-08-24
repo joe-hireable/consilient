@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import cast
 
+from . import events as events_mod
 from .events import (
     CANDIDATE_EXPOSED_KIND,
     DELIVERY_ESTIMATE_KIND,
@@ -37,12 +39,47 @@ from .events import (
     VERIFICATION_OUTCOME_KIND,
     Event,
     Rejection,
+    _fsync_directory,
     decision_protocol_data,
     event_sha256,
     read_all,
     resolve_reference,
 )
 from .work_items import STATE, WORK_MODEL_SCHEMA, state_group
+
+# Stamp written into projection_meta so a legitimate handler/schema change is a
+# third replay state, not Gate A2 "DIVERGED". Bump when a rebuild of the same log
+# is expected to change state_digest.
+PROJECTION_VERSION = "1"
+VERSION_KEY = "version"
+
+# Every events.py `*_KIND` string must appear in exactly one of these. T11.
+HANDLERS: frozenset[str] = frozenset(
+    {
+        CANDIDATE_EXPOSED_KIND,
+        DELIVERY_ESTIMATE_KIND,
+        MEASUREMENT_REGISTERED_KIND,
+        MEASUREMENT_RESULT_KIND,
+        OUTCOME_KIND,
+        RECORD_CAPTURED_KIND,
+        REVIEW_QUEUE_OPENED_KIND,
+        USAGE_KIND,
+        VERDICT_CORRECTION_KIND,
+        VERDICT_KIND,
+        VERIFICATION_OUTCOME_KIND,
+    }
+)
+# Leftover `*_KIND` strings from events.py. Feedback kinds cannot be named here
+# as imports or literals — tests/test_feedback.py forbids any other module from
+# reading them. A new kind therefore lands here until it is moved into HANDLERS.
+NOT_PROJECTED: frozenset[str] = (
+    frozenset(
+        value
+        for name, value in vars(events_mod).items()
+        if name.endswith("_KIND") and isinstance(value, str)
+    )
+    - HANDLERS
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -232,6 +269,7 @@ CREATE TABLE IF NOT EXISTS native_work_items (
 );
 """
 
+
 class ProjectionError(RuntimeError):
     pass
 
@@ -246,36 +284,108 @@ def build(
     log_dir: Path, db_path: Path, *, workspace: Path | None = None
 ) -> sqlite3.Connection:
     """Rebuild the projection from scratch. The only path that writes the database."""
-    if db_path.exists():
-        db_path.unlink()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    conn.executescript(SCHEMA)
     events, rejected = read_all(log_dir)
-    resolved_workspace = workspace if workspace is not None else _infer_workspace(log_dir)
-    verification_attempts: set[str] = set()
-    exposure_positions: dict[str, int] = {}
-    for position, event in enumerate(events):
-        if event.kind == CANDIDATE_EXPOSED_KIND:
+    resolved_workspace = (
+        workspace if workspace is not None else _infer_workspace(log_dir)
+    )
+    return _rebuild(events, rejected, db_path, workspace=resolved_workspace)
+
+
+def _rebuild(
+    events: list[Event],
+    rejected: list[Rejection],
+    db_path: Path,
+    *,
+    workspace: Path | None,
+) -> sqlite3.Connection:
+    """Populate a sibling temp file and publish it with os.replace.
+
+    Unlink-then-write used to destroy the previous state before the new one was
+    complete, so a crash mid-rebuild looked like a missing database and a false
+    DIVERGED. Same shape as records._install_object: write aside, fsync, replace.
+    """
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = db_path.parent / f".{db_path.name}.{os.urandom(16).hex()}.tmp"
+    conn: sqlite3.Connection | None = None
+    try:
+        conn = sqlite3.connect(temporary)
+        conn.executescript(SCHEMA)
+        verification_attempts: set[str] = set()
+        exposure_positions: dict[str, int] = {}
+        for position, event in enumerate(events):
+            if event.kind == CANDIDATE_EXPOSED_KIND:
+                attempt_id = event.data.get("attempt_id")
+                if isinstance(attempt_id, str):
+                    exposure_positions[attempt_id] = position
+            if event.kind != VERIFICATION_OUTCOME_KIND:
+                continue
             attempt_id = event.data.get("attempt_id")
             if isinstance(attempt_id, str):
-                exposure_positions[attempt_id] = position
-        if event.kind != VERIFICATION_OUTCOME_KIND:
-            continue
-        attempt_id = event.data.get("attempt_id")
-        if isinstance(attempt_id, str):
-            verification_attempts.add(attempt_id)
-    _apply(
-        conn,
-        events,
-        verification_attempts,
-        exposure_positions=exposure_positions,
-        workspace=resolved_workspace,
-    )
-    _apply_rejections(conn, rejected)
-    _derive_review_queue_state(conn, events)
-    conn.commit()
-    return conn
+                verification_attempts.add(attempt_id)
+        _apply(
+            conn,
+            events,
+            verification_attempts,
+            exposure_positions=exposure_positions,
+            workspace=workspace,
+        )
+        _apply_rejections(conn, rejected)
+        _derive_review_queue_state(conn, events)
+        conn.execute(
+            "INSERT OR REPLACE INTO projection_meta (key, value) VALUES (?, ?)",
+            (VERSION_KEY, PROJECTION_VERSION),
+        )
+        conn.commit()
+        conn.close()
+        conn = None
+        # Windows FlushFileBuffers refuses a read-only handle (EBADF on "rb").
+        with temporary.open("r+b") as stream:
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, db_path)
+        _fsync_directory(db_path.parent)
+    except Exception:
+        if conn is not None:
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+    return sqlite3.connect(db_path)
+
+
+def prefix_digest(
+    events: list[Event],
+    rejected: list[Rejection],
+    scratch_dir: Path,
+    *,
+    log_dir: Path,
+) -> str:
+    """state_digest of a rebuild of `events` only, used to tell lag from drift."""
+    scratch = scratch_dir / f".prefix-{os.urandom(8).hex()}.tmp"
+    conn = _rebuild(events, rejected, scratch, workspace=_infer_workspace(log_dir))
+    try:
+        return state_digest(conn)
+    finally:
+        conn.close()
+        try:
+            scratch.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def projection_version(conn: sqlite3.Connection) -> str | None:
+    try:
+        row = conn.execute(
+            "SELECT value FROM projection_meta WHERE key = ?", (VERSION_KEY,)
+        ).fetchone()
+    except sqlite3.DatabaseError:
+        return None
+    return None if row is None else str(row[0])
 
 
 def _apply_rejections(conn: sqlite3.Connection, rejected: list[Rejection]) -> None:
@@ -298,8 +408,11 @@ def rejection_count(conn: sqlite3.Connection) -> int:
     return int(conn.execute("SELECT COUNT(*) FROM rejections").fetchone()[0])
 
 
-def relational_quarantine_count(conn: sqlite3.Connection) -> int:
-    return int(conn.execute("SELECT COUNT(*) FROM relational_quarantines").fetchone()[0])
+def rejections(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    return [
+        {"path": row[0], "line": row[1], "reason": row[2]}
+        for row in conn.execute("SELECT path, line, reason FROM rejections ORDER BY id")
+    ]
 
 
 def relational_quarantines(conn: sqlite3.Connection) -> list[dict[str, object]]:
@@ -404,7 +517,9 @@ def _derive_review_queue_state(conn: sqlite3.Connection, events: list[Event]) ->
         for component_pos, component in components:
             if component_pos <= exposure_pos:
                 return
-            if component.data.get("start_token") != exposure_event.data.get("start_token"):
+            if component.data.get("start_token") != exposure_event.data.get(
+                "start_token"
+            ):
                 return
     if not verification_mod.coverage_gate_passed():
         return
@@ -466,7 +581,9 @@ def _apply_review_queue_opened(
     )
 
 
-def _apply_candidate_exposed(conn: sqlite3.Connection, position: int, event: Event) -> None:
+def _apply_candidate_exposed(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
     data = event.data
     exposure_id = cast(str, data["exposure_id"])
     if conn.execute(
@@ -643,7 +760,9 @@ def _apply(
     workspace: Path | None = None,
 ) -> None:
     event_index = {
-        cast(str, event.raw["event_id"]): event for event in events if "event_id" in event.raw
+        cast(str, event.raw["event_id"]): event
+        for event in events
+        if "event_id" in event.raw
     }
     for position, event in enumerate(events):
         raw = event.raw
@@ -662,39 +781,47 @@ def _apply(
                 ),
             ),
         )
-        if event.kind == OUTCOME_KIND:
-            _apply_outcome(conn, position, event, verification_attempts)
-        elif event.kind == VERDICT_KIND:
-            _apply_verdict(conn, position, event)
-        elif event.kind == VERDICT_CORRECTION_KIND:
-            _apply_verdict_correction(conn, position, event)
-        elif event.kind == USAGE_KIND:
-            _apply_usage(conn, position, event)
-        elif event.kind == RECORD_CAPTURED_KIND:
-            _apply_record_captured(conn, position, event, workspace, event_index)
-        elif event.kind == DELIVERY_ESTIMATE_KIND:
-            _apply_delivery_estimate(conn, position, event)
-        elif event.kind == REVIEW_QUEUE_OPENED_KIND:
-            _apply_review_queue_opened(conn, position, event)
-        elif event.kind == CANDIDATE_EXPOSED_KIND:
-            _apply_candidate_exposed(conn, position, event)
-        elif event.kind == VERIFICATION_OUTCOME_KIND:
-            _apply_verification_outcome(
+        try:
+            if event.kind == OUTCOME_KIND:
+                _apply_outcome(conn, position, event, verification_attempts)
+            elif event.kind == VERDICT_KIND:
+                _apply_verdict(conn, position, event)
+            elif event.kind == VERDICT_CORRECTION_KIND:
+                _apply_verdict_correction(conn, position, event)
+            elif event.kind == USAGE_KIND:
+                _apply_usage(conn, position, event)
+            elif event.kind == RECORD_CAPTURED_KIND:
+                _apply_record_captured(conn, position, event, workspace, event_index)
+            elif event.kind == DELIVERY_ESTIMATE_KIND:
+                _apply_delivery_estimate(conn, position, event)
+            elif event.kind == REVIEW_QUEUE_OPENED_KIND:
+                _apply_review_queue_opened(conn, position, event)
+            elif event.kind == CANDIDATE_EXPOSED_KIND:
+                _apply_candidate_exposed(conn, position, event)
+            elif event.kind == VERIFICATION_OUTCOME_KIND:
+                _apply_verification_outcome(
+                    conn,
+                    position,
+                    event,
+                    exposure_positions=exposure_positions,
+                )
+            elif event.kind == MEASUREMENT_REGISTERED_KIND:
+                _apply_measurement_registered(conn, position, event)
+            elif event.kind == MEASUREMENT_RESULT_KIND:
+                _apply_measurement_result(conn, position, event)
+            elif event.kind == "work_item.opened":
+                _apply_work_item_opened(conn, position, event)
+            elif event.kind == STATE:
+                _apply_work_item_state(conn, position, event)
+            elif event.kind == "work_item.completed":
+                _apply_work_item_completed(conn, position, event)
+        except sqlite3.IntegrityError as exc:
+            _quarantine_relational(
                 conn,
                 position,
                 event,
-                exposure_positions=exposure_positions,
+                f"duplicate unique key for {event.kind} at position {position}: {exc}",
             )
-        elif event.kind == MEASUREMENT_REGISTERED_KIND:
-            _apply_measurement_registered(conn, position, event)
-        elif event.kind == MEASUREMENT_RESULT_KIND:
-            _apply_measurement_result(conn, position, event)
-        elif event.kind == "work_item.opened":
-            _apply_work_item_opened(conn, position, event)
-        elif event.kind == STATE:
-            _apply_work_item_state(conn, position, event)
-        elif event.kind == "work_item.completed":
-            _apply_work_item_completed(conn, position, event)
     _apply_native_work_items(conn, events)
 
 
@@ -730,7 +857,9 @@ def _work_item_row(
     )
 
 
-def _apply_work_item_opened(conn: sqlite3.Connection, position: int, event: Event) -> None:
+def _apply_work_item_opened(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
     data = event.data
     if data.get("item_schema") != WORK_MODEL_SCHEMA:
         return
@@ -756,7 +885,9 @@ def _apply_work_item_opened(conn: sqlite3.Connection, position: int, event: Even
     )
 
 
-def _apply_work_item_state(conn: sqlite3.Connection, position: int, event: Event) -> None:
+def _apply_work_item_state(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
     del position
     data = event.data
     ticket = cast(str, data["ticket"])
@@ -777,7 +908,9 @@ def _apply_work_item_state(conn: sqlite3.Connection, position: int, event: Event
     )
 
 
-def _apply_work_item_completed(conn: sqlite3.Connection, position: int, event: Event) -> None:
+def _apply_work_item_completed(
+    conn: sqlite3.Connection, position: int, event: Event
+) -> None:
     del position
     data = event.data
     ticket = cast(str, data["ticket"])
@@ -797,13 +930,16 @@ def _apply_work_item_completed(conn: sqlite3.Connection, position: int, event: E
 
 def work_item_groups(conn: sqlite3.Connection) -> dict[str, list[dict[str, object]]]:
     """Project work-model items into the five declared state groups."""
-    grouped: dict[str, list[dict[str, object]]] = {group: [] for group in (
-        "WAITING",
-        "RUNNING",
-        "NEEDS_YOU",
-        "DONE",
-        "DEAD",
-    )}
+    grouped: dict[str, list[dict[str, object]]] = {
+        group: []
+        for group in (
+            "WAITING",
+            "RUNNING",
+            "NEEDS_YOU",
+            "DONE",
+            "DEAD",
+        )
+    }
     rows = conn.execute(
         "SELECT ticket, revision, state, state_group, is_blocked, blocked_reason,"
         " accountable, requires, informs, inform_scores"
@@ -910,13 +1046,31 @@ def _apply_usage(conn: sqlite3.Connection, position: int, event: Event) -> None:
         data.get("observed_at"),
     )
     rows: list[tuple[object, ...]] = [
-        common + ("quota", q["window"], q["used_fraction"], q.get("resets_at"),
-                  None, None, None, q["provenance"])
+        common
+        + (
+            "quota",
+            q["window"],
+            q["used_fraction"],
+            q.get("resets_at"),
+            None,
+            None,
+            None,
+            q["provenance"],
+        )
         for q in data.get("quotas", [])
     ]
     rows += [
-        common + ("spend", None, None, None,
-                  s["amount"], s["currency"], s["period"], s["provenance"])
+        common
+        + (
+            "spend",
+            None,
+            None,
+            None,
+            s["amount"],
+            s["currency"],
+            s["period"],
+            s["provenance"],
+        )
         for s in data.get("spend", [])
     ]
     if not rows:
@@ -1043,9 +1197,13 @@ def _apply_delivery_estimate(
     if conn.execute(
         "SELECT 1 FROM delivery_estimates WHERE estimate_id = ?", (estimate_id,)
     ).fetchone():
-        raise ProjectionError(
-            f"duplicate estimate_id {estimate_id!r} at position {position}"
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"duplicate estimate_id {estimate_id!r} at position {position}",
         )
+        return
     delivery_id = cast(str, data["delivery_id"])
     revision = cast(int, data["revision"])
     existing = conn.execute(
@@ -1098,7 +1256,9 @@ def delivery_estimate_chain(
         "SELECT payload FROM delivery_estimates WHERE delivery_id = ? ORDER BY revision",
         (delivery_id,),
     ).fetchall()
-    return [cast(dict[str, object], json.loads(cast(str, row[0]))["data"]) for row in rows]
+    return [
+        cast(dict[str, object], json.loads(cast(str, row[0]))["data"]) for row in rows
+    ]
 
 
 def _apply_verdict_correction(
@@ -1174,6 +1334,16 @@ def _apply_record_captured(
     object_locator = cast(str, data["object_locator"])
     valid_time = cast(dict[str, object], data["valid_time"])
     object_status = _object_status(workspace, object_locator, digest, byte_count)
+    if conn.execute(
+        "SELECT 1 FROM record_facts WHERE record_id = ?", (record_id,)
+    ).fetchone():
+        _quarantine_relational(
+            conn,
+            position,
+            event,
+            f"duplicate record_id {record_id!r} at position {position}",
+        )
+        return
     conn.execute(
         "INSERT INTO record_facts (position, record_id, event_id, event_kind, event_sha256,"
         " digest, kind, actor, work_item, capability_contract, source, valid_from, valid_to,"
@@ -1303,7 +1473,9 @@ def _insert_record_defect(
     detail: dict[str, object],
 ) -> None:
     next_id = int(
-        conn.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM record_defects").fetchone()[0]
+        conn.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM record_defects").fetchone()[
+            0
+        ]
     )
     conn.execute(
         "INSERT INTO record_defects (id, position, record_id, defect_kind, detail)"
@@ -1313,7 +1485,9 @@ def _insert_record_defect(
             position,
             record_id,
             defect_kind,
-            json.dumps(detail, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            json.dumps(
+                detail, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
         ),
     )
 
@@ -1414,22 +1588,19 @@ def record_temporal_views(conn: sqlite3.Connection) -> list[dict[str, object]]:
         group = by_source[source]
         record_ids = {cast(str, fact["record_id"]) for fact in group}
         tips = [
-            fact
-            for fact in group
-            if cast(str, fact["record_id"]) not in superseded_by
+            fact for fact in group if cast(str, fact["record_id"]) not in superseded_by
         ]
         tip_ids = {cast(str, fact["record_id"]) for fact in tips}
         group_invalidated = [
-            by_record_id[record_id]
-            for record_id in sorted(record_ids & invalidated)
+            by_record_id[record_id] for record_id in sorted(record_ids & invalidated)
         ]
         defects: list[dict[str, object]] = []
         for record_id in sorted(record_ids):
             defects.extend(defects_by_record.get(record_id, []))
 
-        blocked = any(
-            cast(str, fact["object_status"]) != "ok" for fact in tips
-        ) or any(defects_by_record.get(cast(str, fact["record_id"])) for fact in tips)
+        blocked = any(cast(str, fact["object_status"]) != "ok" for fact in tips) or any(
+            defects_by_record.get(cast(str, fact["record_id"])) for fact in tips
+        )
 
         eligible_tips = [
             fact
@@ -1480,7 +1651,10 @@ def record_temporal_views(conn: sqlite3.Connection) -> list[dict[str, object]]:
 
         contested_heads = sorted(
             eligible_tips if len(eligible_tips) > 1 else tips,
-            key=lambda fact: (cast(int, fact["position"]), cast(str, fact["record_id"])),
+            key=lambda fact: (
+                cast(int, fact["position"]),
+                cast(str, fact["record_id"]),
+            ),
         )
         views.append(
             {
@@ -1497,7 +1671,9 @@ def record_temporal_views(conn: sqlite3.Connection) -> list[dict[str, object]]:
     return views
 
 
-def memory_record_rows(conn: sqlite3.Connection) -> list[tuple[str, tuple[object, ...]]]:
+def memory_record_rows(
+    conn: sqlite3.Connection,
+) -> list[tuple[str, tuple[object, ...]]]:
     """Ordered dump of memory projection tables for determinism checks."""
     rows: list[tuple[str, tuple[object, ...]]] = []
     for table in ("record_facts", "record_relations", "record_defects"):
@@ -1620,9 +1796,7 @@ def _classify_reading(
     reference: object, ordered: list[Event], consumer: Event
 ) -> _Reading:
     if not isinstance(reference, dict):
-        reading = _Reading(
-            {"event_id": "", "event_kind": "", "event_sha256": ""}
-        )
+        reading = _Reading({"event_id": "", "event_kind": "", "event_sha256": ""})
         reading.reasons.append("malformed evidence reference")
         return reading
     ref = {
@@ -1668,7 +1842,11 @@ def _classify_reading(
     if roots == "unknown" or roots == []:
         reading.reasons.append("unmeasured: unknown derivation roots")
         return reading
-    if isinstance(roots, list) and roots and all(isinstance(item, str) for item in roots):
+    if (
+        isinstance(roots, list)
+        and roots
+        and all(isinstance(item, str) for item in roots)
+    ):
         reading.roots = frozenset(cast(list[str], roots))
     else:
         reading.reasons.append("unmeasured: unknown derivation roots")
@@ -1676,12 +1854,16 @@ def _classify_reading(
     if event.kind == VERIFICATION_OUTCOME_KIND:
         status = event.data.get("status")
         if status != "completed":
-            reading.reasons.append(str(status) if isinstance(status, str) else "not completed")
+            reading.reasons.append(
+                str(status) if isinstance(status, str) else "not completed"
+            )
             return reading
     elif event.kind == KNOWLEDGE_RETRIEVED_KIND:
         status = event.data.get("status")
         if status != "ok":
-            reading.reasons.append(str(status) if isinstance(status, str) else "not completed")
+            reading.reasons.append(
+                str(status) if isinstance(status, str) else "not completed"
+            )
             return reading
     else:
         reading.reasons.append("unmeasured: missing acquisition metadata")
@@ -1759,9 +1941,7 @@ def _alternative(polarity: str) -> str:
     return rest
 
 
-def consilience_status(
-    conn: sqlite3.Connection, decision_id: str
-) -> dict[str, object]:
+def consilience_status(conn: sqlite3.Connection, decision_id: str) -> dict[str, object]:
     """Classify a decision's immutable evidence refs without a second evidence store."""
     ordered = _events_from_conn(conn)
     consumer: Event | None = None

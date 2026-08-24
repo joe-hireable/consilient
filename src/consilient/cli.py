@@ -317,6 +317,7 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
 
     prior: str | None = None
     projected: int | None = None
+    prior_version: str | None = None
     if db.exists():
         existing = sqlite3.connect(db)
         try:
@@ -324,6 +325,7 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
             projected = int(
                 existing.execute("SELECT COUNT(*) FROM events").fetchone()[0]
             )
+            prior_version = projection.projection_version(existing)
         except sqlite3.DatabaseError as exc:
             raise EventError(
                 f"state at {db} is not a readable database: {exc}"
@@ -344,18 +346,31 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
 
     read_events, rejected = read_all(log)
     events = len(read_events)
+    version_changed = (
+        prior is not None and prior_version != projection.PROJECTION_VERSION
+    )
 
-    # State that is behind AND independently drifted would otherwise be destroyed by the
-    # rebuild before anything compared it, so the check that noticed the problem would also
-    # remove the evidence. Copy it aside first. Found by an external audit of this repair.
+    # Copy the on-disk state aside only when it disagrees about events it already
+    # covers. A one-event lag is not drift; copying on every lag filled the disk
+    # at 11 MB/hour. The prefix digest is the comparison that can tell them apart
+    # before rebuild replaces the file.
     preserved: str | None = None
-    if prior is not None and projected != events:
-        keep = db.with_suffix(db.suffix + f".stale-{projected}-of-{events}")
-        try:
-            shutil.copy2(db, keep)
-            preserved = str(keep)
-        except OSError:
-            preserved = None
+    if (
+        prior is not None
+        and projected is not None
+        and projected != events
+        and not version_changed
+    ):
+        prefix = projection.prefix_digest(
+            read_events[:projected], rejected, db.parent, log_dir=log
+        )
+        if prefix != prior:
+            keep = db.with_suffix(db.suffix + f".stale-{projected}-of-{events}")
+            try:
+                shutil.copy2(db, keep)
+                preserved = str(keep)
+            except OSError:
+                preserved = None
 
     rebuilt = projection.build(log, db)
     digest = projection.state_digest(rebuilt)
@@ -366,7 +381,7 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
     # trajectory. State built from fewer events than the log now holds is simply behind. The
     # defect V0-02 exists to catch is state that disagrees about events it already covers.
     stale = prior is not None and projected != events
-    compared = prior is not None and not stale
+    compared = prior is not None and not stale and not version_changed
 
     return {
         "events": events,
@@ -374,6 +389,9 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
         "digest": digest,
         "prior_digest": prior,
         "stale": stale,
+        "version_changed": version_changed,
+        "prior_version": prior_version,
+        "projection_version": projection.PROJECTION_VERSION,
         "preserved_stale_state": preserved,
         "compared": compared,
         "identical": (prior == digest) if compared else None,
@@ -388,17 +406,22 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
 
 def cmd_beta(args: argparse.Namespace) -> CommandResult:
     conn = projection.build(Path(args.log), Path(args.db))
-    result = beta_mod.from_connection(conn, args.task_family, args.verifier_version)
-    parser_quarantined = projection.rejection_count(conn)
-    relational = projection.relational_quarantines(conn)
-    sampling = projection.sampling_unconditioned(conn)
-    conn.close()
+    try:
+        result = beta_mod.from_connection(conn, args.task_family, args.verifier_version)
+        parser_quarantined = projection.rejection_count(conn)
+        rejection_reasons = projection.rejections(conn)
+        relational = projection.relational_quarantines(conn)
+        sampling = projection.sampling_unconditioned(conn)
+    finally:
+        conn.close()
     # β is a rate over a denominator, so anything the log refused has to be visible
     # wherever the rate is. A β computed over a quietly shortened log is exactly the false
-    # confidence this project exists to measure.
+    # confidence this project exists to measure. The count stays for callers that already
+    # read it; the reasons are the thing that used to be pooled into that integer.
     return {
         **result.as_dict(),
         "quarantined": parser_quarantined,
+        "rejection_reasons": rejection_reasons,
         "relational_quarantine_count": len(relational),
         "relational_quarantine": relational,
         "sampling_unconditioned": sampling,
@@ -576,6 +599,16 @@ def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResu
     evidence = (f"{log.as_posix()}/*.jsonl", db.as_posix())
     prefix_events = replay["prefix_events"]
     prefix_identical = replay["prefix_identical"]
+    # A projection-version bump is expected to change state_digest, so the prior digest
+    # was written by a different projection than the one that rebuilt the pinned prefix.
+    # There is nothing comparable, and reporting a rebuild as divergence would make the
+    # gate cry wolf on every legitimate schema or handler change.
+    if replay.get("version_changed"):
+        reason = (
+            f"Projection version {replay.get('prior_version')!r} rebuilt as "
+            f"{replay.get('projection_version')!r}; not compared."
+        )
+        return _condition("A2", "unknown", reason, *evidence)
     if prefix_identical is None:
         return _condition(
             "A2",
@@ -584,6 +617,16 @@ def _replay_condition(replay: CommandResult, log: Path, db: Path) -> CommandResu
             *evidence,
         )
     if prefix_events == 0:
+        # An empty high-water mark is unknown either way, but a projection covering none
+        # of a non-empty log is behind, not an empty trajectory. Saying so keeps the 20
+        # August 2026 repair (an empty comparison must never pass) without mislabelling
+        # a lagging projection as a repository with no history.
+        if replay["stale"]:
+            reason = (
+                f"State covers {replay['events_projected']} of {replay['events']} "
+                "events; not compared."
+            )
+            return _condition("A2", "unknown", reason, *evidence)
         return _condition(
             "A2",
             "unknown",
@@ -973,7 +1016,12 @@ def render(command: str, result: CommandResult) -> str:
     if command == "record":
         return f"recorded {result['event']} -> {result['file']}"
     if command == "replay":
-        if result["stale"]:
+        if result.get("version_changed"):
+            mark = (
+                f"REBUILT — projection version {result.get('prior_version')!r} → "
+                f"{result.get('projection_version')!r}"
+            )
+        elif result["stale"]:
             mark = (
                 f"STALE — state covers {result['events_projected']} of {result['events']} "
                 "events; rebuilt"
@@ -1056,6 +1104,8 @@ def render(command: str, result: CommandResult) -> str:
         relational_q = result.get("relational_quarantine_count", 0)
         if parser_q:
             extras.append(f"parser quarantine: {parser_q} line(s)")
+            for row in result.get("rejection_reasons", []):
+                extras.append(f"  {row['path']}:{row['line']}  {row['reason']}")
         if relational_q:
             extras.append(f"relational quarantine: {relational_q} row(s)")
             for row in result.get("relational_quarantine", []):

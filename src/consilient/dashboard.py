@@ -940,6 +940,27 @@ def _e(value: object) -> str:
     return html.escape("" if value is None else str(value), quote=True)
 
 
+def _rejection_reason_list(beta: Payload) -> str:
+    """Parser and relational refusals as reasons, not a pooled integer (T12)."""
+    rows: list[object] = []
+    rows.extend(beta.get("rejection_reasons") or [])
+    rows.extend(beta.get("relational_quarantine") or [])
+    if not rows:
+        return ""
+    items = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        items.append(
+            "<li class=\"mono\">"
+            f"{_e(row.get('path'))}:{_e(row.get('line'))} {_e(row.get('reason'))}"
+            "</li>"
+        )
+    if not items:
+        return ""
+    return "<p>Refusal reasons</p><ul>" + "".join(items) + "</ul>"
+
+
 def _short(value: object, limit: int = 46) -> str:
     text = "" if value is None else str(value)
     return text if len(text) <= limit else text[: limit - 1] + "…"
@@ -1606,6 +1627,7 @@ def render_html(payload: Payload) -> str:
         {_e("yes" if beta["lower_bound_on_joint_error"] else "no")}.
         Lines the log refused: {_e(traj["quarantined"])}; lines not written through
         append(): {_e(traj["not_written_by_append"])}.</p>
+      {_rejection_reason_list(beta)}
     </div>
   </details>
 </div>
