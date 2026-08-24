@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
@@ -165,7 +166,7 @@ def adopted_names(tracked_paths: list[str]) -> set[str]:
 
 
 def self_test() -> None:
-    def valid() -> dict[str, object]:
+    def valid() -> dict[str, list[dict[str, str]]]:
         return {
             "components": [
                 {
@@ -181,41 +182,39 @@ def self_test() -> None:
 
     assert not findings(valid(), set()), "a valid record must be accepted"
 
-    cases: list[tuple[dict[str, object], set[str], str]] = []
+    cases: list[tuple[object, set[str], str]] = []
     cases.append(({"components": []}, set(), "must not be empty"))
     duplicate = valid()
-    duplicate["components"].append(  # type: ignore[union-attr]
-        dict(duplicate["components"][0])  # type: ignore[index]
-    )
+    duplicate["components"].append(dict(duplicate["components"][0]))
     cases.append((duplicate, set(), "duplicate component name"))
     missing = valid()
-    del missing["components"][0]["name"]  # type: ignore[index]
+    del missing["components"][0]["name"]
     cases.append((missing, set(), "name"))
     invalid_date = valid()
-    invalid_date["components"][0]["verified"] = "not-a-date"  # type: ignore[index]
+    invalid_date["components"][0]["verified"] = "not-a-date"
     cases.append((invalid_date, set(), "ISO date"))
     future = valid()
-    future["components"][0]["verified"] = (date.today() + timedelta(days=1)).isoformat()  # type: ignore[index]
+    future["components"][0]["verified"] = (date.today() + timedelta(days=1)).isoformat()
     cases.append((future, set(), "future"))
     stale = valid()
-    stale["components"][0]["verified"] = (date.today() - timedelta(days=MAX_AGE_DAYS + 1)).isoformat()  # type: ignore[index]
+    stale["components"][0]["verified"] = (date.today() - timedelta(days=MAX_AGE_DAYS + 1)).isoformat()
     cases.append((stale, set(), "re-read the licence"))
     refused = valid()
-    refused["components"][0].update({"status": "refused", "reason": ""})  # type: ignore[union-attr,index]
+    refused["components"][0].update({"status": "refused", "reason": ""})
     cases.append((refused, set(), "reason"))
     invalid_status = valid()
-    invalid_status["components"][0]["status"] = "unknown"  # type: ignore[index]
+    invalid_status["components"][0]["status"] = "unknown"
     cases.append((invalid_status, set(), "status"))
     # The real tree currently has no MCP config or runtime dependency. This fixture keeps
     # the adoption binding failable rather than blessing a vacuous check.
     cases.append((valid(), {"missing/component"}, "missing/component"))
     for denied in DENIED_LICENCES:
         record = valid()
-        record["components"][0]["licence"] = denied  # type: ignore[index]
+        record["components"][0]["licence"] = denied
         cases.append((record, set(), "denied licence"))
 
-    for record, adopted, expected in cases:
-        errors = findings(record, adopted)
+    for case_record, adopted, expected in cases:
+        errors = findings(case_record, adopted)
         assert any(expected in error for error in errors), (
             f"detector missed {expected!r}: {errors}"
         )
@@ -223,7 +222,8 @@ def self_test() -> None:
 
 
 def main() -> int:
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="scan the tracked tree")
     parser.add_argument(

@@ -9,7 +9,7 @@ case "$remote_url" in
     root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
     failed=0
     echo "pre-push: public remote — running publication gates." >&2
-    for check in check_foreign_identifiers check_private_corpus check_secrets; do
+    for check in check_foreign_identifiers check_private_corpus check_private_repo_names check_secrets; do
       script="$root/.github/scripts/$check.py"
       if [ ! -f "$script" ]; then
         echo "  FAIL  $check - checker missing at $script" >&2
@@ -18,6 +18,7 @@ case "$remote_url" in
       fi
       case "$check" in
         check_private_corpus) args="--require-corpora" ;;
+        check_private_repo_names) args="--self-test" ;;
         check_secrets)       args="--history --untracked --self-test" ;;
         *)                   args="" ;;
       esac
