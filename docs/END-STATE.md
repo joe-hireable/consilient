@@ -133,7 +133,11 @@ which is still `PROPOSED`; the intent is settled, the decision record is not, an
 difference is stated here rather than smoothed over. [cited: ADR-0024, PROPOSED]
 
 Bring your own model, whether local weights or your own API keys, and you get the full
-product with no degraded route. That is enforced by a check, not promised in prose.
+product with no degraded route. **That is an intention, not yet a check.** The plan this page
+expands claims it is enforced; nothing in this repository enforces it, and until something
+does it is exactly the kind of promise-in-prose the project exists to distrust. [measured: no
+match for a bring-your-own-model parity check across `tests/` or `.github/scripts/`, searched
+24 August 2026]
 
 Paid plans, when they exist, fund maintenance, hosted storage of your record, and hosted
 inference for people who would rather not run their own — at minimal margin, prepaid, never
