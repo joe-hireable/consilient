@@ -445,7 +445,7 @@ def test_dispatcher_written_files_are_not_a_progress_artefact(tmp_path):
     """
     script = _script()
     _log, runs = _dirs(tmp_path)
-    for name in ("brief.md", "recall.md", "nested/brief.md"):
+    for name in ("brief.md", "recall.md", "nested/brief.md", "BRIEF.MD"):
         with pytest.raises(script.ExpectedArtefactError):
             script.write_expected(
                 runs,

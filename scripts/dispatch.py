@@ -854,7 +854,7 @@ def write_expected(
     with no artefact is the silent channel this exists to make impossible.
     """
     artefact = "" if expected_artefact is None else str(expected_artefact).strip()
-    name = Path(artefact.replace("\\", "/")).name
+    name = Path(artefact.replace("\\", "/")).name.casefold()
     if not artefact or name in _DISPATCHER_WRITTEN:
         raise ExpectedArtefactError(
             "a dispatch that declares no artefact is refused at dispatch time"
