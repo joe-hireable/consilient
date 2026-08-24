@@ -26,8 +26,14 @@ def loop_alive() -> bool:
     out = subprocess.run(
         [
             "powershell", "-NoProfile", "-Command",
+            # MEASURED 24 Aug 2026: this matched 'build_driver' ANYWHERE in a command line, and a
+            # unit dispatch that CLAIMS .harness/build_driver.py contains that string. The handover
+            # therefore waited on a process that was not the loop, for ever. Verifying by process
+            # identity is the failure this repository keeps measuring; match the script the loop
+            # actually runs, and exclude dispatch workers explicitly.
             "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-            "Where-Object { $_.CommandLine -match 'build_loop|build_driver' } | "
+            r"Where-Object { $_.CommandLine -match 'build_loop\.py' -and "
+            r"$_.CommandLine -notmatch 'dispatch\.py' } | "
             "Measure-Object).Count",
         ],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
