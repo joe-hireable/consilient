@@ -10,6 +10,23 @@ import pytest
 from consilient import work_items
 from consilient.events import EventError, SCHEMA_VERSION, append, prefix_digest
 
+
+def _current_log(log: Path) -> Path:
+    """The daily log file the writes above actually landed in.
+
+    These tests used `f"{TS[:10]}.jsonl"` -- a date literal -- while every write went through the
+    real API, which names the file after the current date. The two agreed on 23 August 2026 and
+    stopped agreeing at midnight, so eleven tests went red with no code change and the whole build
+    queue stalled behind them: a unit only retires on a green suite. [measured 24 Aug 2026]
+
+    Reading the directory instead of computing a date is immune to that, and also to a run that
+    straddles midnight, which computing `date.today()` would not be.
+    """
+    files = sorted(log.glob("*.jsonl"), key=lambda q: q.stat().st_mtime)
+    if not files:
+        raise AssertionError(f"no daily log was written under {log}")
+    return files[-1]
+
 TS = "2026-08-23T12:00:00+00:00"
 CONVERSATION_ID = "conv-plan-001"
 TURN_ID = "turn-plan-001"
@@ -148,7 +165,7 @@ def _minimal_plan(
             text="ship the plan kernel",
         )
         commitment = work_items.commit_request(log, _minimal_commitment())["data"]
-    line_count = sum(1 for _ in (log / f"{TS[:10]}.jsonl").open(encoding="utf-8"))
+    line_count = sum(1 for _ in _current_log(log).open(encoding="utf-8"))
     plan_streams = streams
     if plan_streams is None:
         plan_streams = [_stream(integration=True)]
@@ -159,7 +176,7 @@ def _minimal_plan(
         "commitment_digest": commitment["commitment_digest"],
         "prefix_anchor": {
             "line_count": line_count,
-            "prefix_digest": prefix_digest(log / f"{TS[:10]}.jsonl", line_count),
+            "prefix_digest": prefix_digest(_current_log(log), line_count),
         },
         "streams": plan_streams,
         "estimate_inputs": {
@@ -394,7 +411,7 @@ def test_generic_append_and_helper_agree_on_plan_validation(tmp_path):
 def test_plan_must_follow_a_matching_commitment_in_the_prefix(tmp_path):
     log = tmp_path / "log"
     commitment = _seed_commitment(log)
-    line_count = sum(1 for _ in (log / f"{TS[:10]}.jsonl").open(encoding="utf-8"))
+    line_count = sum(1 for _ in _current_log(log).open(encoding="utf-8"))
     plan = {
         "plan_id": PLAN_ID,
         "revision": 1,
@@ -402,7 +419,7 @@ def test_plan_must_follow_a_matching_commitment_in_the_prefix(tmp_path):
         "commitment_digest": commitment["commitment_digest"],
         "prefix_anchor": {
             "line_count": line_count,
-            "prefix_digest": prefix_digest(log / f"{TS[:10]}.jsonl", line_count),
+            "prefix_digest": prefix_digest(_current_log(log), line_count),
         },
         "streams": [_stream(integration=True)],
         "estimate_inputs": {
