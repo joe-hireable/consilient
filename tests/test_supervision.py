@@ -19,6 +19,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import inspect
+import json
 import os
 import shutil
 import subprocess
@@ -296,6 +297,8 @@ def test_supervision_never_resolves_liveness_from_a_process_identity(tmp_path):
             script.artefact_bytes_in,
             script.committed_since,
             script.StartFailure,
+            script.write_expected,
+            script.ExpectedArtefactError,
         )
     )
     tree = ast.parse(source)
@@ -339,3 +342,117 @@ def test_the_scheduled_task_exists_and_reports_the_dead_runs(tmp_path, capsys):
 
     (runs / "dead0" / "stdout.txt").write_bytes(b"a first byte\n")
     assert script.main(["--supervise", "--log", str(log), "--runs", str(runs)]) == 0
+
+
+def test_dispatch_with_no_expected_artefact_raises(tmp_path, monkeypatch):
+    """BU-1 / N01. A dispatch that names no progress artefact is refused before spawn.
+
+    The Temporal trap ADR-0034 §4 records: a configured-but-unfed progress channel
+    must fail at configuration time, not quietly at runtime. Whitespace is not a
+    declaration. Nothing is written, because an expected record with no artefact
+    is the silent channel this unit exists to make impossible.
+    """
+    script = _script()
+    _log, runs = _dirs(tmp_path)
+    spawned: list[object] = []
+
+    def fake_run_process(*_a, **_k):
+        spawned.append(True)
+        return 0, False, 0.1, None
+
+    # Direct construction: the named parameter is empty or absent.
+    for artefact in ("", None, "   "):
+        with pytest.raises(script.ExpectedArtefactError):
+            script.write_expected(
+                runs,
+                run_id="n01-empty",
+                arm="codex",
+                unit="N01",
+                expected_artefact=artefact,
+                progress_deadline_s=600,
+            )
+    assert not (runs / "n01-empty.json").exists()
+
+    # The spawn path raises the same way and does not start the child.
+    monkeypatch.setattr(script, "build_command", lambda *_a, **_k: ["agent"])
+    monkeypatch.setattr(script, "run_process", fake_run_process)
+    harness = harness_by_id("codex")
+    assert harness is not None
+    with pytest.raises(script.ExpectedArtefactError):
+        script.run_harness(
+            harness,
+            task="pong",
+            cwd=tmp_path,
+            run_dir=runs / "n01-empty",
+            timeout_s=5,
+            model=None,
+            run_id="n01-empty",
+            expected_artefact="",
+        )
+    assert spawned == []
+
+
+def test_expected_record_is_written_before_spawn(tmp_path, monkeypatch):
+    """The wrapper writes `expected` before Popen, never after, never by goodwill.
+
+    If this fails because the record appears after `run_process` returns, spawn
+    happened unsupervised — F-13 with a file name on it.
+    """
+    script = _script()
+    seen: dict[str, object] = {}
+    run_id = "n01-before"
+    record_path = tmp_path / f"{run_id}.json"
+
+    def fake_run_process(*_a, **_k):
+        seen["exists"] = record_path.exists()
+        if record_path.exists():
+            seen["record"] = json.loads(record_path.read_text(encoding="utf-8"))
+        return 0, False, 0.1, None
+
+    monkeypatch.setattr(script, "build_command", lambda *_a, **_k: ["agent"])
+    monkeypatch.setattr(script, "run_process", fake_run_process)
+    harness = harness_by_id("codex")
+    assert harness is not None
+    script.run_harness(
+        harness,
+        task="pong",
+        cwd=tmp_path,
+        run_dir=tmp_path / run_id,
+        timeout_s=90,
+        model=None,
+        run_id=run_id,
+        expected_artefact="stdout.txt",
+        unit="N01",
+    )
+
+    assert seen.get("exists") is True
+    expected = seen["record"]["expected"]  # type: ignore[index]
+    assert expected["run_id"] == run_id
+    assert expected["arm"] == "codex"
+    assert expected["unit"] == "N01"
+    assert expected["artefact"] == "stdout.txt"
+    assert expected["start_window_s"] == script.START_WINDOW_S
+    assert expected["progress_deadline_s"] == 90
+    assert expected["grace_s"] == coordination.CLAIM_GRACE_S
+
+
+def test_dispatcher_written_files_are_not_a_progress_artefact(tmp_path):
+    """N00 measured this: brief.md and recall.md are the dispatcher's own output.
+
+    If they count as the declared progress artefact, every dead dispatch reads
+    healthy — the 23 August failure exactly. Declaring one is the same as
+    declaring none.
+    """
+    script = _script()
+    _log, runs = _dirs(tmp_path)
+    for name in ("brief.md", "recall.md", "nested/brief.md"):
+        with pytest.raises(script.ExpectedArtefactError):
+            script.write_expected(
+                runs,
+                run_id="n01-self",
+                arm="codex",
+                unit="N01",
+                expected_artefact=name,
+                progress_deadline_s=600,
+            )
+    assert not (runs / "n01-self.json").exists()

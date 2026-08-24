@@ -804,6 +804,62 @@ START_WINDOW_S = 120
 _DISPATCHER_WRITTEN = frozenset({"brief.md", "recall.md"})
 
 
+class ExpectedArtefactError(ValueError):
+    """A dispatch that declares no progress artefact is refused before spawn."""
+
+
+def write_expected(
+    runs_dir: Path,
+    *,
+    run_id: str,
+    arm: str,
+    unit: str,
+    expected_artefact: str | None,
+    start_window_s: int = START_WINDOW_S,
+    progress_deadline_s: int,
+    grace_s: int = coordination.CLAIM_GRACE_S,
+) -> Path:
+    """Write `dispatch/<run_id>.json` `expected` before spawn, or refuse.
+
+    BU-1 / N01. The record names what the supervisor will watch. An empty, blank
+    or dispatcher-written artefact is not a declaration: brief.md and recall.md
+    are our own output, and counting them as progress is the 23 August failure
+    [measured, N00]. Nothing is written on refusal, because an expected record
+    with no artefact is the silent channel this exists to make impossible.
+    """
+    artefact = "" if expected_artefact is None else str(expected_artefact).strip()
+    name = Path(artefact.replace("\\", "/")).name
+    if not artefact or name in _DISPATCHER_WRITTEN:
+        raise ExpectedArtefactError(
+            "a dispatch that declares no artefact is refused at dispatch time"
+        )
+    record = {
+        "run_id": run_id,
+        "arm": arm,
+        "unit": unit,
+        "artefact": artefact,
+        "start_window_s": start_window_s,
+        "progress_deadline_s": progress_deadline_s,
+        "grace_s": grace_s,
+    }
+    path = runs_dir / f"{run_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, object] = {}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            loaded = None
+        if isinstance(loaded, dict):
+            payload = loaded
+    payload["expected"] = record
+    encoded = json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(encoded, encoding="utf-8")
+    os.replace(tmp, path)
+    return path
+
+
 @dataclass(frozen=True)
 class StartFailure:
     """One open dispatch that never produced a first artefact.
@@ -1214,6 +1270,8 @@ def run_harness(
     claim_run_id: str | None = None,
     max_turns: int = DEFAULT_MAX_TURNS,
     max_tokens: int = DEFAULT_MAX_TOKENS,
+    expected_artefact: str = "stdout.txt",
+    unit: str = "",
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
@@ -1262,6 +1320,14 @@ def run_harness(
     )
     if log_dir is not None and assembly is not None:
         instructions.record_assembly(log_dir, assembly, task=task)
+    write_expected(
+        run_dir.parent,
+        run_id=run_id,
+        arm=harness.id,
+        unit=unit,
+        expected_artefact=expected_artefact,
+        progress_deadline_s=timeout_s,
+    )
     argv = built
     env = dict(GIT_ENV)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
