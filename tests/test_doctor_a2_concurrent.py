@@ -7,6 +7,8 @@ Replay itself reproduced; the read window was the defect.
 
 These checks append *during* the A2 read, not before it. A quiet-log test would
 reproduce the bug it is meant to catch.
+
+A2 is decided against a pinned prefix, not the live tail.
 """
 
 from __future__ import annotations
@@ -16,10 +18,19 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from consilient import projection
 from consilient.cli import main
-from consilient.events import SCHEMA_VERSION, append
+from consilient.events import (
+    OUTCOME_KIND,
+    SCHEMA_VERSION,
+    VERDICT_KIND,
+    append,
+    read_all,
+)
 
 HUMAN = "joe-brown"
 
@@ -42,7 +53,7 @@ def _ev(**over: object) -> dict[str, object]:
 
 def _outcome(attempt_id: str, task: str, accept: bool) -> dict[str, object]:
     return _ev(
-        event=projection.OUTCOME_KIND,
+        event=OUTCOME_KIND,
         data={
             "attempt_id": attempt_id,
             "task": task,
@@ -56,7 +67,7 @@ def _outcome(attempt_id: str, task: str, accept: bool) -> dict[str, object]:
 def _verdict(attempt_id: str, human_verdict: str) -> dict[str, object]:
     return _ev(
         actor=HUMAN,
-        event=projection.VERDICT_KIND,
+        event=VERDICT_KIND,
         data={
             "attempt_id": attempt_id,
             "human_verdict": human_verdict,
@@ -72,7 +83,7 @@ def _append_judged(path: Path, attempt_id: str, task: str) -> None:
     append(path, _verdict(attempt_id, "reject"))
 
 
-def _a2(payload: dict[str, object]) -> dict[str, object]:
+def _a2(payload: dict[str, Any]) -> dict[str, Any]:
     gates = payload["gates"]
     assert isinstance(gates, dict)
     conditions = gates["A"]["conditions"]
@@ -80,13 +91,17 @@ def _a2(payload: dict[str, object]) -> dict[str, object]:
     return next(c for c in conditions if c["id"] == "A2")
 
 
-def _doctor(log: Path, db: Path, capsys) -> dict[str, object]:
+def _doctor(
+    log: Path, db: Path, capsys: pytest.CaptureFixture[str]
+) -> dict[str, Any]:
     code = main(["--log", str(log), "--db", str(db), "--json", "doctor"])
     captured = capsys.readouterr()
     assert captured.out, (
         f"doctor produced no stdout (exit {code}): {captured.err.strip() or '<empty stderr>'}"
     )
-    return json.loads(captured.out)
+    parsed: object = json.loads(captured.out)
+    assert isinstance(parsed, dict)
+    return parsed
 
 
 def _seeded(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -99,8 +114,8 @@ def _seeded(tmp_path: Path) -> tuple[Path, Path, Path]:
 
 
 def test_a2_is_pass_when_events_land_between_the_count_and_the_rebuild(
-    tmp_path, capsys, monkeypatch
-):
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The FAIL race: log grows after the count and before the rebuild.
 
     cmd_replay used to read the live length, then rebuild from a later length.
@@ -125,13 +140,14 @@ def test_a2_is_pass_when_events_land_between_the_count_and_the_rebuild(
         "the check never touched the live log; the race was not run"
     )
     assert condition["status"] == "pass", condition["reason"]
-    assert "identical" in condition["reason"]
-    assert "diverged" not in condition["reason"]
+    reason = str(condition["reason"])
+    assert "identical" in reason
+    assert "diverged" not in reason
 
 
 def test_a2_is_pass_when_events_land_between_the_projection_read_and_the_log_read(
-    tmp_path, capsys, monkeypatch
-):
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The UNKNOWN race: log grows after the high-water mark is read.
 
     Matching that later length against the projection reported 'state covers N of M'
@@ -140,10 +156,10 @@ def test_a2_is_pass_when_events_land_between_the_projection_read_and_the_log_rea
     from consilient import cli as cli_mod
 
     log, db, path = _seeded(tmp_path)
-    original_read_all = cli_mod.read_all
+    original_read_all = read_all
     appended = {"n": 0}
 
-    def racing_read_all(directory: Path):
+    def racing_read_all(directory: Path) -> object:
         if Path(directory).resolve() == log.resolve():
             _append_judged(path, f"race-read-{appended['n']}", "t-race")
             appended["n"] += 1
@@ -154,13 +170,14 @@ def test_a2_is_pass_when_events_land_between_the_projection_read_and_the_log_rea
     condition = _a2(_doctor(log, db, capsys))
     assert appended["n"] >= 1, "the live log was never re-read; the race was not run"
     assert condition["status"] == "pass", condition["reason"]
-    assert "identical" in condition["reason"]
-    assert "covers" not in condition["reason"]
+    reason = str(condition["reason"])
+    assert "identical" in reason
+    assert "covers" not in reason
 
 
 def test_a2_still_fails_on_a_diverged_prefix_while_the_log_grows(
-    tmp_path, capsys, monkeypatch
-):
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Pinning the prefix must not widen what counts as identical."""
     log, db, path = _seeded(tmp_path)
     drifted = sqlite3.connect(db)
@@ -181,12 +198,12 @@ def test_a2_still_fails_on_a_diverged_prefix_while_the_log_grows(
 
     condition = _a2(_doctor(log, db, capsys))
     assert condition["status"] == "fail", condition["reason"]
-    assert "diverged" in condition["reason"]
+    assert "diverged" in str(condition["reason"])
 
 
 def test_a2_stays_unknown_on_an_empty_prefix_while_the_log_grows(
-    tmp_path, capsys, monkeypatch
-):
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Do not reintroduce the tautological pass repaired on 20 Aug 2026.
 
     An empty prefix compared against later arrivals is not evidence that replay works.
@@ -210,12 +227,12 @@ def test_a2_stays_unknown_on_an_empty_prefix_while_the_log_grows(
 
     condition = _a2(_doctor(log, db, capsys))
     assert condition["status"] == "unknown", condition["reason"]
-    assert "zero events" in condition["reason"]
+    assert "zero events" in str(condition["reason"])
 
 
 def test_a2_verdict_is_stable_when_a_writer_thread_appends_during_the_check(
-    tmp_path, capsys, monkeypatch
-):
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A real concurrent writer, not only a hook: the check must still decide PASS."""
     log, db, path = _seeded(tmp_path)
     stop = threading.Event()
@@ -262,4 +279,4 @@ def test_a2_verdict_is_stable_when_a_writer_thread_appends_during_the_check(
         first["reason"],
         second["reason"],
     )
-    assert "identical" in first["reason"] and "identical" in second["reason"]
+    assert "identical" in str(first["reason"]) and "identical" in str(second["reason"])
