@@ -22,6 +22,7 @@ from consilient.effects import (
     AdmissionFacts,
     EffectManifest,
     derive_admission,
+    OUTBOUND_EFFECTS,
 )
 
 
@@ -53,7 +54,14 @@ def manifest(
     operations: tuple[str, ...] = ("read",),
     gate_digest: str = "d" * 64,
 ) -> EffectManifest:
+    # Unit B01 made `disclosure` REQUIRED for outbound message.send effects, and permitted ONLY
+    # for those. This helper predates that contract, so it supplies the digest exactly when the
+    # effect set calls for it. Relaxing B01 to accept an outbound send with no disclosure would
+    # delete the guarantee that a message this system emits is always traceable to what it
+    # disclosed -- which is the point of the field.
+    disclosure = "b" * 64 if set(effects) & OUTBOUND_EFFECTS else None
     return EffectManifest(
+        disclosure=disclosure,
         operation_id="operation-1",
         work_item_id="work-1",
         attempt_id="attempt-1",

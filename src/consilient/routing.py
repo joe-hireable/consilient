@@ -82,10 +82,23 @@ def candidates_ceiling(estimate: beta.Beta, epsilon: float) -> Ceiling | Routing
     if upper >= 1.0:
         # Every attempt is accepted-and-bad; even one candidate busts any ε < 1.
         return Ceiling(n_attempt_max=0, beta_used=upper, epsilon=epsilon)
+    # The union bound is n·β ≤ ε, so the ceiling is floor(ε / β_upper). This previously
+    # returned a hard-coded 1 for every β in (0, 1), which is the correct answer only for
+    # ε in [β, 2β) and silently wrong everywhere else -- too permissive below β, where the
+    # honest ceiling is zero, and needlessly restrictive above 2β.
+    #
+    # Computed over exact integer ratios, never floats. `3 * (1/3)` is exactly 1.0 in binary
+    # floating point, so a multiply-and-compare admits a third candidate at ε just below 1
+    # where the true bound allows two; the float-boundary test asserts precisely that case.
+    #
+    # `float.as_integer_ratio` is a builtin method and gives the exact value of each float, so
+    # this is `fractions.Fraction` arithmetic without the import. That matters: `fractions` is
+    # not on the product tree's permitted-import list, and widening that list to fit this
+    # calculation would trade a capability boundary for a convenience.
     epsilon_num, epsilon_den = epsilon.as_integer_ratio()
     upper_num, upper_den = upper.as_integer_ratio()
     n_attempt_max = (epsilon_num * upper_den) // (epsilon_den * upper_num)
-    return Ceiling(n_attempt_max=max(n_attempt_max, 0), beta_used=upper, epsilon=epsilon)
+    return Ceiling(n_attempt_max=n_attempt_max, beta_used=upper, epsilon=epsilon)
 
 
 def ceiling_for_trajectory(

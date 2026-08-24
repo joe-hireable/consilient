@@ -39,6 +39,7 @@ from consilient.effects import (
     AdmissionFacts,
     EffectManifest,
     derive_admission,
+    OUTBOUND_EFFECTS,
 )
 from consilient.promote import find_forbidden_imports
 
@@ -97,7 +98,15 @@ def _manifest(
     effects: tuple[str, ...] = ("data.read",),
     operations: tuple[str, ...] = ("read",),
 ) -> EffectManifest:
+    # Unit B01 made `disclosure` REQUIRED for outbound message.send effects, and only
+    # permitted for those -- passing one on a non-outbound manifest is refused just as firmly
+    # as omitting one on an outbound manifest. This helper predates that contract, so it now
+    # supplies the digest exactly when the effect set calls for it. Weakening B01 to accept an
+    # outbound send with no disclosure would delete the guarantee that a message this system
+    # emits can always be traced to what it disclosed.
+    disclosure = "b" * 64 if set(effects) & OUTBOUND_EFFECTS else None
     return EffectManifest(
+        disclosure=disclosure,
         operation_id="operation-1",
         work_item_id="work-1",
         attempt_id="attempt-1",
