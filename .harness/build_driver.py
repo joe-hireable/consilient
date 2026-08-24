@@ -1352,7 +1352,19 @@ def main() -> int:
     blocked = [u for u in candidates if not ready(u, units[u], done, units)]
     startable = [u for u in candidates if ready(u, units[u], done, units)]
     # Spend slots on whatever releases the most work, not on whatever sorts first.
-    startable.sort(key=lambda u: (-downstream_count(u, units), PHASE.get(u[0], 9), u))
+    # Downstream count is the right default and a bad rule for one case: a unit that unblocks
+    # nothing but improves the QUALITY of everything -- the cross-family verdict parser is the
+    # example -- sorts last under it, which is exactly backwards. An explicit `priority` on the
+    # unit is added to its effective rank. It is deliberately a separate, visible field rather
+    # than a fudged dependency, because inflating a dependency count to win a scheduling argument
+    # is how a plan stops describing the work.
+    startable.sort(
+        key=lambda u: (
+            -(downstream_count(u, units) + int(units[u].get("priority", 0))),
+            PHASE.get(u[0], 9),
+            u,
+        )
+    )
 
     if not candidates:
         print(f"driver: every unit is done or exhausted ({len(done)}/{len(units)})")
