@@ -422,7 +422,7 @@ def test_cpu_below_clock_resolution_is_flagged_not_reported_as_zero(bench):
 CITATION_FLAGS = ("FULL", "ABS", "SNIP", "2ND")
 
 
-def test_rss_fixed_cost_over_n_is_flagged_not_silently_divided(bench):
+def test_rss_fixed_cost_over_n_is_flagged_not_silently_divided(bench: Any) -> None:
     """Constant cell growth over a swept N is fixed cost, and must say so."""
     report = bench.run_meter(
         hooks=_hooks(bench, rss_kb=1600.0, baseline_rss_kb=0.0),
@@ -438,7 +438,7 @@ def test_rss_fixed_cost_over_n_is_flagged_not_silently_divided(bench):
     assert report["rss_fixed_cost_dominates"] is True
 
 
-def test_rss_flag_is_false_when_the_cost_is_genuinely_per_stream(bench):
+def test_rss_flag_is_false_when_the_cost_is_genuinely_per_stream(bench: Any) -> None:
     """A cell whose growth scales with N reports a flat per-stream figure, no flag."""
     per_stream = {str(n): {"rss_kb_per_stream": {"mean": 80.0}} for n in (1, 10, 100)}
     assert bench.rss_fixed_cost_dominates(per_stream) is False
@@ -453,13 +453,15 @@ def test_rss_flag_is_false_when_the_cost_is_genuinely_per_stream(bench):
     )
 
 
-def test_default_meter_reports_the_rss_flag(bench):
+def test_default_meter_reports_the_rss_flag(bench: Any) -> None:
     """The flag is derived from the payload on every run, not only under injection."""
     report = bench.run_meter(min_samples=1, n_runs=2, concurrencies=(1, 10))
     assert isinstance(report["rss_fixed_cost_dominates"], bool)
 
 
-def test_every_citation_carries_a_verification_flag_and_a_retrieval_date(bench):
+def test_every_citation_carries_a_verification_flag_and_a_retrieval_date(
+    bench: Any,
+) -> None:
     """`citing-sources`: a source is fetched and dated, or it is not `[cited]` here.
 
     The defect this replaces attributed "ClawRouters 18 ms behind" to two sources,
@@ -481,7 +483,7 @@ def test_every_citation_carries_a_verification_flag_and_a_retrieval_date(bench):
         )
 
 
-def test_withdrawn_figure_is_not_reintroduced(bench):
+def test_withdrawn_figure_is_not_reintroduced(bench: Any) -> None:
     """The specific unsupported number, named so its return is a test failure."""
     doc = bench.__doc__ or ""
     assert "18 ms" not in doc or "withdrawn" in doc.lower()
