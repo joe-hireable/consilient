@@ -171,8 +171,19 @@ def pick_arm(index: int, state: dict) -> tuple:
     """
     inflight = state.get("in_flight", {})
     arms_by_unit = state.get("last_arm", {})
+    # Every cursor dispatch contends for the same startup lock, not just the builds. Reviews go
+    # out through their own path and resolvers through this one, and neither appears in
+    # `in_flight` -- so counting only in-flight builds let cursor be oversubscribed by however
+    # many reviews and resolvers happened to be live, and the extras then queued on the lock.
+    # Found 24 August 2026 by a test from an orphaned worktree (AI2) whose implementation was
+    # seven hours stale but whose invariant was right.
+    cursor_units = (
+        set(inflight)
+        | set(state.get("review_dispatched") or [])
+        | set(state.get("resolve_dispatched") or [])
+    )
     cursor_live = sum(
-        1 for uid in inflight if arms_by_unit.get(uid) == "cursor-composer"
+        1 for uid in cursor_units if arms_by_unit.get(uid) == "cursor-composer"
     )
     for offset in range(len(ARMS)):
         harness, model, leash = ARMS[(index + offset) % len(ARMS)]
