@@ -22,14 +22,16 @@ in the design report, not hidden.
 
 from __future__ import annotations
 
+import json
+import os
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import work_items
-from .events import Event, EventPayload
+from .events import Event, EventPayload, read_all
 
 # Plan unit ids: F01, T01, T01B, AA, etc.
 _PLAN_UNIT_ID = re.compile(r"\b([A-Z][A-Z0-9]*)\b")
@@ -275,6 +277,78 @@ def close_claim(log: Path, *, run_id: str) -> EventPayload:
     return work_items.complete_item(
         log, ticket=claim_ticket(run_id), actor=DISPATCH_ACTOR
     )
+
+
+@dataclass(frozen=True)
+class ClaimRelease:
+    """Outcome of one attempted claim release for a start_failed dispatch."""
+
+    run_id: str
+    released: bool
+    reason: str
+
+
+def worker_gone_from_pid_record(runs_dir: Path, run_id: str) -> bool | None:
+    """Map a run to its recorded pid and confirm the worker is not running.
+
+    Reads ``runs_dir/<run_id>/process.json`` for ``{"pid": <int>}``. Returns
+    ``True`` when the pid is confirmed gone, ``False`` when it is still running,
+    and ``None`` when the mapping or liveness check cannot be completed — the
+    fail-closed case. Artefact silence alone is not consulted here.
+    """
+    record_path = runs_dir / run_id / "process.json"
+    try:
+        payload = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    pid = payload.get("pid") if isinstance(payload, dict) else None
+    if not isinstance(pid, int) or pid < 1:
+        return None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return None
+    else:
+        return False
+
+
+def release_claims_when_worker_gone(
+    log: Path,
+    *,
+    run_ids: Sequence[str],
+    worker_gone: Callable[[str], bool | None],
+    now: datetime | None = None,
+) -> tuple[ClaimRelease, ...]:
+    """Release live dispatch claims only when the worker is confirmed gone.
+
+    N00 identifies start_failed candidates from artefact silence; this function
+    closes their claims only when ``worker_gone`` proves the worker is not
+    running. Releasing while the worker is merely slow would admit two agents
+    to one path — worse than waiting for claim expiry.
+
+    ``worker_gone(run_id)`` returns ``True`` when the worker is confirmed gone
+    (``close_claim`` is written), ``False`` when it is still running, and
+    ``None`` when liveness cannot be determined (the claim is retained).
+    """
+    stamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    events, _rejected = read_all(log)
+    live_ids = {claim.run_id for claim in live_claims(events, now=stamp)}
+    results: list[ClaimRelease] = []
+    for run_id in run_ids:
+        if run_id not in live_ids:
+            results.append(ClaimRelease(run_id, False, "no live claim"))
+            continue
+        gone = worker_gone(run_id)
+        if gone is True:
+            close_claim(log, run_id=run_id)
+            results.append(ClaimRelease(run_id, True, "worker confirmed gone"))
+        elif gone is False:
+            results.append(ClaimRelease(run_id, False, "worker still running"))
+        else:
+            results.append(ClaimRelease(run_id, False, "liveness unknown"))
+    return tuple(results)
 
 
 def render_in_flight(
