@@ -22,13 +22,21 @@ in the design report, not hidden.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+import re
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import work_items
 from .events import Event, EventPayload
+
+# Plan unit ids: F01, T01, T01B, AA, etc.
+_PLAN_UNIT_ID = re.compile(r"\b([A-Z][A-Z0-9]*)\b")
+_PLAN_UNIT_HEADING = re.compile(
+    r"^## ([A-Z][A-Z0-9]*) [—-] (.*?)\n(.*?)(?=^## |\Z)", re.M | re.S
+)
+_LANE_TABLE_MARKER = "## Parallelism and claim lanes"
 
 # Restates harness.DISPATCH_ACTOR: the product capability allowlist in
 # test_budget.py forbids importing the registry module from product code, and a
@@ -323,3 +331,222 @@ def render_in_flight(
             text = text[:-1] + "\n"
         return text
     return text if text.endswith("\n") else text + "\n"
+
+
+@dataclass(frozen=True)
+class PlanUnit:
+    """One build-plan unit's declared claims and dependency edges."""
+
+    unit_id: str
+    title: str
+    paths: tuple[str, ...]
+    depends: tuple[str, ...]
+    plan: str
+
+
+def parse_plan_units(plans: Mapping[str, str]) -> dict[str, PlanUnit]:
+    """Parse stream-plan markdown into unit records.
+
+    Each plan file may define multiple units. ``depends`` lists only ids that
+    appear in the same parsed corpus; external references are dropped.
+    """
+    units: dict[str, PlanUnit] = {}
+    for plan_name, text in plans.items():
+        for match in _PLAN_UNIT_HEADING.finditer(text):
+            unit_id, title, body = match.group(1), match.group(2), match.group(3)
+            claim_match = re.search(r"\*\*Claim exactly:\*\*\n((?:\n- .*)+)", body)
+            paths = tuple(
+                re.findall(r"`([^`]+)`", claim_match.group(1)) if claim_match else ()
+            )
+            dep_match = re.search(r"\*\*Depends on:\*\*(.*)", body)
+            raw_deps = _PLAN_UNIT_ID.findall(dep_match.group(1)) if dep_match else []
+            depends = tuple(sorted({d for d in raw_deps if d != unit_id}))
+            units[unit_id] = PlanUnit(
+                unit_id=unit_id,
+                title=title.strip(),
+                paths=paths,
+                depends=depends,
+                plan=plan_name,
+            )
+    known = set(units)
+    return {
+        uid: PlanUnit(
+            unit_id=unit.unit_id,
+            title=unit.title,
+            paths=unit.paths,
+            depends=tuple(d for d in unit.depends if d in known),
+            plan=unit.plan,
+        )
+        for uid, unit in units.items()
+    }
+
+
+def parse_build_plan_lanes(build_plan_text: str) -> dict[str, tuple[str, ...]]:
+    """Read the hand-maintained lane table from a build-plan markdown body."""
+    if _LANE_TABLE_MARKER not in build_plan_text:
+        return {}
+    section = build_plan_text.split(_LANE_TABLE_MARKER, 1)[1]
+    lanes: dict[str, tuple[str, ...]] = {}
+    for line in section.splitlines():
+        if not line.startswith("| `"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        lane_file = cells[0].strip("`")
+        order = tuple(_PLAN_UNIT_ID.findall(cells[1]))
+        if order:
+            lanes[lane_file] = order
+    return lanes
+
+
+def _units_claiming_path(
+    units: Mapping[str, PlanUnit], lane_path: str
+) -> tuple[str, ...]:
+    canonical_lane = canonical_path(lane_path)
+    claimed: list[str] = []
+    for unit_id, unit in units.items():
+        if any(
+            paths_overlap(canonical_lane, canonical_path(path)) for path in unit.paths
+        ):
+            claimed.append(unit_id)
+    return tuple(sorted(claimed))
+
+
+def _transitive_depends(
+    unit_id: str, units: Mapping[str, PlanUnit]
+) -> frozenset[str]:
+    seen: set[str] = set()
+    queue = list(units[unit_id].depends)
+    while queue:
+        cur = queue.pop()
+        if cur in seen or cur not in units:
+            continue
+        seen.add(cur)
+        queue.extend(units[cur].depends)
+    return frozenset(seen)
+
+
+def _stable_serial_order(unit_ids: Sequence[str], units: Mapping[str, PlanUnit]) -> tuple[str, ...]:
+    """Topological order with path-overlap serialisation and unit-id tie-break."""
+    ids = tuple(sorted(unit_ids))
+    if not ids:
+        return ()
+    must_precede: dict[str, set[str]] = {uid: set() for uid in ids}
+    for left in ids:
+        for right in ids:
+            if left == right:
+                continue
+            if right in units[left].depends:
+                must_precede[left].add(right)
+            elif left in units[right].depends:
+                must_precede[right].add(left)
+            elif (
+                _transitive_depends(left, units).isdisjoint({right})
+                and _transitive_depends(right, units).isdisjoint({left})
+                and units[left].paths
+                and units[right].paths
+            ):
+                left_paths = [canonical_path(p) for p in units[left].paths]
+                right_paths = [canonical_path(p) for p in units[right].paths]
+                if any(
+                    paths_overlap(a, b) for a in left_paths for b in right_paths
+                ):
+                    if left < right:
+                        must_precede[right].add(left)
+                    else:
+                        must_precede[left].add(right)
+    indegree = {uid: len(must_precede[uid]) for uid in ids}
+    ready = sorted(uid for uid in ids if indegree[uid] == 0)
+    ordered: list[str] = []
+    while ready:
+        uid = ready.pop(0)
+        ordered.append(uid)
+        for other in ids:
+            if uid in must_precede[other]:
+                must_precede[other].remove(uid)
+                indegree[other] -= 1
+                if indegree[other] == 0:
+                    ready.append(other)
+                    ready.sort()
+    if len(ordered) != len(ids):
+        # Cycle among declared edges — fall back to sorted ids so callers still
+        # get a deterministic answer rather than a partial list.
+        return ids
+    return tuple(ordered)
+
+
+def derive_lane_order(
+    units: Mapping[str, PlanUnit], lane_path: str
+) -> tuple[str, ...]:
+    """Serial order for one mutable lane derived from claims and depends edges."""
+    return _stable_serial_order(_units_claiming_path(units, lane_path), units)
+
+
+def derive_serial_lane_contract(
+    units: Mapping[str, PlanUnit], lane_paths: Sequence[str]
+) -> dict[str, tuple[str, ...]]:
+    """Derived order for each named lane file."""
+    return {lane: derive_lane_order(units, lane) for lane in lane_paths}
+
+
+def lane_order_inversions(
+    units: Mapping[str, PlanUnit],
+    hand_lanes: Mapping[str, Sequence[str]],
+) -> tuple[tuple[str, str, str], ...]:
+    """Hand-written lane rows that list a unit before one it depends on.
+
+    Returns ``(lane_path, earlier, later)`` triples where ``later`` is a
+    transitive dependency of ``earlier`` but appears after it in the hand table.
+    """
+    inversions: list[tuple[str, str, str]] = []
+    for lane_path, order in hand_lanes.items():
+        for index, earlier in enumerate(order):
+            if earlier not in units:
+                continue
+            deps = _transitive_depends(earlier, units)
+            for later in order[index + 1 :]:
+                if later in deps:
+                    inversions.append((lane_path, earlier, later))
+    return tuple(inversions)
+
+
+def claim_predecessors(
+    unit_id: str, units: Mapping[str, PlanUnit]
+) -> frozenset[str]:
+    """Units that must finish before ``unit_id`` may open a claim."""
+    if unit_id not in units:
+        return frozenset()
+    preds = set(_transitive_depends(unit_id, units))
+    unit = units[unit_id]
+    if not unit.paths:
+        return frozenset(preds)
+    for other_id, other in units.items():
+        if other_id == unit_id:
+            continue
+        if not other.paths:
+            continue
+        if not any(
+            paths_overlap(canonical_path(a), canonical_path(b))
+            for a in unit.paths
+            for b in other.paths
+        ):
+            continue
+        order = _stable_serial_order((unit_id, other_id), units)
+        if order.index(other_id) < order.index(unit_id):
+            preds.add(other_id)
+            preds.update(_transitive_depends(other_id, units))
+    return frozenset(preds)
+
+
+def claim_order_violation(
+    unit_id: str,
+    completed: frozenset[str],
+    units: Mapping[str, PlanUnit],
+) -> str | None:
+    """Refusal reason when predecessors are not complete, else ``None``."""
+    missing = claim_predecessors(unit_id, units) - completed
+    if not missing:
+        return None
+    blockers = ", ".join(sorted(missing))
+    return f"claim ordering: {unit_id} requires completed predecessors: {blockers}"
