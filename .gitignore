@@ -130,6 +130,7 @@ docs/10-research/experiments/*/results-*.json.lock
 # decides what gets dispatched. .harness/log/ was already ignored and never suffered either.
 # The files stay on disk; only the index stops carrying them. See unit Z04.
 .harness/driver-state.json
+.harness/plan-units.json
 .harness/driver-tick.lock
 .harness/*.lock
 .harness/build-loop.out
@@ -151,3 +152,6 @@ docs/10-research/experiments/*/results-*.json.lock
 .harness/exp-s02-audit-*/
 .harness/orch-*/
 .harness/s02-mut-*/
+# Any future scratch tree that copies the package. The prefixes above are the
+# two that were measured; this pattern is the one the ratchet names.
+.harness/**/src/consilient/
