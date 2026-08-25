@@ -363,8 +363,12 @@ def _run_git(
     )
 
 
-def workspace_index_path(work_tree: Path, extra_env: Mapping[str, str] | None = None) -> Path:
-    completed = _run_git(work_tree, "rev-parse", "--git-path", "index", extra_env=extra_env)
+def workspace_index_path(
+    work_tree: Path, extra_env: Mapping[str, str] | None = None
+) -> Path:
+    completed = _run_git(
+        work_tree, "rev-parse", "--git-path", "index", extra_env=extra_env
+    )
     if completed.returncode != 0:
         raise WorkspaceProbeError(completed.stderr or "could not resolve git index")
     raw = (completed.stdout or "").strip()
@@ -390,23 +394,64 @@ def _probe_read_write_stage_commit(
     added = _run_git(work_tree, "add", probe.name, extra_env=extra_env)
     if added.returncode != 0:
         raise WorkspaceProbeError(added.stderr or "stage probe failed")
-    committed = _run_git(
-        work_tree, "commit", "-m", "consilient workspace probe", extra_env=extra_env
-    )
-    if committed.returncode != 0:
-        raise WorkspaceProbeError(committed.stderr or "throwaway commit probe failed")
+    # PLUMBING, NOT PORCELAIN, AND THIS IS THE WHOLE OF THE BUG IT FIXES.
+    #
+    # This used to run `git commit`. MEASURED 25 August 2026: that single choice was silently
+    # losing every agent's work, and the mechanism is entirely self-inflicted.
+    #
+    # `_git_identity_env` sets GIT_AUTHOR and GIT_COMMITTER but never CONSILIENT_RUN_ID. A
+    # LINKED WORKTREE inherits `core.hooksPath` from the shared .git/config, so this
+    # repository's own pre-commit commit-attribution gate runs against the probe -- and
+    # refuses it, because an unattributed commit is refused whenever any live claim's cwd
+    # overlaps the tree. Review dispatches record cwd as the repository root, which overlaps
+    # every workspace beneath it. A CLONE gets a fresh config with no hooksPath, so no gate
+    # runs and the probe passes.
+    #
+    # So "linked_worktree fails under load" was never slowness or lock contention. "Load" is
+    # the number of concurrent live claims, and the fallback ladder was selecting, with
+    # perfect reliability, for the one form whose commits CANNOT be harvested: a clone made
+    # with --separate-git-dir puts every agent commit in a different object store, invisible
+    # to the driver's merge path. Eleven commits and about 3,300 insertions were stranded that
+    # way, and one unit was built twice because the first result could not be seen.
+    #
+    # The probe exists to prove read, write, stage and object-write. `write-tree` plus
+    # `commit-tree` proves all four: it builds a real tree from the index and writes a real
+    # commit object. It moves no ref, leaves no throwaway commit in the history, and runs no
+    # hooks -- because it asks git for an object, not for a commit against a branch.
+    #
+    # This does NOT weaken the commit gate. The gate exists to stop a RUN committing paths
+    # another run has claimed. A plumbing object write commits nothing to any branch and
+    # claims nothing; asking the gate for permission here was the category error.
+    tree = _run_git(work_tree, "write-tree", extra_env=extra_env)
+    if tree.returncode != 0:
+        raise WorkspaceProbeError(tree.stderr or "write-tree probe failed")
+    tree_sha = (tree.stdout or "").strip()
+    if not tree_sha:
+        raise WorkspaceProbeError("write-tree probe produced no tree")
+    parent = _run_git(work_tree, "rev-parse", "HEAD", extra_env=extra_env)
+    args = ["commit-tree", tree_sha, "-m", "consilient workspace probe"]
+    if parent.returncode == 0 and (parent.stdout or "").strip():
+        args[2:2] = ["-p", (parent.stdout or "").strip()]
+    written = _run_git(work_tree, *args, extra_env=extra_env)
+    if written.returncode != 0 or not (written.stdout or "").strip():
+        raise WorkspaceProbeError(written.stderr or "commit-tree probe failed")
+    # Unstage before removing the file, so the workspace is left exactly as it was found. The
+    # old probe committed and then unlinked, leaving a tracked deletion in every workspace --
+    # which gave `git diff --stat` a permanent 72-byte floor and made `terminal.outcome` read
+    # "incomplete" for a run that committed correctly and one that committed nothing alike.
+    _run_git(work_tree, "reset", "-q", "HEAD", "--", probe.name, extra_env=extra_env)
     probe.unlink(missing_ok=True)
 
 
-def _materialise_workspace_form(form: str, source: Path, dest: Path) -> Mapping[str, str]:
+def _materialise_workspace_form(
+    form: str, source: Path, dest: Path
+) -> Mapping[str, str]:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         shutil.rmtree(dest)
     if form == "linked_worktree":
         branch = f"consilient-ws-{dest.name}"
-        completed = _run_git(
-            source, "worktree", "add", "-b", branch, str(dest)
-        )
+        completed = _run_git(source, "worktree", "add", "-b", branch, str(dest))
         if completed.returncode != 0:
             raise WorkspaceProbeError(completed.stderr or "linked worktree add failed")
         return {}
@@ -876,9 +921,7 @@ def run_process(
         if isinstance(ts, str)
     ]
     t_first = min(candidates) if candidates else t_send
-    t_first_nonempty = (
-        min(nonempty_candidates) if nonempty_candidates else t_first
-    )
+    t_first_nonempty = min(nonempty_candidates) if nonempty_candidates else t_first
     timing = StreamTiming(
         t_send=t_send,
         t_first_chunk=t_first,
@@ -1242,9 +1285,7 @@ def started_line_in(run_dir: Path, artefact: str) -> str | None:
     return None
 
 
-def write_started(
-    runs_dir: Path, run_id: str, *, now: datetime
-) -> Path | None:
+def write_started(runs_dir: Path, run_id: str, *, now: datetime) -> Path | None:
     """Write `started` only when the agent has appended a line to the declared path.
 
     BU-2 / N02. Surviving a timer is not a start. The wrapper observes the
@@ -1452,9 +1493,7 @@ def stall_failures(
             continue
         started = record.get("started")
         line = (
-            str(started.get("line") or "").strip()
-            if isinstance(started, dict)
-            else ""
+            str(started.get("line") or "").strip() if isinstance(started, dict) else ""
         )
         if not line:
             observed = started_line_in(runs_dir / claim.run_id, artefact)
@@ -1821,9 +1860,7 @@ def run_harness(
         assembled_instructions = run_dir / "assembled-instructions.txt"
         sealed_task.parent.mkdir(parents=True, exist_ok=True)
         sealed_task.write_text(task, encoding="utf-8", newline="\n")
-        assembled_instructions.write_text(
-            assembly.text, encoding="utf-8", newline="\n"
-        )
+        assembled_instructions.write_text(assembly.text, encoding="utf-8", newline="\n")
         if capture_ok:
             pre_run_records = {
                 "task": _capture_source(
@@ -2695,7 +2732,9 @@ def dispatch_one(
                 epsilon=float(native_claim.get("epsilon") or 0.40),
                 now=now,
                 task=task,
-                exposure_state=str(native_claim.get("exposure_state") or "pre_verifier"),
+                exposure_state=str(
+                    native_claim.get("exposure_state") or "pre_verifier"
+                ),
                 estimate=native_claim.get("estimate"),  # type: ignore[arg-type]
                 estimand_kind=(
                     str(native_claim["estimand_kind"])
@@ -3156,7 +3195,9 @@ def _scan_enclosing(enclosing: Path, scratch: Path) -> dict[str, str]:
 class _ProofObserver:
     """The outer sandbox. It records and refuses; the adapter cannot see it."""
 
-    def __init__(self, scratch: Path, enclosing: Path, verifier_policy_digest: str) -> None:
+    def __init__(
+        self, scratch: Path, enclosing: Path, verifier_policy_digest: str
+    ) -> None:
         self.scratch = scratch
         self.enclosing = enclosing
         self.observed_verifier_policy = verifier_policy_digest
@@ -3191,12 +3232,17 @@ class _ProofObserver:
             elif kind == "process":
                 residuals = item.get("residuals", ())
                 self.residuals.extend(
-                    str(name) for name in (residuals if isinstance(residuals, Sequence) else ())
+                    str(name)
+                    for name in (residuals if isinstance(residuals, Sequence) else ())
                 )
-                self.log.append({"step": kind, "allowed": True, "detail": "residual_only"})
+                self.log.append(
+                    {"step": kind, "allowed": True, "detail": "residual_only"}
+                )
             elif kind == "change_verifier_policy":
                 self.observed_verifier_policy = str(item.get("digest", ""))
-                self.log.append({"step": kind, "allowed": True, "detail": "verifier_policy"})
+                self.log.append(
+                    {"step": kind, "allowed": True, "detail": "verifier_policy"}
+                )
             elif kind in _PROOF_ESCAPES:
                 self._deny(kind, _PROOF_ESCAPES[kind])
                 denied = True
@@ -3245,7 +3291,9 @@ def run_isolated_recovery_proof(
     enclosing_after = canonical_state_digest(_scan_enclosing(enclosing, scratch))
 
     log_path = Path(verifier_log)
-    lines = [json.dumps(entry, ensure_ascii=False, sort_keys=True) for entry in observer.log]
+    lines = [
+        json.dumps(entry, ensure_ascii=False, sort_keys=True) for entry in observer.log
+    ]
     with log_path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write("".join(line + "\n" for line in lines))
     observer_log_digest = hashlib.sha256(log_path.read_bytes()).hexdigest()
