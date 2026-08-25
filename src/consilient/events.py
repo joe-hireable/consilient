@@ -195,6 +195,37 @@ CAPABILITY_VERSIONED_FIELDS = frozenset(
 CAPABILITY_KIND_ALIASES = frozenset(
     {"capability.version", "capability_versioned", "capabilities.versioned"}
 )
+MODEL_CHANGE_KIND = "model.change"
+MODEL_CHANGE_FIELDS = frozenset(
+    {
+        "authoring_run",
+        "base_model",
+        "base_model_digest",
+        "change_id",
+        "checkpoint",
+        "checkpoint_digest",
+        "dataset",
+        "dataset_digest",
+        "failure",
+        "licence",
+        "mutation_class",
+        "privacy_class",
+        "procedure",
+        "procedure_digest",
+        "status",
+    }
+)
+MODEL_CHANGE_KIND_ALIASES = frozenset(
+    {"model.changed", "model_change", "models.change"}
+)
+MODEL_CHANGE_MUTATION_CLASSES = frozenset(
+    {"data_driven_training", "non_data_driven_state_change"}
+)
+MODEL_CHANGE_STATUSES = frozenset({"started", "succeeded", "failed", "refused"})
+_DATA_DRIVEN_PROCEDURES = frozenset({"closed_form", "embedding_fit", "optimiser"})
+_NON_DATA_DRIVEN_PROCEDURES = frozenset({"direct_edit"})
+_RETRIEVAL_PROCEDURES = frozenset({"embedding_inference", "frozen_embedding"})
+_UNKNOWN_DISPOSITIONS = frozenset({"n/a", "none", "unknown", "unspecified"})
 CAPABILITY_MANIFEST_KINDS = frozenset(
     {"tool", "mcp", "skill", "plugin", "connection"}
 )
@@ -692,6 +723,7 @@ def validate(event: object) -> EventPayload:
 
     _check_record_contract(event)
     _check_capability_versioned_contract(event)
+    _check_model_change_contract(event)
     _check_budget_contract(event)
     _check_usage_contract(event)
     _check_knowledge_contract(event)
@@ -956,6 +988,175 @@ def _check_capability_versioned_contract(event: EventPayload) -> None:
         reference = data[relation]
         if isinstance(reference, dict) and reference.get("event_id") == event_id:
             raise EventError(f"{CAPABILITY_VERSIONED_KIND} {relation} cannot reference itself")
+
+
+def mutation_class_for(procedure_kind: object) -> str | None:
+    """Classify a learned-state operation. None means it is not a model.change."""
+    if not isinstance(procedure_kind, str) or not procedure_kind.strip():
+        raise EventError("learned-state procedure must be a non-empty string")
+    if procedure_kind in _DATA_DRIVEN_PROCEDURES:
+        return "data_driven_training"
+    if procedure_kind in _NON_DATA_DRIVEN_PROCEDURES:
+        return "non_data_driven_state_change"
+    if procedure_kind in _RETRIEVAL_PROCEDURES:
+        return None
+    raise EventError(f"unknown learned-state procedure {procedure_kind!r}")
+
+
+def _sha256_hex(kind: str, value: object, field: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise EventError(f"{kind} {field} must be 64 lower-case hex characters")
+    return value
+
+
+def _nullable_sha256(kind: str, value: object, field: str) -> str | None:
+    if value is None:
+        return None
+    return _sha256_hex(kind, value, field)
+
+
+def _explicit_disposition(kind: str, value: object, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or not value.isprintable()
+        or value.casefold() in _UNKNOWN_DISPOSITIONS
+    ):
+        raise EventError(f"{kind} must carry an explicit {field} disposition")
+    return value
+
+
+def _check_model_change_contract(event: EventPayload) -> None:
+    """M06: one exact model.change contract at the F02/F03 writer."""
+    kind = event["event"]
+    if kind != MODEL_CHANGE_KIND:
+        if kind in MODEL_CHANGE_KIND_ALIASES:
+            raise EventError(
+                f"model event kind must be {MODEL_CHANGE_KIND!r}; aliases are not accepted"
+            )
+        return
+
+    data = event["data"]
+    actual = set(data)
+    if actual != MODEL_CHANGE_FIELDS:
+        missing = sorted(MODEL_CHANGE_FIELDS - actual)
+        unexpected = sorted(actual - MODEL_CHANGE_FIELDS)
+        detail = []
+        if missing:
+            detail.append(f"missing {missing}")
+        if unexpected:
+            detail.append(f"unexpected {unexpected}")
+        raise EventError(
+            f"{MODEL_CHANGE_KIND} body fields are fixed: {'; '.join(detail)}"
+        )
+
+    _check_uuid4(data["change_id"], f"{MODEL_CHANGE_KIND} change_id")
+    mutation_class = data["mutation_class"]
+    if mutation_class not in MODEL_CHANGE_MUTATION_CLASSES:
+        raise EventError(
+            f"{MODEL_CHANGE_KIND} mutation_class must be one of "
+            f"{sorted(MODEL_CHANGE_MUTATION_CLASSES)}"
+        )
+    status = data["status"]
+    if status not in MODEL_CHANGE_STATUSES:
+        raise EventError(
+            f"{MODEL_CHANGE_KIND} status must be one of {sorted(MODEL_CHANGE_STATUSES)}"
+        )
+
+    authoring_run = data["authoring_run"]
+    if (
+        not isinstance(authoring_run, str)
+        or not authoring_run
+        or authoring_run != authoring_run.strip()
+        or not authoring_run.isprintable()
+    ):
+        raise EventError(
+            f"{MODEL_CHANGE_KIND} authoring_run must be non-empty printable text"
+        )
+
+    _sha256_hex(MODEL_CHANGE_KIND, data["base_model_digest"], "base_model_digest")
+    _sha256_hex(MODEL_CHANGE_KIND, data["procedure_digest"], "procedure_digest")
+    dataset_digest = _nullable_sha256(
+        MODEL_CHANGE_KIND, data["dataset_digest"], "dataset_digest"
+    )
+    checkpoint_digest = _nullable_sha256(
+        MODEL_CHANGE_KIND, data["checkpoint_digest"], "checkpoint_digest"
+    )
+    _explicit_disposition(MODEL_CHANGE_KIND, data["licence"], "licence")
+    _explicit_disposition(MODEL_CHANGE_KIND, data["privacy_class"], "privacy_class")
+
+    _check_event_reference(
+        data["base_model"], MODEL_CHANGE_KIND, "base_model", RECORD_CAPTURED_KIND
+    )
+    _check_event_reference(
+        data["procedure"], MODEL_CHANGE_KIND, "procedure", CAPABILITY_VERSIONED_KIND
+    )
+
+    dataset = data["dataset"]
+    checkpoint = data["checkpoint"]
+    if (dataset is None) != (dataset_digest is None):
+        raise EventError(
+            f"{MODEL_CHANGE_KIND} dataset and dataset_digest must be set together"
+        )
+    if (checkpoint is None) != (checkpoint_digest is None):
+        raise EventError(
+            f"{MODEL_CHANGE_KIND} checkpoint and checkpoint_digest must be set together"
+        )
+    if mutation_class == "data_driven_training":
+        if dataset is None:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} data-driven training requires a dataset record"
+            )
+        _check_event_reference(
+            dataset, MODEL_CHANGE_KIND, "dataset", RECORD_CAPTURED_KIND
+        )
+    elif dataset is not None:
+        raise EventError(
+            f"{MODEL_CHANGE_KIND} non-data-driven change must not carry a dataset"
+        )
+
+    failure = data["failure"]
+    if status == "succeeded":
+        if checkpoint is None:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} succeeded records require a checkpoint"
+            )
+        if failure is not None:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} succeeded records must not carry a failure"
+            )
+    elif status in {"failed", "refused"}:
+        if (
+            not isinstance(failure, str)
+            or not failure.strip()
+            or failure != failure.strip()
+        ):
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} {status} records require a visible failure reason"
+            )
+    else:
+        if failure is not None:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} started records must not carry a failure"
+            )
+        if checkpoint is not None:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} started records must not carry a checkpoint"
+            )
+
+    if checkpoint is not None:
+        _check_event_reference(
+            checkpoint, MODEL_CHANGE_KIND, "checkpoint", RECORD_CAPTURED_KIND
+        )
+
+    event_id = event.get("event_id")
+    for relation in ("base_model", "dataset", "procedure", "checkpoint"):
+        reference = data[relation]
+        if isinstance(reference, dict) and reference.get("event_id") == event_id:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} {relation} cannot reference itself"
+            )
 
 
 def _decimal_field(
@@ -2986,6 +3187,98 @@ def _validate_capability_versioned_links(
                 )
 
 
+def _validate_model_change_links(
+    prefix: tuple[Event, ...],
+    _rejections: tuple[Rejection, ...],
+    candidates: tuple[EventPayload, ...],
+) -> None:
+    """Resolve model-change provenance against the locked accepted prefix."""
+    for candidate in candidates:
+        if candidate["event"] != MODEL_CHANGE_KIND:
+            continue
+        data = candidate["data"]
+        if data["base_model"]["event_id"] == candidate["event_id"]:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} base_model cannot reference itself"
+            )
+        try:
+            base = resolve_reference(data["base_model"], prefix)
+        except EventError as exc:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} base_model must reference an exact earlier "
+                f"record.captured event: {exc}"
+            ) from exc
+        if not isinstance(base, Event) or base.kind != RECORD_CAPTURED_KIND:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} base_model must reference a record.captured event"
+            )
+        if base.data["digest"] != data["base_model_digest"]:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} base_model_digest does not match the referenced record"
+            )
+
+        try:
+            procedure = resolve_reference(data["procedure"], prefix)
+        except EventError as exc:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} procedure must reference an exact earlier "
+                f"capability.versioned event: {exc}"
+            ) from exc
+        if (
+            not isinstance(procedure, Event)
+            or procedure.kind != CAPABILITY_VERSIONED_KIND
+        ):
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} procedure must reference a capability.versioned event"
+            )
+        if procedure.data["version_digest"] != data["procedure_digest"]:
+            raise EventError(
+                f"{MODEL_CHANGE_KIND} procedure_digest does not match the referenced capability"
+            )
+
+        dataset = data["dataset"]
+        if dataset is not None:
+            try:
+                resolved_dataset = resolve_reference(dataset, prefix)
+            except EventError as exc:
+                raise EventError(
+                    f"{MODEL_CHANGE_KIND} dataset must reference an exact earlier "
+                    f"record.captured event: {exc}"
+                ) from exc
+            if (
+                not isinstance(resolved_dataset, Event)
+                or resolved_dataset.kind != RECORD_CAPTURED_KIND
+            ):
+                raise EventError(
+                    f"{MODEL_CHANGE_KIND} dataset must reference a record.captured event"
+                )
+            if resolved_dataset.data["digest"] != data["dataset_digest"]:
+                raise EventError(
+                    f"{MODEL_CHANGE_KIND} dataset_digest does not match the referenced record"
+                )
+
+        checkpoint = data["checkpoint"]
+        if checkpoint is not None:
+            try:
+                resolved_checkpoint = resolve_reference(checkpoint, prefix)
+            except EventError as exc:
+                raise EventError(
+                    f"{MODEL_CHANGE_KIND} checkpoint must reference an exact earlier "
+                    f"record.captured event: {exc}"
+                ) from exc
+            if (
+                not isinstance(resolved_checkpoint, Event)
+                or resolved_checkpoint.kind != RECORD_CAPTURED_KIND
+            ):
+                raise EventError(
+                    f"{MODEL_CHANGE_KIND} checkpoint must reference a record.captured event"
+                )
+            if resolved_checkpoint.data["digest"] != data["checkpoint_digest"]:
+                raise EventError(
+                    f"{MODEL_CHANGE_KIND} checkpoint_digest does not match the referenced record"
+                )
+
+
 def _validate_decision_relations(
     prefix: tuple[Event, ...],
     _rejections: tuple[Rejection, ...],
@@ -3077,6 +3370,7 @@ def _validate_decision_relations(
 
 register_transition_validator((RECORD_CAPTURED_KIND,), _validate_record_relations)
 register_transition_validator((CAPABILITY_VERSIONED_KIND,), _validate_capability_versioned_links)
+register_transition_validator((MODEL_CHANGE_KIND,), _validate_model_change_links)
 register_transition_validator(
     (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT), _validate_effect_receipt_chain
 )
