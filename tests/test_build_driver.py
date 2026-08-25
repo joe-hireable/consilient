@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import re
@@ -348,3 +349,56 @@ def test_defective_review_records_restart_before_rejection(
     assert len(state["total_restarts"]["U01"]) == 1
     assert state["built"] == []
     assert state["rejected_artefacts"] == {"U01": "digest"}
+
+
+# --- the loop must actually CALL its self-repair, 25 August 2026 ---------------
+#
+# `self_heal` was written on 24 August, documented at length, and NEVER CALLED. A WSL agent had
+# written `core.worktree = /mnt/c/...` into the shared .git/config at 22:57 on the 24th and it
+# was still there thirteen hours later, because the repair that exists for exactly that line
+# had no call site.
+#
+# The cost was not cosmetic. `git worktree add` fails while that line is present, so every
+# dispatch fell through to the isolated_git_env workspace form, which clones with
+# --separate-git-dir; agent commits then landed in a different object store, invisible to the
+# driver. Eleven commits of finished work were stranded and one unit was built twice.
+#
+# A defined-but-uncalled repair is indistinguishable from no repair, and nothing in the suite
+# could tell the difference. This is that check.
+
+
+def test_the_loop_calls_self_heal_every_tick() -> None:
+    source = (ROOT / ".harness" / "build_loop.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    defined = {
+        node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+    }
+    assert "self_heal" in defined, "self_heal is gone; this test guards its call, not its name"
+
+    main = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "main"
+    )
+    called = {
+        node.func.id
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "self_heal" in called, (
+        "build_loop.main() does not call self_heal. It was defined and never called for a "
+        "full day, during which a /mnt/c path sat in .git/config breaking every worktree "
+        "creation and stranding eleven commits of finished work."
+    )
+
+    # And inside the loop, not once before it: the corruption is written DURING operation by a
+    # dispatched agent, so a repair that only runs at startup cannot fix it.
+    loops = [node for node in ast.walk(main) if isinstance(node, (ast.While, ast.For))]
+    assert any(
+        isinstance(inner, ast.Call)
+        and isinstance(inner.func, ast.Name)
+        and inner.func.id == "self_heal"
+        for loop in loops
+        for inner in ast.walk(loop)
+    ), "self_heal is called outside the tick loop; a startup-only repair cannot fix a fault that appears after startup"

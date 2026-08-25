@@ -98,7 +98,10 @@ def self_heal(log) -> None:
         if "/mnt/c" in text:
             kept = [ln for ln in text.split(chr(10)) if "/mnt/c" not in ln]
             main_config.write_text(chr(10).join(kept), encoding="utf-8")
-            log.write("loop: repaired .git/config -- a WSL path had broken every git command" + chr(10))
+            log.write(
+                "loop: repaired .git/config -- a WSL path had broken every git command"
+                + chr(10)
+            )
     except OSError:
         pass
 
@@ -118,14 +121,22 @@ def self_heal(log) -> None:
     try:
         current = subprocess.run(
             ["git", "config", "--global", "--get", "core.longpaths"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
         ).stdout.strip()
         if current.lower() != "true":
             subprocess.run(
                 ["git", "config", "--global", "core.longpaths", "true"],
-                capture_output=True, timeout=60,
+                capture_output=True,
+                timeout=60,
             )
-            log.write("loop: set git core.longpaths -- long paths were breaking every review clone" + chr(10))
+            log.write(
+                "loop: set git core.longpaths -- long paths were breaking every review clone"
+                + chr(10)
+            )
     except Exception:
         pass
 
@@ -137,9 +148,17 @@ def self_heal(log) -> None:
             continue
         try:
             alive = subprocess.run(
-                ["powershell", "-NoProfile", "-Command",
-                 "(Get-Process git -ErrorAction SilentlyContinue | Measure-Object).Count"],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "(Get-Process git -ErrorAction SilentlyContinue | Measure-Object).Count",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=60,
             ).stdout.strip()
         except Exception:
             continue
@@ -147,7 +166,10 @@ def self_heal(log) -> None:
             continue
         try:
             lock.unlink()
-            log.write(f"loop: removed a stale {lock.name} -- no git process was holding it" + chr(10))
+            log.write(
+                f"loop: removed a stale {lock.name} -- no git process was holding it"
+                + chr(10)
+            )
         except OSError:
             pass
 
@@ -160,6 +182,23 @@ def main() -> int:
         with LOG.open("a", encoding="utf-8") as handle:
             handle.write(f"\n===== tick {tick} at {stamp} =====\n")
             handle.flush()
+            # BEFORE the tick, every tick. `self_heal` was written on 24 August 2026 and NEVER
+            # CALLED -- defined, documented, dead. MEASURED 25 August 2026: a WSL agent had
+            # written `core.worktree = /mnt/c/...` into the shared .git/config at 22:57 on the
+            # 24th and it was still there THIRTEEN HOURS LATER, because the repair that exists
+            # for exactly that line had no call site.
+            #
+            # What it cost: `git worktree add` fails while that line is present, so every
+            # dispatch fell through to the isolated_git_env workspace form, which clones with
+            # --separate-git-dir. Agent commits then landed in a DIFFERENT object store, invisible
+            # to the driver, and eleven commits of finished work -- about 3,300 insertions --
+            # were stranded. One unit was built twice because the first result could not be seen.
+            #
+            # Per tick rather than per loop start, because the corruption is written DURING
+            # operation by a dispatched agent. A repair that only runs at startup cannot fix a
+            # fault that appears after startup, which is precisely what happened here.
+            self_heal(handle)
+            handle.flush()
             try:
                 subprocess.run(
                     [sys.executable, "-u", str(ROOT / ".harness" / "build_driver.py")],
@@ -170,14 +209,18 @@ def main() -> int:
                     check=False,
                 )
             except subprocess.TimeoutExpired:
-                handle.write("loop: tick exceeded 50 minutes; abandoning it and starting the next\n")
+                handle.write(
+                    "loop: tick exceeded 50 minutes; abandoning it and starting the next\n"
+                )
             except Exception as exc:  # a loop that dies on one bad tick is not a loop
                 handle.write(f"loop: tick raised {type(exc).__name__}: {exc}\n")
         if STOP.exists():
             break
         time.sleep(INTERVAL_S)
     with LOG.open("a", encoding="utf-8") as handle:
-        handle.write(f"\nloop: STOP-LOOP present, exiting cleanly after {tick} tick(s)\n")
+        handle.write(
+            f"\nloop: STOP-LOOP present, exiting cleanly after {tick} tick(s)\n"
+        )
     return 0
 
 
