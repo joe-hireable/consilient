@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import functools
 import os
 import sqlite3
 import subprocess
@@ -52,6 +53,9 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 # of tiny files, so the cap is short.
 SELFTEST_TIMEOUT_S = 60
 
+# This script lives at .github/scripts/, so the repository root is two levels up.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 SKIP_DIRS = {
     ".git",
     "__pycache__",
@@ -60,6 +64,22 @@ SKIP_DIRS = {
     ".mypy_cache",
     ".ruff_cache",
     ".pytest_cache",
+    # Ephemeral agent workspaces. Each dispatch materialises a FULL COPY of this repository
+    # under .harness/dispatch/<run-id>/ and each unit keeps one under .harness/unit-worktrees/,
+    # so a scan of `.harness` was walking the repository once per live workspace.
+    #
+    # MEASURED 25 August 2026: 388,459 .py files under .harness, against 10,123 with these two
+    # excluded -- a 38x amplification, every file of it `ast.parse`d. The live-tree scan stopped
+    # returning at all (killed at 400 s), which failed the suite, and a red suite blocks
+    # retirement, merging and publication together.
+    #
+    # This NARROWS the scan, which is what the test's own note directs -- "if a future scan is
+    # non-zero, narrow the check, never disable it" -- and it narrows it by excluding COPIES of
+    # the source rather than any source. Nothing in a dispatch workspace is this repository's
+    # code: it is a checkout of it, and the original is already scanned through `src`, `scripts`
+    # and `tests`. A precision regression cannot hide here that is not also caught there.
+    "dispatch",
+    "unit-worktrees",
 }
 
 SPECIMEN = "\n".join(
@@ -218,7 +238,49 @@ def findings_in_file(path: Path) -> list[str]:
     return rebinding_findings(path, tree) + ddl_tree_findings(path, tree)
 
 
+@functools.lru_cache(maxsize=1)
+def _tracked_python() -> frozenset[Path]:
+    """Every .py file git tracks, resolved. Empty if git cannot answer.
+
+    The scan is meant to judge THIS repository's Python. Deciding that by directory name does
+    not survive contact with the tree: `.venv-exp96` is not `.venv`, an experiment corpus is
+    not `node_modules`, and every dispatch materialises another full copy of the source. What
+    git tracks IS the definition of this repository's code, so it is used directly rather than
+    approximated by a skip list that has to be extended every time a new directory appears.
+
+    MEASURED 25 August 2026. Scanning `.harness` walked 388,459 .py files against 10,123 with
+    the workspace copies removed, and the live-tree scan stopped returning at all -- killed at
+    400 s. Under a tracked-file filter it finishes in seconds. The findings it had been
+    reporting were real by its own rule and entirely in code we do not own: `CREATE TABLE`
+    constants inside a vendored external source tree, and rebindings inside pip, mypy,
+    setuptools and dateutil in an experiment virtualenv.
+
+    This NARROWS the scan, which is what the test's own note directs -- "if a future scan is
+    non-zero, narrow the check, never disable it". A precision regression in this repository
+    cannot hide behind it: every file that was in scope and is ours is still in scope.
+
+    Fails OPEN by design. If git cannot answer, the filter is skipped and everything is scanned,
+    because a check that silently inspects nothing is worse than one that is slow.
+    """
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files", "-z", "--", "*.py"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return frozenset()
+    if completed.returncode != 0:
+        return frozenset()
+    names = completed.stdout.decode("utf-8", "replace").split(chr(0))
+    return frozenset(
+        (REPO_ROOT / name).resolve() for name in names if name.strip()
+    )
+
+
 def iter_python(paths: list[Path]) -> list[Path]:
+    tracked = _tracked_python()
     files: list[Path] = []
     for path in paths:
         if path.is_file():
@@ -229,6 +291,8 @@ def iter_python(paths: list[Path]) -> list[Path]:
             continue
         for child in path.rglob("*.py"):
             if any(part in SKIP_DIRS for part in child.parts):
+                continue
+            if tracked and child.resolve() not in tracked:
                 continue
             files.append(child)
     return files
