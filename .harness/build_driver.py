@@ -618,6 +618,51 @@ def _consume_review_receipt(
     return _load_verdict_file(uid, unit, expected)
 
 
+def review_receipt_is_finished(uid: str, expected: dict[str, Any]) -> bool:
+    """Is there real evidence THIS review attempt is done -- envelope, or a bound receipt?
+
+    Two independent signals, either sufficient: `<uid>-verify.out` non-empty (the wrapper
+    finished and wrote its report, once, at completion -- see `consume_review_verdict`'s own
+    note on why that write is atomic), or `<uid>-verdict.json` present AND bound to the CURRENT
+    expectation (this attempt's number and artefact).
+
+    The second half of that AND is not optional. A non-empty verdict.json is not enough by
+    itself -- it must be THIS attempt's receipt, or a stale one left by a PRIOR attempt
+    satisfies this check the instant a re-dispatch truncates `.out`, before the new review has
+    produced anything at all.
+
+    MEASURED 25 August 2026, ~23:00, a REGRESSION introduced by the fix that first admitted
+    verdict.json as a completion signal. `open(path, "w")` truncates `.out` to 0 bytes the
+    moment `subprocess.Popen(stdout=vo)` opens it for a re-dispatch -- but nothing clears the
+    OLD `<uid>-verdict.json` from the attempt before. A01, AB and AC were each re-dispatched at
+    a fresh attempt=1 after their artefact changed; at that same tick, their STALE verdict.json
+    (from a much earlier attempt, wrong artefact) still had bytes in it, so the old check fired
+    immediately. `_load_verdict_file` correctly refused the mismatched identity, fell through to
+    the freshly-truncated empty `.out`, and returned "no_dispatch" -- which
+    `consume_review_verdict` memoises PERMANENTLY, before the real reviewer had even started.
+    The eventual valid verdict, written minutes later, was never looked at again.
+
+    So a verdict.json only counts as evidence THIS review finished if it is bound to the same
+    attempt and artefact the driver is currently expecting. A leftover from a different attempt
+    is not evidence about this one.
+    """
+    try:
+        if (BRIEFS / f"{uid}-verify.out").stat().st_size > 0:
+            return True
+    except OSError:
+        pass
+    try:
+        candidate = json.loads((BRIEFS / f"{uid}-verdict.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(candidate, dict)
+        and candidate.get("unit") == uid
+        and candidate.get("attempt") == expected.get("attempt")
+        and candidate.get("artefact") == expected.get("artefact")
+    )
+
+
 def consume_review_verdict(
     state: dict[str, Any], uid: str, unit: dict[str, Any]
 ) -> str:
@@ -2252,37 +2297,8 @@ def main() -> int:
     # fails json.loads, becomes a check_error, and is retried, so the race fails closed.
     consumed_any = False
     for uid in sorted(list(state.setdefault("review_dispatched", []))):
-        receipt = BRIEFS / f"{uid}-verify.out"
-        try:
-            finished = receipt.stat().st_size > 0
-        except OSError:
-            finished = False
-        # A VALID VERDICT RECEIPT IS ITSELF PROOF THE REVIEW FINISHED.
-        #
-        # MEASURED 25 August 2026, 21:50, and this is why the day produced so little. AE and AA
-        # both held well-formed `<uid>-verdict.json` receipts bound to their unit's CURRENT
-        # artefact -- the driver's own `_load_verdict_file` returned SOUND and DEFECTIVE for them
-        # when called directly -- and both sat in `review_dispatched` unconsumed, because
-        # `<uid>-verify.out` was ZERO BYTES. A finished review with a valid verdict was ignored
-        # on account of a DIFFERENT file being empty.
-        #
-        # The `.out` is the dispatch ENVELOPE, written by the wrapper. The verdict is what the
-        # reviewer wrote. Gating on the envelope adds a failure mode without adding safety: the
-        # envelope can be truncated by a re-dispatch, or never written if the wrapper died after
-        # the reviewer had already produced its verdict, and in both cases real evidence is
-        # discarded.
-        #
-        # This is not a relaxation. `_load_verdict_file` still validates schema and re-derives
-        # artefact identity on both sides, and a torn or partial receipt fails `json.loads` and
-        # comes back `receipt_unparseable`, which is retried. The race fails closed exactly as
-        # before -- what changes is that a COMPLETE receipt is no longer thrown away because a
-        # sibling file is empty.
-        if not finished:
-            try:
-                finished = (BRIEFS / f"{uid}-verdict.json").stat().st_size > 0
-            except OSError:
-                finished = False
-        if not finished:
+        expected_now = state.setdefault("review_expected", {}).get(uid) or {}
+        if not review_receipt_is_finished(uid, expected_now):
             continue
         outcome = consume_review_verdict(state, uid, units[uid])
         print(f"driver: review of {uid} consumed as {outcome}")

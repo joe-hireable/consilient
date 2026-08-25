@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
-import os
 import re
 import subprocess
 import sys
@@ -113,7 +112,9 @@ def test_restart_window_quarantines_once_without_refunding_history() -> None:
     for now in range(100, 107):
         driver.record_restart(state, "U01", now=float(now))
 
-    assert state["total_restarts"] == {"U01": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0]}
+    assert state["total_restarts"] == {
+        "U01": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0]
+    }
     assert state["quarantined"] == ["U01"]
     assert state["quarantine_escalated"] == ["U01"]
 
@@ -184,7 +185,10 @@ def test_main_escalates_when_reclamation_crosses_restart_limit(
 
     assert driver.main() == 0
 
-    assert "ESCALATION -- U01 exceeded the restart intensity limit" in capsys.readouterr().out
+    assert (
+        "ESCALATION -- U01 exceeded the restart intensity limit"
+        in capsys.readouterr().out
+    )
     assert state["attempts"] == {"U01": 2}
     assert state["quarantined"] == ["U01"]
 
@@ -378,7 +382,9 @@ def test_the_loop_calls_self_heal_every_tick() -> None:
     defined = {
         node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
     }
-    assert "self_heal" in defined, "self_heal is gone; this test guards its call, not its name"
+    assert "self_heal" in defined, (
+        "self_heal is gone; this test guards its call, not its name"
+    )
 
     main = next(
         node
@@ -405,7 +411,9 @@ def test_the_loop_calls_self_heal_every_tick() -> None:
         and inner.func.id == "self_heal"
         for loop in loops
         for inner in ast.walk(loop)
-    ), "self_heal is called outside the tick loop; a startup-only repair cannot fix a fault that appears after startup"
+    ), (
+        "self_heal is called outside the tick loop; a startup-only repair cannot fix a fault that appears after startup"
+    )
 
 
 # --- a crash is evidence once, not once per tick, 25 August 2026 ---------------
@@ -450,13 +458,17 @@ def test_a_new_crash_is_counted_again(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(driver, "BRIEFS", briefs)
     state = {"in_flight": {"U2": (0.0, 3600.0)}, "review_dispatched": []}
 
-    _write_err(briefs, "U2", "Traceback (most recent call last):\nRuntimeError: first\n")
+    _write_err(
+        briefs, "U2", "Traceback (most recent call last):\nRuntimeError: first\n"
+    )
     assert [row[0] for row in driver.crashed_dispatches(state)] == ["U2"]
     assert driver.crashed_dispatches(state) == []
 
     # A later dispatch overwrites the file with a different failure: that IS new evidence.
     _write_err(
-        briefs, "U2", "Traceback (most recent call last):\nValueError: second and different\n"
+        briefs,
+        "U2",
+        "Traceback (most recent call last):\nValueError: second and different\n",
     )
     again = driver.crashed_dispatches(state)
     assert [row[0] for row in again] == ["U2"], "a new crash must still be reported"
@@ -476,7 +488,6 @@ def test_the_counted_set_does_not_grow_without_bound(tmp_path, monkeypatch) -> N
     state["in_flight"] = {}
     driver.crashed_dispatches(state)
     assert "U3" not in state["crash_counted"]
-
 
 
 # --- autonomous workspace pruning lives in the loop, 25 August 2026 ------------
@@ -507,7 +518,9 @@ def test_the_loop_prunes_spent_workspaces_every_tick() -> None:
         and inner.func.id == "prune_spent_workspaces"
         for loop in loops
         for inner in ast.walk(loop)
-    ), "build_loop.main() does not prune inside the tick loop; accumulation broke provisioning once already"
+    ), (
+        "build_loop.main() does not prune inside the tick loop; accumulation broke provisioning once already"
+    )
 
 
 def test_the_prune_refuses_to_touch_anything_but_a_dispatch_workspace() -> None:
@@ -555,9 +568,7 @@ def test_duplicate_subsystem_serialises_n03_and_t02_from_the_real_plan(
         )
     units = json.loads(driver.UNITS.read_text(encoding="utf-8"))
 
-    assert not driver.ready(
-        "T02", units["T02"], set(units), units, in_flight={"N03"}
-    )
+    assert not driver.ready("T02", units["T02"], set(units), units, in_flight={"N03"})
     assert "serialising T02 behind N03" in capsys.readouterr().out
     assert driver.ready("T02", units["T02"], set(units), units, in_flight=set())
 
@@ -591,9 +602,7 @@ def test_duplicate_subsystem_firing_rate_stays_below_five_percent() -> None:
     firings = [
         (left, right)
         for left, right in sharing
-        if not driver.ready(
-            left, units[left], set(units), units, in_flight={right}
-        )
+        if not driver.ready(left, units[left], set(units), units, in_flight={right})
     ]
 
     assert sharing
@@ -654,8 +663,9 @@ def _run_duplicate_subsystem_merge_tick(
     monkeypatch.setattr(
         driver,
         "merge_unit_worktree",
-        lambda uid, quiescent=False: calls.append(("merge", uid, quiescent))
-        or "no commits",
+        lambda uid, quiescent=False: (
+            calls.append(("merge", uid, quiescent)) or "no commits"
+        ),
     )
 
     assert driver.main() == 0
@@ -773,20 +783,34 @@ def test_a_worktree_sitting_at_head_is_not_already_landed(monkeypatch) -> None:
     assert driver._cherry_and_diff_match("b" * 40, [".harness/build_driver.py"]) is True
 
 
-def _verdict_fixture(tmp_path, monkeypatch, *, receipt_attempt, expected_attempt,
-                     receipt_artefact, expected_artefact, current_artefact,
-                     verdict="SOUND", findings=None):
+def _verdict_fixture(
+    tmp_path,
+    monkeypatch,
+    *,
+    receipt_attempt,
+    expected_attempt,
+    receipt_artefact,
+    expected_artefact,
+    current_artefact,
+    verdict="SOUND",
+    findings=None,
+):
     driver = _load_driver()
     briefs = tmp_path / "briefs"
     briefs.mkdir()
     monkeypatch.setattr(driver, "BRIEFS", briefs)
     monkeypatch.setattr(driver, "artefact_identity", lambda _unit: current_artefact)
     (briefs / "U01-verdict.json").write_text(
-        json.dumps({
-            "v": 1, "unit": "U01", "artefact": receipt_artefact,
-            "attempt": receipt_attempt, "verdict": verdict,
-            "findings": findings if findings is not None else [],
-        }),
+        json.dumps(
+            {
+                "v": 1,
+                "unit": "U01",
+                "artefact": receipt_artefact,
+                "attempt": receipt_attempt,
+                "verdict": verdict,
+                "findings": findings if findings is not None else [],
+            }
+        ),
         encoding="utf-8",
     )
     expected = {"artefact": expected_artefact, "attempt": expected_attempt}
@@ -805,12 +829,17 @@ def test_a_verdict_about_the_current_artefact_survives_a_stale_attempt_number(
     The attempt number says which dispatch spoke. The artefact says what was judged.
     """
     outcome, _ = _verdict_fixture(
-        tmp_path, monkeypatch,
-        receipt_attempt=2, expected_attempt=3,
-        receipt_artefact="a" * 64, expected_artefact="a" * 64,
+        tmp_path,
+        monkeypatch,
+        receipt_attempt=2,
+        expected_attempt=3,
+        receipt_artefact="a" * 64,
+        expected_artefact="a" * 64,
         current_artefact="a" * 64,
     )
-    assert outcome == "SOUND", "a verdict about the current artefact must not be lost to a counter"
+    assert outcome == "SOUND", (
+        "a verdict about the current artefact must not be lost to a counter"
+    )
 
 
 def test_a_verdict_about_a_different_artefact_is_still_refused(
@@ -819,9 +848,12 @@ def test_a_verdict_about_a_different_artefact_is_still_refused(
     """The binding that matters is unchanged: a verdict about other code is not evidence about
     this code, whatever its attempt number says."""
     outcome, _ = _verdict_fixture(
-        tmp_path, monkeypatch,
-        receipt_attempt=3, expected_attempt=3,
-        receipt_artefact="b" * 64, expected_artefact="a" * 64,
+        tmp_path,
+        monkeypatch,
+        receipt_attempt=3,
+        expected_attempt=3,
+        receipt_artefact="b" * 64,
+        expected_artefact="a" * 64,
         current_artefact="a" * 64,
     )
     assert outcome == "receipt_mismatched"
@@ -833,9 +865,12 @@ def test_a_verdict_is_refused_when_the_tree_has_moved_under_the_expectation(
     """Both sides are still checked. If the unit's identity re-derived from the tree no longer
     equals what the review was told to judge, the verdict is stale and refused."""
     outcome, _ = _verdict_fixture(
-        tmp_path, monkeypatch,
-        receipt_attempt=3, expected_attempt=3,
-        receipt_artefact="a" * 64, expected_artefact="a" * 64,
+        tmp_path,
+        monkeypatch,
+        receipt_attempt=3,
+        expected_attempt=3,
+        receipt_artefact="a" * 64,
+        expected_artefact="a" * 64,
         current_artefact="c" * 64,
     )
     assert outcome == "receipt_mismatched"
@@ -866,8 +901,12 @@ def test_the_suite_bound_is_well_inside_the_tick_abandonment(monkeypatch) -> Non
     """The bound only helps if it fires before the loop gives up on the whole tick. The loop
     abandons at 3000s; a clean run of this suite is about seven minutes."""
     driver = _load_driver()
-    assert driver.SUITE_TIMEOUT_S >= 600, "shorter than a clean run would fail closed constantly"
-    assert driver.SUITE_TIMEOUT_S <= 1800, "must fire well before the 3000s tick abandonment"
+    assert driver.SUITE_TIMEOUT_S >= 600, (
+        "shorter than a clean run would fail closed constantly"
+    )
+    assert driver.SUITE_TIMEOUT_S <= 1800, (
+        "must fire well before the 3000s tick abandonment"
+    )
 
 
 def test_a_valid_verdict_receipt_is_consumed_even_with_an_empty_envelope(
@@ -893,10 +932,16 @@ def test_a_valid_verdict_receipt_is_consumed_even_with_an_empty_envelope(
     monkeypatch.setattr(driver, "artefact_identity", lambda _unit: artefact)
     (briefs / "U01-verify.out").write_text("", encoding="utf-8")  # the empty envelope
     (briefs / "U01-verdict.json").write_text(
-        json.dumps({
-            "v": 1, "unit": "U01", "artefact": artefact, "attempt": 1,
-            "verdict": "SOUND", "findings": [],
-        }),
+        json.dumps(
+            {
+                "v": 1,
+                "unit": "U01",
+                "artefact": artefact,
+                "attempt": 1,
+                "verdict": "SOUND",
+                "findings": [],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -905,11 +950,119 @@ def test_a_valid_verdict_receipt_is_consumed_even_with_an_empty_envelope(
     )
     assert outcome == "SOUND"
 
-    # The completion gate itself: an empty envelope must not hide a present receipt.
-    envelope_empty = (briefs / "U01-verify.out").stat().st_size == 0
-    receipt_present = (briefs / "U01-verdict.json").stat().st_size > 0
-    assert envelope_empty and receipt_present
-    source = DRIVER.read_text(encoding="utf-8")
-    assert "-verdict.json\").stat().st_size > 0" in source, (
-        "review completion must also be satisfiable by a present verdict receipt"
+    # The completion gate itself: an empty envelope must not hide a present, BOUND receipt.
+    # (Superseded assertion once here checked for a literal source string; that string moved
+    # when the gate was extracted into `review_receipt_is_finished` to fix the stale-receipt
+    # regression below, so this now calls the real function instead of grepping for its shape.)
+    assert (briefs / "U01-verify.out").stat().st_size == 0
+    assert (briefs / "U01-verdict.json").stat().st_size > 0
+    assert (
+        driver.review_receipt_is_finished("U01", {"artefact": artefact, "attempt": 1})
+        is True
+    )
+
+
+def test_a_stale_verdict_receipt_from_a_prior_attempt_is_not_evidence_this_one_finished(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 25 August 2026, ~23:00 -- a REGRESSION in the very fix that let a receipt count
+    as completion evidence. `open(path, "w")` truncates `.out` to 0 bytes the instant a
+    re-dispatch launches, but nothing clears the OLD `<uid>-verdict.json` from the attempt
+    before. A01, AB and AC were each re-dispatched at a fresh attempt after their artefact
+    changed; their stale verdict.json (wrong attempt/artefact) still had bytes in it, so the
+    naive "verdict.json exists" check fired immediately -- before the new review had produced
+    anything -- and the resulting `no_dispatch` was memoised PERMANENTLY. The real verdict,
+    written minutes later, was never looked at again.
+
+    A verdict.json only counts as evidence THIS review finished if its own (unit, attempt,
+    artefact) matches what the driver currently expects.
+    """
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+
+    (briefs / "U01-verify.out").write_text(
+        "", encoding="utf-8"
+    )  # freshly truncated by re-dispatch
+    (briefs / "U01-verdict.json").write_text(
+        json.dumps(
+            {
+                "v": 1,
+                "unit": "U01",
+                "artefact": "OLD" + "a" * 61,
+                "attempt": 1,
+                "verdict": "SOUND",
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    current_expectation = {"artefact": "NEW" + "b" * 61, "attempt": 2}
+    assert driver.review_receipt_is_finished("U01", current_expectation) is False, (
+        "a verdict.json from a DIFFERENT attempt/artefact must not count as this review "
+        "having finished"
+    )
+
+
+def test_a_verdict_receipt_matching_the_current_attempt_still_counts_as_finished(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The case `review_receipt_is_finished` exists to preserve: an empty envelope must not
+    hide a genuinely current, valid verdict (the original AE/AA fix)."""
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+
+    (briefs / "U01-verify.out").write_text("", encoding="utf-8")
+    artefact = "c" * 64
+    (briefs / "U01-verdict.json").write_text(
+        json.dumps(
+            {
+                "v": 1,
+                "unit": "U01",
+                "artefact": artefact,
+                "attempt": 1,
+                "verdict": "SOUND",
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        driver.review_receipt_is_finished("U01", {"artefact": artefact, "attempt": 1})
+        is True
+    )
+
+
+def test_a_non_empty_envelope_counts_as_finished_regardless_of_the_receipt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The other half: a real, completed envelope is proof enough on its own, whatever state
+    the verdict.json is in -- including absent."""
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+
+    (briefs / "U01-verify.out").write_text("status: ok\n", encoding="utf-8")
+    assert (
+        driver.review_receipt_is_finished("U01", {"artefact": "x", "attempt": 1})
+        is True
+    )
+
+
+def test_neither_file_present_is_not_finished(tmp_path: Path, monkeypatch) -> None:
+    """The ordinary, most common state: a review genuinely still running. Must not be treated
+    as finished, or its eventual real verdict is exposed to the same permanent-memo hazard."""
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    assert (
+        driver.review_receipt_is_finished("U01", {"artefact": "x", "attempt": 1})
+        is False
     )
