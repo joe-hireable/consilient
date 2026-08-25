@@ -280,18 +280,36 @@ def suite_green() -> bool:
 
     Judge on the summary line pytest actually prints, and fail closed when there is none:
     an absent summary means the run did not complete, which is not the same as passing.
+
+    SUBSTRINGS, NOT COUNTS, was the second defect here and it cost far more than the first.
+    The test was `"failed" not in last`, and pytest's summary for a green run reads
+
+        1761 passed, 3 skipped, 1 xfailed in 250.69s
+
+    -- in which "xfailed" CONTAINS "failed". So a suite with a single expected failure was
+    reported red for ever. MEASURED 25 August 2026: the same tree that pytest summarised as
+    "1761 passed, 3 skipped, 1 xfailed" was reported by this function as not green, and the
+    publication gate printed "publish held: 123 commit(s) ready, suite not green" tick after
+    tick while public sat 123 commits behind. An xfail is a PASSING outcome; a test expected
+    to fail and failing is the suite working.
+
+    Count the numbers pytest reports rather than sniffing for words inside other words. The
+    word boundary is what does the work: `\\b\\d+ failed` cannot match "1 xfailed", because the
+    "x" is a word character. Fails closed still -- no counted pass means not green.
     """
     r = sh([sys.executable, "-m", "pytest", "tests/", "-q"])
     text = (r.stdout or "") + (r.stderr or "")
     summary = [
         ln
         for ln in text.splitlines()
-        if " passed" in ln or " failed" in ln or " error" in ln
+        if re.search(r"\b\d+ (passed|failed|error|errors|xfailed|skipped)\b", ln)
     ]
     if not summary:
         return False
     last = summary[-1]
-    return "passed" in last and "failed" not in last and "error" not in last
+    if re.search(r"\b\d+ (failed|error|errors)\b", last):
+        return False
+    return bool(re.search(r"\b\d+ passed\b", last))
 
 
 def committed(uid: str, unit: dict) -> bool:
