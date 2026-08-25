@@ -475,6 +475,27 @@ def consume_review_verdict(
 
     outcome = "check_error"
     findings: list[str] = []
+    # Did the REVIEWER actually run and say something, or did the dispatch die before it got
+    # there? The two are recorded identically as check_error, but they are not the same event
+    # and must not cost the same. F-05, this driver's own rule: an infrastructure death is not
+    # evidence about the work, so it must not spend a retry.
+    #
+    # MEASURED 25 August 2026. Of 50 check_errors, 33 had an EMPTY receipt -- the review never
+    # produced a byte, because its clone failed or its workspace was stranded. Those three
+    # empty attempts nonetheless consumed the review cap, and the driver then refused to review
+    # those units ever again: "ESCALATION -- review of X reached 3 attempts". Ten units became
+    # permanently unverifiable because the infrastructure had failed, not the work. A unit that
+    # cannot be reviewed cannot retire, cannot unblock its dependants, and cannot count.
+    reviewer_spoke = False
+    try:
+        receipt = BRIEFS / f"{uid}-verify.out"
+        if receipt.exists() and receipt.stat().st_size > 0:
+            body = receipt.read_text(encoding="utf-8", errors="replace")
+            marker = body.find("--- stdout ---")
+            said = body[marker + len("--- stdout ---") :] if marker >= 0 else body
+            reviewer_spoke = bool(said.strip())
+    except OSError:
+        reviewer_spoke = False
     try:
         outer = json.loads((BRIEFS / f"{uid}-verify.out").read_text(encoding="utf-8"))
         if not isinstance(outer, dict) or outer.get("status") != "ok":
@@ -520,6 +541,13 @@ def consume_review_verdict(
             + " exceeded the restart intensity limit. Auto-repair stopped; "
             "it needs a person."
         )
+    if outcome == "check_error" and not reviewer_spoke:
+        # Nothing was said, so nothing was judged. Give the attempt back rather than spending a
+        # third of this unit's review budget on a workspace that never provisioned.
+        counter = state.setdefault("review_attempts", {})
+        counter[uid] = max(0, counter.get(uid, 1) - 1)
+        outcome = "check_error_infrastructure"
+
     record = {
         "unit": uid,
         "artefact": artefact,

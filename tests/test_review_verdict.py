@@ -139,10 +139,17 @@ def test_unusable_review_output_fails_closed(
     if payload is not None:
         _write_review(tmp_path, payload)
 
-    assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error"
+    # Both shapes fail closed -- that is the property under test and it is unchanged. They are
+    # reported under different names because they are different events: a receipt that is
+    # MALFORMED means the reviewer ran and produced something unusable, while NO RECEIPT AT ALL
+    # means the dispatch died before the reviewer said anything. Only the first is evidence
+    # about the review, and only the first may spend a review attempt (F-05).
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    expected = "check_error" if payload is not None else "check_error_infrastructure"
+    assert outcome == expected
     assert state["done"] == []
     assert state["verified"] == []
-    assert recorded[0]["outcome"] == "check_error"
+    assert recorded[0]["outcome"] == expected
 
 
 def test_legacy_flags_and_a_rejected_artefact_cannot_retire(tmp_path: Path, monkeypatch) -> None:
@@ -170,3 +177,36 @@ def test_malformed_and_stale_sound_outputs_fail_closed(tmp_path: Path, monkeypat
     _write_review(tmp_path, _outer(_verdict("SOUND")))
     monkeypatch.setattr(driver, "artefact_identity", lambda _unit: "b" * 64)
     assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error"
+
+
+
+# --- an infrastructure failure must not spend a review attempt, 25 August 2026 ---
+#
+# MEASURED: of 50 check_errors, 33 had an EMPTY receipt -- the review never produced a byte,
+# because its clone failed or its workspace was stranded. Those empty attempts nonetheless
+# consumed the review cap, and the driver then refused to review those units ever again:
+# "ESCALATION -- review of X reached 3 attempts". Ten units became permanently unverifiable
+# because the infrastructure had failed, not the work.
+
+
+def test_a_silent_review_does_not_spend_an_attempt(tmp_path: Path, monkeypatch) -> None:
+    driver, _recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    state["review_attempts"] = {"AV": 2}
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: ARTEFACT)
+
+    # No receipt written at all: the dispatch died before the reviewer said anything.
+    assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error_infrastructure"
+    assert state["review_attempts"]["AV"] == 1, "a silent review consumed a review attempt"
+
+
+def test_a_reviewer_that_spoke_badly_does_spend_an_attempt(tmp_path: Path, monkeypatch) -> None:
+    """Deduplication of infrastructure must not become a free pass for a bad reviewer."""
+    driver, _recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    state["review_attempts"] = {"AV": 2}
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: ARTEFACT)
+    _write_review(tmp_path, _outer("I looked at it and it seems fine to me."))
+
+    assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error"
+    assert state["review_attempts"]["AV"] == 2, "a reviewer that ran must still spend its attempt"
