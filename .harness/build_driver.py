@@ -2228,6 +2228,31 @@ def main() -> int:
             finished = receipt.stat().st_size > 0
         except OSError:
             finished = False
+        # A VALID VERDICT RECEIPT IS ITSELF PROOF THE REVIEW FINISHED.
+        #
+        # MEASURED 25 August 2026, 21:50, and this is why the day produced so little. AE and AA
+        # both held well-formed `<uid>-verdict.json` receipts bound to their unit's CURRENT
+        # artefact -- the driver's own `_load_verdict_file` returned SOUND and DEFECTIVE for them
+        # when called directly -- and both sat in `review_dispatched` unconsumed, because
+        # `<uid>-verify.out` was ZERO BYTES. A finished review with a valid verdict was ignored
+        # on account of a DIFFERENT file being empty.
+        #
+        # The `.out` is the dispatch ENVELOPE, written by the wrapper. The verdict is what the
+        # reviewer wrote. Gating on the envelope adds a failure mode without adding safety: the
+        # envelope can be truncated by a re-dispatch, or never written if the wrapper died after
+        # the reviewer had already produced its verdict, and in both cases real evidence is
+        # discarded.
+        #
+        # This is not a relaxation. `_load_verdict_file` still validates schema and re-derives
+        # artefact identity on both sides, and a torn or partial receipt fails `json.loads` and
+        # comes back `receipt_unparseable`, which is retried. The race fails closed exactly as
+        # before -- what changes is that a COMPLETE receipt is no longer thrown away because a
+        # sibling file is empty.
+        if not finished:
+            try:
+                finished = (BRIEFS / f"{uid}-verdict.json").stat().st_size > 0
+            except OSError:
+                finished = False
         if not finished:
             continue
         outcome = consume_review_verdict(state, uid, units[uid])

@@ -868,3 +868,48 @@ def test_the_suite_bound_is_well_inside_the_tick_abandonment(monkeypatch) -> Non
     driver = _load_driver()
     assert driver.SUITE_TIMEOUT_S >= 600, "shorter than a clean run would fail closed constantly"
     assert driver.SUITE_TIMEOUT_S <= 1800, "must fire well before the 3000s tick abandonment"
+
+
+def test_a_valid_verdict_receipt_is_consumed_even_with_an_empty_envelope(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 25 August 2026, 21:50 -- why the day produced so few verdicts.
+
+    AE and AA both held well-formed `<uid>-verdict.json` receipts bound to their unit's CURRENT
+    artefact; the driver's own `_load_verdict_file` returned SOUND and DEFECTIVE for them when
+    called directly. Both sat unconsumed because `<uid>-verify.out` was ZERO BYTES. A finished
+    review with a valid verdict was ignored because a DIFFERENT file was empty.
+
+    The `.out` is the dispatch envelope; the verdict is what the reviewer wrote. The envelope can
+    be truncated by a re-dispatch or never written if the wrapper died after the reviewer had
+    already produced its verdict.
+    """
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+
+    artefact = "d" * 64
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: artefact)
+    (briefs / "U01-verify.out").write_text("", encoding="utf-8")  # the empty envelope
+    (briefs / "U01-verdict.json").write_text(
+        json.dumps({
+            "v": 1, "unit": "U01", "artefact": artefact, "attempt": 1,
+            "verdict": "SOUND", "findings": [],
+        }),
+        encoding="utf-8",
+    )
+
+    outcome, _findings = driver._load_verdict_file(
+        "U01", {"claims": ["a.py"]}, {"artefact": artefact, "attempt": 1}
+    )
+    assert outcome == "SOUND"
+
+    # The completion gate itself: an empty envelope must not hide a present receipt.
+    envelope_empty = (briefs / "U01-verify.out").stat().st_size == 0
+    receipt_present = (briefs / "U01-verdict.json").stat().st_size > 0
+    assert envelope_empty and receipt_present
+    source = DRIVER.read_text(encoding="utf-8")
+    assert "-verdict.json\").stat().st_size > 0" in source, (
+        "review completion must also be satisfiable by a present verdict receipt"
+    )
