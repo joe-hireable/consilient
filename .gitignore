@@ -135,3 +135,19 @@ docs/10-research/experiments/*/results-*.json.lock
 .harness/build-loop.out
 .harness/build-loop.err
 .harness/board-snapshot.json
+
+# Teardown/research clones kept under .harness. These are other people's repositories, cloned
+# locally to read; committing one as a GITLINK publishes a submodule pointer to a repo this
+# project does not control, and the publication gate cannot read it as a file so it fails
+# closed -- which is what refused the push on 25 Aug 2026. Instance data; never tracked.
+.harness/*-teardown-source-*/
+.harness/*-teardown-source-*
+
+# Orchestration and experiment scratch directories. These are per-run working copies -- two of
+# them are COMPLETE extra copies of src/consilient/, so `git ls-files` returned three
+# consilient/events.py and the guard-mutation registry could not tell which module a finding
+# belonged to. They also failed the publication gate as unrecognised tracked paths, which is
+# what refused the push on 25 Aug 2026. Instance data; the files stay on disk. See unit Z04.
+.harness/exp-s02-audit-*/
+.harness/orch-*/
+.harness/s02-mut-*/
