@@ -21,7 +21,7 @@ import pytest
 
 from consilient import coordination, routing, work_items
 from consilient.beta import INSUFFICIENT, MEASURED, Beta
-from consilient.events import EventError, read_all
+from consilient.events import Event, EventError, read_all
 from consilient.harness import (
     DEFAULT_POOLS,
     HARNESSES,
@@ -1399,3 +1399,75 @@ def test_claim_ready_work_binds_epoch_and_refuses_an_unready_dependent(tmp_path)
             epsilon=0.40,
             now=T0,
         )
+
+
+# --- fencing epoch across a day boundary, 25 August 2026 -----------------------
+#
+# `open_claim` derives the epoch from `read_all(log)`, which reads EVERY day file. The F02
+# append transaction validates it against `_read_under_lock(path, fd)` -- ONE file, the day
+# being appended to. While every claim lived in the same day file the two agreed. At midnight
+# the log rolled, the new day's file held no earlier claim, the expectation collapsed to 1, and
+# every dispatch that had legitimately computed a higher epoch from the real history was
+# refused as stale. 26 units reached the retry cap this way and dispatch stopped.
+#
+# Equality was never the safety property: a token that outranks by more than the minimum is
+# still monotone. Only a token that is BEHIND is unsafe.
+
+
+def _claim_payload(tmp_path, *, run_id, epoch, at):
+    return coordination._claim_event_payload(
+        run_id=run_id,
+        paths=[coordination.canonical_path("src", cwd=tmp_path)],
+        cwd=tmp_path,
+        opened=at,
+        expires=at + timedelta(seconds=coordination.LEASE_TTL_S),
+        fencing_epoch=epoch,
+        harness=None,
+        task=None,
+    )
+
+
+def test_an_epoch_ahead_of_the_locked_prefix_is_admitted(tmp_path):
+    """The exact regression that stopped dispatch.
+
+    The locked prefix is the day file being appended to. On a fresh day it is EMPTY, so the
+    expectation is 1 -- while the client, reading the whole trajectory, correctly computed 4.
+    That must be admitted: 4 outranks everything in scope, which is the fencing property.
+    """
+    coordination._validate_dispatch_claim_admission(
+        (),
+        (),
+        (_claim_payload(tmp_path, run_id="run-next-day", epoch=4, at=T0),),
+        cwd=tmp_path,
+        now=T0,
+    )
+
+
+def test_an_epoch_behind_the_locked_prefix_is_still_refused(tmp_path):
+    """Negative control: the safety property is that a token may not be BEHIND."""
+    held = _claim_payload(tmp_path, run_id="run-holder", epoch=2, at=T0)
+    expired = T0 + timedelta(seconds=coordination.LEASE_TTL_S + 5)
+    with pytest.raises(EventError, match="is stale"):
+        coordination._validate_dispatch_claim_admission(
+            (Event(held),),
+            (),
+            (_claim_payload(tmp_path, run_id="run-behind", epoch=1, at=expired),),
+            cwd=tmp_path,
+            now=expired,
+        )
+
+
+def test_the_epoch_climbs_past_expired_claims(tmp_path):
+    """An expired holder can wake and write, so the next lease must still outrank it."""
+    log = tmp_path / "log"
+    for index, run in enumerate(("run-a", "run-b", "run-c")):
+        event = coordination.open_claim(
+            log,
+            run_id=run,
+            paths=["src"],
+            cwd=tmp_path,
+            timeout_s=3600,
+            now=T0 + timedelta(seconds=index * (coordination.LEASE_TTL_S + 5)),
+            lease_s=coordination.LEASE_TTL_S,
+        )
+    assert event["data"]["fencing_epoch"] == 3, event["data"]["fencing_epoch"]

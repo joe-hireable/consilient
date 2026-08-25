@@ -434,9 +434,35 @@ def _validate_dispatch_claim_admission(
         expected = _next_fencing_epoch(
             history, paths, cwd=cwd, ticket=claim_ticket(str(data["run_id"]))
         )
-        if data.get("fencing_epoch") != expected:
+        # AT LEAST, not EXACTLY. MEASURED 25 August 2026: this was `!= expected` and it stopped
+        # the harness dispatching. 26 units sat at the retry cap and every one of them had died
+        # here -- "fencing epoch 4 is stale; expected 1", 78 recorded deaths of this shape.
+        #
+        # The two sides compute over different scopes. `open_claim` derives the epoch from
+        # `read_all(log)`, which reads EVERY day file in the trajectory. This validator runs
+        # inside the F02 append transaction, whose locked prefix is `_read_under_lock(path, fd)`
+        # -- ONE file, the day being appended to. While every claim lived in the same day file
+        # the two agreed. At midnight the log rolled, the new day's file held no earlier claim,
+        # `expected` collapsed to 1, and every dispatch that had legitimately computed 4 or 5
+        # from the real history was refused as stale. That is exactly when dispatch stopped.
+        #
+        # Equality was never the safety property. The fencing rule (Kleppmann) is that a new
+        # token must OUTRANK every earlier one; a token that outranks by more than the minimum
+        # is still monotone and still safe. Only a token that is too LOW can let an expired
+        # holder write behind a live one, and the error text has always said "stale", which is
+        # a claim about being behind. So refuse below `expected` and accept at or above it.
+        #
+        # Widening the locked read to the whole directory would be the other repair, and it is
+        # the wrong one: it puts a seven-file scan inside a held write lock on the hot path.
+        supplied = data.get("fencing_epoch")
+        if (
+            not isinstance(supplied, int)
+            or isinstance(supplied, bool)
+            or supplied < expected
+        ):
             raise EventError(
-                f"fencing epoch {data.get('fencing_epoch')!r} is stale; expected {expected}"
+                f"fencing epoch {supplied!r} is stale; the next epoch for these paths "
+                f"is at least {expected}"
             )
         history.append(Event(candidate))
 
