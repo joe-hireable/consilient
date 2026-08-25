@@ -720,6 +720,21 @@ def test_escalation_banner_counts_retirements(tmp_path: Path, monkeypatch, capsy
     monkeypatch.setattr(driver, "publish_if_ready", lambda _state, _green: "")
     monkeypatch.setattr(driver, "ready", lambda *_a, **_k: False)
     monkeypatch.setattr(driver.subprocess, "Popen", lambda *_a, **_k: None)
+    # The Popen stub above states the intent -- this test must never start a process -- but it
+    # cannot carry it out on its own: `sh` calls `subprocess.run`, which uses Popen as a CONTEXT
+    # MANAGER, so a None return raises `TypeError: 'NoneType' object does not support the context
+    # manager protocol` from inside the stdlib. It surfaced when a `sh` call was added to a path
+    # this test reaches, and it fired AFTER the banner had already been printed correctly: the
+    # assertion below was passing while the test failed.
+    #
+    # Stubbing `sh` is what the Popen stub was reaching for. Nothing about the banner is relaxed;
+    # the empty stdout makes `suite_green` fail closed, which is the honest default here.
+    class _NoProcess:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(driver, "sh", lambda *_a, **_k: _NoProcess())
 
     def fake_retest(current: dict) -> int:
         for uid in ("T02", "K01"):
