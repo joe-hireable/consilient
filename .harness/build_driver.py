@@ -941,10 +941,24 @@ def gate_merged_tree(touched: list[str]) -> str | None:
     existing = [path for path in touched if path and (ROOT / path).exists()]
     if not existing:
         return None
-    checks: list[list[str]] = [
-        ["ruff", "check", *existing],
-        [sys.executable, "-m", "mypy", "--config-file", "mypy.ini", *existing],
-    ]
+    # ruff and mypy are PYTHON tools and must only be handed Python.
+    #
+    # MEASURED 25 August 2026: a cherry-pick that touched `.gitignore` had it passed straight to
+    # `ruff check`, which parsed it as a module and reported `invalid-syntax: Expected an
+    # expression` on the glob patterns -- 129 errors, non-zero exit, merge REFUSED. The commit
+    # was fine. The gate was reading a gitignore as a syntax error, and the units it blocked
+    # hardest were the harness-cleanup ones, because those are the commits that touch
+    # `.gitignore`.
+    #
+    # A gate that refuses correct work is worse than no gate: it is indistinguishable from the
+    # work being wrong, and it teaches everyone to route around the gate.
+    python_files = [path for path in existing if path.endswith(".py")]
+    checks: list[list[str]] = []
+    if python_files:
+        checks.append(["ruff", "check", *python_files])
+        checks.append(
+            [sys.executable, "-m", "mypy", "--config-file", "mypy.ini", *python_files]
+        )
     acceptance = ROOT / ".github" / "scripts" / "check_merge_acceptance.py"
     if acceptance.is_file():
         checks.append([sys.executable, str(acceptance), "--files", *existing])

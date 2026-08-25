@@ -745,3 +745,85 @@ def test_escalation_banner_counts_retirements(tmp_path: Path, monkeypatch, capsy
     assert driver.main() == 0
     out = capsys.readouterr().out
     assert "5 escalated, 2 retired without review" in out
+
+
+def test_merge_gate_never_hands_a_non_python_file_to_ruff_or_mypy(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 25 August 2026: a cherry-pick touching `.gitignore` had it passed straight to
+    `ruff check`, which parsed the glob patterns as Python and reported 129
+    `invalid-syntax: Expected an expression` errors. Non-zero exit, merge REFUSED, commit fine.
+
+    The units this blocked hardest were the harness-cleanup ones, because those are precisely
+    the commits that touch `.gitignore`. A gate that refuses correct work is worse than no
+    gate: it is indistinguishable from the work being wrong.
+    """
+    driver = _load_driver()
+    monkeypatch.setattr(driver, "ROOT", tmp_path)
+    for name in (".gitignore", "notes.md", "data.json", "mod.py"):
+        (tmp_path / name).write_text("x\n", encoding="utf-8")
+
+    seen: list[list[str]] = []
+
+    class _Ok:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _record(args: list[str]) -> "_Ok":
+        seen.append(list(args))
+        return _Ok()
+
+    monkeypatch.setattr(driver, "sh", _record)
+    assert (
+        driver.gate_merged_tree([".gitignore", "notes.md", "data.json", "mod.py"])
+        is None
+    )
+
+    linters = [
+        command
+        for command in seen
+        if any("ruff" in part or "mypy" in part for part in command)
+    ]
+    assert linters, "the gate ran no linter at all"
+    allowed = {"check", "-m", "mypy", "--config-file"}
+    for command in linters:
+        for argument in command[1:]:
+            if argument.startswith("-") or argument.endswith("mypy.ini"):
+                continue
+            if argument.endswith(".py") or "python" in argument.lower():
+                continue
+            if argument in allowed:
+                continue
+            raise AssertionError(
+                f"{command[0]} was handed a non-Python path {argument!r}"
+            )
+
+
+def test_merge_gate_runs_no_linter_when_a_commit_touches_no_python(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A docs-only or gitignore-only commit gives a Python linter nothing to say, and must not
+    be refused for that."""
+    driver = _load_driver()
+    monkeypatch.setattr(driver, "ROOT", tmp_path)
+    (tmp_path / ".gitignore").write_text("*.pyc\n", encoding="utf-8")
+
+    seen: list[list[str]] = []
+
+    class _Ok:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _record(args: list[str]) -> "_Ok":
+        seen.append(list(args))
+        return _Ok()
+
+    monkeypatch.setattr(driver, "sh", _record)
+    assert driver.gate_merged_tree([".gitignore"]) is None
+    assert not [
+        command
+        for command in seen
+        if any("ruff" in part or "mypy" in part for part in command)
+    ], "a gitignore-only commit must not invoke a Python linter"
