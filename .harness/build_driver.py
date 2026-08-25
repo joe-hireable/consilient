@@ -2139,11 +2139,32 @@ def main() -> int:
 
     # Built but unreviewed units get an adversarial reviewer from a different family before
     # they count as complete. Verifying by the unit's own tests alone is echo.
+    # Quarantine must NOT block review, and this used to exclude quarantined units here.
+    #
+    # MEASURED 25 August 2026: that made quarantine a terminal state wearing a recoverable
+    # one's clothes. `clear_quarantine_after_landed_check` says so in its own docstring -- "a
+    # SOUND, identity-bound review is the automatic quarantine recovery path" -- and the only
+    # route to a SOUND review was a list this filter removed the unit from. Quarantine blocked
+    # review; only review cleared quarantine. Seven units sat in it with no way out: AJ, AL,
+    # F04, N04, BM, D02 and BN.
+    #
+    # BN is the one that shows the cost. It was quarantined for three identical fencing deaths,
+    # and it had ALREADY produced the fix for the build's central convergence problem --
+    # serialising units that design the same subsystem. Its work was sound and its tests passed.
+    # A deadlock in the recovery path was holding the repair for the thing most in need of it.
+    #
+    # Quarantine exists to stop a unit burning retries on a dispatch that keeps dying the same
+    # way -- "a defect, not bad luck". That is a statement about DISPATCHING more work. It is
+    # not a reason to refuse to JUDGE work that already exists and is already committed. The two
+    # are different questions and only the first is what quarantine was reasoning about.
+    #
+    # Dispatch stays blocked (the build and resolve paths still exclude quarantined units), so
+    # nothing starts burning retries again. Only the verdict path reopens, which is precisely
+    # the door the recovery was written to come through.
     pending_review = [
         u
         for u in sorted(state.setdefault("built", []))
         if u not in state.setdefault("review_dispatched", [])
-        and u not in state.setdefault("quarantined", [])
     ]
 
     live = live_dispatchers(state)

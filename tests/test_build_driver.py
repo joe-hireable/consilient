@@ -842,3 +842,45 @@ def test_merge_gate_runs_no_linter_when_a_commit_touches_no_python(
         for command in seen
         if any("ruff" in part or "mypy" in part for part in command)
     ], "a gitignore-only commit must not invoke a Python linter"
+
+
+def test_a_quarantined_unit_is_still_eligible_for_review(monkeypatch) -> None:
+    """Quarantine must not block the one path out of quarantine.
+
+    MEASURED 25 August 2026: review selection excluded quarantined units, while
+    `clear_quarantine_after_landed_check` documents "a SOUND, identity-bound review is the
+    automatic quarantine recovery path". Quarantine blocked review; only review cleared
+    quarantine. Seven units were stuck with no route out, one of them BN -- which had already
+    built the fix for the build's central convergence problem.
+
+    Quarantine is a statement about dispatching more work, not about judging work that exists.
+    """
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "built": ["BN", "OK1"],
+        "review_dispatched": [],
+        "quarantined": ["BN"],
+    }
+    pending = [
+        u
+        for u in sorted(state["built"])  # type: ignore[arg-type]
+        if u not in state["review_dispatched"]  # type: ignore[operator]
+    ]
+    assert "BN" in pending, "a quarantined unit must still be reachable by review"
+
+    source = DRIVER.read_text(encoding="utf-8")
+    selection = source.split("pending_review = [", 1)[1].split("]", 1)[0]
+    assert "quarantined" not in selection, (
+        "review selection must not filter on quarantine -- that is the deadlock: "
+        "quarantine blocks review, and only a SOUND review clears quarantine"
+    )
+
+
+def test_quarantine_still_blocks_dispatching_new_work(monkeypatch) -> None:
+    """The half of quarantine that must stay: a unit dying the same way three times does not
+    get handed more dispatches. Only the verdict path reopens."""
+    source = DRIVER.read_text(encoding="utf-8")
+    assert source.count('state.setdefault("quarantined", [])') >= 3, (
+        "quarantine must still gate build selection and conflict resolution; only review "
+        "was meant to reopen"
+    )
