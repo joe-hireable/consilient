@@ -2250,6 +2250,7 @@ def main() -> int:
     # that made the tail-only parser fail is what makes this safe. A non-empty artefact means
     # that review's process has written its final report and let go of the file. A torn read
     # fails json.loads, becomes a check_error, and is retried, so the race fails closed.
+    consumed_any = False
     for uid in sorted(list(state.setdefault("review_dispatched", []))):
         receipt = BRIEFS / f"{uid}-verify.out"
         try:
@@ -2285,6 +2286,26 @@ def main() -> int:
             continue
         outcome = consume_review_verdict(state, uid, units[uid])
         print(f"driver: review of {uid} consumed as {outcome}")
+        consumed_any = True
+    # PERSIST A VERDICT THE MOMENT IT IS CONSUMED, not at the end of the tick.
+    #
+    # MEASURED 25 August 2026, 22:30. The log recorded `review of AA consumed as DEFECTIVE` and
+    # `review of AE consumed as SOUND`, and forty minutes later the state file still said
+    # `no_dispatch` for both -- because `save_state` runs at the END of `main()`, and the tick had
+    # not got there. Consumption happens in the first minutes; merges, dispatches and a full suite
+    # follow. A tick that is killed, wedged or abandoned at its deadline loses every verdict it
+    # consumed, and this driver's ticks have been killed repeatedly today.
+    #
+    # So the evidence was being gathered correctly and then thrown away by a save that came too
+    # late. That is the quietest way to lose work: nothing errors, the log says the verdict was
+    # consumed, and the state simply does not have it.
+    #
+    # A verdict is the most expensive artefact this system produces -- an adversarial review by a
+    # different model family, twenty minutes of it -- and it should not be held in memory across
+    # the slowest part of the tick. `save_state` is atomic (temp file plus `os.replace`), so
+    # calling it more than once per tick costs a write and risks nothing.
+    if consumed_any:
+        save_state(state)
     done = retired_units(state, units)
     built = set(state.setdefault("built", []))
     state["done"] = sorted(done)
