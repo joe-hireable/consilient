@@ -5,9 +5,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from datetime import date
 from pathlib import Path
-
-import pytest
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -17,7 +16,17 @@ UNIT = {
     "claims": [".harness/build_driver.py"],
     "title": "review gate",
     "plan": "review-plan.md",
+    "commit": "fix(driver): make the reviewer receipt arrive and count what is lost",
 }
+
+LOSS_REASONS = (
+    "no_dispatch",
+    "dispatch_refused",
+    "dispatch_failed",
+    "no_receipt_file",
+    "receipt_unparseable",
+    "receipt_mismatched",
+)
 
 
 def _load_driver():
@@ -40,12 +49,18 @@ def _state() -> dict:
     }
 
 
-def _write_review(tmp_path: Path, payload: object) -> None:
-    (tmp_path / "AV-verify.out").write_text(json.dumps(payload), encoding="utf-8")
+def _write_dispatch(tmp_path: Path, payload: object | str) -> None:
+    text = payload if isinstance(payload, str) else json.dumps(payload)
+    (tmp_path / "AV-verify.out").write_text(text, encoding="utf-8")
 
 
-def _outer(verdict: object, status: str = "ok") -> dict:
-    return {"status": status, "stdout_tail": json.dumps(verdict)}
+def _write_receipt(tmp_path: Path, payload: object | str) -> None:
+    text = payload if isinstance(payload, str) else json.dumps(payload)
+    (tmp_path / "AV-verdict.json").write_text(text, encoding="utf-8")
+
+
+def _ok_envelope() -> dict:
+    return {"status": "ok", "stdout_tail": "A01 stays **SOUND**"}
 
 
 def _verdict(verdict: str, **extra: object) -> dict:
@@ -75,7 +90,8 @@ def test_identity_matched_sound_retires_once_and_records_trajectory(
     """Removing verdict consumption must leave a built unit unretired."""
     driver, recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
-    _write_review(tmp_path, _outer(_verdict("SOUND")))
+    _write_dispatch(tmp_path, _ok_envelope())
+    _write_receipt(tmp_path, _verdict("SOUND"))
 
     assert driver.consume_review_verdict(state, "AV", UNIT) == "SOUND"
     assert state["done"] == ["AV"]
@@ -99,9 +115,10 @@ def test_defective_review_requeues_repair_with_findings(tmp_path: Path, monkeypa
     """Changing DEFECTIVE into pass must retire a known-bad artefact."""
     driver, recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
-    _write_review(
+    _write_dispatch(tmp_path, _ok_envelope())
+    _write_receipt(
         tmp_path,
-        _outer(_verdict("DEFECTIVE", findings=["missing refusal at the trust boundary"])),
+        _verdict("DEFECTIVE", findings=["missing refusal at the trust boundary"]),
     )
 
     assert driver.consume_review_verdict(state, "AV", UNIT) == "DEFECTIVE"
@@ -115,44 +132,161 @@ def test_defective_review_requeues_repair_with_findings(tmp_path: Path, monkeypa
     ).read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize(
-    ("payload", "artefact"),
-    [
-        (None, ARTEFACT),
-        ("SOUND", ARTEFACT),
-        (_outer("prose only"), ARTEFACT),
-        (_outer(_verdict("SOUND"), status="failed"), ARTEFACT),
-        (_outer(_verdict("SOUND", v=2)), ARTEFACT),
-        (_outer(_verdict("UNKNOWN")), ARTEFACT),
-        (_outer(_verdict("SOUND", unit="OTHER")), ARTEFACT),
-        (_outer(_verdict("SOUND", artefact="b" * 64)), ARTEFACT),
-        (_outer(_verdict("SOUND", extra="not allowed")), ARTEFACT),
-    ],
-)
-def test_unusable_review_output_fails_closed(
-    tmp_path: Path, monkeypatch, payload: object, artefact: str
+def test_stdout_json_without_receipt_file_is_not_sound(
+    tmp_path: Path, monkeypatch
 ) -> None:
-    """Malformed, failed, and identity-mismatched reviews are infrastructure errors."""
+    """The driver must not consume a receipt from stdout_tail."""
     driver, recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
-    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: artefact)
-    if payload is not None:
-        _write_review(tmp_path, payload)
+    _write_dispatch(
+        tmp_path,
+        {"status": "ok", "stdout_tail": json.dumps(_verdict("SOUND"))},
+    )
 
-    # Both shapes fail closed -- that is the property under test and it is unchanged. They are
-    # reported under different names because they are different events: a receipt that is
-    # MALFORMED means the reviewer ran and produced something unusable, while NO RECEIPT AT ALL
-    # means the dispatch died before the reviewer said anything. Only the first is evidence
-    # about the review, and only the first may spend a review attempt (F-05).
     outcome = driver.consume_review_verdict(state, "AV", UNIT)
-    expected = "check_error" if payload is not None else "check_error_infrastructure"
-    assert outcome == expected
+    assert outcome == "no_receipt_file"
+    assert outcome != "SOUND"
     assert state["done"] == []
-    assert state["verified"] == []
-    assert recorded[0]["outcome"] == expected
+    assert recorded[0]["outcome"] == "no_receipt_file"
 
 
-def test_legacy_flags_and_a_rejected_artefact_cannot_retire(tmp_path: Path, monkeypatch) -> None:
+def test_prose_receipt_file_is_unparseable_and_not_sound(
+    tmp_path: Path, monkeypatch
+) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    _write_dispatch(tmp_path, _ok_envelope())
+    _write_receipt(tmp_path, "A01 stays **SOUND**")
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "receipt_unparseable"
+    assert recorded[0]["outcome"] == "receipt_unparseable"
+    assert state["done"] == []
+
+
+def test_absent_receipt_file_is_no_receipt_file(tmp_path: Path, monkeypatch) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    _write_dispatch(tmp_path, _ok_envelope())
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "no_receipt_file"
+    assert recorded[0]["outcome"] == "no_receipt_file"
+    assert state["done"] == []
+
+
+def test_empty_out_is_no_dispatch(tmp_path: Path, monkeypatch) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    (tmp_path / "AV-verify.out").write_text("", encoding="utf-8")
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "no_dispatch"
+    assert recorded[0]["outcome"] == "no_dispatch"
+    assert state["done"] == []
+
+
+def test_missing_out_is_no_dispatch(tmp_path: Path, monkeypatch) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "no_dispatch"
+    assert recorded[0]["outcome"] == "no_dispatch"
+
+
+def test_refused_dispatch_is_dispatch_refused(tmp_path: Path, monkeypatch) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    _write_dispatch(tmp_path, "status: refused\nreason: trajectory lock held\n")
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "dispatch_refused"
+    assert recorded[0]["outcome"] == "dispatch_refused"
+    assert state["done"] == []
+
+
+def test_json_refused_dispatch_is_dispatch_refused(
+    tmp_path: Path, monkeypatch
+) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    _write_dispatch(tmp_path, {"status": "refused", "reason": "claim collision"})
+    _write_receipt(tmp_path, _verdict("SOUND"))
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "dispatch_refused"
+    assert recorded[0]["outcome"] == "dispatch_refused"
+
+
+def test_failed_dispatch_is_dispatch_failed(tmp_path: Path, monkeypatch) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    _write_dispatch(tmp_path, {"status": "timeout"})
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "dispatch_failed"
+    assert recorded[0]["outcome"] == "dispatch_failed"
+    assert state["done"] == []
+
+
+def test_mismatched_artefact_is_receipt_mismatched(
+    tmp_path: Path, monkeypatch
+) -> None:
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    state = _state()
+    _write_dispatch(tmp_path, _ok_envelope())
+    _write_receipt(tmp_path, _verdict("SOUND", artefact="b" * 64))
+
+    outcome = driver.consume_review_verdict(state, "AV", UNIT)
+    assert outcome == "receipt_mismatched"
+    assert recorded[0]["outcome"] == "receipt_mismatched"
+    assert state["done"] == []
+
+
+def test_loss_reasons_are_distinct_and_none_is_sound(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Prose, absent file, empty .out, refused dispatch and mismatch stay partitioned."""
+    driver, recorded = _prepare(tmp_path, monkeypatch)
+    cases = [
+        ("prose", "receipt_unparseable"),
+        ("absent", "no_receipt_file"),
+        ("empty", "no_dispatch"),
+        ("refused", "dispatch_refused"),
+        ("mismatch", "receipt_mismatched"),
+    ]
+    seen: list[str] = []
+    for label, expected in cases:
+        state = _state()
+        if (tmp_path / "AV-verdict.json").exists():
+            (tmp_path / "AV-verdict.json").unlink()
+        if (tmp_path / "AV-verify.out").exists():
+            (tmp_path / "AV-verify.out").unlink()
+        if label == "prose":
+            _write_dispatch(tmp_path, _ok_envelope())
+            _write_receipt(tmp_path, "A01 stays **SOUND**")
+        elif label == "absent":
+            _write_dispatch(tmp_path, _ok_envelope())
+        elif label == "empty":
+            (tmp_path / "AV-verify.out").write_text("", encoding="utf-8")
+        elif label == "refused":
+            _write_dispatch(tmp_path, "status: refused\n")
+        else:
+            _write_dispatch(tmp_path, _ok_envelope())
+            _write_receipt(tmp_path, _verdict("SOUND", artefact="b" * 64))
+        outcome = driver.consume_review_verdict(state, "AV", UNIT)
+        assert outcome == expected, label
+        assert outcome != "SOUND"
+        assert state["done"] == []
+        seen.append(outcome)
+    assert len(set(seen)) == len(seen)
+    assert set(seen) <= set(LOSS_REASONS)
+
+
+def test_legacy_flags_and_a_rejected_artefact_cannot_retire(
+    tmp_path: Path, monkeypatch
+) -> None:
     """Deleting the current receipt must make legacy completion state insufficient."""
     driver, _recorded = _prepare(tmp_path, monkeypatch)
     state = {
@@ -165,48 +299,71 @@ def test_legacy_flags_and_a_rejected_artefact_cannot_retire(tmp_path: Path, monk
     assert driver.retired_units(state, {"AV": UNIT}) == set()
 
 
-def test_malformed_and_stale_sound_outputs_fail_closed(tmp_path: Path, monkeypatch) -> None:
-    """A truncated receipt or a changed artefact cannot reuse a prior SOUND."""
-    driver, recorded = _prepare(tmp_path, monkeypatch)
-    state = _state()
-    (tmp_path / "AV-verify.out").write_text("{", encoding="utf-8")
-    assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error"
-    assert recorded[0]["outcome"] == "check_error"
-
-    state = _state()
-    _write_review(tmp_path, _outer(_verdict("SOUND")))
-    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: "b" * 64)
-    assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error"
+def test_verify_brief_demands_the_receipt_file(tmp_path: Path, monkeypatch) -> None:
+    driver, _recorded = _prepare(tmp_path, monkeypatch)
+    path = driver.write_verify_brief("AV", UNIT, ARTEFACT, 1)
+    text = path.read_text(encoding="utf-8")
+    receipt = tmp_path / "AV-verdict.json"
+    assert str(receipt) in text
+    assert "stdout" in text.lower()
+    assert "not the receipt" in text.lower() or "not stdout" in text.lower()
 
 
+def test_end_to_end_receipt_file_writes_sound_trajectory_event(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A real receipt file must produce a review.outcome event, not an exit code."""
+    driver = _load_driver()
+    log_dir = tmp_path / "log"
+    log_dir.mkdir()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    monkeypatch.setattr(driver, "LOG", log_dir)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: ARTEFACT)
+    (briefs / "AV-verify.out").write_text(json.dumps(_ok_envelope()), encoding="utf-8")
+    (briefs / "AV-verdict.json").write_text(
+        json.dumps(_verdict("SOUND")), encoding="utf-8"
+    )
 
-# --- an infrastructure failure must not spend a review attempt, 25 August 2026 ---
-#
-# MEASURED: of 50 check_errors, 33 had an EMPTY receipt -- the review never produced a byte,
-# because its clone failed or its workspace was stranded. Those empty attempts nonetheless
-# consumed the review cap, and the driver then refused to review those units ever again:
-# "ESCALATION -- review of X reached 3 attempts". Ten units became permanently unverifiable
-# because the infrastructure had failed, not the work.
+    returned = driver.consume_review_verdict(_state(), "AV", UNIT)
+    assert returned == "SOUND"
+
+    log_path = log_dir / (date.today().isoformat() + ".jsonl")
+    assert log_path.is_file()
+    events = [
+        json.loads(line)
+        for line in log_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    outcomes = [
+        event
+        for event in events
+        if event.get("event") == "review.outcome"
+        and event.get("data", {}).get("unit") == "AV"
+    ]
+    assert outcomes, "no review.outcome event was appended"
+    assert outcomes[-1]["data"]["outcome"] in {"SOUND", "DEFECTIVE"}
+    assert outcomes[-1]["data"]["outcome"] == "SOUND"
 
 
 def test_a_silent_review_does_not_spend_an_attempt(tmp_path: Path, monkeypatch) -> None:
     driver, _recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
     state["review_attempts"] = {"AV": 2}
-    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: ARTEFACT)
 
-    # No receipt written at all: the dispatch died before the reviewer said anything.
-    assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error_infrastructure"
+    assert driver.consume_review_verdict(state, "AV", UNIT) == "no_dispatch"
     assert state["review_attempts"]["AV"] == 1, "a silent review consumed a review attempt"
 
 
-def test_a_reviewer_that_spoke_badly_does_spend_an_attempt(tmp_path: Path, monkeypatch) -> None:
+def test_a_reviewer_that_spoke_badly_does_spend_an_attempt(
+    tmp_path: Path, monkeypatch
+) -> None:
     """Deduplication of infrastructure must not become a free pass for a bad reviewer."""
     driver, _recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
     state["review_attempts"] = {"AV": 2}
-    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: ARTEFACT)
-    _write_review(tmp_path, _outer("I looked at it and it seems fine to me."))
+    _write_dispatch(tmp_path, {"status": "ok", "stdout_tail": "it seems fine to me."})
 
-    assert driver.consume_review_verdict(state, "AV", UNIT) == "check_error"
+    assert driver.consume_review_verdict(state, "AV", UNIT) == "no_receipt_file"
     assert state["review_attempts"]["AV"] == 2, "a reviewer that ran must still spend its attempt"

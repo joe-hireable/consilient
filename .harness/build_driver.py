@@ -423,47 +423,111 @@ def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> se
     return retired
 
 
-def _verdict_candidates(outer: dict[str, Any]) -> list[str]:
-    """Every JSON object in the reviewer's output that might be the verdict, newest last.
+_INFRASTRUCTURE_LOSS = frozenset({"no_dispatch", "dispatch_refused"})
 
-    MEASURED 24 August 2026. The parser required `stdout_tail` to BE the verdict JSON. It is
-    not: it is the LAST 2000 CHARACTERS of the reviewer's stdout, and a reviewer writes prose
-    around its verdict. All 44 verdicts consumed that day came back `check_error`, so nothing
-    could retire -- reviews dispatched, billed, and discarded at a later stage than before.
 
-    The envelope carries `stdout_path`, the whole output on disk, so the verdict is looked for
-    across all of it rather than in whatever happened to fall inside a 2000-character window.
-    This changes only where the candidate is FOUND. Every field is still validated afterwards
-    exactly as before -- v, unit, artefact, attempt, verdict, findings -- so a wrong verdict
-    cannot be admitted by looking in more places for it.
-    """
-    seen: list[str] = []
-    blobs: list[str] = []
-    path = outer.get("stdout_path")
-    if isinstance(path, str) and path:
-        try:
-            blobs.append(
-                pathlib.Path(path).read_text(encoding="utf-8", errors="replace")
-            )
-        except OSError:
-            pass
-    tail = outer.get("stdout_tail")
-    if isinstance(tail, str) and tail:
-        blobs.append(tail)
-    for blob in blobs:
-        # Objects that name a verdict at all. Non-greedy and brace-balanced only to one level,
-        # which is enough: the receipt is flat by specification.
-        for match in re.finditer(r"\{[^{}]*\"verdict\"[^{}]*\}", blob, re.S):
-            text = match.group(0)
-            if text not in seen:
-                seen.append(text)
-    return seen
+def _outer_status(text: str) -> str:
+    """Classify the dispatch envelope. Never reads a verdict out of stdout."""
+    stripped = text.lstrip()
+    if stripped.startswith("status:"):
+        token = stripped.split(":", 1)[1].strip().split()[0].strip().rstrip(",")
+        return token or "failed"
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        return "failed"
+    if not isinstance(obj, dict):
+        return "failed"
+    status = obj.get("status")
+    if isinstance(status, str) and status:
+        return status
+    return "failed"
+
+
+def _err_shows_refusal(uid: str) -> bool:
+    err = BRIEFS / f"{uid}-verify.err"
+    try:
+        text = err.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return "held by another process" in text or "status: refused" in text
+
+
+def _load_verdict_file(
+    uid: str, unit: dict[str, Any], expected: dict[str, Any]
+) -> tuple[str, list[str]]:
+    """Read `<uid>-verdict.json`. Fail closed; never scrape stdout for SOUND."""
+    attempt = expected.get("attempt")
+    artefact = expected.get("artefact")
+    path = BRIEFS / f"{uid}-verdict.json"
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return "no_receipt_file", []
+    if not raw.strip():
+        return "no_receipt_file", []
+    try:
+        inner = json.loads(raw)
+    except json.JSONDecodeError:
+        return "receipt_unparseable", []
+    identity_ok = (
+        isinstance(inner, dict)
+        and inner.get("unit") == uid
+        and inner.get("artefact") == artefact
+        and inner.get("attempt") == attempt
+        and artefact_identity(unit) == artefact
+    )
+    schema_ok = (
+        isinstance(inner, dict)
+        and set(inner) == {"v", "unit", "artefact", "attempt", "verdict", "findings"}
+        and inner.get("v") == 1
+        and inner.get("verdict") in {"SOUND", "DEFECTIVE"}
+        and isinstance(inner.get("findings"), list)
+        and all(
+            isinstance(finding, str) and finding.strip()
+            for finding in inner["findings"]
+        )
+        and not (inner.get("verdict") == "SOUND" and inner["findings"])
+        and not (inner.get("verdict") == "DEFECTIVE" and not inner["findings"])
+        and isinstance(attempt, int)
+    )
+    if schema_ok and identity_ok:
+        return inner["verdict"], inner["findings"]
+    if not schema_ok:
+        return "receipt_unparseable", []
+    return "receipt_mismatched", []
+
+
+def _consume_review_receipt(
+    uid: str, unit: dict[str, Any], expected: dict[str, Any]
+) -> tuple[str, list[str]]:
+    out_path = BRIEFS / f"{uid}-verify.out"
+    try:
+        size = out_path.stat().st_size
+        exists = True
+    except OSError:
+        size = 0
+        exists = False
+    if not exists or size == 0:
+        if _err_shows_refusal(uid):
+            return "dispatch_refused", []
+        return "no_dispatch", []
+    try:
+        text = out_path.read_text(encoding="utf-8")
+    except OSError:
+        return "no_dispatch", []
+    status = _outer_status(text)
+    if status == "refused":
+        return "dispatch_refused", []
+    if status != "ok":
+        return "dispatch_failed", []
+    return _load_verdict_file(uid, unit, expected)
 
 
 def consume_review_verdict(
     state: dict[str, Any], uid: str, unit: dict[str, Any]
 ) -> str:
-    """Consume one strict reviewer receipt; anything else is a retryable check error."""
+    """Consume one strict reviewer receipt file; losses are typed, never collapsed."""
     expected = state.setdefault("review_expected", {}).get(uid)
     if not isinstance(expected, dict):
         expected = {}
@@ -473,66 +537,7 @@ def consume_review_verdict(
     if consumed == expected and expected:
         return "consumed"
 
-    outcome = "check_error"
-    findings: list[str] = []
-    # Did the REVIEWER actually run and say something, or did the dispatch die before it got
-    # there? The two are recorded identically as check_error, but they are not the same event
-    # and must not cost the same. F-05, this driver's own rule: an infrastructure death is not
-    # evidence about the work, so it must not spend a retry.
-    #
-    # MEASURED 25 August 2026. Of 50 check_errors, 33 had an EMPTY receipt -- the review never
-    # produced a byte, because its clone failed or its workspace was stranded. Those three
-    # empty attempts nonetheless consumed the review cap, and the driver then refused to review
-    # those units ever again: "ESCALATION -- review of X reached 3 attempts". Ten units became
-    # permanently unverifiable because the infrastructure had failed, not the work. A unit that
-    # cannot be reviewed cannot retire, cannot unblock its dependants, and cannot count.
-    reviewer_spoke = False
-    try:
-        receipt = BRIEFS / f"{uid}-verify.out"
-        if receipt.exists() and receipt.stat().st_size > 0:
-            body = receipt.read_text(encoding="utf-8", errors="replace")
-            marker = body.find("--- stdout ---")
-            said = body[marker + len("--- stdout ---") :] if marker >= 0 else body
-            reviewer_spoke = bool(said.strip())
-    except OSError:
-        reviewer_spoke = False
-    try:
-        outer = json.loads((BRIEFS / f"{uid}-verify.out").read_text(encoding="utf-8"))
-        if not isinstance(outer, dict) or outer.get("status") != "ok":
-            raise ValueError("outer dispatch did not succeed")
-        inner = None
-        for candidate in _verdict_candidates(outer):
-            try:
-                parsed = json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(parsed, dict) and parsed.get("unit") == uid:
-                inner = parsed
-        if inner is None:
-            raise ValueError("no verdict object found in the reviewer's output")
-        if (
-            not isinstance(inner, dict)
-            or set(inner) != {"v", "unit", "artefact", "attempt", "verdict", "findings"}
-            or inner.get("v") != 1
-            or inner.get("unit") != uid
-            or inner.get("artefact") != artefact
-            or inner.get("attempt") != attempt
-            or artefact_identity(unit) != artefact
-            or inner.get("verdict") not in {"SOUND", "DEFECTIVE"}
-            or not isinstance(inner.get("findings"), list)
-            or not all(
-                isinstance(finding, str) and finding.strip()
-                for finding in inner["findings"]
-            )
-            or (inner["verdict"] == "SOUND" and inner["findings"])
-            or (inner["verdict"] == "DEFECTIVE" and not inner["findings"])
-            or not isinstance(attempt, int)
-        ):
-            raise ValueError("invalid review verdict")
-        outcome = inner["verdict"]
-        findings = inner["findings"]
-    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
-        pass
+    outcome, findings = _consume_review_receipt(uid, unit, expected)
 
     if outcome != "SOUND" and record_restart(state, uid, now=time.time()):
         print(
@@ -541,12 +546,12 @@ def consume_review_verdict(
             + " exceeded the restart intensity limit. Auto-repair stopped; "
             "it needs a person."
         )
-    if outcome == "check_error" and not reviewer_spoke:
-        # Nothing was said, so nothing was judged. Give the attempt back rather than spending a
-        # third of this unit's review budget on a workspace that never provisioned.
+    if outcome in _INFRASTRUCTURE_LOSS:
+        # MEASURED 25 August 2026. Empty and refused dispatches used to spend the review
+        # cap, after which the driver refused to review those units ever again. An
+        # infrastructure death is not evidence about the work, so it must not spend a retry.
         counter = state.setdefault("review_attempts", {})
         counter[uid] = max(0, counter.get(uid, 1) - 1)
-        outcome = "check_error_infrastructure"
 
     record = {
         "unit": uid,
@@ -1185,6 +1190,7 @@ def write_verify_brief(
         if "/" in unit["plan"]
         else "docs/superpowers/plans/" + unit["plan"]
     )
+    receipt_path = BRIEFS / f"{uid}-verdict.json"
     path.write_text(
         f"""# Adversarially verify {uid}. Find where it fails the plan or the bar.
 
@@ -1234,7 +1240,9 @@ tests, and whether they caught it.** The incumbent and how this compares.
 
 ## Required machine receipt
 
-Your final output must be this exact JSON object and nothing else. `findings` is empty for SOUND and
+Write this exact JSON object to `{receipt_path}`. That file is the receipt. Stdout is not the receipt:
+it is truncated, wrapped differently by different harnesses, and invites prose. Do not wrap the
+object in markdown and do not regex the word SOUND into a verdict. `findings` is empty for SOUND and
 contains one or more non-empty strings for DEFECTIVE. The immutable artefact identity and attempt
 number are fixed below; a mismatch is refused and retried.
 
@@ -1483,8 +1491,27 @@ silently.** And any path you needed that your claim list did not cover.
 # so a killed one stops costing its whole tick. Both were blocked behind a dispatch path that
 # could not start work; that is now fixed, so they can be built -- and this constant goes back
 # to 24/12 when they land.
-MAX_BUILDS = 24
-MAX_REVIEWS = 12
+#
+# 25 August 2026, 15:05: saturation recurred at 24/12, exactly as the paragraph above predicted,
+# and the note above says the answer is Z03/Z06 rather than "another quiet reduction". It still
+# is -- but neither can land while nothing completes, so the shed is what lets its own fix
+# through. This one is not quiet: the number is measured, and the exit condition is written down.
+#
+# MEASURED from the dispatch cohorts of this day, counting a run as started only if it wrote a
+# real artefact (scratchpad/cohort.py):
+#     11:51  12 runs -> 100% started      11:22  31 runs ->   0% started
+#     11:52  13 runs -> 100% started      11:38  31 runs ->   0% started
+#     11:58  19 runs -> 100% started      13:21  30 runs ->  90% started
+# The knee sits between 19 and 31. Twelve builds plus six reviews is 18 concurrent, inside the
+# band that started every time, and it is a ceiling rather than a target.
+#
+# Corroborating, at the moment of this change: 658 agent processes on 32 cores, and the entire
+# 14:21 cohort -- 26 dispatches -- alive for 40 minutes with agent CLIs spawned and ZERO bytes
+# written. Not slow: producing nothing. 24/12 is not parallelism at that point, it is queueing.
+#
+# REVERT TO 24/12 when Z03 and Z06 land. Nothing else about this file needs to change.
+MAX_BUILDS = 12
+MAX_REVIEWS = 6
 MAX_CONCURRENT = MAX_BUILDS + MAX_REVIEWS
 
 # Phase order from the build plan's recommended sequence. Foundation and the record first;

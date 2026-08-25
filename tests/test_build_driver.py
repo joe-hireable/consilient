@@ -312,7 +312,7 @@ def test_main_quarantines_malformed_review_before_same_tick_redispatch(
     output = capsys.readouterr().out
     assert output.count("ESCALATION -- U01 exceeded the restart intensity limit") == 1
     assert len(state["total_restarts"]["U01"]) == 7
-    assert state["review_results"]["U01"]["outcome"] == "check_error"
+    assert state["review_results"]["U01"]["outcome"] == "dispatch_failed"
     assert state["quarantined"] == ["U01"]
 
 
@@ -332,9 +332,10 @@ def test_defective_review_records_restart_before_rejection(
         "findings": ["fault"],
     }
     (briefs / "U01-verify.out").write_text(
-        json.dumps({"status": "ok", "stdout_tail": json.dumps(receipt)}),
+        json.dumps({"status": "ok", "stdout_tail": "reviewer finished"}),
         encoding="utf-8",
     )
+    (briefs / "U01-verdict.json").write_text(json.dumps(receipt), encoding="utf-8")
     state: dict[str, object] = {
         "built": ["U01"],
         "review_dispatched": ["U01"],
