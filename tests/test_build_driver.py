@@ -80,7 +80,7 @@ def test_suite_green_counts_outcomes_rather_than_sniffing_substrings(
 
 
 def test_an_xfail_alone_does_not_make_the_suite_red() -> None:
-    """The specific regression: `\b\d+ failed` must not match inside "xfailed"."""
+    r"""The specific regression: `\b\d+ failed` must not match inside "xfailed"."""
     green = "1761 passed, 3 skipped, 1 xfailed in 250.69s"
     assert re.search(r"\b\d+ (failed|error|errors)\b", green) is None
     assert re.search(r"\b\d+ passed\b", green) is not None
