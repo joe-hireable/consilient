@@ -2212,6 +2212,95 @@ def hold_tick_lock():
     return handle
 
 
+def _handle_crashed_dispatches(state: dict) -> None:
+    """Report every dead dispatch, release what it held, and refund the RIGHT counter.
+
+    Extracted from what was inline in `main()`, so it can be tested directly -- matching this
+    file's own pattern (`review_receipt_is_finished`, `clear_stale_review_memos`).
+
+    A crash during a REVIEW dispatch must refund the REVIEW attempt, not the build one.
+
+    MEASURED 25 August 2026, ~23:30: AL and AO, freshly reset for review under
+    `reset_review_attempts_on_new_artefact`, crashed on a `git clone --separate-git-dir` timeout
+    inside workspace setup -- before a reviewer ever ran. The refund below used to touch
+    `state["attempts"]`, the BUILD counter, UNCONDITIONALLY, for every crash regardless of which
+    pool the dead run belonged to. A unit crashing while being REVIEWED never had its review
+    attempt refunded at all: F-05 says an infrastructure death must not spend a retry, and this
+    path was spending one silently, undoing the fresh budget just granted one commit earlier.
+    """
+    dead = crashed_dispatches(state)
+    if not dead:
+        return
+    crash_log = state.setdefault("crash_history", {})
+    for uid, why, refused in dead:
+        kind = "REFUSED" if refused else "CRASHED"
+        print("driver: " + kind + " " + uid + " -- " + why[:160])
+        seen = crash_log.setdefault(uid, [])
+        seen.append(why[:200])
+        restart_quarantined = record_restart(state, uid, now=time.time())
+        # An infrastructure death is not evidence about the work, so it must not spend a
+        # retry -- F-05. But a repeated identical death IS evidence, and auto-repair that
+        # silently retries a systematic defect is how a system ships with its own bugs built
+        # in. Three of the same failure stops being repaired and starts being escalated.
+        # Releasing what a dead run held is hygiene, not repair, so it happens for every
+        # death INCLUDING an escalated one. The escalation used to `continue` straight past
+        # this block, so an escalated unit kept its slot for ever: Y02 died the same way 77
+        # times while still counted as in flight. Stopping the retries is right; leaking the
+        # capacity is not. [measured 24 Aug 2026]
+        #
+        # Captured before cleanup below removes it, so the refund can tell which pool this
+        # crash actually belonged to.
+        was_review_dispatched = uid in state.get("review_dispatched", [])
+        state["in_flight"].pop(uid, None)
+        for bucket_name in ("resolve_dispatched", "review_dispatched"):
+            bucket = state.get(bucket_name, [])
+            if uid in bucket:
+                bucket.remove(uid)
+        if len(seen) >= 3 and len(set(seen[-3:])) == 1:
+            if restart_quarantined:
+                print(
+                    "driver: ESCALATION -- "
+                    + uid
+                    + " exceeded the restart intensity limit. Auto-repair stopped; "
+                    "it needs a person."
+                )
+            elif quarantine_unit(state, uid):
+                print(
+                    "driver: ESCALATION -- "
+                    + uid
+                    + " has died the same way "
+                    + str(len(seen))
+                    + " times. This is a defect, not bad luck. Auto-repair "
+                    "stopped; it needs a person."
+                )
+            continue
+        elif restart_quarantined:
+            print(
+                "driver: ESCALATION -- "
+                + uid
+                + " exceeded the restart intensity limit. Auto-repair stopped; "
+                "it needs a person."
+            )
+        if was_review_dispatched:
+            review_attempts = state.setdefault("review_attempts", {})
+            review_attempts[uid] = max(0, review_attempts.get(uid, 1) - 1)
+        else:
+            state.setdefault("attempts", {})[uid] = max(
+                0, state.get("attempts", {}).get(uid, 1) - 1
+            )
+        # A crashed review is the quietest failure of the lot: the unit stays "done", the
+        # review never happens, and nothing anywhere records that the artefact was never
+        # checked by a different model family. Three units reached done this way today.
+        state.setdefault("verified", [])
+    freed = release_dead_claims({u for u, _, _ in dead})
+    if freed:
+        print(
+            "driver: released "
+            + str(freed)
+            + " claim(s) held by runs that are gone"
+        )
+
+
 def main() -> int:
     units = load(UNITS, {})
     state = load(STATE, {"done": [], "attempts": {}})
@@ -2304,68 +2393,7 @@ def main() -> int:
     # A crash is reported the tick it happens, not at the next check-in. The principal asked for
     # this after finding three of them himself: "this needs to be reported and auto-fixed to
     # orchestrators in real time not discovered during a check in."
-    dead = crashed_dispatches(state)
-    if dead:
-        crash_log = state.setdefault("crash_history", {})
-        for uid, why, refused in dead:
-            kind = "REFUSED" if refused else "CRASHED"
-            print("driver: " + kind + " " + uid + " -- " + why[:160])
-            seen = crash_log.setdefault(uid, [])
-            seen.append(why[:200])
-            restart_quarantined = record_restart(state, uid, now=time.time())
-            # An infrastructure death is not evidence about the work, so it must not spend a
-            # retry -- F-05. But a repeated identical death IS evidence, and auto-repair that
-            # silently retries a systematic defect is how a system ships with its own bugs built
-            # in. Three of the same failure stops being repaired and starts being escalated.
-            # Releasing what a dead run held is hygiene, not repair, so it happens for every
-            # death INCLUDING an escalated one. The escalation used to `continue` straight past
-            # this block, so an escalated unit kept its slot for ever: Y02 died the same way 77
-            # times while still counted as in flight. Stopping the retries is right; leaking the
-            # capacity is not. [measured 24 Aug 2026]
-            state["in_flight"].pop(uid, None)
-            for bucket_name in ("resolve_dispatched", "review_dispatched"):
-                bucket = state.get(bucket_name, [])
-                if uid in bucket:
-                    bucket.remove(uid)
-            if len(seen) >= 3 and len(set(seen[-3:])) == 1:
-                if restart_quarantined:
-                    print(
-                        "driver: ESCALATION -- "
-                        + uid
-                        + " exceeded the restart intensity limit. Auto-repair stopped; "
-                        "it needs a person."
-                    )
-                elif quarantine_unit(state, uid):
-                    print(
-                        "driver: ESCALATION -- "
-                        + uid
-                        + " has died the same way "
-                        + str(len(seen))
-                        + " times. This is a defect, not bad luck. Auto-repair "
-                        "stopped; it needs a person."
-                    )
-                continue
-            elif restart_quarantined:
-                print(
-                    "driver: ESCALATION -- "
-                    + uid
-                    + " exceeded the restart intensity limit. Auto-repair stopped; "
-                    "it needs a person."
-                )
-            state.setdefault("attempts", {})[uid] = max(
-                0, state.get("attempts", {}).get(uid, 1) - 1
-            )
-            # A crashed review is the quietest failure of the lot: the unit stays "done", the
-            # review never happens, and nothing anywhere records that the artefact was never
-            # checked by a different model family. Three units reached done this way today.
-            state.setdefault("verified", [])
-        freed = release_dead_claims({u for u, _, _ in dead})
-        if freed:
-            print(
-                "driver: released "
-                + str(freed)
-                + " claim(s) held by runs that are gone"
-            )
+    _handle_crashed_dispatches(state)
 
     # A review process owns the output until it exits. Once none is live, consume every receipt;
     # malformed, stale and failed output are explicit check errors and will be retried.

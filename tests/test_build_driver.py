@@ -1217,3 +1217,66 @@ def test_reset_does_nothing_for_a_unit_never_dispatched_before(monkeypatch) -> N
     state: dict[str, object] = {"review_expected": {}}
     assert driver.reset_review_attempts_on_new_artefact(state, "U01", "x" * 64) is False
     assert state.get("review_attempts", {}).get("U01") is None
+
+
+def test_a_crash_during_review_dispatch_refunds_the_review_attempt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 25 August 2026, ~23:30: AL and AO, freshly reset for review, crashed on a
+    workspace-setup timeout (`git clone --separate-git-dir`) before a reviewer ever ran. The
+    crash-handling loop refunded `state["attempts"]` -- the BUILD counter -- unconditionally,
+    for every crash, regardless of whether the dead run belonged to the build pool or the
+    review pool. A crash during a REVIEW dispatch never had its review attempt refunded at
+    all: F-05 says an infrastructure death must not spend a retry, and this path was spending
+    one silently.
+    """
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    (briefs / "U01.err").write_text("boom\n", encoding="utf-8")
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [("U01", "boom", False)])
+    monkeypatch.setattr(driver, "record_restart", lambda *_a, **_k: False)
+    monkeypatch.setattr(driver, "release_dead_claims", lambda _uids: 0)
+    monkeypatch.setattr(driver, "quarantine_unit", lambda *_a, **_k: False)
+
+    state: dict[str, object] = {
+        "in_flight": {},
+        "review_dispatched": ["U01"],
+        "review_attempts": {"U01": 2},
+        "attempts": {"U01": 5},
+        "crash_history": {},
+    }
+    driver._handle_crashed_dispatches(state)
+
+    assert state["review_attempts"]["U01"] == 1, "the REVIEW attempt must be refunded"
+    assert state["attempts"]["U01"] == 5, "the unrelated BUILD counter must be untouched"
+    assert "U01" not in state["review_dispatched"]
+
+
+def test_a_crash_during_build_dispatch_still_refunds_the_build_attempt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The other half: a crash while a unit is being BUILT must keep refunding the build
+    counter exactly as before -- this fix must not touch that path."""
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    (briefs / "U02.err").write_text("boom\n", encoding="utf-8")
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [("U02", "boom", False)])
+    monkeypatch.setattr(driver, "record_restart", lambda *_a, **_k: False)
+    monkeypatch.setattr(driver, "release_dead_claims", lambda _uids: 0)
+    monkeypatch.setattr(driver, "quarantine_unit", lambda *_a, **_k: False)
+
+    state: dict[str, object] = {
+        "in_flight": {"U02": (0.0, 0.0)},
+        "review_dispatched": [],
+        "review_attempts": {},
+        "attempts": {"U02": 3},
+        "crash_history": {},
+    }
+    driver._handle_crashed_dispatches(state)
+
+    assert state["attempts"]["U02"] == 2, "the BUILD attempt must still be refunded"
+    assert "U02" not in state["in_flight"]
