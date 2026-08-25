@@ -57,6 +57,8 @@ Invariants, each with a test in the same commit (tests/test_instructions.py):
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -260,6 +262,8 @@ class Assembly:
     adapted: AdaptedLayer
     text: str
     sha256: str
+    capability_manifests: tuple[dict[str, str], ...]
+    recall_receipt: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -290,6 +294,25 @@ class Reconstruction:
     @property
     def ok(self) -> bool:
         return self.found and all(report.ok for report in self.layers)
+
+
+@dataclass(frozen=True)
+class EnvelopePart:
+    """One reconstructable slot in a dispatch envelope."""
+
+    name: str
+    ok: bool
+    digest: str | None
+    detail: str
+
+
+@dataclass(frozen=True)
+class EnvelopeReconstruction:
+    """Fresh-process reconstruction of one dispatch from trajectory and objects."""
+
+    run_id: str
+    ok: bool
+    parts: tuple[EnvelopePart, ...]
 
 
 @dataclass(frozen=True)
@@ -835,6 +858,38 @@ def load_adapted(log_dir: Path) -> AdaptedLayer:
     return _adapted_from_events(events)
 
 
+def bind_recall_receipt(pack: str) -> dict[str, object]:
+    """Digest one canonical recall receipt, or name why it cannot be bound."""
+    try:
+        receipt = recall.parse_receipt(pack)
+    except ValueError as exc:
+        return {"status": "refused", "reason": str(exc)}
+    encoded = json.dumps(
+        receipt, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    )
+    return {"status": "ok", "digest": promote.digest(encoded)}
+
+
+def _capability_manifest_bindings(
+    selection: Mapping[str, object] | None,
+) -> tuple[dict[str, str], ...]:
+    """Take the M04 selector result. An absent request selects nothing."""
+    if selection is None:
+        return ()
+    rows = selection.get("selected_manifests")
+    if not isinstance(rows, list):
+        return ()
+    bound: list[dict[str, str]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        identity = row.get("identity")
+        version = row.get("version_digest")
+        if isinstance(identity, str) and isinstance(version, str):
+            bound.append({"identity": identity, "version_digest": version})
+    return tuple(bound)
+
+
 def assemble(
     skills_dir: Path,
     log_dir: Path,
@@ -844,6 +899,7 @@ def assemble(
     skill_limit: int = SKILL_LIMIT,
     skill_chars: int = SKILL_CHARS,
     threshold: ProtocolThreshold | None = None,
+    capability_selection: Mapping[str, object] | None = None,
 ) -> Assembly:
     """Assemble the four layers for one task.
 
@@ -874,10 +930,18 @@ def assemble(
         adapted=adapted,
         text=text,
         sha256=promote.digest(text),
+        capability_manifests=_capability_manifest_bindings(capability_selection),
+        recall_receipt=bind_recall_receipt(pack),
     )
 
 
-def record_assembly(log_dir: Path, assembly: Assembly, *, task: str) -> EventPayload:
+def record_assembly(
+    log_dir: Path,
+    assembly: Assembly,
+    *,
+    task: str,
+    pre_run_records: Mapping[str, object] | None = None,
+) -> EventPayload:
     """Append the assembly through the single writer, naming every layer (V0-47)."""
     now = datetime.now(timezone.utc)
     return append(
@@ -916,6 +980,11 @@ def record_assembly(log_dir: Path, assembly: Assembly, *, task: str) -> EventPay
                     "sha256": assembly.adapted.sha256,
                     "candidate_id": assembly.adapted.candidate_id,
                 },
+                "recall_receipt": dict(assembly.recall_receipt),
+                "capability_manifests": [
+                    dict(row) for row in assembly.capability_manifests
+                ],
+                "pre_run_records": dict(pre_run_records or {}),
             },
         },
     )
@@ -1219,6 +1288,160 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
             )
 
     return Reconstruction(assembly_id, True, tuple(reports))
+
+
+def _object_digest(workspace_root: Path, locator: object) -> tuple[str | None, str]:
+    if not isinstance(locator, str) or not locator or locator.startswith("/"):
+        return None, "object locator is not a repository-relative path"
+    if ".." in locator.split("/") or "\\" in locator:
+        return None, "object locator is not a canonical relative path"
+    path = workspace_root / locator
+    try:
+        payload = path.read_bytes()
+    except OSError as exc:
+        return None, f"object unreadable: {exc}"
+    return hashlib.sha256(payload).hexdigest(), "matched object bytes"
+
+
+def _part_from_binding(name: str, binding: object, workspace_root: Path) -> EnvelopePart:
+    if not isinstance(binding, dict):
+        return EnvelopePart(name, False, None, "missing binding")
+    status = binding.get("status")
+    if status != "ok":
+        reason = binding.get("reason")
+        return EnvelopePart(
+            name,
+            False,
+            None,
+            str(reason if isinstance(reason, str) and reason else status),
+        )
+    digest = binding.get("digest")
+    locator = binding.get("object_locator")
+    if not isinstance(digest, str):
+        return EnvelopePart(name, False, None, "incomplete ok binding")
+    actual, detail = _object_digest(workspace_root, locator)
+    if actual is None:
+        return EnvelopePart(name, False, digest, detail)
+    if actual != digest:
+        return EnvelopePart(name, False, digest, "digest mismatch")
+    return EnvelopePart(name, True, digest, detail)
+
+
+def reconstruct_envelope(
+    log_dir: Path, workspace_root: Path, run_id: str
+) -> EnvelopeReconstruction:
+    """Rebuild one dispatch envelope from the trajectory and object store."""
+    events, _rejected = read_all(log_dir)
+    outcome: Event | None = None
+    for event in events:
+        if event.kind == "dispatch.outcome" and event.data.get("run_id") == run_id:
+            outcome = event
+    if outcome is None:
+        return EnvelopeReconstruction(
+            run_id,
+            False,
+            (EnvelopePart("outcome", False, None, "no dispatch.outcome for run"),),
+        )
+
+    assembly_id = outcome.data.get("assembly_id")
+    assembled: Event | None = None
+    if isinstance(assembly_id, str):
+        for event in events:
+            if event.kind == ASSEMBLED and event.data.get("assembly_id") == assembly_id:
+                assembled = event
+
+    parts: list[EnvelopePart] = []
+    pre_run = assembled.data.get("pre_run_records") if assembled is not None else None
+    if not isinstance(pre_run, dict):
+        pre_run = {}
+    parts.append(_part_from_binding("task", pre_run.get("task"), workspace_root))
+    parts.append(
+        _part_from_binding("instructions", pre_run.get("instructions"), workspace_root)
+    )
+
+    receipt = assembled.data.get("recall_receipt") if assembled is not None else None
+    if isinstance(receipt, dict) and receipt.get("status") == "ok":
+        digest = receipt.get("digest")
+        parts.append(
+            EnvelopePart(
+                "recall_receipt",
+                isinstance(digest, str),
+                digest if isinstance(digest, str) else None,
+                "bound" if isinstance(digest, str) else "missing digest",
+            )
+        )
+    else:
+        reason = receipt.get("reason") if isinstance(receipt, dict) else "missing"
+        parts.append(
+            EnvelopePart(
+                "recall_receipt",
+                False,
+                None,
+                str(reason if isinstance(reason, str) and reason else "missing"),
+            )
+        )
+
+    manifests = (
+        assembled.data.get("capability_manifests") if assembled is not None else None
+    )
+    if manifests == []:
+        parts.append(EnvelopePart("capability_manifests", True, None, "none selected"))
+    elif isinstance(manifests, list) and manifests:
+        valid = True
+        first_digest: str | None = None
+        for row in manifests:
+            if (
+                not isinstance(row, dict)
+                or not isinstance(row.get("identity"), str)
+                or not isinstance(row.get("version_digest"), str)
+            ):
+                valid = False
+                break
+            if first_digest is None:
+                version = row.get("version_digest")
+                first_digest = version if isinstance(version, str) else None
+        parts.append(
+            EnvelopePart(
+                "capability_manifests",
+                valid,
+                first_digest,
+                "bound" if valid else "invalid manifest binding",
+            )
+        )
+    else:
+        parts.append(EnvelopePart("capability_manifests", False, None, "missing"))
+
+    outputs = outcome.data.get("output_records")
+    if not isinstance(outputs, dict):
+        outputs = {}
+    for name in ("stdout", "stderr", "artefact_manifest", "verifier_outcome"):
+        parts.append(_part_from_binding(name, outputs.get(name), workspace_root))
+
+    listed = outputs.get("listed_artefacts")
+    if listed is None or listed == []:
+        parts.append(EnvelopePart("listed_artefacts", True, None, "none listed"))
+    elif isinstance(listed, list):
+        failed: list[str] = []
+        for index, row in enumerate(listed):
+            part = _part_from_binding(f"listed_artefacts[{index}]", row, workspace_root)
+            if not part.ok:
+                failed.append(part.detail)
+        parts.append(
+            EnvelopePart(
+                "listed_artefacts",
+                not failed,
+                None,
+                "; ".join(failed) if failed else "matched object bytes",
+            )
+        )
+    else:
+        parts.append(
+            EnvelopePart("listed_artefacts", False, None, "listed_artefacts is not a list")
+        )
+
+    return EnvelopeReconstruction(
+        run_id, all(part.ok for part in parts), tuple(parts)
+    )
 
 
 def _event_reference(raw: EventPayload) -> dict[str, str]:

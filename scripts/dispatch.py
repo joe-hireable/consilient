@@ -58,7 +58,8 @@ from consilient.error_tracking import (  # noqa: E402
     append_record,
     build_record,
 )
-from consilient.events import EventError, read_all  # noqa: E402
+from consilient.events import SCHEMA_VERSION, EventError, append, read_all  # noqa: E402
+from consilient.records import RecordRef, capture_file  # noqa: E402
 from consilient.harness import (  # noqa: E402
     DEFAULT_PERMISSION_MODE,
     DEFAULT_POOLS,
@@ -82,8 +83,11 @@ from consilient.harness import (  # noqa: E402
     now_ts,
     parse_status,
     permission_flags,
+    DISPATCH_ACTOR,
+    DISPATCH_OUTCOME_KIND,
+    classify_gap,
     record_fanout,
-    record_outcome,
+    record_gap,
     record_refusal,
     record_request,
     build_request_timing,
@@ -154,6 +158,8 @@ class RunResult:
     stdout_path: str
     stderr_path: str
     request_timing: object | None = None
+    assembly_id: str | None = None
+    output_records: dict[str, object] | None = None
 
 
 def heldout_contract_refusal(contract: str) -> str:
@@ -1762,6 +1768,8 @@ def run_harness(
     max_tokens: int = DEFAULT_MAX_TOKENS,
     expected_artefact: str = "stdout.txt",
     unit: str = "",
+    capability_selection: Mapping[str, object] | None = None,
+    workspace_root: Path | None = None,
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
@@ -1798,8 +1806,38 @@ def run_harness(
             stderr_path=str(stderr_path),
         )
     assembly: instructions.Assembly | None = None
+    pre_run_records: dict[str, object] = {}
+    output_records: dict[str, object] | None = None
+    capture_workspace = cwd if workspace_root is None else workspace_root
     if log_dir is not None:
-        assembly = instructions.assemble(DEFAULT_SKILLS, log_dir, task=task)
+        assembly = instructions.assemble(
+            DEFAULT_SKILLS,
+            log_dir,
+            task=task,
+            capability_selection=capability_selection,
+        )
+        capture_ok = _capture_root_ok(capture_workspace, log_dir)
+        sealed_task = run_dir / "sealed-task.txt"
+        assembled_instructions = run_dir / "assembled-instructions.txt"
+        sealed_task.parent.mkdir(parents=True, exist_ok=True)
+        sealed_task.write_text(task, encoding="utf-8", newline="\n")
+        assembled_instructions.write_text(
+            assembly.text, encoding="utf-8", newline="\n"
+        )
+        if capture_ok:
+            pre_run_records = {
+                "task": _capture_source(
+                    sealed_task, workspace=capture_workspace, media_type="text/plain"
+                ),
+                "instructions": _capture_source(
+                    assembled_instructions,
+                    workspace=capture_workspace,
+                    media_type="text/plain",
+                ),
+            }
+        else:
+            refused = _refused_capture("log_dir is not the authorised capture root")
+            pre_run_records = {"task": refused, "instructions": refused}
     write_brief(
         run_dir,
         task,
@@ -1809,7 +1847,9 @@ def run_harness(
         assembly=assembly,
     )
     if log_dir is not None and assembly is not None:
-        instructions.record_assembly(log_dir, assembly, task=task)
+        instructions.record_assembly(
+            log_dir, assembly, task=task, pre_run_records=pre_run_records
+        )
     write_expected(
         run_dir.parent,
         run_id=run_id,
@@ -1938,6 +1978,20 @@ def run_harness(
             cache_read_input_tokens=usage["cache_read_input_tokens"],
             in_flight_at_dispatch=in_flight_at_dispatch,
         )
+    if log_dir is not None:
+        if _capture_root_ok(capture_workspace, log_dir):
+            output_records = _capture_run_outputs(
+                run_dir, stdout_path, stderr_path, capture_workspace
+            )
+        else:
+            refused = _refused_capture("log_dir is not the authorised capture root")
+            output_records = {
+                "stdout": refused,
+                "stderr": refused,
+                "artefact_manifest": refused,
+                "verifier_outcome": refused,
+                "listed_artefacts": [],
+            }
     return RunResult(
         harness=harness,
         status=status,
@@ -1954,6 +2008,8 @@ def run_harness(
         stdout_path=str(stdout_path),
         stderr_path=str(stderr_path),
         request_timing=request_timing,
+        assembly_id=None if assembly is None else assembly.sha256,
+        output_records=output_records,
     )
 
 
@@ -2203,33 +2259,232 @@ def load_task(positional: str | None, task_file: str | None) -> str:
     raise ValueError("a task is required (positional or --task-file)")
 
 
+def load_capability_selection(
+    inventory_path: str | None, request_path: str | None
+) -> dict[str, object] | None:
+    """Return the M04 selector result, or None when no capability request was made."""
+    if bool(inventory_path) != bool(request_path):
+        raise ValueError(
+            "--capability-inventory and --capability-request must be passed together"
+        )
+    if inventory_path is None or request_path is None:
+        return None
+    try:
+        inventory = json.loads(
+            Path(inventory_path).resolve().read_text(encoding="utf-8")
+        )
+        request = json.loads(Path(request_path).resolve().read_text(encoding="utf-8"))
+        return select_capabilities(inventory, request)
+    except (CapabilityError, json.JSONDecodeError, OSError, UnicodeError) as exc:
+        raise ValueError(f"capability context refused: {exc}") from exc
+
+
+def _task_with_selection(task: str, selection: dict[str, object] | None) -> str:
+    if selection is None:
+        return task
+    encoded = json.dumps(
+        selection, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    )
+    return (
+        f"{task.rstrip()}\n\n---\n\n## Selected capability context\n\n"
+        f"```json\n{encoded}\n```\n"
+    )
+
+
 def task_with_capabilities(
     task: str,
     inventory_path: str | None,
     request_path: str | None,
 ) -> str:
     """Select and inject one vendor-neutral per-task capability context."""
-    if bool(inventory_path) != bool(request_path):
-        raise ValueError(
-            "--capability-inventory and --capability-request must be passed together"
-        )
-    if inventory_path is None or request_path is None:
-        return task
+    return _task_with_selection(
+        task, load_capability_selection(inventory_path, request_path)
+    )
+
+
+def _authorised_log_dir(workspace: Path) -> Path:
+    return (workspace / ".harness" / "log").resolve()
+
+
+def _capture_root_ok(workspace: Path, log_dir: Path) -> bool:
     try:
-        inventory = json.loads(
-            Path(inventory_path).resolve().read_text(encoding="utf-8")
+        return log_dir.resolve() == _authorised_log_dir(workspace)
+    except OSError:
+        return False
+
+
+def _record_binding(ref: RecordRef) -> dict[str, object]:
+    return {
+        "status": "ok",
+        "record_id": ref.record_id,
+        "digest": ref.digest,
+        "byte_count": ref.byte_count,
+        "media_type": ref.media_type,
+        "object_locator": ref.object_locator,
+        "event_id": ref.event_id,
+        "event_sha256": ref.event_sha256,
+    }
+
+
+def _capture_source(
+    source: Path,
+    *,
+    workspace: Path,
+    media_type: str,
+    actor: str = DISPATCH_ACTOR,
+) -> dict[str, object]:
+    if not source.is_file():
+        return {"status": "absent", "reason": f"missing output: {source.name}"}
+    try:
+        ref = capture_file(
+            source,
+            workspace_root=workspace,
+            object_root=workspace / ".harness" / "objects",
+            log_dir=workspace / ".harness" / "log",
+            actor=actor,
+            media_type=media_type,
+            consent_purpose="dispatch-envelope",
+            retention_class="project",
         )
-        request = json.loads(Path(request_path).resolve().read_text(encoding="utf-8"))
-        context = select_capabilities(inventory, request)
-    except (CapabilityError, json.JSONDecodeError, OSError, UnicodeError) as exc:
-        raise ValueError(f"capability context refused: {exc}") from exc
-    encoded = json.dumps(
-        context, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    except EventError as exc:
+        return {"status": "refused", "reason": str(exc)}
+    return _record_binding(ref)
+
+
+def _refused_capture(reason: str) -> dict[str, object]:
+    return {"status": "refused", "reason": reason}
+
+
+def _capture_run_outputs(
+    run_dir: Path, stdout_path: Path, stderr_path: Path, workspace: Path
+) -> dict[str, object]:
+    manifest_path = run_dir / "artefact-manifest.json"
+    verifier_path = run_dir / "verifier-outcome.json"
+    listed: list[dict[str, object]] = []
+    if manifest_path.is_file():
+        listed = _listed_artefact_bindings(manifest_path, workspace)
+    return {
+        "stdout": _capture_source(
+            stdout_path, workspace=workspace, media_type="text/plain"
+        ),
+        "stderr": _capture_source(
+            stderr_path, workspace=workspace, media_type="text/plain"
+        ),
+        "artefact_manifest": _capture_source(
+            manifest_path, workspace=workspace, media_type="application/json"
+        ),
+        "verifier_outcome": _capture_source(
+            verifier_path, workspace=workspace, media_type="application/json"
+        ),
+        "listed_artefacts": listed,
+    }
+
+
+def _listed_artefact_bindings(
+    manifest_path: Path, workspace: Path
+) -> list[dict[str, object]]:
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        return [{"status": "refused", "reason": "artefact manifest is not valid JSON"}]
+    if not isinstance(raw, dict):
+        return [{"status": "refused", "reason": "artefact manifest must be an object"}]
+    rows = raw.get("artefacts")
+    if rows is None:
+        return []
+    if not isinstance(rows, list):
+        return [{"status": "refused", "reason": "artefacts must be a list"}]
+    bindings: list[dict[str, object]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            bindings.append(
+                {"status": "refused", "reason": f"artefacts[{index}] must be an object"}
+            )
+            continue
+        path_value = row.get("path")
+        if not isinstance(path_value, str) or not path_value.strip():
+            bindings.append(
+                {"status": "refused", "reason": f"artefacts[{index}] has no path"}
+            )
+            continue
+        candidate = Path(path_value)
+        if not candidate.is_absolute():
+            candidate = workspace / path_value
+        bindings.append(
+            _capture_source(
+                candidate, workspace=workspace, media_type="application/octet-stream"
+            )
+        )
+    return bindings
+
+
+def _record_dispatch_outcome(
+    log_dir: Path,
+    *,
+    ts: str,
+    run_id: str,
+    task: str,
+    cwd: str,
+    harness: Harness,
+    status: str,
+    reason: str,
+    exit_code: int | None,
+    artefact_bytes: int,
+    diff_bytes: int,
+    timed_out: bool,
+    duration_s: float,
+    command: Sequence[str],
+    assembly_id: str | None = None,
+    output_records: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    data: dict[str, object] = {
+        "run_id": run_id,
+        "task": task,
+        "cwd": cwd,
+        "harness": harness.id,
+        "family": harness.family,
+        "pool": harness.pool,
+        "status": status,
+        "reason": reason,
+        "exit_code": exit_code,
+        "artefact_bytes": artefact_bytes,
+        "diff_bytes": diff_bytes,
+        "timed_out": timed_out,
+        "duration_s": duration_s,
+        "command": list(command),
+        "supervised": True,
+    }
+    if assembly_id is not None:
+        data["assembly_id"] = assembly_id
+    if output_records is not None:
+        data["output_records"] = dict(output_records)
+    recorded = append(
+        log_dir / f"{ts[:10]}.jsonl",
+        {
+            "v": SCHEMA_VERSION,
+            "ts": ts,
+            "event": DISPATCH_OUTCOME_KIND,
+            "actor": DISPATCH_ACTOR,
+            "data": data,
+        },
     )
-    return (
-        f"{task.rstrip()}\n\n---\n\n## Selected capability context\n\n"
-        f"```json\n{encoded}\n```\n"
-    )
+    gap = classify_gap(status, reason)
+    if gap is not None:
+        failure, closure, repair = gap
+        record_gap(
+            log_dir,
+            ts=ts,
+            run_id=run_id,
+            task=task,
+            cwd=cwd,
+            attempted=harness.id,
+            failure=failure,
+            detail=reason,
+            closure=closure,
+            repair=repair,
+            source=DISPATCH_OUTCOME_KIND,
+        )
+    return recorded
 
 
 def supervise(*, log_dir: Path, runs_dir: Path, as_json: bool) -> int:
@@ -2338,6 +2593,7 @@ def dispatch_one(
     max_turns: int = DEFAULT_MAX_TURNS,
     max_tokens: int = DEFAULT_MAX_TOKENS,
     native_claim: Mapping[str, object] | None = None,
+    capability_selection: Mapping[str, object] | None = None,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "dispatch")
@@ -2524,7 +2780,7 @@ def dispatch_one(
                 stdout_path="",
                 stderr_path="",
             )
-            recorded = record_outcome(
+            recorded = _record_dispatch_outcome(
                 log_dir,
                 ts=now_ts(),
                 run_id=run_id,
@@ -2559,6 +2815,8 @@ def dispatch_one(
                 claim_run_id=run_id,
                 max_turns=max_turns,
                 max_tokens=max_tokens,
+                capability_selection=capability_selection,
+                workspace_root=cwd,
             )
             if result.request_timing is not None:
                 record_request(
@@ -2568,7 +2826,7 @@ def dispatch_one(
                     harness_id=harness.id,
                     timing=result.request_timing,
                 )
-            recorded = record_outcome(
+            recorded = _record_dispatch_outcome(
                 log_dir,
                 ts=now_ts(),
                 run_id=result.run_id,
@@ -2583,6 +2841,8 @@ def dispatch_one(
                 timed_out=result.timed_out,
                 duration_s=result.duration_s,
                 command=result.command,
+                assembly_id=result.assembly_id,
+                output_records=result.output_records,
             )
             record_dispatch_error(log_dir, result)
             _harvest_quietly(log_dir, runs_dir)
@@ -2638,6 +2898,7 @@ def dispatch_fanout(
     pools: tuple[PoolState, ...] = (),
     max_turns: int = DEFAULT_MAX_TURNS,
     max_tokens: int = DEFAULT_MAX_TOKENS,
+    capability_selection: Mapping[str, object] | None = None,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "fanout")
@@ -2762,6 +3023,8 @@ def dispatch_fanout(
                 claim_run_id=run_id,
                 max_turns=max_turns,
                 max_tokens=max_tokens,
+                capability_selection=capability_selection,
+                workspace_root=cwd,
             )
             if result.request_timing is not None:
                 record_request(
@@ -2771,7 +3034,7 @@ def dispatch_fanout(
                     harness_id=harness.id,
                     timing=result.request_timing,
                 )
-            record_outcome(
+            _record_dispatch_outcome(
                 log_dir,
                 ts=now_ts(),
                 run_id=result.run_id,
@@ -2786,6 +3049,8 @@ def dispatch_fanout(
                 timed_out=result.timed_out,
                 duration_s=result.duration_s,
                 command=result.command,
+                assembly_id=result.assembly_id,
+                output_records=result.output_records,
             )
             record_dispatch_error(log_dir, result)
             results.append(result)
@@ -3177,9 +3442,10 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         task = load_task(args.task, args.task_file)
-        task = task_with_capabilities(
-            task, args.capability_inventory, args.capability_request
+        capability_selection = load_capability_selection(
+            args.capability_inventory, args.capability_request
         )
+        task = _task_with_selection(task, capability_selection)
     except ValueError as exc:
         emit({"status": "refused", "reason": str(exc)}, args.json)
         return 2
@@ -3228,6 +3494,7 @@ def main(argv: list[str] | None = None) -> int:
             pools=pools,
             max_turns=args.max_turns,
             max_tokens=args.max_tokens,
+            capability_selection=capability_selection,
         )
         emit(payload, args.json)
         return code
@@ -3253,6 +3520,7 @@ def main(argv: list[str] | None = None) -> int:
         pools=pools,
         max_turns=args.max_turns,
         max_tokens=args.max_tokens,
+        capability_selection=capability_selection,
     )
     emit(payload, args.json)
     return code
