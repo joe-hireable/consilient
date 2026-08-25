@@ -1162,3 +1162,58 @@ def test_clear_stale_review_memos_is_a_no_op_once_nothing_is_stale(
     assert driver.clear_stale_review_memos(state, units) == []
     assert state["review_consumed"] == {"AF": {"attempt": 1, "artefact": "f" * 64}}
     assert state["review_dispatched"] == []
+
+
+def test_a_rebuilt_unit_gets_a_fresh_review_budget(monkeypatch) -> None:
+    """DECIDED BY THE PRINCIPAL, 25 August 2026: AL, AO and AP were each escalated -- "reached
+    3 attempts, refusing another dispatch" -- while each held a DIFFERENT, newer artefact than
+    the one their three attempts had actually been spent against. `review_attempts` was a pure
+    LIFETIME counter, unrelated to which code was under review: a unit rebuilt after a genuine
+    DEFECTIVE finding, each time addressing what the review found, accumulated exactly as fast
+    as one stuck reviewing the SAME broken code three times over -- and both landed on the
+    identical "it needs a person," even though only the second is actually stuck.
+    """
+    driver = _load_driver()
+    old_artefact = "a" * 64
+    new_artefact = "b" * 64
+    state: dict[str, object] = {
+        "review_attempts": {"U01": 3},
+        "review_escalated": ["U01"],
+        "review_expected": {"U01": {"artefact": old_artefact, "attempt": 3}},
+    }
+    assert driver.review_dispatch_allowed(state, "U01") is False, (
+        "sanity: three attempts against the old artefact must still be escalated"
+    )
+
+    changed = driver.reset_review_attempts_on_new_artefact(state, "U01", new_artefact)
+    assert changed is True
+    assert state["review_attempts"]["U01"] == 0
+    assert "U01" not in state["review_escalated"]
+    assert driver.review_dispatch_allowed(state, "U01") is True, (
+        "a rebuilt unit's new code must be reviewable again"
+    )
+
+
+def test_reset_is_a_no_op_when_the_artefact_has_not_changed(monkeypatch) -> None:
+    """The other half: F-05 refunds an infrastructure-loss retry WITHOUT changing
+    `review_expected`, and three genuine attempts against the SAME code must still escalate."""
+    driver = _load_driver()
+    artefact = "c" * 64
+    state: dict[str, object] = {
+        "review_attempts": {"U01": 3},
+        "review_escalated": ["U01"],
+        "review_expected": {"U01": {"artefact": artefact, "attempt": 3}},
+    }
+    changed = driver.reset_review_attempts_on_new_artefact(state, "U01", artefact)
+    assert changed is False
+    assert state["review_attempts"]["U01"] == 3
+    assert "U01" in state["review_escalated"]
+
+
+def test_reset_does_nothing_for_a_unit_never_dispatched_before(monkeypatch) -> None:
+    """No `review_expected` entry yet -- a first-ever dispatch -- must not be treated as a
+    reset event (nothing to report, nothing to change)."""
+    driver = _load_driver()
+    state: dict[str, object] = {"review_expected": {}}
+    assert driver.reset_review_attempts_on_new_artefact(state, "U01", "x" * 64) is False
+    assert state.get("review_attempts", {}).get("U01") is None

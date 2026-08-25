@@ -286,6 +286,37 @@ def record_restart(state: dict, uid: str, *, now: float) -> bool:
     return len(restarts) > MAX_RESTARTS and quarantine_unit(state, uid)
 
 
+def reset_review_attempts_on_new_artefact(state: dict, uid: str, artefact: str) -> bool:
+    """A rebuilt unit gets a fresh review budget for the code it actually carries now.
+
+    Decided by the principal, 25 August 2026, after AL, AO and AP were found escalated while
+    each held a DIFFERENT, newer artefact than the one their three attempts had been spent
+    against. `review_attempts` was a pure LIFETIME counter with no relationship to which code
+    was under review: a unit reviewed three times, rebuilt after a genuine DEFECTIVE finding
+    each time, accumulated exactly as fast as one reviewed three times against the SAME
+    unchanged code -- and both landed on the identical escalation, "it needs a person," even
+    though only the second is actually stuck.
+
+    `review_expected[uid]` already records the artefact the LAST dispatched attempt was against.
+    If the artefact computed for a fresh dispatch differs from that, the code has moved --
+    through a legitimate rebuild addressing prior findings -- and the counter resets. If it is
+    the SAME artefact (an infrastructure-loss retry under F-05, which does not change
+    `review_expected`), nothing resets, and three genuine attempts against the SAME code still
+    escalates exactly as before. Returns whether anything was actually reset, so the caller can
+    report it rather than print on every dispatch.
+    """
+    last_artefact = state.setdefault("review_expected", {}).get(uid, {}).get("artefact")
+    if last_artefact is None or last_artefact == artefact:
+        return False
+    attempts = state.setdefault("review_attempts", {})
+    escalated = state.setdefault("review_escalated", [])
+    changed = attempts.get(uid, 0) > 0 or uid in escalated
+    attempts[uid] = 0
+    if uid in escalated:
+        escalated.remove(uid)
+    return changed
+
+
 def review_dispatch_allowed(state: dict, uid: str) -> bool:
     """Refuse a fourth review attempt and emit its escalation only once."""
     attempts = state.setdefault("review_attempts", {}).get(uid, 0)
@@ -2513,6 +2544,11 @@ def main() -> int:
         artefact = artefact_identity(units[uid])
         if artefact is None:
             continue
+        if reset_review_attempts_on_new_artefact(state, uid, artefact):
+            print(
+                f"driver: {uid}'s artefact changed since its last review attempt; "
+                "review budget reset"
+            )
         review_escalated = uid in state.setdefault("review_escalated", [])
         if not review_dispatch_allowed(state, uid):
             if not review_escalated:
