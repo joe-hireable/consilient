@@ -1066,3 +1066,99 @@ def test_neither_file_present_is_not_finished(tmp_path: Path, monkeypatch) -> No
         driver.review_receipt_is_finished("U01", {"artefact": "x", "attempt": 1})
         is False
     )
+
+
+def test_consume_review_verdict_only_memoises_a_terminal_outcome(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 25 August 2026, ~23:15, from the trajectory itself: A01's history shows
+    `attempt=1 artefact=6e826... outcome=no_dispatch`, and the SAME (attempt, artefact) pair
+    was never looked at again -- because the memo used to be written for EVERY outcome, and
+    F-05 refunds an infrastructure loss's attempt counter so a retry reuses the identical pair.
+
+    SOUND and DEFECTIVE must still be remembered, so a re-dispatch under the same pair cannot
+    double-apply a real verdict.
+    """
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    monkeypatch.setattr(driver, "append_review_outcome", lambda _record: None)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: None)
+
+    unit = {"claims": ["a.py"]}
+
+    state: dict[str, object] = {"review_expected": {"U01": {"attempt": 1, "artefact": "x" * 64}}}
+    driver.consume_review_verdict(state, "U01", unit)  # no files -> no_dispatch
+    assert state["review_results"]["U01"]["outcome"] == "no_dispatch"
+    assert "U01" not in state.get("review_consumed", {}), (
+        "a non-terminal outcome must not be memoised"
+    )
+
+    artefact = "y" * 64
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: artefact)
+    (briefs / "U02-verdict.json").write_text(
+        json.dumps({
+            "v": 1, "unit": "U02", "artefact": artefact, "attempt": 1,
+            "verdict": "SOUND", "findings": [],
+        }),
+        encoding="utf-8",
+    )
+    state2: dict[str, object] = {
+        "review_expected": {"U02": {"attempt": 1, "artefact": artefact}}
+    }
+    driver.consume_review_verdict(state2, "U02", unit)
+    assert state2["review_results"]["U02"]["outcome"] == "SOUND"
+    assert state2["review_consumed"]["U02"] == {"attempt": 1, "artefact": artefact}, (
+        "a terminal SOUND outcome must still be memoised"
+    )
+
+
+def test_clear_stale_review_memos_recovers_units_stuck_by_the_old_semantics(
+    tmp_path: Path,
+) -> None:
+    """The one-time migration for memos written before outcome-gating existed. A01, AB and AC
+    were exactly this: a real SOUND/DEFECTIVE receipt sat on disk, unreachable because a
+    non-terminal memo from an earlier tick had already frozen their (attempt, artefact) pair."""
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "review_consumed": {
+            "A01": {"attempt": 1, "artefact": "a" * 64},   # stuck: non-terminal
+            "AF": {"attempt": 1, "artefact": "f" * 64},     # correctly terminal, must survive
+            "GONE": {"attempt": 1, "artefact": "g" * 64},   # not a real unit; must not be re-queued
+        },
+        "review_results": {
+            "A01": {"outcome": "no_dispatch"},
+            "AF": {"outcome": "SOUND"},
+            "GONE": {"outcome": "no_dispatch"},
+        },
+        "review_dispatched": [],
+    }
+    units = {"A01": {"claims": []}, "AF": {"claims": []}}
+
+    cleared = driver.clear_stale_review_memos(state, units)
+
+    assert sorted(cleared) == ["A01", "GONE"]
+    assert "A01" not in state["review_consumed"]
+    assert "A01" in state["review_dispatched"], "must be re-queued so it is looked at again"
+    assert "AF" in state["review_consumed"], "a terminal memo must not be disturbed"
+    assert "AF" not in state["review_dispatched"], "a correctly-consumed unit is not re-queued"
+    assert "GONE" not in state["review_dispatched"], (
+        "a uid absent from the plan must not be queued for review"
+    )
+
+
+def test_clear_stale_review_memos_is_a_no_op_once_nothing_is_stale(
+    tmp_path: Path,
+) -> None:
+    """Safe to run every tick: once every memo is terminal, this changes nothing."""
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "review_consumed": {"AF": {"attempt": 1, "artefact": "f" * 64}},
+        "review_results": {"AF": {"outcome": "SOUND"}},
+        "review_dispatched": [],
+    }
+    units = {"AF": {"claims": []}}
+    assert driver.clear_stale_review_memos(state, units) == []
+    assert state["review_consumed"] == {"AF": {"attempt": 1, "artefact": "f" * 64}}
+    assert state["review_dispatched"] == []

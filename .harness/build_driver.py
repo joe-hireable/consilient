@@ -663,6 +663,42 @@ def review_receipt_is_finished(uid: str, expected: dict[str, Any]) -> bool:
     )
 
 
+def clear_stale_review_memos(state: dict[str, Any], units: dict[str, Any]) -> list[str]:
+    """Undo a memo written before outcome-gating existed. Returns the uids cleared.
+
+    ONE-TIME MIGRATION, but safe to run every tick: a no-op once no stale non-terminal memo
+    remains. `consume_review_verdict` used to memoise EVERY outcome, not only SOUND/DEFECTIVE.
+    A memo recorded against a non-terminal outcome -- no_dispatch, dispatch_refused,
+    dispatch_failed, receipt_unparseable, receipt_mismatched, no_receipt_file -- blocks a
+    genuinely later, valid verdict for no reason: F-05 refunds an infrastructure loss's attempt
+    counter precisely so it can be retried under the SAME (attempt, artefact) pair, and the old
+    memo froze exactly that pair.
+
+    MEASURED 25 August 2026, ~23:15, from the trajectory itself: A01's history reads
+    `attempt=1 artefact=6e826... outcome=no_dispatch`, and the SAME pair was never looked at
+    again even after a genuinely valid, matching receipt arrived minutes later. AB and AC were
+    stuck the identical way.
+
+    Re-adding a uid to `review_dispatched` cannot cause a double dispatch -- `pending_review`
+    already excludes anything already in that set -- so this only widens what gets LOOKED AT,
+    never what gets admitted to a fresh review.
+    """
+    cleared: list[str] = []
+    consumed = state.setdefault("review_consumed", {})
+    results = state.setdefault("review_results", {})
+    dispatched = state.setdefault("review_dispatched", [])
+    for uid, memo in list(consumed.items()):
+        if not memo:
+            continue
+        if results.get(uid, {}).get("outcome") in ("SOUND", "DEFECTIVE"):
+            continue
+        consumed.pop(uid, None)
+        if uid in units and uid not in dispatched:
+            dispatched.append(uid)
+        cleared.append(uid)
+    return cleared
+
+
 def consume_review_verdict(
     state: dict[str, Any], uid: str, unit: dict[str, Any]
 ) -> str:
@@ -700,7 +736,25 @@ def consume_review_verdict(
         "findings": findings,
     }
     append_review_outcome(record)
-    state["review_consumed"][uid] = expected
+    # Memoise ONLY a terminal outcome. A verdict of SOUND or DEFECTIVE is a real, identity-bound
+    # answer, and remembering it stops a re-dispatch of the SAME (attempt, artefact) pair from
+    # double-applying it -- appending the outcome event twice, or double-adding to `done`.
+    #
+    # MEASURED 25 August 2026, ~23:15, via the trajectory itself: A01's history reads
+    # `attempt=1 artefact=6e826... outcome=no_dispatch`, and the SAME (attempt, artefact) pair
+    # was never looked at again, because this line used to fire for EVERY outcome. F-05 refunds
+    # an infrastructure loss's attempt counter precisely so it can be retried WITHOUT a new
+    # attempt number -- `no_dispatch`, `dispatch_refused` and `dispatch_failed` all take that
+    # path -- so the retry re-enters `review_dispatched` under the IDENTICAL expected pair the
+    # memo had already frozen. The retry's own genuine verdict, arriving later, was then refused
+    # by the short-circuit at the top of this function before it was ever read.
+    #
+    # `review_dispatched` membership already governs whether a unit is looked at THIS tick, and
+    # `review_receipt_is_finished` already governs WHEN a look is warranted; the memo add nothing
+    # to safety for a non-terminal outcome, and actively discards a later, real one. So it is
+    # written only for the two outcomes that cannot be improved on by waiting: SOUND, DEFECTIVE.
+    if outcome in ("SOUND", "DEFECTIVE"):
+        state["review_consumed"][uid] = expected
     state.setdefault("review_results", {})[uid] = record
     dispatched = state.setdefault("review_dispatched", [])
     if uid in dispatched:
@@ -2295,6 +2349,13 @@ def main() -> int:
     # that made the tail-only parser fail is what makes this safe. A non-empty artefact means
     # that review's process has written its final report and let go of the file. A torn read
     # fails json.loads, becomes a check_error, and is retried, so the race fails closed.
+    stale_memos = clear_stale_review_memos(state, units)
+    if stale_memos:
+        print(
+            f"driver: cleared {len(stale_memos)} non-terminal review memo(s), re-queued: "
+            + " ".join(sorted(stale_memos))
+        )
+
     consumed_any = False
     for uid in sorted(list(state.setdefault("review_dispatched", []))):
         expected_now = state.setdefault("review_expected", {}).get(uid) or {}
