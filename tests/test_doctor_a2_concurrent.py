@@ -201,6 +201,60 @@ def test_a2_still_fails_on_a_diverged_prefix_while_the_log_grows(
     assert "diverged" in str(condition["reason"])
 
 
+def test_a2_canonicalises_rejection_paths_across_log_locations(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The same refused line has the same projected state wherever its log lives."""
+    first_log = tmp_path / "first" / "log"
+    second_log = tmp_path / "second" / "log"
+    name = f"{datetime.now(timezone.utc).date().isoformat()}.jsonl"
+    first_path = first_log / name
+    second_path = second_log / name
+    first_path.parent.mkdir(parents=True)
+    first_path.write_text("{not valid JSON}\n", encoding="utf-8")
+    _append_judged(first_path, "rejected-path", "t-rejected-path")
+    second_path.parent.mkdir(parents=True)
+    second_path.write_text(first_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    first_db = tmp_path / "first.db"
+    second_db = tmp_path / "second.db"
+    first = projection.build(first_log, first_db)
+    second = projection.build(second_log, second_db)
+    try:
+        first_rejections = projection.rejections(first)
+        assert first_rejections == projection.rejections(second)
+        assert first_rejections[0]["path"] == name
+        assert first_rejections[0]["line"] == 1
+        assert str(first_rejections[0]["reason"]).startswith("not valid JSON:")
+        assert projection.state_digest(first) == projection.state_digest(second)
+    finally:
+        first.close()
+        second.close()
+
+    assert _a2(_doctor(first_log, first_db, capsys))["status"] == "pass"
+    assert _a2(_doctor(second_log, second_db, capsys))["status"] == "pass"
+
+
+def test_a2_is_unknown_when_pragma_projection_version_changes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The SQLite header version, not projection_meta, decides compatibility."""
+    old, new = 1, 2
+    assert projection.PROJECTION_VERSION == new
+    log, db, _path = _seeded(tmp_path)
+    existing = sqlite3.connect(db)
+    existing.execute(f"PRAGMA user_version = {old}")
+    existing.execute(
+        "UPDATE projection_meta SET value = ? WHERE key = ?", ("999", "version")
+    )
+    existing.commit()
+    existing.close()
+
+    condition = _a2(_doctor(log, db, capsys))
+    assert condition["status"] == "unknown", condition["reason"]
+    assert condition["reason"] == "Projection version 1 rebuilt as 2; not compared."
+
+
 def test_a2_stays_unknown_on_an_empty_prefix_while_the_log_grows(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

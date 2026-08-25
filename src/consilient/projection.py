@@ -48,10 +48,10 @@ from .events import (
 )
 from .work_items import STATE, WORK_MODEL_SCHEMA, state_group
 
-# Stamp written into projection_meta so a legitimate handler/schema change is a
-# third replay state, not Gate A2 "DIVERGED". Bump when a rebuild of the same log
-# is expected to change state_digest.
-PROJECTION_VERSION = "1"
+# The SQLite header version makes a legitimate handler/schema change a third replay
+# state, not Gate A2 "DIVERGED". Bump when a rebuild of the same log is expected to
+# change state_digest.
+PROJECTION_VERSION = 2
 VERSION_KEY = "version"
 
 # Every events.py `*_KIND` string must appear in exactly one of these. T11.
@@ -370,6 +370,7 @@ def _rebuild(
             "INSERT OR REPLACE INTO projection_meta (key, value) VALUES (?, ?)",
             (VERSION_KEY, PROJECTION_VERSION),
         )
+        conn.execute(f"PRAGMA user_version = {PROJECTION_VERSION}")
         conn.commit()
         conn.close()
         conn = None
@@ -413,14 +414,22 @@ def prefix_digest(
             pass
 
 
-def projection_version(conn: sqlite3.Connection) -> str | None:
+def projection_version(conn: sqlite3.Connection) -> int | None:
     try:
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if version:
+            return version
         row = conn.execute(
             "SELECT value FROM projection_meta WHERE key = ?", (VERSION_KEY,)
         ).fetchone()
     except sqlite3.DatabaseError:
         return None
-    return None if row is None else str(row[0])
+    if row is None:
+        return None
+    try:
+        return int(str(row[0]))
+    except ValueError:
+        return None
 
 
 def _apply_rejections(conn: sqlite3.Connection, rejected: list[Rejection]) -> None:
@@ -435,7 +444,7 @@ def _apply_rejections(conn: sqlite3.Connection, rejected: list[Rejection]) -> No
     for index, rejection in enumerate(rejected):
         conn.execute(
             "INSERT INTO rejections (id, path, line, reason) VALUES (?, ?, ?, ?)",
-            (index, rejection.path, rejection.line, rejection.reason),
+            (index, Path(rejection.path).name, rejection.line, rejection.reason),
         )
 
 

@@ -317,7 +317,7 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
 
     prior: str | None = None
     projected: int | None = None
-    prior_version: str | None = None
+    prior_version: int | None = None
     if db.exists():
         existing = sqlite3.connect(db)
         try:
