@@ -226,9 +226,7 @@ _DATA_DRIVEN_PROCEDURES = frozenset({"closed_form", "embedding_fit", "optimiser"
 _NON_DATA_DRIVEN_PROCEDURES = frozenset({"direct_edit"})
 _RETRIEVAL_PROCEDURES = frozenset({"embedding_inference", "frozen_embedding"})
 _UNKNOWN_DISPOSITIONS = frozenset({"n/a", "none", "unknown", "unspecified"})
-CAPABILITY_MANIFEST_KINDS = frozenset(
-    {"tool", "mcp", "skill", "plugin", "connection"}
-)
+CAPABILITY_MANIFEST_KINDS = frozenset({"tool", "mcp", "skill", "plugin", "connection"})
 CAPABILITY_MANIFEST_STATUSES = frozenset(
     {"active", "inactive", "expired", "superseded", "duplicate", "unmeasured"}
 )
@@ -455,9 +453,15 @@ def parse_capability_identity(value: object) -> tuple[str, str]:
         raise EventError("identity must be a kind:name string")
     kind, name = value.split(":", 1)
     if kind not in CAPABILITY_MANIFEST_KINDS:
-        raise EventError(f"identity kind must be one of {sorted(CAPABILITY_MANIFEST_KINDS)!r}")
-    if not name or any(character.isspace() or not character.isprintable() for character in name):
-        raise EventError("identity name must be a non-empty identifier without whitespace")
+        raise EventError(
+            f"identity kind must be one of {sorted(CAPABILITY_MANIFEST_KINDS)!r}"
+        )
+    if not name or any(
+        character.isspace() or not character.isprintable() for character in name
+    ):
+        raise EventError(
+            "identity name must be a non-empty identifier without whitespace"
+        )
     return kind, name
 
 
@@ -503,9 +507,9 @@ def execution_contract_key(fields: dict[str, object]) -> str:
 def version_digest(fields: dict[str, object]) -> str:
     payload = _content_payload(fields)
     payload["content_digest"] = fields.get("content_digest") or content_digest(fields)
-    payload["execution_contract_key"] = fields.get("execution_contract_key") or execution_contract_key(
-        fields
-    )
+    payload["execution_contract_key"] = fields.get(
+        "execution_contract_key"
+    ) or execution_contract_key(fields)
     payload["status"] = fields["status"]
     return _digest_json(payload)
 
@@ -583,7 +587,12 @@ class CapabilityManifest:
 
         def text(field: str) -> str:
             raw = record.get(field)
-            if not isinstance(raw, str) or not raw or raw != raw.strip() or not raw.isprintable():
+            if (
+                not isinstance(raw, str)
+                or not raw
+                or raw != raw.strip()
+                or not raw.isprintable()
+            ):
                 raise EventError(f"{field} must be non-empty printable text")
             return raw
 
@@ -643,7 +652,9 @@ class CapabilityManifest:
                 or len(digest) != 64
                 or any(character not in _HEX for character in digest)
             ):
-                raise EventError("version_digest must be 64 lowercase hexadecimal characters")
+                raise EventError(
+                    "version_digest must be 64 lowercase hexadecimal characters"
+                )
             if digest != expected_version:
                 raise EventError("version_digest does not match canonical version")
         return cls(
@@ -664,8 +675,12 @@ class CapabilityManifest:
             destination_class=str(payload["destination_class"]),
             duplicate_of=nullable_mapping("duplicate_of"),
             supersedes=nullable_mapping("supersedes"),
-            expires_at=payload["expires_at"] if payload["expires_at"] is None else str(payload["expires_at"]),
-            recheck_at=payload["recheck_at"] if payload["recheck_at"] is None else str(payload["recheck_at"]),
+            expires_at=payload["expires_at"]
+            if payload["expires_at"] is None
+            else str(payload["expires_at"]),
+            recheck_at=payload["recheck_at"]
+            if payload["recheck_at"] is None
+            else str(payload["recheck_at"]),
             content_digest=expected_content,
             execution_contract_key=expected_contract,
             version_digest=expected_version,
@@ -925,7 +940,9 @@ def _check_event_reference(
 
 
 def _check_record_reference(reference: object, relation: str) -> None:
-    _check_event_reference(reference, RECORD_CAPTURED_KIND, relation, RECORD_CAPTURED_KIND)
+    _check_event_reference(
+        reference, RECORD_CAPTURED_KIND, relation, RECORD_CAPTURED_KIND
+    )
 
 
 def _check_capability_versioned_contract(event: EventPayload) -> None:
@@ -987,7 +1004,9 @@ def _check_capability_versioned_contract(event: EventPayload) -> None:
     for relation in ("duplicate_of", "supersedes", "source_object"):
         reference = data[relation]
         if isinstance(reference, dict) and reference.get("event_id") == event_id:
-            raise EventError(f"{CAPABILITY_VERSIONED_KIND} {relation} cannot reference itself")
+            raise EventError(
+                f"{CAPABILITY_VERSIONED_KIND} {relation} cannot reference itself"
+            )
 
 
 def mutation_class_for(procedure_kind: object) -> str | None:
@@ -1154,9 +1173,7 @@ def _check_model_change_contract(event: EventPayload) -> None:
     for relation in ("base_model", "dataset", "procedure", "checkpoint"):
         reference = data[relation]
         if isinstance(reference, dict) and reference.get("event_id") == event_id:
-            raise EventError(
-                f"{MODEL_CHANGE_KIND} {relation} cannot reference itself"
-            )
+            raise EventError(f"{MODEL_CHANGE_KIND} {relation} cannot reference itself")
 
 
 def _decimal_field(
@@ -2891,18 +2908,52 @@ else:
     _TRANSACTION_OPEN_FLAGS = os.O_RDWR | os.O_CREAT | os.O_APPEND
 
 
+# The transaction lock lives past every byte a reader will ever touch.
+#
+# MEASURED 25 August 2026: of 4,930 recorded dispatch deaths, 3,895 -- SEVENTY-NINE PERCENT --
+# were readers refused on this file, across 106 units. It was the single largest cause of
+# failure in the whole system, larger than every other cause combined.
+#
+# The mechanism was the lock offset. A Windows byte-range lock denies a reader that overlaps
+# the locked region, and this lock was taken on BYTE 0 -- which is inside the region every
+# reader reads. So for the entire duration of a transaction, including the full parse of the
+# prefix that a transaction performs before it writes anything, every concurrent reader was
+# denied. `read()` retries six times over ~2.5 s and then fails closed, correctly, but
+# globally: a refused read fails the suite, and a failed suite blocks retirement, merging and
+# publication together. As the log grew the hold grew with it, so the system got worse at
+# exactly the rate it did work.
+#
+# Byte-range locks are per-REGION. Moving the lock to a byte beyond any plausible end of file
+# keeps writers excluding each other -- they contend for the same sentinel -- while readers
+# never overlap it at all. MEASURED with a two-process probe before this change
+# (scratchpad/lock_region_experiment.py):
+#
+#   lock byte 0        reader DENIED (PermissionError)      writer refused (exclusion holds)
+#   lock byte 2^40     reader read 2,000 lines in 0 ms      writer refused (exclusion holds)
+#
+# One terabyte. A JSONL trajectory reaching that offset has problems this lock cannot help
+# with, and locking past EOF neither extends the file nor writes to it.
+_TRANSACTION_LOCK_BYTE = 1 << 40
+
+
 def _lock_file(fd: int) -> None:
     """Take the kernel-backed per-log lock; block until held. Death releases it."""
     if sys.platform == "win32":
         import msvcrt
 
-        os.lseek(fd, 0, os.SEEK_SET)
         while True:
             try:
+                os.lseek(fd, _TRANSACTION_LOCK_BYTE, os.SEEK_SET)
                 msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
                 return
             except OSError:
-                time.sleep(0.005)
+                # Jittered, for the same measured reason `_retry_sleep` is: a fixed 5 ms
+                # sleep put every waiter on the same instants, and this repository runs
+                # dozens of concurrent writers. They were re-colliding at every step --
+                # 26 dispatchers were measured spinning here, ~40 CPU-seconds each,
+                # making no progress. The one jitter rule, applied at the second retry
+                # site that needed it and never got it.
+                jittered_sleep(0.01)
     else:
         import fcntl
 
@@ -2916,7 +2967,7 @@ def _unlock_file(fd: int) -> None:
         import msvcrt
 
         try:
-            os.lseek(fd, 0, os.SEEK_SET)
+            os.lseek(fd, _TRANSACTION_LOCK_BYTE, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
         except OSError:
             pass
@@ -2927,6 +2978,55 @@ def _unlock_file(fd: int) -> None:
             fcntl.flock(fd, fcntl.LOCK_UN)
         except OSError:
             pass
+
+
+@contextmanager
+def _appending(fd: int) -> Iterator[None]:
+    """Hold byte 0 across the append itself, and only across the append.
+
+    Two reasons, and the second is the one that makes this permanent rather than transitional.
+
+    First, a writer that has not yet adopted `_TRANSACTION_LOCK_BYTE` -- an older checkout, a
+    long-lived process that imported this module before the change, another tool appending to
+    the same trajectory -- still contends on byte 0. Without this, such a writer and a current
+    one would not exclude each other at all, and two concurrent `O_APPEND` writes on Windows
+    are a seek-then-write pair rather than one atomic operation, so they can interleave into a
+    torn line. A torn line is quarantined by `read()` rather than accepted, so it fails
+    closed -- but a trajectory that β is measured from should not be shedding lines at all.
+
+    Second, it keeps the honest invariant that concurrent appenders exclude one another
+    through the bytes they actually write, whatever else changes above.
+
+    Readers still overlap this region, so they can still be denied -- for the microseconds of
+    a write and an fsync, not for the whole parse. That is precisely the transient the six
+    jittered retries in `read()` exist to ride out, and it is why that budget stays unchanged.
+
+    POSIX needs nothing here: `flock` is whole-file and advisory, so it already excludes
+    writers without denying readers, which is why this failure was Windows-only.
+    """
+    if sys.platform != "win32":
+        yield
+        return
+    import msvcrt
+
+    held = False
+    try:
+        while True:
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                held = True
+                break
+            except OSError:
+                jittered_sleep(0.01)
+        yield
+    finally:
+        if held:
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
 
 
 def _write_all(fd: int, data: bytes) -> None:
@@ -3015,17 +3115,18 @@ def _write_validated(path: Path, event: EventPayload) -> EventPayload:
         try:
             prefix, _rejected = _read_under_lock(path, fd)
             _reject_duplicate_event_ids(tuple(prefix), (event,))
-            offset = os.lseek(fd, 0, os.SEEK_END)
-            try:
-                _write_all(fd, line)
-                # fsync inside the lock: an acknowledged prefix is always durable,
-                # so a failed fsync rolls back before any later line can be
-                # acknowledged over a non-durable earlier one.
-                _fsync_file(fd)
-                _fsync_parent_before_acknowledgement(path)
-            except EventError:
-                _rollback(fd, offset)
-                raise
+            with _appending(fd):
+                offset = os.lseek(fd, 0, os.SEEK_END)
+                try:
+                    _write_all(fd, line)
+                    # fsync inside the lock: an acknowledged prefix is always durable,
+                    # so a failed fsync rolls back before any later line can be
+                    # acknowledged over a non-durable earlier one.
+                    _fsync_file(fd)
+                    _fsync_parent_before_acknowledgement(path)
+                except EventError:
+                    _rollback(fd, offset)
+                    raise
         finally:
             _unlock_file(fd)
     finally:
@@ -3181,7 +3282,10 @@ def _validate_capability_versioned_links(
                     f"{CAPABILITY_VERSIONED_KIND} {relation} must reference an exact earlier "
                     f"capability.versioned event: {exc}"
                 ) from exc
-            if not isinstance(target, Event) or target.kind != CAPABILITY_VERSIONED_KIND:
+            if (
+                not isinstance(target, Event)
+                or target.kind != CAPABILITY_VERSIONED_KIND
+            ):
                 raise EventError(
                     f"{CAPABILITY_VERSIONED_KIND} {relation} must reference capability.versioned"
                 )
@@ -3198,9 +3302,7 @@ def _validate_model_change_links(
             continue
         data = candidate["data"]
         if data["base_model"]["event_id"] == candidate["event_id"]:
-            raise EventError(
-                f"{MODEL_CHANGE_KIND} base_model cannot reference itself"
-            )
+            raise EventError(f"{MODEL_CHANGE_KIND} base_model cannot reference itself")
         try:
             base = resolve_reference(data["base_model"], prefix)
         except EventError as exc:
@@ -3369,7 +3471,9 @@ def _validate_decision_relations(
 
 
 register_transition_validator((RECORD_CAPTURED_KIND,), _validate_record_relations)
-register_transition_validator((CAPABILITY_VERSIONED_KIND,), _validate_capability_versioned_links)
+register_transition_validator(
+    (CAPABILITY_VERSIONED_KIND,), _validate_capability_versioned_links
+)
 register_transition_validator((MODEL_CHANGE_KIND,), _validate_model_change_links)
 
 
@@ -3480,19 +3584,20 @@ def _transaction_one_log(
                     else:
                         registered(prefix, rejections, batch)
             _validate_delivery_claim_ordering(prefix, rejections, batch)
-            offset = os.lseek(fd, 0, os.SEEK_END)
-            try:
-                for candidate in batch:
-                    _write_all(fd, (canonical(candidate) + "\n").encode("utf-8"))
-                # fsync inside the lock, exactly as the single-append path: an
-                # acknowledged batch is always durably ordered behind every
-                # earlier acknowledged line, and a failed fsync rolls back
-                # before any later line can be acknowledged over it.
-                _fsync_file(fd)
-                _fsync_parent_before_acknowledgement(path)
-            except EventError:
-                _rollback(fd, offset)
-                raise
+            with _appending(fd):
+                offset = os.lseek(fd, 0, os.SEEK_END)
+                try:
+                    for candidate in batch:
+                        _write_all(fd, (canonical(candidate) + "\n").encode("utf-8"))
+                    # fsync inside the lock, exactly as the single-append path: an
+                    # acknowledged batch is always durably ordered behind every
+                    # earlier acknowledged line, and a failed fsync rolls back
+                    # before any later line can be acknowledged over it.
+                    _fsync_file(fd)
+                    _fsync_parent_before_acknowledgement(path)
+                except EventError:
+                    _rollback(fd, offset)
+                    raise
         finally:
             _unlock_file(fd)
     finally:
@@ -3678,15 +3783,39 @@ def _read_under_lock(path: Path, fd: int) -> tuple[list[Event], list[Rejection]]
     be read through a fresh open; the locking descriptor itself may read it. The
     bytes are decoded with the same universal-newline rule text mode applies, so
     a line classifies identically through either path.
+
+    Holding the transaction lock no longer implies nothing else can lock bytes this read
+    touches: `_appending` takes byte 0 for the duration of a write, and a writer that has not
+    adopted `_TRANSACTION_LOCK_BYTE` holds byte 0 for its whole transaction. Either can deny
+    this read, so it retries on the same jittered budget `read()` uses and fails closed the
+    same way. The retry restarts from offset zero rather than resuming: a denial part-way
+    through would otherwise splice two reads of a file that may have grown between them, and
+    a prefix assembled from two moments is not a prefix.
     """
-    os.lseek(fd, 0, os.SEEK_SET)
-    chunks: list[bytes] = []
-    while True:
-        chunk = os.read(fd, 65536)
-        if not chunk:
-            break
-        chunks.append(chunk)
-    payload = b"".join(chunks)
+    payload = b""
+    last: OSError | None = None
+    for attempt in range(_READ_RETRIES):
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            chunks: list[bytes] = []
+            while True:
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+        except PermissionError as exc:
+            last = exc
+            _retry_sleep(attempt)
+            continue
+        payload = b"".join(chunks)
+        break
+    else:
+        raise EventError(
+            f"{path} could not be read after {_READ_RETRIES} attempts while holding the "
+            f"transaction lock: observed access denial ({last}); another writer holds the "
+            "append region. The transaction is not acknowledged rather than run against an "
+            "incomplete prefix."
+        )
     if payload and not payload.endswith(b"\n"):
         raise EventError(
             f"refusing append to {path.name!r}: torn line at byte offset {payload.rfind(b'\n') + 1}"
