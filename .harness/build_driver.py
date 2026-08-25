@@ -567,6 +567,34 @@ def _load_verdict_file(
 def _consume_review_receipt(
     uid: str, unit: dict[str, Any], expected: dict[str, Any]
 ) -> tuple[str, list[str]]:
+    # THE REVIEWER'S VERDICT OUTRANKS THE WRAPPER'S ENVELOPE.
+    #
+    # MEASURED 25 August 2026, 22:02. Everything below classifies `<uid>-verify.out` -- the
+    # dispatch ENVELOPE -- and only reaches `_load_verdict_file` when that envelope reads "ok".
+    # So AE and AA, each holding a well-formed verdict bound to their unit's CURRENT artefact,
+    # were typed `no_dispatch` on the strength of a zero-byte envelope, and the verdict file was
+    # never opened. The driver's own loader returned SOUND and DEFECTIVE for them when called
+    # directly.
+    #
+    # The envelope describes the WRAPPER's fate: whether the process launched, was refused, timed
+    # out. The receipt describes the REVIEW's fate. When both exist the receipt is the stronger
+    # evidence, and when they disagree the envelope is usually the one that is wrong -- it is
+    # truncated by a re-dispatch, or never written because the wrapper died after the reviewer had
+    # already finished.
+    #
+    # So the receipt is tried FIRST, and only a real verdict short-circuits. Anything else --
+    # missing, unparseable, mismatched identity -- falls through to the envelope classification
+    # below, which is what correctly types an infrastructure loss as `no_dispatch` or
+    # `dispatch_refused` so it does not spend a review attempt (F-05).
+    #
+    # Nothing is weakened: `_load_verdict_file` still validates the schema and re-derives artefact
+    # identity on both sides, so a verdict from an earlier attempt about code that has since moved
+    # is still refused. What changes is that a valid verdict is no longer discarded unread because
+    # a sibling file is empty.
+    early_outcome, early_findings = _load_verdict_file(uid, unit, expected)
+    if early_outcome in ("SOUND", "DEFECTIVE"):
+        return early_outcome, early_findings
+
     out_path = BRIEFS / f"{uid}-verify.out"
     try:
         size = out_path.stat().st_size
