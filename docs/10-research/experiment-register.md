@@ -6688,3 +6688,71 @@ bound is `[-1, +1]`, and precision, recall and false-surfacing each lie in `[0, 
 result can support a later principal-authored activation ADR or remove only v1 automatic surfacing
 for the frozen mixture; it never self-activates. [asserted] Specification, accepted append-only
 record history and deliberate pull survive every result. [asserted]
+
+### EXP-145 · Unconditioned human-verdict β on third-party PRs to tracked upstream repositories `READY`
+
+**Allocated 25 August 2026.** The next unused heading after EXP-143 is EXP-144; Z09's published
+unit note already claims that identifier for the admission-bar protocol on PRs *we* submit. This
+unit takes EXP-145 so the two protocols do not share a number. [measured: register headings;
+asserted: Z09 allocation]
+
+**Decides:** the false-accept rate of our composite verifier on the task family
+`third_party_upstream_prs:<repository>` — pull requests other people submitted to repositories
+this project already tracks — judged against a maintainer's correctness decision. [asserted] It
+does not decide the harness's own β, does not open Gate A or Gate B, and must not be compared
+to a figure computed on a different family or check set. [cited: measuring-beta skill; EXP-49
+`comparison_with_exp47: "not_permitted"`]
+
+**Task family.** `third_party_upstream_prs:<repository>`. This is not the family the harness
+produces. A reported figure names the family and the repository, and is a calibration of the
+verifier against real human judgement, not a quote of harness β. [asserted]
+
+**Repositories, sampling frame.** Open and subsequently decided pull requests against:
+
+- `pallets/itsdangerous` — already the second corpus in EXP-96. [measured]
+- `joe-hireable/consilient` — this public repository. [measured]
+
+authored by accounts that are not this project's agents, whose maintainer action is a decision
+that the change is *correct* or *incorrect*. Closures for scope, staleness, inactivity, roadmap
+or house style are recorded if seen and then refused as verdicts; they never enter the
+numerator or the denominator. [asserted]
+
+**Precondition.** For each PR: run the composite verifier on the judged commit and persist
+`verifier_accept`, `verifier_ts` and `judged_commit` *before* the maintainer's decision is
+visible. `scripts/upstream_verdicts.py` refuses any row whose verdict timestamp is later than
+the maintainer's decision. Do not comment, review or approve the PR. [asserted]
+
+**Procedure.**
+
+1. Sample the next eligible PR in the frame. Do not filter on our verifier's outcome.
+2. Record our accept/reject with timestamp and judged commit.
+3. After the maintainer decides, classify the decision as correctness or not. Only
+   correctness rows are verdicts.
+4. Store both cells when they occur: checks-accepted / human-rejected, and checks-rejected /
+   human-accepted. A schema that can express only one cell is a defect.
+5. Never set `lower_bound_on_joint_error` from a caller Boolean. The sampling protocol that
+   would warrant the bound is this entry: the sample is not conditioned on the verifier's own
+   outcome, because we record every eligible PR and the maintainer has never seen our checks.
+   The collector does not flip the flag; a later join may do so only by citing this protocol.
+6. Do not lower `MIN_REJECTIONS`. [measured: `beta.MIN_REJECTIONS = 30`]
+
+**Measures.** Per-repository β = P(verifier_accept | human_reject) with a Wilson 95% interval,
+`n_rejected`, `n_accepted_by_human`, and the count in each cell of the 2×2. Report the family
+name on every figure. Do not pool across repositories. Do not feed these rows to the gate
+quantity; ADR-0106 is PROPOSED and V0-18 still reserves gate authorship. [asserted]
+
+**Stopping rule, fixed in advance.** Stop at 30 correctness rejections in a single repository
+(the `MIN_REJECTIONS` floor) or 180 days after the first recorded prediction, whichever comes
+first. [asserted] Report `insufficient_data` if either cell is empty at the stop — an empty
+checks-rejected / human-accepted cell means the bound property was not observed. Report
+`protocol_failed` if any recorded row interacted with the upstream PR, or if any complete row
+has `verifier_ts` later than `human_decision_ts`. Do not replace the family name after seeing
+results; a renamed family is a new experiment.
+
+**Largest plausible effect (ADR-0050):** the figure can land anywhere in `[0, 1]` and can only
+calibrate the verifier against this family. It cannot open a gate, change `MIN_REJECTIONS`, or
+stand in for harness-family β. [asserted]
+
+**Status:** READY — the collector and its refusal tests exist; no live row has been recorded.
+[measured 25 August 2026]
+

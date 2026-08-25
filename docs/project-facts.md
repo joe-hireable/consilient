@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_project_facts.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md, docs/10-research/experiment-register.md, docs/superpowers/specs/*.md, pyproject.toml`
-> **Source SHA-256:** `3274586b99e0ca954f7a3790a06d3142cddf6def5be696e176ae9d536f316961`
+> **Source SHA-256:** `7a6d55614a80ea960ff4cafd6f34955d8200fb74786dc9c27a8d14bc5bd6d0f9`
 > **Do not hand-edit:** regenerate with `python scripts/build_project_facts.py`.
 
 ## adr_count
@@ -11,7 +11,7 @@
 
 ## experiment_count
 
-113
+114
 
 ## spec_count
 
