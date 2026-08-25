@@ -433,6 +433,3 @@ def test_overflow_fixture_reports_honest_completion_flags(tmp_path: Path) -> Non
     selected = set(receipt["selected_ids"])
     omitted_ids = {entry["id"] for entry in receipt["omitted"] if entry["reason"] == "context_bound"}
     assert selected.isdisjoint(omitted_ids)
-
-
-from typing import cast
