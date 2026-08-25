@@ -111,3 +111,4 @@
 | [0104](0104-re-derive-both-halves-of-beta-star-from-evidence.md) | Re-derive both halves of β\\\* from evidence, and let the arithmetic fall where it does | PROVISIONAL | — |
 | [0105](0105-baseline-the-22-august-capture-loss.md) | Baseline the 22 August capture loss | ACCEPTED | — |
 | [0106](0106-admit-third-party-maintainer-verdicts-as-human-beta.md) | Admit identified third-party maintainer verdicts as human-β authors | PROPOSED | — |
+| [0107](0107-a-unit-may-merge-into-a-red-tree-but-nothing-may-publish-from-one.md) | A unit may merge into a red tree; nothing may publish from one | ACCEPTED | — |
