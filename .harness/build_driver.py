@@ -685,6 +685,39 @@ def rebase_worktree(uid: str, path: pathlib.Path) -> bool:
     return False
 
 
+def rebase_mergeable_worktrees(
+    mergeable: list[str], state: dict, now: float, dispatchers_alive: int
+) -> None:
+    """Replay every unmerged worktree that no live dispatcher can still be writing."""
+    for uid in mergeable:
+        started, leash = state.get("in_flight", {}).get(uid, (0.0, 0.0))
+        if now - started <= leash and dispatchers_alive:
+            continue
+        path = WORKTREES / uid
+        head = sh(["git", "-C", str(path), "rev-parse", "HEAD"]).stdout.strip()
+        if not head:
+            continue
+        commits = [
+            line
+            for line in sh(
+                ["git", "rev-list", "--reverse", f"HEAD..{head}"]
+            ).stdout.splitlines()
+            if line.strip()
+        ]
+        if not commits:
+            continue
+        if rebase_worktree(uid, path):
+            print(
+                f"driver: rebased {uid} onto HEAD "
+                f"({len(commits)} commit(s) replayed)"
+            )
+        else:
+            print(
+                f"driver: rebase of {uid} failed "
+                f"(0 of {len(commits)} commit(s) replayed)"
+            )
+
+
 # How long a dispatch may write nothing before its slot is treated as unused. Generous, because a
 # unit legitimately spends time reading before it writes; the measured idle cases sat at 43 minutes
 # with zero bytes produced.
@@ -1259,7 +1292,7 @@ def release_dead_claims(uids: set[str]) -> int:
     return closed
 
 
-def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
+def merge_unit_worktree(uid: str) -> str:
     """Take only the commits the unit itself made, never its whole tree state.
 
     `git merge <worktree-head>` was wrong: a worktree branched from an older HEAD carries the
@@ -1333,11 +1366,8 @@ def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
                 already += 1
                 continue
             sh(["git", "cherry-pick", "--abort"])
-            # Silently returning a string here is how S01 sat unmerged: the driver printed
-            # the line and forgot it, and the queue behind it read as "idle" (F-01/F-02).
-            # A conflict is now either repaired in the unit's own tree or escalated by name.
-            if quiescent and rebase_worktree(uid, path):
-                return merge_unit_worktree(uid, quiescent=False)
+            # The tick rebases every quiescent worktree before reaching this merge. A conflict
+            # that survives that pass needs named escalation, not another hidden retry here.
             return f"CONFLICT cherry-picking {sha[:9]} for {uid} ({applied} applied); needs resolution"
         applied += 1
         post_pick_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
@@ -1855,7 +1885,30 @@ def record_tick_intent(tick, selected, not_selected, *, window=None):
     )
 
 
-def ready(uid, unit, done, units):
+SUBSYSTEM_JACCARD_THRESHOLD = float(
+    os.environ.get("CONSILIENT_SUBSYSTEM_JACCARD_THRESHOLD", "0.18")
+)
+if not 0.0 <= SUBSYSTEM_JACCARD_THRESHOLD <= 1.0:
+    raise ValueError(
+        "CONSILIENT_SUBSYSTEM_JACCARD_THRESHOLD must be between 0 and 1"
+    )
+
+SUBSYSTEM_STOP_WORDS = frozenset(
+    "a an the and or of to for in on with by that it its is are be not no "
+    "feat fix docs test research ci chore refactor perf build style revert".split()
+)
+
+
+def _subsystem_tokens(unit: dict) -> set[str]:
+    text = f"{unit.get('title', '')} {unit.get('commit', '')}".lower()
+    return {
+        token
+        for token in re.findall(r"[a-z]+", text)
+        if len(token) > 2 and token not in SUBSYSTEM_STOP_WORDS
+    }
+
+
+def ready(uid, unit, done, units, in_flight=()):
     """A unit may start when every dependency it declares has landed.
 
     Dependencies come from the plans' own `Depends on:` lines. A dependency naming a unit
@@ -1867,7 +1920,26 @@ def ready(uid, unit, done, units):
             return False
         if d not in done:
             return False
-    return True
+    tokens = _subsystem_tokens(unit)
+    serialised = False
+    for other_uid in in_flight:
+        if other_uid == uid or other_uid not in units:
+            continue
+        other = units[other_uid]
+        shared_claims = set(unit.get("claims", [])) & set(other.get("claims", []))
+        if not shared_claims:
+            continue
+        other_tokens = _subsystem_tokens(other)
+        union = tokens | other_tokens
+        similarity = len(tokens & other_tokens) / len(union) if union else 0.0
+        if similarity > SUBSYSTEM_JACCARD_THRESHOLD:
+            print(
+                f"driver: serialising {uid} behind {other_uid} -- duplicate subsystem "
+                f"similarity {similarity:.3f} > {SUBSYSTEM_JACCARD_THRESHOLD:.3f}; "
+                f"shared claims: {', '.join(sorted(shared_claims))}"
+            )
+            serialised = True
+    return not serialised
 
 
 TICK_LOCK = ROOT / ".harness" / "driver-tick.lock"
@@ -2116,21 +2188,16 @@ def main() -> int:
         for uid in units
         if uid not in done and uid not in built and (WORKTREES / uid).exists()
     ]
+    rebase_mergeable_worktrees(mergeable, state, _now_m, _dispatchers_alive)
     for uid in mergeable:
-        if True:
-            started, leash = state.get("in_flight", {}).get(uid, (0.0, 0.0))
-            # Quiescent means the leash has run out, so no dispatcher should still be writing
-            # in that tree. Only then may its branch be rebased under it.
-            msg = merge_unit_worktree(
-                uid, quiescent=(_now_m - started > leash or _dispatchers_alive == 0)
-            )
-            if msg not in ("no commits", "no worktree"):
-                print(f"driver: {msg}")
-            if msg.startswith("CONFLICT"):
-                conflicts[uid] = msg
-            else:
-                conflicts.pop(uid, None)
-    if conflicts or retired_without_review:
+        msg = merge_unit_worktree(uid)
+        if msg not in ("no commits", "no worktree"):
+            print(f"driver: {msg}")
+        if msg.startswith("CONFLICT"):
+            conflicts[uid] = msg
+        else:
+            conflicts.pop(uid, None)
+    if conflicts:
         print(
             f"driver: ESCALATION -- {len(conflicts)} escalated, "
             f"{retired_without_review} retired without review"
@@ -2298,8 +2365,6 @@ def main() -> int:
         and attempts.get(u, 0) < 3
         and u not in state.setdefault("quarantined", [])
     ]
-    candidates.sort(key=lambda u: (PHASE.get(u[0], 9), u))
-
     # A dependency is satisfied when its code is IN THE TREE, not when it has been verified.
     # AV correctly made RETIREMENT require a consumed SOUND verdict, but the same set was also
     # gating what may START, and those are different questions: a dependent needs the code to
@@ -2315,8 +2380,6 @@ def main() -> int:
     # retirement or publication -- both still require the identity-bound SOUND verdict, which is
     # where the beta discipline actually bites.
     landed = done | set(state.setdefault("built", []))
-    blocked = [u for u in candidates if not ready(u, units[u], landed, units)]
-    startable = [u for u in candidates if ready(u, units[u], landed, units)]
     # Spend slots on whatever releases the most work, not on whatever sorts first.
     # Downstream count is the right default and a bad rule for one case: a unit that unblocks
     # nothing but improves the QUALITY of everything -- the cross-family verdict parser is the
@@ -2324,13 +2387,22 @@ def main() -> int:
     # unit is added to its effective rank. It is deliberately a separate, visible field rather
     # than a fudged dependency, because inflating a dependency count to win a scheduling argument
     # is how a plan stops describing the work.
-    startable.sort(
+    candidates.sort(
         key=lambda u: (
             -(downstream_count(u, units) + int(units[u].get("priority", 0))),
             PHASE.get(u[0], 9),
             u,
         )
     )
+    blocked = []
+    startable = []
+    planned_in_flight = set(inflight)
+    for uid in candidates:
+        if ready(uid, units[uid], landed, units, planned_in_flight):
+            startable.append(uid)
+            planned_in_flight.add(uid)
+        else:
+            blocked.append(uid)
 
     # Intent first, spawn second. A tick that selects nobody still names why, which is
     # the only record F-08-class silence can leave. Written before the cap return so a

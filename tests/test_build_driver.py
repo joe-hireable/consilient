@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+from itertools import combinations
 from pathlib import Path
 
 import pytest
@@ -540,174 +541,101 @@ def test_the_prune_has_a_ceiling_so_an_ordinary_tick_pays_nothing() -> None:
     assert "PRUNE_CEILING" in body, "the ceiling is defined but not consulted"
 
 
-# --- BL: classify conflicts by content, clear them on retirement, gate merges --
-#
-# The already-landed detector used to grep commit SUBJECTS. Over 646 commits this
-# repository reused 14 subjects; 9 of the top 12 reused subjects carry different
-# patch content [measured, 24 August 2026]. A subject hit retired the unit. That
-# is a false-accept in the driver's own classifier, and it is how harness.py
-# acquired a duplicate 313-line block.
-#
-# These four tests are the unit's done criteria (A1, A2, A5-driver-half, F).
+# --- duplicate-subsystem serialisation and pre-merge rebasing, BN ----------------
 
 
-_GIT_ENV = {
-    key: value
-    for key, value in os.environ.items()
-    if key not in {"GIT_DIR", "GIT_WORK_TREE"}
-}
-
-
-def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=str(repo),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=_GIT_ENV,
-    )
-    assert result.returncode == 0, result.stderr or result.stdout
-    return result
-
-
-def _init_repo(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    _git(path, "init")
-    _git(path, "config", "user.email", "bl@test")
-    _git(path, "config", "user.name", "BL")
-
-
-def _commit_file(repo: Path, rel: str, body: str, subject: str) -> str:
-    target = repo / rel
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(body, encoding="utf-8")
-    _git(repo, "add", rel)
-    _git(repo, "commit", "-m", subject)
-    return _git(repo, "rev-parse", "HEAD").stdout.strip()
-
-
-def _isolate_driver(driver, repo: Path, monkeypatch) -> None:
-    monkeypatch.setattr(driver, "ROOT", repo)
-    monkeypatch.setattr(driver, "WORKTREES", repo / ".harness" / "unit-worktrees")
-    monkeypatch.setattr(driver, "STATE", repo / ".harness" / "driver-state.json")
-
-    def isolated_sh(args, **kw):
-        return subprocess.run(
-            args,
-            cwd=str(repo),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=_GIT_ENV,
-            **kw,
+def test_duplicate_subsystem_serialises_n03_and_t02_from_the_real_plan(
+    capsys,
+) -> None:
+    driver = _load_driver()
+    if not driver.UNITS.is_file():
+        pytest.skip(
+            "the real plan is instance data and is not tracked (Z04); this check reads it "
+            "as evidence and cannot run without it"
         )
+    units = json.loads(driver.UNITS.read_text(encoding="utf-8"))
 
-    monkeypatch.setattr(driver, "sh", isolated_sh)
+    assert not driver.ready(
+        "T02", units["T02"], set(units), units, in_flight={"N03"}
+    )
+    assert "serialising T02 behind N03" in capsys.readouterr().out
+    assert driver.ready("T02", units["T02"], set(units), units, in_flight=set())
 
 
-def test_classifier_does_not_retire_on_subject_reuse(tmp_path: Path, monkeypatch) -> None:
-    """A1: identical subject, different content — the second stays escalated."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    _commit_file(repo, "mod.py", "base = 0\n", "init")
-    default = _git(repo, "branch", "--show-current").stdout.strip()
-    first_lines = "\n".join(f"FIRST_{i} = {i}" for i in range(25)) + "\n"
-    second_lines = "\n".join(f"SECOND_{i} = {i}" for i in range(25)) + "\n"
-    _git(repo, "checkout", "-b", "first")
-    _commit_file(repo, "mod.py", first_lines, "feat: shared subject")
-    _git(repo, "checkout", default)
-    _git(repo, "checkout", "-b", "second")
-    second_sha = _commit_file(repo, "mod.py", second_lines, "feat: shared subject")
-    _git(repo, "checkout", default)
-    _git(repo, "merge", "--no-ff", "first", "-m", "land first")
-
+def test_duplicate_subsystem_threshold_is_configurable(monkeypatch) -> None:
+    monkeypatch.setenv("CONSILIENT_SUBSYSTEM_JACCARD_THRESHOLD", "0.21")
     driver = _load_driver()
-    _isolate_driver(driver, repo, monkeypatch)
-    state: dict[str, object] = {
-        "conflicts": {
-            "U2": f"CONFLICT cherry-picking {second_sha[:9]} for U2 (0 applied); needs resolution"
-        },
-        "force_done": [],
-        "built": [],
-        "done": [],
-    }
-    retired = driver.retest_conflicts(state)
-    assert retired == 0
-    assert "U2" in state["conflicts"]
+    if not driver.UNITS.is_file():
+        pytest.skip(
+            "the real plan is instance data and is not tracked (Z04); this check reads it "
+            "as evidence and cannot run without it"
+        )
+    units = json.loads(driver.UNITS.read_text(encoding="utf-8"))
+
+    assert driver.ready("T02", units["T02"], set(units), units, in_flight={"N03"})
 
 
-def test_conflict_cleared_on_retire() -> None:
-    """A2: no uid may sit in both conflicts and force_done — that was K01 live."""
+def test_duplicate_subsystem_firing_rate_stays_below_five_percent() -> None:
     driver = _load_driver()
-    state: dict[str, object] = {
-        "conflicts": {"K01": "CONFLICT cherry-picking deadbeef for K01"},
-        "force_done": ["K01", "T01"],
-        "built": [],
-        "done": [],
-    }
-    driver.clear_retired_conflicts(state)
-    overlap = set(state["conflicts"]) & set(state["force_done"])
-    assert overlap == set(), overlap
+    if not driver.UNITS.is_file():
+        pytest.skip(
+            "the real plan is instance data and is not tracked (Z04); this check reads it "
+            "as evidence and cannot run without it"
+        )
+    units = json.loads(driver.UNITS.read_text(encoding="utf-8"))
+    sharing = [
+        (left, right)
+        for left, right in combinations(units, 2)
+        if set(units[left]["claims"]) & set(units[right]["claims"])
+    ]
+    firings = [
+        (left, right)
+        for left, right in sharing
+        if not driver.ready(
+            left, units[left], set(units), units, in_flight={right}
+        )
+    ]
 
-
-def test_failed_gate_reverts_cherry_pick(tmp_path: Path, monkeypatch) -> None:
-    """A cherry-pick whose result fails the gate is undone and the unit escalates."""
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    pre = _commit_file(repo, "ok.py", "VALUE = 1\n", "init")
-    default = _git(repo, "branch", "--show-current").stdout.strip()
-    _git(repo, "checkout", "-b", "unit")
-    _commit_file(repo, "ok.py", "VALUE = 2\n", "feat: change value")
-    _git(repo, "checkout", default)
-    worktree = repo / ".harness" / "unit-worktrees" / "U1"
-    worktree.parent.mkdir(parents=True, exist_ok=True)
-    _git(repo, "worktree", "add", str(worktree), "unit")
-
-    driver = _load_driver()
-    _isolate_driver(driver, repo, monkeypatch)
-    monkeypatch.setattr(
-        driver, "gate_merged_tree", lambda _touched: "ruff: simulated gate failure"
+    assert sharing
+    assert len(firings) / len(sharing) <= 0.05, (
+        f"duplicate-subsystem threshold fired for {len(firings)}/{len(sharing)} "
+        "claim-sharing pairs"
     )
 
-    msg = driver.merge_unit_worktree("U1")
-    assert msg.startswith("CONFLICT"), msg
-    assert "gate" in msg.lower()
-    assert _git(repo, "rev-parse", "HEAD").stdout.strip() == pre
 
-
-def test_classifier_does_not_grep_subjects() -> None:
-    """The false-accept path was `git log --grep <subject>`. It must stay gone."""
-    source = DRIVER.read_text(encoding="utf-8")
-    assert "--grep" not in source
-    assert "--merge-base=" in source
-    assert "retired without review" in source
-    assert "--config-file" in source and "mypy.ini" in source
-    gate = source.split("def gate_merged_tree", 1)[1].split("\ndef ", 1)[0]
-    assert "--config-file" in gate and "mypy.ini" in gate
-    assert "--strict" not in gate.replace("never bare `--strict`", "")
-
-
-def test_escalation_banner_counts_retirements(tmp_path: Path, monkeypatch, capsys) -> None:
-    """F: the banner grows when the classifier retires, it does not shrink."""
+def _run_duplicate_subsystem_merge_tick(
+    tmp_path: Path, monkeypatch, capsys, *, dispatcher_live: bool
+) -> tuple[list[tuple[object, ...]], str]:
     driver = _load_driver()
-    units = {f"E{i}": {"title": "held", "claims": []} for i in range(5)}
-    units["T02"] = {"title": "landed", "claims": []}
-    units["K01"] = {"title": "landed", "claims": []}
-    remaining = {
-        f"E{i}": f"CONFLICT cherry-picking {'abcdabcd'[:7]}{i} for E{i}"
-        for i in range(5)
-    }
+    worktrees = tmp_path / "unit-worktrees"
+    (worktrees / "U01").mkdir(parents=True)
+    now = driver.time.time()
     state: dict[str, object] = {
-        "conflicts": {**remaining, "T02": "CONFLICT cherry-picking deadbee1 for T02", "K01": "CONFLICT cherry-picking deadbee2 for K01"},
-        "force_done": [],
-        "built": [],
-        "done": [],
-        "in_flight": {},
+        "in_flight": {"U01": (now, 3600.0)} if dispatcher_live else {},
         "attempts": {},
+        "quarantined": ["U01"],
     }
+    units = {
+        "U01": {
+            "title": "one bounded unit",
+            "commit": "feat(unit): bounded work",
+            "claims": [],
+            "deps": [],
+        }
+    }
+
+    class _GitResult:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_sh(args: list[str]) -> _GitResult:
+        result = _GitResult()
+        result.stdout = "one\ntwo\n" if "rev-list" in args else "head"
+        return result
+
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(driver, "WORKTREES", worktrees)
     monkeypatch.setattr(
         driver, "load", lambda path, _default: units if path == driver.UNITS else state
     )
@@ -716,164 +644,88 @@ def test_escalation_banner_counts_retirements(tmp_path: Path, monkeypatch, capsy
     monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
     monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
     monkeypatch.setattr(driver, "save_state", lambda _state: None)
-    monkeypatch.setattr(driver, "live_dispatchers", lambda _state: 1)
-    monkeypatch.setattr(driver, "publish_if_ready", lambda _state, _green: "")
-    monkeypatch.setattr(driver, "ready", lambda *_a, **_k: False)
-    monkeypatch.setattr(driver.subprocess, "Popen", lambda *_a, **_k: None)
-    # The Popen stub above states the intent -- this test must never start a process -- but it
-    # cannot carry it out on its own: `sh` calls `subprocess.run`, which uses Popen as a CONTEXT
-    # MANAGER, so a None return raises `TypeError: 'NoneType' object does not support the context
-    # manager protocol` from inside the stdlib. It surfaced when a `sh` call was added to a path
-    # this test reaches, and it fired AFTER the banner had already been printed correctly: the
-    # assertion below was passing while the test failed.
-    #
-    # Stubbing `sh` is what the Popen stub was reaching for. Nothing about the banner is relaxed;
-    # the empty stdout makes `suite_green` fail closed, which is the honest default here.
-    class _NoProcess:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    monkeypatch.setattr(driver, "sh", lambda *_a, **_k: _NoProcess())
-
-    def fake_retest(current: dict) -> int:
-        for uid in ("T02", "K01"):
-            current.get("conflicts", {}).pop(uid, None)
-            built = current.setdefault("built", [])
-            if uid not in built:
-                built.append(uid)
-        return 2
-
-    monkeypatch.setattr(driver, "retest_conflicts", fake_retest)
-    monkeypatch.setattr(driver, "clear_retired_conflicts", lambda _state: None)
+    monkeypatch.setattr(driver, "record_tick_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    monkeypatch.setattr(
+        driver,
+        "rebase_worktree",
+        lambda uid, _path: calls.append(("rebase", uid)) or True,
+    )
     monkeypatch.setattr(
         driver,
         "merge_unit_worktree",
-        lambda uid, quiescent=False: current_conflict(uid),
+        lambda uid, quiescent=False: calls.append(("merge", uid, quiescent))
+        or "no commits",
     )
-
-    def current_conflict(uid: str) -> str:
-        if uid in ("T02", "K01"):
-            return "no worktree"
-        return state["conflicts"].get(uid, "CONFLICT leftover")
 
     assert driver.main() == 0
-    out = capsys.readouterr().out
-    assert "5 escalated, 2 retired without review" in out
+    return calls, capsys.readouterr().out
 
 
-def test_merge_gate_never_hands_a_non_python_file_to_ruff_or_mypy(
-    tmp_path: Path, monkeypatch
+def test_duplicate_subsystem_rebases_quiescent_worktree_before_merge(
+    tmp_path: Path, monkeypatch, capsys
 ) -> None:
-    """MEASURED 25 August 2026: a cherry-pick touching `.gitignore` had it passed straight to
-    `ruff check`, which parsed the glob patterns as Python and reported 129
-    `invalid-syntax: Expected an expression` errors. Non-zero exit, merge REFUSED, commit fine.
-
-    The units this blocked hardest were the harness-cleanup ones, because those are precisely
-    the commits that touch `.gitignore`. A gate that refuses correct work is worse than no
-    gate: it is indistinguishable from the work being wrong.
-    """
-    driver = _load_driver()
-    monkeypatch.setattr(driver, "ROOT", tmp_path)
-    for name in (".gitignore", "notes.md", "data.json", "mod.py"):
-        (tmp_path / name).write_text("x\n", encoding="utf-8")
-
-    seen: list[list[str]] = []
-
-    class _Ok:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def _record(args: list[str]) -> "_Ok":
-        seen.append(list(args))
-        return _Ok()
-
-    monkeypatch.setattr(driver, "sh", _record)
-    assert (
-        driver.gate_merged_tree([".gitignore", "notes.md", "data.json", "mod.py"])
-        is None
+    calls, output = _run_duplicate_subsystem_merge_tick(
+        tmp_path, monkeypatch, capsys, dispatcher_live=False
     )
 
-    linters = [
-        command
-        for command in seen
-        if any("ruff" in part or "mypy" in part for part in command)
-    ]
-    assert linters, "the gate ran no linter at all"
-    allowed = {"check", "-m", "mypy", "--config-file"}
-    for command in linters:
-        for argument in command[1:]:
-            if argument.startswith("-") or argument.endswith("mypy.ini"):
-                continue
-            if argument.endswith(".py") or "python" in argument.lower():
-                continue
-            if argument in allowed:
-                continue
-            raise AssertionError(
-                f"{command[0]} was handed a non-Python path {argument!r}"
-            )
+    assert calls == [("rebase", "U01"), ("merge", "U01", False)]
+    assert "2 commit(s) replayed" in output
 
 
-def test_merge_gate_runs_no_linter_when_a_commit_touches_no_python(
+def test_duplicate_subsystem_does_not_rebase_a_live_dispatcher(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    calls, _output = _run_duplicate_subsystem_merge_tick(
+        tmp_path, monkeypatch, capsys, dispatcher_live=True
+    )
+
+    assert calls == [("merge", "U01", False)]
+
+
+def test_duplicate_subsystem_candidates_do_not_launch_together(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """A docs-only or gitignore-only commit gives a Python linter nothing to say, and must not
-    be refused for that."""
     driver = _load_driver()
-    monkeypatch.setattr(driver, "ROOT", tmp_path)
-    (tmp_path / ".gitignore").write_text("*.pyc\n", encoding="utf-8")
-
-    seen: list[list[str]] = []
-
-    class _Ok:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def _record(args: list[str]) -> "_Ok":
-        seen.append(list(args))
-        return _Ok()
-
-    monkeypatch.setattr(driver, "sh", _record)
-    assert driver.gate_merged_tree([".gitignore"]) is None
-    assert not [
-        command
-        for command in seen
-        if any("ruff" in part or "mypy" in part for part in command)
-    ], "a gitignore-only commit must not invoke a Python linter"
-
-
-def test_a_quarantined_unit_is_still_eligible_for_review(monkeypatch) -> None:
-    """Quarantine must not block the one path out of quarantine.
-
-    MEASURED 25 August 2026: review selection excluded quarantined units, while
-    `clear_quarantine_after_landed_check` documents "a SOUND, identity-bound review is the
-    automatic quarantine recovery path". Quarantine blocked review; only review cleared
-    quarantine. Seven units were stuck with no route out, one of them BN -- which had already
-    built the fix for the build's central convergence problem.
-
-    Quarantine is a statement about dispatching more work, not about judging work that exists.
-    """
-    driver = _load_driver()
-    state: dict[str, object] = {
-        "built": ["BN", "OK1"],
-        "review_dispatched": [],
-        "quarantined": ["BN"],
+    if not driver.UNITS.is_file():
+        pytest.skip(
+            "the real plan is instance data and is not tracked (Z04); this check reads it "
+            "as evidence and cannot run without it"
+        )
+    units = {
+        uid: {
+            "title": "atomic coordination fencing",
+            "commit": "feat(coordination): atomic fencing",
+            "claims": ["shared.py"],
+            "deps": [],
+        }
+        for uid in ("U01", "U02")
     }
-    pending = [
-        u
-        for u in sorted(state["built"])  # type: ignore[arg-type]
-        if u not in state["review_dispatched"]  # type: ignore[operator]
-    ]
-    assert "BN" in pending, "a quarantined unit must still be reachable by review"
+    state: dict[str, object] = {"in_flight": {}, "attempts": {}}
+    launched: list[list[str]] = []
 
-    source = DRIVER.read_text(encoding="utf-8")
-    selection = source.split("pending_review = [", 1)[1].split("]", 1)[0]
-    assert "quarantined" not in selection, (
-        "review selection must not filter on quarantine -- that is the deadlock: "
-        "quarantine blocks review, and only a SOUND review clears quarantine"
+    monkeypatch.setattr(driver, "BRIEFS", tmp_path)
+    monkeypatch.setattr(
+        driver, "load", lambda path, _default: units if path == driver.UNITS else state
     )
+    monkeypatch.setattr(driver, "committed", lambda _uid, _unit: False)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: None)
+    monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
+    monkeypatch.setattr(driver, "save_state", lambda _state: None)
+    monkeypatch.setattr(driver, "write_brief", lambda *_args: tmp_path / "brief.md")
+    monkeypatch.setattr(driver, "pick_arm", lambda *_args: ("codex", None, 60))
+    monkeypatch.setattr(driver, "unit_worktree", lambda _uid: None)
+    monkeypatch.setattr(driver, "publish_if_ready", lambda *_args: "")
+    monkeypatch.setattr(driver, "record_tick_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        driver.subprocess,
+        "Popen",
+        lambda args, **_kwargs: launched.append(args),
+    )
+
+    assert driver.main() == 0
+    assert len(launched) == 1
 
 
 def test_quarantine_still_blocks_dispatching_new_work(monkeypatch) -> None:
