@@ -1675,7 +1675,10 @@ silently.** And any path you needed that your claim list did not cover.
 # 14:21 cohort -- 26 dispatches -- alive for 40 minutes with agent CLIs spawned and ZERO bytes
 # written. Not slow: producing nothing. 24/12 is not parallelism at that point, it is queueing.
 #
-# REVERT TO 24/12 when Z03 and Z06 land. Nothing else about this file needs to change.
+# Z06 landed: the lanes are independent pools and a full lane sheds rather than
+# borrowing. The ceilings stay at the measured 12/6. Restoring 24/12 would raise
+# MAX_CONCURRENT past the knee this comment just measured (19–31), which is the
+# remedy the unit forbids. Z03 still owns tick checkpointing and subprocess bounds.
 MAX_BUILDS = 12
 MAX_REVIEWS = 6
 MAX_CONCURRENT = MAX_BUILDS + MAX_REVIEWS
@@ -1727,9 +1730,36 @@ def not_selected_reasons(units, landed, blocked, startable, selected):
     return reasons
 
 
+def shed_lane(outstanding: int, ceiling: int) -> bool:
+    """True when this lane is at or over its own ceiling.
+
+    A full lane sheds. It does not borrow the other lane's reserved slots.
+    MAX_CONCURRENT is the documented sum of the two ceilings, not an admission
+    pool — a safety property held only by that incidental constant is the
+    defect this function exists to retire.
+    """
+    return outstanding >= ceiling
+
+
+def admit_review(reviews_out: int) -> bool:
+    return not shed_lane(reviews_out, MAX_REVIEWS)
+
+
+def admit_build(builds_out: int) -> bool:
+    return not shed_lane(builds_out, MAX_BUILDS)
+
+
+def builds_outstanding(state: dict) -> int:
+    return len(state.get("in_flight", {}))
+
+
+def reviews_outstanding(state: dict) -> int:
+    return len(state.get("review_dispatched", []))
+
+
 def choose_selected(startable, live):
-    """Who this tick will spawn, given the slots that still exist."""
-    slots = min(MAX_BUILDS, max(0, MAX_CONCURRENT - live))
+    """Who this tick will spawn from the build lane's own remaining slots."""
+    slots = max(0, MAX_BUILDS - live)
     return list(startable[:slots])
 
 
@@ -2085,7 +2115,10 @@ def main() -> int:
     # name says so -- and this makes it one instead of a per-tick rate.
     reviews_out = len(state.setdefault("review_dispatched", []))
     for uid in pending_review:
-        if reviews_out >= MAX_REVIEWS or live >= MAX_CONCURRENT:
+        if not admit_review(reviews_out):
+            print(
+                f"driver: review lane at ceiling ({reviews_out}/{MAX_REVIEWS}); shedding"
+            )
             break
         builder = state.get("built_by", {}).get(uid, "codex")
         reviewers = [a for a in ARMS if FAMILY.get(a[0]) != FAMILY.get(builder)]
@@ -2132,7 +2165,6 @@ def main() -> int:
         ve = (BRIEFS / f"{uid}-verify.err").open("w", encoding="utf-8")
         subprocess.Popen(vargs, cwd=str(ROOT), stdout=vo, stderr=ve)
         state["review_dispatched"].append(uid)
-        live += 1
         reviews_out += 1
         print(f"driver: review of {uid} dispatched to {rh} (built by {builder})")
 
@@ -2225,11 +2257,6 @@ def main() -> int:
     )
     state["intent_tick"] = tick + 1
 
-    if live >= MAX_CONCURRENT:
-        print(f"driver: {live} dispatchers live at the cap; holding")
-        save_state(state)
-        return 0
-
     if not candidates:
         print(f"driver: every unit is done or exhausted ({len(done)}/{len(units)})")
         save_state(state)
@@ -2237,7 +2264,10 @@ def main() -> int:
 
     launched = 0
     for uid in startable:
-        if launched >= MAX_BUILDS or live + launched >= MAX_CONCURRENT:
+        if not admit_build(len(inflight)):
+            print(
+                f"driver: build lane at ceiling ({len(inflight)}/{MAX_BUILDS}); shedding"
+            )
             break
         unit = units[uid]
         n = attempts.get(uid, 0)
@@ -2290,7 +2320,10 @@ def main() -> int:
     # its own dispatch, its own brief, and does not touch the build retry counter.
     resolving = state.setdefault("resolve_dispatched", [])
     for uid, why in sorted(conflicts.items()):
-        if launched >= MAX_BUILDS or live + launched >= MAX_CONCURRENT:
+        if not admit_build(len(inflight)):
+            print(
+                f"driver: build lane at ceiling ({len(inflight)}/{MAX_BUILDS}); shedding"
+            )
             break
         if (
             uid in resolving
