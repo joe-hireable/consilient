@@ -884,3 +884,38 @@ def test_quarantine_still_blocks_dispatching_new_work(monkeypatch) -> None:
         "quarantine must still gate build selection and conflict resolution; only review "
         "was meant to reopen"
     )
+
+
+def test_a_worktree_sitting_at_head_is_not_already_landed(monkeypatch) -> None:
+    """Emptiness is not evidence of completion.
+
+    MEASURED 25 August 2026: both halves of `_cherry_and_diff_match` pass trivially when the
+    worktree head IS HEAD -- `git cherry` prints nothing and `git diff --quiet` exits 0 -- so
+    the driver reported BN's work as present in HEAD while `rebase_mergeable_worktrees` and
+    `SUBSYSTEM_JACCARD_THRESHOLD` were both absent from it. The unit was then dropped from
+    `conflicts`, so the driver stopped trying to merge the work it had actually done.
+
+    `_refresh_worktree` resets clean unit worktrees to HEAD every tick, so this is the ordinary
+    state of a conflicted unit, not an edge case. A gate accepting an artefact that is not there
+    is a false accept, which is the quantity this project exists to measure.
+    """
+    driver = _load_driver()
+    head = "a" * 40
+
+    def fake_sh(args: list[str]):
+        class _R:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        result = _R()
+        if args[:2] == ["git", "rev-parse"]:
+            result.stdout = head + "\n"
+        return result
+
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    assert driver._cherry_and_diff_match(head, [".harness/build_driver.py"]) is False, (
+        "a worktree at exactly HEAD has done nothing and must not read as landed"
+    )
+    # A genuinely different head still reaches the real checks (which the stub passes).
+    assert driver._cherry_and_diff_match("b" * 40, [".harness/build_driver.py"]) is True

@@ -824,6 +824,29 @@ def _cherry_and_diff_match(worktree_head: str, touched: list[str]) -> bool:
     """
     if not worktree_head or not touched:
         return False
+    # A worktree sitting EXACTLY at HEAD has done nothing; it has not "already landed".
+    #
+    # MEASURED 25 August 2026. Both halves of this check pass trivially when the two trees are
+    # the same commit: `git cherry HEAD <head>` prints nothing, so no line starts with "+", and
+    # `git diff --quiet <head> HEAD` exits 0 because there is no difference. The function then
+    # reports the unit's work as present in HEAD. What it actually observed is the unit having
+    # no work at all.
+    #
+    # That is not a hypothetical window. `_refresh_worktree` resets a unit worktree to HEAD
+    # every tick whenever it is clean and carries no commits of its own, so a conflicted unit
+    # is routinely sitting at exactly HEAD when `retest_conflicts` runs. BN was reported
+    # "already landed -- its added lines are present in HEAD; retiring" while
+    # `rebase_mergeable_worktrees` and `SUBSYSTEM_JACCARD_THRESHOLD` were both absent from HEAD,
+    # and the unit was dropped from `conflicts` so the driver stopped trying to merge its work.
+    #
+    # A gate accepting an artefact that is not there is a FALSE ACCEPT -- the quantity this
+    # repository exists to measure -- and it was arriving through the cheapest rung of the
+    # cheapest check. Emptiness is not evidence of completion.
+    head_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
+    if head_sha and worktree_head.startswith(head_sha[:12]):
+        return False
+    if head_sha and head_sha.startswith(worktree_head[:12]):
+        return False
     cherry = sh(["git", "cherry", "HEAD", worktree_head])
     if cherry.returncode != 0:
         return False
