@@ -567,34 +567,31 @@ def _load_verdict_file(
 def _consume_review_receipt(
     uid: str, unit: dict[str, Any], expected: dict[str, Any]
 ) -> tuple[str, list[str]]:
-    # THE REVIEWER'S VERDICT OUTRANKS THE WRAPPER'S ENVELOPE.
+    # A RECEIPT OUTRANKS THE ENVELOPE ONLY WHEN THE ENVELOPE IS SILENT -- never when the
+    # wrapper made a DEFINITE statement about this dispatch.
     #
-    # MEASURED 25 August 2026, 22:02. Everything below classifies `<uid>-verify.out` -- the
-    # dispatch ENVELOPE -- and only reaches `_load_verdict_file` when that envelope reads "ok".
-    # So AE and AA, each holding a well-formed verdict bound to their unit's CURRENT artefact,
-    # were typed `no_dispatch` on the strength of a zero-byte envelope, and the verdict file was
-    # never opened. The driver's own loader returned SOUND and DEFECTIVE for them when called
-    # directly.
+    # MEASURED 25 August 2026, 22:02, then corrected the same evening by a test that already
+    # existed to guard exactly this: `test_json_refused_dispatch_is_dispatch_refused` writes a
+    # dispatch envelope reporting `status: refused` (a claim collision -- the wrapper explicitly
+    # declined to even launch a reviewer) ALONGSIDE a well-formed, identity-matching SOUND
+    # receipt, and asserts the outcome is `dispatch_refused`. The first version of this fix broke
+    # that test, because it tried the receipt unconditionally, before ever looking at the
+    # envelope's status.
     #
-    # The envelope describes the WRAPPER's fate: whether the process launched, was refused, timed
-    # out. The receipt describes the REVIEW's fate. When both exist the receipt is the stronger
-    # evidence, and when they disagree the envelope is usually the one that is wrong -- it is
-    # truncated by a re-dispatch, or never written because the wrapper died after the reviewer had
-    # already finished.
+    # The two cases are not the same shape and must not be treated alike. An EMPTY or ABSENT
+    # envelope (AE, AA, A01, AB, AC) is genuinely ambiguous -- the wrapper may have died after the
+    # reviewer had already finished and written its receipt, or nothing may have run at all, and
+    # there is no way to tell from the envelope alone. A receipt IS the stronger evidence there,
+    # because there is nothing to weigh it against. An envelope that explicitly reads "refused"
+    # or any other non-"ok" status is NOT ambiguous: the wrapper is asserting, definitely, that
+    # this dispatch never ran a legitimate review to completion. A receipt claiming otherwise for
+    # that exact attempt is not stronger evidence than that assertion -- it is a contradiction of
+    # it, and accepting the friendlier of two disagreeing signals is precisely the false accept
+    # this project exists to measure. So a definite envelope status wins, unconditionally.
     #
-    # So the receipt is tried FIRST, and only a real verdict short-circuits. Anything else --
-    # missing, unparseable, mismatched identity -- falls through to the envelope classification
-    # below, which is what correctly types an infrastructure loss as `no_dispatch` or
-    # `dispatch_refused` so it does not spend a review attempt (F-05).
-    #
-    # Nothing is weakened: `_load_verdict_file` still validates the schema and re-derives artefact
-    # identity on both sides, so a verdict from an earlier attempt about code that has since moved
-    # is still refused. What changes is that a valid verdict is no longer discarded unread because
-    # a sibling file is empty.
-    early_outcome, early_findings = _load_verdict_file(uid, unit, expected)
-    if early_outcome in ("SOUND", "DEFECTIVE"):
-        return early_outcome, early_findings
-
+    # Nothing else changes. `_load_verdict_file` still validates the schema and re-derives
+    # artefact identity on both sides in every path that reaches it, so a verdict from an earlier
+    # attempt about code that has since moved is still refused.
     out_path = BRIEFS / f"{uid}-verify.out"
     try:
         size = out_path.stat().st_size
@@ -602,10 +599,15 @@ def _consume_review_receipt(
     except OSError:
         size = 0
         exists = False
+
     if not exists or size == 0:
+        early_outcome, early_findings = _load_verdict_file(uid, unit, expected)
+        if early_outcome in ("SOUND", "DEFECTIVE"):
+            return early_outcome, early_findings
         if _err_shows_refusal(uid):
             return "dispatch_refused", []
         return "no_dispatch", []
+
     try:
         text = out_path.read_text(encoding="utf-8")
     except OSError:
