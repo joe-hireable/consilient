@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -329,7 +329,15 @@ def test_end_to_end_receipt_file_writes_sound_trajectory_event(
     returned = driver.consume_review_verdict(_state(), "AV", UNIT)
     assert returned == "SOUND"
 
-    log_path = log_dir / (date.today().isoformat() + ".jsonl")
+    # UTC date, not local -- every production write site in this repository dates the
+    # daily trajectory file by `datetime.now(timezone.utc)` (grep src/ and .harness/: zero
+    # hits for local `date.today()` anywhere outside this test). Asserting local date here
+    # was silently wrong for the ~1-2 hour window each night between local and UTC midnight,
+    # and it took exactly that window, hit by chance during a real suite run on 25/26 August
+    # 2026, to prove it: the event correctly landed in "yesterday's" (UTC) file while local
+    # had already rolled over, and this assertion, unmodified, failed against a healthy
+    # write.
+    log_path = log_dir / (datetime.now(timezone.utc).date().isoformat() + ".jsonl")
     assert log_path.is_file()
     events = [
         json.loads(line)
