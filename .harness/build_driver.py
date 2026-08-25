@@ -1342,7 +1342,17 @@ silently.** And any path you needed that your claim list did not cover.
 # consilient-w-a1..w-p5 — one tree per workstream, so a shared git index never arises. This
 # driver now does the same: every unit builds in its own worktree, so two units editing
 # different files cannot collide at all, and only the merge-back is serial.
-# TEMPORARILY REDUCED, 25 August 2026, and to be restored to 24/12 once Z03 and Z06 land.
+# RESTORED to 24/12 on 25 August 2026. The reduction was a load-shed while ticks could not
+# finish, and the reason they could not has been fixed at its root: a /mnt/c line in the
+# shared .git/config broke `git worktree add`, so every dispatch fell through to a
+# workspace form whose commits are unreachable, and work was being redone rather than
+# landed. Redone work is what filled the machine. `self_heal` now runs per tick and the
+# line cannot persist.
+#
+# The principal's standing instruction is to maximise parallelism and never constrain it.
+# The shed was measured and temporary; this restores it. Z03 (checkpoint the tick, bound
+# every subprocess) and Z06 (separate admission pools) remain the durable fixes and are
+# queued -- if saturation recurs, the answer is those, not another quiet reduction.
 # The principal's standing instruction is to maximise parallelism and never constrain it, and
 # this does not contradict it: at 36 the system was completing NOTHING, so 36 was not
 # parallelism, it was saturation past the knee.
@@ -1363,8 +1373,8 @@ silently.** And any path you needed that your claim list did not cover.
 # so a killed one stops costing its whole tick. Both were blocked behind a dispatch path that
 # could not start work; that is now fixed, so they can be built -- and this constant goes back
 # to 24/12 when they land.
-MAX_BUILDS = 8
-MAX_REVIEWS = 4
+MAX_BUILDS = 24
+MAX_REVIEWS = 12
 MAX_CONCURRENT = MAX_BUILDS + MAX_REVIEWS
 
 # Phase order from the build plan's recommended sequence. Foundation and the record first;
