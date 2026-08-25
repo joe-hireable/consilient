@@ -61,7 +61,7 @@ from pathlib import Path
 import pytest
 
 from consilient.cli import CAPTURE_REFUSAL_BASELINE, HISTORICAL_REFUSAL_DIGESTS
-from consilient.events import read_all
+from consilient.events import EventError, read_all
 from tests.test_v0_invariants import (
     HISTORICAL_REFUSAL_LINES,
     PINNED_TRAJECTORY_REJECTIONS,
@@ -157,9 +157,20 @@ def test_real_trajectory_rejections_still_match_the_pin():
         pytest.skip("no repository trajectory in this checkout")
     if not (log / "2026-08-20.jsonl").exists():
         pytest.skip("historical repository trajectory is not present in this checkout")
+    # An access denial is INFRASTRUCTURE, not evidence about drift. This reads the LIVE
+    # trajectory while up to 36 dispatchers append to it, and on Windows a writer denies every
+    # reader while it holds the file. Failing here is a false alarm, and an expensive one: a red
+    # suite blocks retirement, merging and publication together. Skips ONLY on a denial -- a log
+    # that reads cleanly and HAS drifted still fails, which is the whole point of the pin.
+    try:
+        rejections = read_all(log)[1]
+    except EventError as exc:
+        if "observed access denial" not in str(exc):
+            raise
+        pytest.skip(f"the live trajectory was held by another process: {exc}")
     real = {
         (Path(rejection.path).name, rejection.line, rejection.content_digest)
-        for rejection in read_all(log)[1]
+        for rejection in rejections
     }
     assert real == PINNED_TRAJECTORY_REJECTIONS, (
         "the trajectory's exact rejection set changed; inspect the quarantine before "

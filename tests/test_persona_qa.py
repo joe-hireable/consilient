@@ -48,6 +48,24 @@ def _present_as_mutated(
     monkeypatch.setattr(Path, "read_text", fake_read_text)
 
 
+
+def _skip_if_trajectory_unreadable(result) -> None:
+    """A journey that never reached its check has not disproved the check.
+
+    `journey_operator` shells out to `consil usage` and `consil doctor`. Both read the live
+    trajectory, and under concurrent dispatch a writer denies the reader -- doctor then exits
+    non-zero and the journey stops at "usage and doctor ran", before the ceilings comparison
+    this ratchet is about. That is infrastructure, not a verdict on the documentation.
+    """
+    if getattr(result, "exit_code", 0) not in (0, 1) or "could not be read" in (
+        getattr(result, "stderr", "") or ""
+    ):
+        pytest.skip(
+            "consil could not read the live trajectory, so the journey stopped before its "
+            f"check: stopped_at={getattr(result, 'stopped_at', '?')!r}"
+        )
+
+
 def test_persona_specs_cover_all_named_personas() -> None:
     assert set(persona_qa.PERSONAS) == set(persona_qa.JOURNEYS)
 
@@ -148,5 +166,6 @@ def test_operator_ratchet_fails_when_ceilings_undocumented(
         "limits-removed.example.json",
     )
     result = persona_qa.journey_operator(ROOT)
+    _skip_if_trajectory_unreadable(result)
     assert result.finding is not None
     assert "undocumented" in result.stopped_at

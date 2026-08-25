@@ -1586,8 +1586,19 @@ def main() -> int:
 
     # BU-0: the cheap supervision floor. One pass over open claims and their artefacts;
     # non-zero means something died quiet and the tick should not pretend the queue is fine.
+    # REPORTED ONCE PER RUN, not once per tick. `start_failed_dispatches` re-derives the same
+    # stalled runs from the same run directories every tick, so the log filled with the same
+    # ids over and over with nothing changing but the elapsed seconds -- one run was reported
+    # with 847s, then 1457s, then 3353s. MEASURED 25 August 2026, caught by a monitor.
+    #
+    # Same defect as the crash re-reporting fixed alongside this: a supervisor that cannot tell
+    # a new failure from an old one it has already seen reports an echo as evidence, and the
+    # signal that something is wrong NOW is buried under a hundred repetitions of something
+    # that was wrong an hour ago.
     stalled = start_failed_dispatches()
-    for row in stalled:
+    reported = state.setdefault("start_failed_reported", [])
+    fresh = [row for row in stalled if row.get("run_id") not in reported]
+    for row in fresh:
         run_id = row.get("run_id", "?")
         signal = row.get("signal", "no artefact within the start window")
         observed = row.get("observed_bytes", 0)
@@ -1595,6 +1606,16 @@ def main() -> int:
             f"driver: START_FAILED {run_id} -- {signal} "
             f"({observed} bytes after {row.get('observed_s')}s)"
         )
+        reported.append(run_id)
+    if len(stalled) > len(fresh):
+        print(
+            f"driver: {len(stalled) - len(fresh)} start-failure(s) already reported; "
+            "not repeating them"
+        )
+    # Bounded: a run id that no longer appears as stalled is forgotten, so this cannot grow
+    # without limit and a run that stalls again later is reported again.
+    live_ids = {row.get("run_id") for row in stalled}
+    state["start_failed_reported"] = [r for r in reported if r in live_ids]
 
     # A crash is reported the tick it happens, not at the next check-in. The principal asked for
     # this after finding three of them himself: "this needs to be reported and auto-fixed to
