@@ -80,7 +80,7 @@ def test_suite_green_counts_outcomes_rather_than_sniffing_substrings(
         stdout = summary
         stderr = ""
 
-    monkeypatch.setattr(driver, "sh", lambda _args: _Result())
+    monkeypatch.setattr(driver, "sh", lambda _args, **_kw: _Result())
     assert driver.suite_green() is expected_green, summary
 
 
@@ -101,7 +101,7 @@ def test_suite_green_fails_closed_when_pytest_printed_no_summary(monkeypatch) ->
         stdout = "ERROR: usage: pytest [options]\nunrecognised argument: --timeout=600"
         stderr = ""
 
-    monkeypatch.setattr(driver, "sh", lambda _args: _Result())
+    monkeypatch.setattr(driver, "sh", lambda _args, **_kw: _Result())
     assert driver.suite_green() is False
 
 
@@ -754,7 +754,7 @@ def test_a_worktree_sitting_at_head_is_not_already_landed(monkeypatch) -> None:
     driver = _load_driver()
     head = "a" * 40
 
-    def fake_sh(args: list[str]):
+    def fake_sh(args: list[str], **_kw):
         class _R:
             returncode = 0
             stdout = ""
@@ -839,3 +839,32 @@ def test_a_verdict_is_refused_when_the_tree_has_moved_under_the_expectation(
         current_artefact="c" * 64,
     )
     assert outcome == "receipt_mismatched"
+
+
+def test_suite_green_fails_closed_when_the_run_does_not_finish(monkeypatch) -> None:
+    """MEASURED 25 August 2026, 21:36: a tick sat THIRTY-FIVE MINUTES on the suite having burned
+    29 seconds of CPU -- starved, not computing -- because `sh()` passes no timeout. The only
+    bound was the loop abandoning the whole tick at 3000s, which also leaks grandchildren.
+
+    The starvation is self-inflicted: the same tick dispatches its agents and then runs the full
+    suite against the load it just created. Since the suite is the last gate before publication,
+    a tick that never finishes it never publishes -- thirty commits sat behind exactly this.
+
+    An unfinished run is "not evaluated", which is not "passing".
+    """
+    driver = _load_driver()
+
+    def _timeout(*_args, **kwargs):
+        assert "timeout" in kwargs, "the suite call must carry a timeout"
+        raise subprocess.TimeoutExpired(cmd="pytest", timeout=kwargs["timeout"])
+
+    monkeypatch.setattr(driver, "sh", _timeout)
+    assert driver.suite_green() is False
+
+
+def test_the_suite_bound_is_well_inside_the_tick_abandonment(monkeypatch) -> None:
+    """The bound only helps if it fires before the loop gives up on the whole tick. The loop
+    abandons at 3000s; a clean run of this suite is about seven minutes."""
+    driver = _load_driver()
+    assert driver.SUITE_TIMEOUT_S >= 600, "shorter than a clean run would fail closed constantly"
+    assert driver.SUITE_TIMEOUT_S <= 1800, "must fire well before the 3000s tick abandonment"

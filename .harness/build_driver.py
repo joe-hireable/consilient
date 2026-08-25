@@ -302,6 +302,11 @@ def live_dispatchers(state: dict) -> int:
     return len(state.get("in_flight", {}))
 
 
+# A clean run of this suite is ~7 minutes. Twice that is generous for contention and still far
+# short of the loop's 3000 s tick abandonment, which is the outcome this exists to avoid.
+SUITE_TIMEOUT_S = 900
+
+
 def suite_green() -> bool:
     """True only when pytest printed a summary and that summary shows no failures.
 
@@ -330,7 +335,33 @@ def suite_green() -> bool:
     word boundary is what does the work: `\\b\\d+ failed` cannot match "1 xfailed", because the
     "x" is a word character. Fails closed still -- no counted pass means not green.
     """
-    r = sh([sys.executable, "-m", "pytest", "tests/", "-q"])
+    # BOUNDED, and the bound is the point.
+    #
+    # MEASURED 25 August 2026, 21:36: a driver tick sat for THIRTY-FIVE MINUTES on this call
+    # having burned 29 seconds of CPU -- starved, not computing. `sh()` passes no timeout, so
+    # the only bound was the loop abandoning the whole tick at 3000 s, which also leaks the
+    # grandchildren (82 processes were cleared from two such abandonments earlier today).
+    #
+    # The starvation is SELF-INFLICTED and that is what makes the bound necessary rather than
+    # merely tidy. The same tick dispatches its agents and THEN runs the full suite, so the
+    # suite always runs against the maximum load the driver has just created -- five dispatch
+    # agents and their CLIs, in the measured case. A clean run of this suite takes about seven
+    # minutes; the same suite under the tick's own dispatches had not finished in thirty-five.
+    #
+    # Because the suite is the LAST gate before publication, a tick that never finishes it never
+    # publishes. Thirty commits sat ready behind a suite this driver was starving itself.
+    #
+    # A timeout here FAILS CLOSED: an unfinished run is "not evaluated", which is not the same
+    # as passing, and `publish_if_ready` already refuses on a false. So the cost of the bound is
+    # a tick that declines to publish; the cost of no bound is a tick that never ends.
+    try:
+        r = sh([sys.executable, "-m", "pytest", "tests/", "-q"], timeout=SUITE_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        print(
+            f"driver: suite did not finish within {SUITE_TIMEOUT_S}s -- treating as NOT GREEN "
+            "and continuing the tick rather than wedging it"
+        )
+        return False
     text = (r.stdout or "") + (r.stderr or "")
     summary = [
         ln
