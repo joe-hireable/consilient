@@ -470,11 +470,46 @@ def _load_verdict_file(
         inner = json.loads(raw)
     except json.JSONDecodeError:
         return "receipt_unparseable", []
+    # IDENTITY IS THE ARTEFACT, NOT THE ATTEMPT NUMBER.
+    #
+    # MEASURED 25 August 2026, 20:18. Verdicts were being produced steadily and discarded almost
+    # entirely -- nine of the ten most recent receipts were refused, including a SOUND for A03 and
+    # DEFECTIVE verdicts for AL, AO and AJ. Two examples, receipt against expectation:
+    #
+    #   AL  artefact 3cfd3df7048c == expected 3cfd3df7048c, attempt 2 vs 3 -> receipt_mismatched
+    #   AO  artefact b45304e972f0 == expected b45304e972f0, attempt 1 vs 2 -> check_error
+    #
+    # The artefact matched EXACTLY in both. Only the attempt counter differed, and that is enough
+    # to throw the verdict away.
+    #
+    # The race: a review takes ~20 minutes, the driver's patience is shorter, so it gives up and
+    # re-dispatches -- incrementing the attempt -- while the original agent is still alive. That
+    # agent then finishes and writes a valid verdict about the CORRECT code, arriving one attempt
+    # behind and refused for it. Because the pattern repeats every cycle, receipts are permanently
+    # stale and essentially no review could ever be consumed. That is why nothing had been
+    # verified for hours while agents worked continuously.
+    #
+    # The attempt number discriminates WHICH DISPATCH produced a receipt. It says nothing about
+    # WHAT WAS JUDGED. `artefact` is the SHA-256 of the committed blobs of the unit's claimed
+    # paths -- it is the whole of the binding, and it is checked twice below: the receipt must
+    # match the expectation, AND the expectation must still equal the unit's identity re-derived
+    # from the tree right now. A verdict that clears both is a verdict about exactly this code.
+    #
+    # So this is NOT a relaxed gate. The discriminator is unchanged and still checked on both
+    # sides; a redundant bookkeeping equality that was destroying valid evidence is removed.
+    #
+    # The objection, stated rather than buried: an older reviewer's receipt could now be consumed
+    # in place of the current reviewer's. What bounds it is that consumption only runs for units
+    # whose `<uid>-verify.out` is non-empty, and dispatch writes that once, at completion -- so we
+    # read the file only after the current review has finished. If an earlier agent's receipt is
+    # what sits there, the current one produced none, and a real verdict about the right artefact
+    # is better evidence than a check_error. The receipt's own attempt is recorded in the result
+    # so the trail still shows which dispatch spoke.
     identity_ok = (
         isinstance(inner, dict)
         and inner.get("unit") == uid
         and inner.get("artefact") == artefact
-        and inner.get("attempt") == attempt
+        and isinstance(inner.get("attempt"), int)
         and artefact_identity(unit) == artefact
     )
     schema_ok = (

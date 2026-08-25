@@ -771,3 +771,71 @@ def test_a_worktree_sitting_at_head_is_not_already_landed(monkeypatch) -> None:
     )
     # A genuinely different head still reaches the real checks (which the stub passes).
     assert driver._cherry_and_diff_match("b" * 40, [".harness/build_driver.py"]) is True
+
+
+def _verdict_fixture(tmp_path, monkeypatch, *, receipt_attempt, expected_attempt,
+                     receipt_artefact, expected_artefact, current_artefact,
+                     verdict="SOUND", findings=None):
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: current_artefact)
+    (briefs / "U01-verdict.json").write_text(
+        json.dumps({
+            "v": 1, "unit": "U01", "artefact": receipt_artefact,
+            "attempt": receipt_attempt, "verdict": verdict,
+            "findings": findings if findings is not None else [],
+        }),
+        encoding="utf-8",
+    )
+    expected = {"artefact": expected_artefact, "attempt": expected_attempt}
+    return driver._load_verdict_file("U01", {"claims": ["a.py"]}, expected)
+
+
+def test_a_verdict_about_the_current_artefact_survives_a_stale_attempt_number(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 25 August 2026: nine of the ten most recent receipts were discarded, several with
+    the artefact matching EXACTLY and only the attempt counter differing -- AL at 2 against an
+    expected 3, AO at 1 against 2. A review takes ~20 minutes, the driver re-dispatches sooner,
+    and the original agent's valid verdict arrives one attempt behind and is refused. Nothing
+    could be verified while agents worked continuously.
+
+    The attempt number says which dispatch spoke. The artefact says what was judged.
+    """
+    outcome, _ = _verdict_fixture(
+        tmp_path, monkeypatch,
+        receipt_attempt=2, expected_attempt=3,
+        receipt_artefact="a" * 64, expected_artefact="a" * 64,
+        current_artefact="a" * 64,
+    )
+    assert outcome == "SOUND", "a verdict about the current artefact must not be lost to a counter"
+
+
+def test_a_verdict_about_a_different_artefact_is_still_refused(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The binding that matters is unchanged: a verdict about other code is not evidence about
+    this code, whatever its attempt number says."""
+    outcome, _ = _verdict_fixture(
+        tmp_path, monkeypatch,
+        receipt_attempt=3, expected_attempt=3,
+        receipt_artefact="b" * 64, expected_artefact="a" * 64,
+        current_artefact="a" * 64,
+    )
+    assert outcome == "receipt_mismatched"
+
+
+def test_a_verdict_is_refused_when_the_tree_has_moved_under_the_expectation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Both sides are still checked. If the unit's identity re-derived from the tree no longer
+    equals what the review was told to judge, the verdict is stale and refused."""
+    outcome, _ = _verdict_fixture(
+        tmp_path, monkeypatch,
+        receipt_attempt=3, expected_attempt=3,
+        receipt_artefact="a" * 64, expected_artefact="a" * 64,
+        current_artefact="c" * 64,
+    )
+    assert outcome == "receipt_mismatched"
