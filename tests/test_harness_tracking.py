@@ -38,6 +38,26 @@ REQUIRED_HARNESS_SOURCE = (
     ".harness/board_snapshot.py",
 )
 
+# DONE WHEN: `git ls-files .harness` returns only source and documentation.
+# The named denylist is not enough — it left generated scratch and a JSONL
+# log tracked after the first Z04 commit. An allowlist is the ADR-0057 shape.
+ALLOWED_HARNESS_TRACKED = frozenset(
+    {
+        ".harness/HANDOFF.md",
+        ".harness/STOP-PUBLISH.lifted-20260824-joe-authorised",
+        ".harness/allowed-cwds.example.json",
+        ".harness/board_snapshot.py",
+        ".harness/build_board.py",
+        ".harness/build_driver.py",
+        ".harness/build_loop.py",
+        ".harness/integrate_when_quiet.sh",
+        ".harness/limits.example.json",
+        ".harness/permissions.example.json",
+        ".harness/publish_when_integrated.sh",
+        ".harness/resume_loop.py",
+    }
+)
+
 BLANKET_HARNESS_IGNORES = frozenset(
     {
         ".harness",
@@ -139,6 +159,21 @@ def test_harness_source_stays_tracked() -> None:
     )
 
 
+def test_harness_index_is_source_and_documentation_only() -> None:
+    """`git ls-files .harness` must return only source and documentation."""
+    tracked = set(_tracked_harness())
+    unexpected = sorted(tracked - ALLOWED_HARNESS_TRACKED)
+    assert unexpected == [], (
+        "git ls-files .harness returned instance data; a checkout can restore "
+        f"it: {unexpected}. `git rm --cached` the path; do not delete it from disk."
+    )
+    missing = sorted(ALLOWED_HARNESS_TRACKED - tracked)
+    assert missing == [], (
+        "a blanket .harness/ ignore (or an over-broad untrack) dropped source "
+        f"that must stay tracked: {missing}"
+    )
+
+
 def test_gitignore_names_the_mutable_paths_and_is_not_a_blanket() -> None:
     patterns = _gitignore_patterns()
     required = (
@@ -147,7 +182,15 @@ def test_gitignore_names_the_mutable_paths_and_is_not_a_blanket() -> None:
         ".harness/*.lock",
         ".harness/build-loop.out",
         ".harness/build-loop.err",
+        ".harness/build-loop.*",
         ".harness/**/src/consilient/",
+        ".harness/build-board.html",
+        ".harness/exp79-scratch/",
+        ".harness/exp130-out.txt",
+        ".harness/exp130-scratch/",
+        ".harness/fallback-result.json",
+        ".harness/stray-debris-*/",
+        ".harness/gate-specs.json",
     )
     missing = [pattern for pattern in required if pattern not in patterns]
     assert missing == [], (

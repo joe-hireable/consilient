@@ -135,7 +135,20 @@ docs/10-research/experiments/*/results-*.json.lock
 .harness/*.lock
 .harness/build-loop.out
 .harness/build-loop.err
+.harness/build-loop.*
 .harness/board-snapshot.json
+# Generated board: a rendering of a snapshot, same class as dashboard.html.
+.harness/build-board.html
+# Experiment scratch and local runner results. Instance data; a checkout
+# must not restore them. .harness/exp79-scratch/log/ was a tracked JSONL
+# log — the ADR-0057 leak class, one directory over from .harness/log/.
+.harness/exp79-scratch/
+.harness/exp130-out.txt
+.harness/exp130-scratch/
+.harness/fallback-result.json
+.harness/stray-debris-*/
+# Mutable gate-unit dump; same class as plan-units.json.
+.harness/gate-specs.json
 
 # Teardown/research clones kept under .harness. These are other people's repositories, cloned
 # locally to read; committing one as a GITLINK publishes a submodule pointer to a repo this

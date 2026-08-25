@@ -1,5 +1,0 @@
-Append exactly one line to `shared/coordination.txt` in this workspace:
-
-AGENT-A-1000-dca02e35
-
-Do not remove existing lines. Do not edit any other file. If recall shows an in-flight claim on this file, say so in one sentence before editing. Report what you did in stdout.
