@@ -279,7 +279,9 @@ def clear_quarantine_after_landed_check(state: dict, uid: str) -> None:
 def record_restart(state: dict, uid: str, *, now: float) -> bool:
     """Record every repair attempt, including failures refundable to the unit budget."""
     restarts = state.setdefault("total_restarts", {}).setdefault(uid, [])
-    restarts[:] = [timestamp for timestamp in restarts if now - timestamp <= RESTART_WINDOW_S]
+    restarts[:] = [
+        timestamp for timestamp in restarts if now - timestamp <= RESTART_WINDOW_S
+    ]
     restarts.append(now)
     return len(restarts) > MAX_RESTARTS and quarantine_unit(state, uid)
 
@@ -574,9 +576,57 @@ def unit_worktree(uid: str) -> pathlib.Path | None:
     WORKTREES.mkdir(parents=True, exist_ok=True)
     path = WORKTREES / uid
     if path.exists():
+        _refresh_worktree(uid, path)
         return path
     r = sh(["git", "worktree", "add", "--detach", str(path), "HEAD"])
     return path if r.returncode == 0 else None
+
+
+def _refresh_worktree(uid: str, path: pathlib.Path) -> None:
+    """Bring an existing unit worktree up to HEAD before anything is dispatched into it.
+
+    A STALE WORKTREE REINTRODUCES EVERY BUG FIXED SINCE IT WAS CREATED, and the driver then
+    reads the resulting crash as evidence about the unit rather than about the tree.
+
+    MEASURED 25 August 2026. Unit worktrees sat at 0d088db for hours while HEAD carried the
+    fencing-epoch fix. Dispatch runs with `--cwd <unit worktree>`, so every agent imported the
+    OLD src/consilient/coordination.py and died with "fencing epoch 4 is stale; expected 1" --
+    the exact defect that had been fixed and committed hours earlier. BM died that way eleven
+    times and D02 nine, and both were escalated as "a defect, not bad luck", which was true but
+    about the wrong thing. Forty worktrees were stale at once.
+
+    Three refusals, and each of them protects work:
+
+      * a DIRTY worktree is left alone -- an agent may be working in it right now, and its
+        uncommitted work is not ours to discard;
+      * a worktree holding COMMITS OF ITS OWN is left alone -- that is unmerged work and the
+        merge path owns it;
+      * anything else is reset to HEAD, which is a no-op when it is already there.
+
+    This is deliberately the narrow version. Unit BN, "keep worktrees current and refuse
+    concurrent duplicate-subsystem units", is the full treatment and is queued; that unit was
+    itself stranded by the workspace bug, which is why this stopgap exists in the meantime.
+    """
+    head = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
+    if not head:
+        return
+    current = sh(["git", "-C", str(path), "rev-parse", "HEAD"]).stdout.strip()
+    if not current or current == head:
+        return
+    dirty = [
+        line
+        for line in sh(
+            ["git", "-C", str(path), "status", "--porcelain"]
+        ).stdout.splitlines()
+        if line.strip() and ".consilient-workspace-probe-" not in line
+    ]
+    if dirty:
+        return
+    own = sh(["git", "rev-list", "--count", f"{head}..{current}"]).stdout.strip()
+    if own not in ("", "0"):
+        return
+    if sh(["git", "-C", str(path), "reset", "--hard", head]).returncode == 0:
+        print(f"driver: refreshed {uid}'s worktree to {head[:9]} (was {current[:9]})")
 
 
 def rebase_worktree(uid: str, path: pathlib.Path) -> bool:
