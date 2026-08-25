@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `a75949a942d7dc40858f55badbef02b5679440e4a5f4007b4cf08d30a8125e4a`
+> **Source SHA-256:** `a270d4301741629f0a2748b3fc694880c6df5bb1d1da16b61af1fc75f90b6963`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -110,3 +110,4 @@
 | [0103](0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md) | Make contract-β the gate quantity, and keep human-β as alignment rather than a blocker | PROVISIONAL | — |
 | [0104](0104-re-derive-both-halves-of-beta-star-from-evidence.md) | Re-derive both halves of β\\\* from evidence, and let the arithmetic fall where it does | PROVISIONAL | — |
 | [0105](0105-baseline-the-22-august-capture-loss.md) | Baseline the 22 August capture loss | ACCEPTED | — |
+| [0106](0106-admit-third-party-maintainer-verdicts-as-human-beta.md) | Admit identified third-party maintainer verdicts as human-β authors | PROPOSED | — |

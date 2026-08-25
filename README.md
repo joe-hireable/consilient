@@ -144,7 +144,7 @@ it cannot route, block or accept anything, and a test asserts the CLI exposes no
 could. Everything past instrumentation is gated on ADR-0015 Gate A, which has not been passed.
 
 <!-- BEGIN GENERATED: scripts/build_counts.py#inventory -->
-103 ADRs, 113 registered experiments, 13 invariant checks in CI.
+104 ADRs, 113 registered experiments, 13 invariant checks in CI.
 <!-- END GENERATED: scripts/build_counts.py#inventory -->
 
 ## What it is for
