@@ -1288,6 +1288,7 @@ def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
         return f"deferred {uid}: {len(clash)} path(s) dirty in the main tree ({sorted(clash)[0]})"
 
     pre_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
+    post_pick_sha = pre_sha
     applied = 0
     already = 0
     for sha in own:
@@ -1316,9 +1317,35 @@ def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
                 return merge_unit_worktree(uid, quiescent=False)
             return f"CONFLICT cherry-picking {sha[:9]} for {uid} ({applied} applied); needs resolution"
         applied += 1
+        post_pick_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
     if applied:
         gate_fail = gate_merged_tree(sorted(touched))
         if gate_fail:
+            # `reset --hard pre_sha` discards EVERYTHING committed since pre_sha was read, not
+            # only this unit's cherry-picks. That assumption -- nothing else commits to this
+            # worktree during a merge -- is false, and the reflog proves it:
+            #
+            #   1deb5f1 HEAD@{0}: reset: moving to 1deb5f19d...
+            #   1deb5f1 HEAD@{1}: reset: moving to 1deb5f19d...   (x5)
+            #   084c174 HEAD@{5}: commit: fix(driver): quarantine blocked review ...
+            #
+            # MEASURED 25 August 2026: a commit made between `pre_sha` being read and the gate
+            # failing was destroyed, repeatedly, by a rollback that had no business touching it.
+            # The commit object survived in the reflog, so the loss was silent AND recoverable
+            # only by someone who thought to look. Agents commit into this worktree too.
+            #
+            # So the rollback is now CONDITIONAL on the tree still being where we left it. If
+            # HEAD has moved past our last cherry-pick, another writer got there first and their
+            # work is not ours to throw away: leave the tree alone and report the gate failure.
+            # The unit stays unmerged either way, which is the outcome the gate was asking for;
+            # what changes is that it no longer takes bystanders with it.
+            head_now = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
+            if head_now and head_now != post_pick_sha:
+                return (
+                    f"CONFLICT gate failed for {uid} after cherry-pick, and HEAD moved to "
+                    f"{head_now[:9]} while the gate ran -- refusing to roll back over "
+                    "another writer's commit; needs resolution\n" + gate_fail
+                )
             sh(["git", "reset", "--hard", pre_sha])
             return (
                 f"CONFLICT gate failed for {uid} after cherry-pick; needs resolution\n"
@@ -1679,8 +1706,24 @@ silently.** And any path you needed that your claim list did not cover.
 # borrowing. The ceilings stay at the measured 12/6. Restoring 24/12 would raise
 # MAX_CONCURRENT past the knee this comment just measured (19–31), which is the
 # remedy the unit forbids. Z03 still owns tick checkpointing and subprocess bounds.
-MAX_BUILDS = 12
-MAX_REVIEWS = 6
+# 19:30, same day: the SHAPE of the work changed, so the split follows it. The ceiling is
+# unchanged at 18 -- the measured safe band is 12-19 concurrent and this stays inside it.
+#
+# MEASURED at this moment: 81 units BUILT and waiting on review or merge, against roughly 56
+# not yet built, and 10 done. The queue is not short of things to build; it is short of things
+# JUDGED. Ten more builds would add to a backlog that already dwarfs the review lane's ability
+# to drain it, and a built-but-unverified unit retires nothing and unblocks nothing.
+#
+# The receipt work makes the shift worth making. Reviews used to return a usable verdict 32% of
+# the time (24 of 76). Since `<uid>-verdict.json` landed, five dispatched reviews have produced
+# six well-formed receipts -- three SOUND, three DEFECTIVE, every one of them usable. Review
+# capacity converts to verdicts now, where before it largely converted to `check_error`, so
+# capacity spent there is worth more than it was this morning.
+#
+# REVERT TO 12/6 if the review lane stops being the constraint -- that is, when `built` falls
+# to the same order as the not-yet-built count. This is a ratio, not a preference.
+MAX_BUILDS = 8
+MAX_REVIEWS = 10
 MAX_CONCURRENT = MAX_BUILDS + MAX_REVIEWS
 
 # Phase order from the build plan's recommended sequence. Foundation and the record first;
