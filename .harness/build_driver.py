@@ -1537,6 +1537,62 @@ PHASE = {
 }
 
 
+def not_selected_reasons(units, landed, blocked, startable, selected):
+    """Why each waiting unit was not selected this tick.
+
+    Section 2.1's vocabulary is closed in events.py. This function only emits
+    reasons it can observe: `blocked_on:<unit>` from an unmet dependency, and
+    `no_capacity` for startable work that did not get a slot. `quota_exhausted`
+    and `breaker_open` stay unused until a measured pool or breaker reading
+    exists — ADR-0056 D3/D4 are inert until EXP-94, and inventing either reason
+    from a brand name is the F-08 failure the record exists to catch.
+    """
+    chosen = set(selected)
+    reasons = {}
+    for uid in blocked:
+        if uid in chosen:
+            continue
+        unmet = [dep for dep in units.get(uid, {}).get("deps", []) if dep not in landed]
+        reasons[uid] = f"blocked_on:{unmet[0]}" if unmet else "no_capacity"
+    for uid in startable:
+        if uid in chosen:
+            continue
+        reasons[uid] = "no_capacity"
+    return reasons
+
+
+def choose_selected(startable, live):
+    """Who this tick will spawn, given the slots that still exist."""
+    slots = min(MAX_BUILDS, max(0, MAX_CONCURRENT - live))
+    return list(startable[:slots])
+
+
+def record_tick_intent(tick, selected, not_selected, *, window=None):
+    """Write this tick's intent through events.py, before any unit spawn.
+
+    A tick that selects nobody still records why. That is the only way a
+    benched arm becomes an event rather than a quiet night. events.py remains
+    the single writer.
+    """
+    sys.path.insert(0, str(ROOT / "src"))
+    from datetime import datetime, timezone
+
+    from consilient.events import record_intent
+
+    now = datetime.now(timezone.utc)
+    extra = {}
+    if window is not None:
+        extra["window"] = window
+    record_intent(
+        LOG / (now.date().isoformat() + ".jsonl"),
+        ts=now.isoformat(),
+        tick=tick,
+        selected=selected,
+        not_selected=not_selected,
+        **extra,
+    )
+
+
 def ready(uid, unit, done, units):
     """A unit may start when every dependency it declares has landed.
 
@@ -1969,11 +2025,6 @@ def main() -> int:
         reviews_out += 1
         print(f"driver: review of {uid} dispatched to {rh} (built by {builder})")
 
-    if live >= MAX_CONCURRENT:
-        print(f"driver: {live} dispatchers live at the cap; holding")
-        save_state(state)
-        return 0
-
     attempts = state.setdefault("attempts", {})
 
     # A unit already dispatched and still within its leash is NOT a candidate. The driver
@@ -2050,6 +2101,23 @@ def main() -> int:
             u,
         )
     )
+
+    # Intent first, spawn second. A tick that selects nobody still names why, which is
+    # the only record F-08-class silence can leave. Written before the cap return so a
+    # full queue is not indistinguishable from a night with nothing to do.
+    selected = choose_selected(startable, live)
+    tick = int(state.get("intent_tick", 0))
+    record_tick_intent(
+        tick,
+        selected,
+        not_selected_reasons(units, landed, blocked, startable, selected),
+    )
+    state["intent_tick"] = tick + 1
+
+    if live >= MAX_CONCURRENT:
+        print(f"driver: {live} dispatchers live at the cap; holding")
+        save_state(state)
+        return 0
 
     if not candidates:
         print(f"driver: every unit is done or exhausted ({len(done)}/{len(units)})")

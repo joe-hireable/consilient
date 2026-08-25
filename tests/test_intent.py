@@ -15,6 +15,10 @@ and the tick floor against the writing path with the window lowered.
 
 from __future__ import annotations
 
+import ast
+import importlib.util
+import inspect
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -22,6 +26,22 @@ import pytest
 
 from consilient import events as events_mod
 from consilient.events import EventError, read_all
+
+ROOT = Path(__file__).resolve().parent.parent
+DRIVER_PATH = ROOT / ".harness" / "build_driver.py"
+
+
+def _driver():
+    name = "build_driver_intent_test"
+    existing = sys.modules.get(name)
+    if existing is not None:
+        return existing
+    spec = importlib.util.spec_from_file_location(name, DRIVER_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
 NO_WINDOW = timedelta(0)
 
@@ -289,3 +309,83 @@ def test_a_starvation_claim_below_the_tick_floor_is_refused(tmp_path: Path) -> N
                 },
             },
         )
+
+
+def test_a_blocked_unit_is_recorded_as_blocked_on_its_dependency() -> None:
+    """Section 2.1: non-selection is a named reason, not an absence from the record."""
+    reasons = _driver().not_selected_reasons(
+        units={"N07": {"deps": ["N06"]}, "N06": {"deps": []}},
+        landed=set(),
+        blocked=["N07"],
+        startable=["N06"],
+        selected=["N06"],
+    )
+    assert reasons == {"N07": "blocked_on:N06"}
+
+
+def test_unlaunched_ready_units_are_recorded_as_no_capacity() -> None:
+    reasons = _driver().not_selected_reasons(
+        units={"N06": {"deps": []}, "N07": {"deps": []}},
+        landed=set(),
+        blocked=[],
+        startable=["N06", "N07"],
+        selected=["N06"],
+    )
+    assert reasons == {"N07": "no_capacity"}
+
+
+def test_the_scheduler_writes_intent_before_it_spawns() -> None:
+    """The record exists even if spawn dies. Writing after Popen recreates F-08."""
+    source = inspect.getsource(_driver().main)
+    intent_at = source.find("record_tick_intent(")
+    assert intent_at != -1, "the tick never writes an intent record"
+    launch_at = source.find("for uid in startable:")
+    assert launch_at != -1
+    assert intent_at < launch_at, "intent must be on disk before spawn"
+
+
+def test_the_driver_appends_intent_through_events_py() -> None:
+    """events.py is the single writer. A second log is the defect the brief forbids."""
+    source = inspect.getsource(_driver().record_tick_intent)
+    tree = ast.parse(source)
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    attrs = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+    assert "record_intent" in names | attrs
+
+
+def test_the_driver_writes_the_tick_onto_the_trajectory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    driver = _driver()
+    log_dir = tmp_path / "log"
+    log_dir.mkdir()
+    monkeypatch.setattr(driver, "LOG", log_dir)
+    driver.record_tick_intent(
+        0,
+        selected=(),
+        not_selected={"N06": "quota_exhausted:codex"},
+        window=NO_WINDOW,
+    )
+    assert _kinds(tmp_path / "log" / "ignored.jsonl") == [
+        events_mod.INTENT_RECORDED_KIND
+    ]
+
+
+def test_six_driver_ticks_on_a_benched_arm_emit_starved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The unit's done criterion, through the scheduler rather than the writer alone."""
+    driver = _driver()
+    log_dir = tmp_path / "log"
+    log_dir.mkdir()
+    monkeypatch.setattr(driver, "LOG", log_dir)
+    for tick in range(events_mod.STARVATION_TICKS):
+        driver.record_tick_intent(
+            tick,
+            selected=(),
+            not_selected={"N06": "quota_exhausted:codex"},
+            window=NO_WINDOW,
+        )
+    assert [starved["unit"] for starved in _starved(tmp_path / "log" / "ignored.jsonl")] == [
+        "N06"
+    ]
