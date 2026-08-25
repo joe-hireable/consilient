@@ -31,6 +31,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -75,7 +76,6 @@ def hold_loop_lock():
     return handle
 
 
-
 # Above this many registered worktrees, housekeeping runs. Below it an ordinary tick pays
 # nothing.
 PRUNE_CEILING = 180
@@ -107,10 +107,14 @@ def prune_spent_workspaces(log) -> None:
     lands; BN was itself stranded by the workspace bug, so it has already been written once and
     lost.
     """
+
     def git(*args, cwd=None, timeout=600):
         return subprocess.run(
             ["git", "-C", str(cwd or ROOT), *args],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
         )
 
@@ -169,8 +173,14 @@ def prune_spent_workspaces(log) -> None:
     if removed:
         git("worktree", "prune", timeout=900)
         log.write(
-            "loop: pruned " + str(removed) + " spent dispatch worktree(s) from "
-            + str(len(entries)) + "; kept " + str(kept_with_work) + " carrying work" + chr(10)
+            "loop: pruned "
+            + str(removed)
+            + " spent dispatch worktree(s) from "
+            + str(len(entries))
+            + "; kept "
+            + str(kept_with_work)
+            + " carrying work"
+            + chr(10)
         )
 
 
@@ -274,8 +284,49 @@ def self_heal(log) -> None:
             pass
 
 
+class _NullLog:
+    """self_heal writes its repairs somewhere; the watchdog opens the log per repair rather
+    than holding the handle the tick is writing to."""
+
+    def write(self, text: str) -> None:
+        try:
+            with LOG.open("a", encoding="utf-8") as handle:
+                handle.write(text)
+        except OSError:
+            pass
+
+
+def _healing_watchdog() -> None:
+    """Repair the shared config on a clock, not on a tick boundary.
+
+    MEASURED 25 August 2026, from the monitors, four times in one afternoon:
+
+        WSL-CONFIG: /mnt/c in .git/config and no tick for 34m - self_heal is not clearing it
+
+    `self_heal` was correct and correctly wired; it simply could not run. It executes at the
+    top of a tick, and a tick can occupy the loop for the full 3000-second deadline, so a
+    corruption written by a dispatched agent at minute one is not repaired until minute fifty.
+    Meanwhile EVERY git command in the repository fails, and the damage is not confined to
+    merging and publishing: `artefact_identity` shells out to `git rev-parse HEAD:<path>` per
+    claimed file and returns None when git fails, `retired_units` requires a non-None identity,
+    and the retirement count therefore fell from 10 to 0 while no work had been lost at all.
+    A broken config silently reports the build as having completed nothing.
+
+    A repair whose period is set by the thing it repairs is not a repair. Sixty seconds, on its
+    own thread, daemon so it never keeps the process alive, and every failure swallowed -- a
+    watchdog that can raise is one more thing to go wrong.
+    """
+    while not STOP.exists():
+        try:
+            self_heal(_NullLog())
+        except Exception:  # a watchdog that dies is worse than one that skips a beat
+            pass
+        time.sleep(60)
+
+
 def main() -> int:
     tick = 0
+    threading.Thread(target=_healing_watchdog, daemon=True).start()
     while not STOP.exists():
         tick += 1
         stamp = time.strftime("%Y-%m-%d %H:%M:%S")
