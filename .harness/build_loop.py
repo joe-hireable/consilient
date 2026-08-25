@@ -28,6 +28,7 @@ option and the one to prefer -- a tick killed mid-suite leaves a worktree half-j
 """
 
 import os
+import pathlib
 import subprocess
 import sys
 import time
@@ -72,6 +73,105 @@ def hold_loop_lock():
         handle.close()
         return None
     return handle
+
+
+
+# Above this many registered worktrees, housekeeping runs. Below it an ordinary tick pays
+# nothing.
+PRUNE_CEILING = 180
+
+
+def prune_spent_workspaces(log) -> None:
+    """Remove dispatch worktrees that hold nothing, before accumulation breaks provisioning.
+
+    MEASURED 25 August 2026, and it took the whole harness down once already. 547 worktrees and
+    673 stale `consilient-ws-*` branches had accumulated with nothing pruning them, `.git` had
+    reached 136 MB, and provisioning a workspace began to fail -- which sent every dispatch to a
+    fallback form whose commits cannot be harvested. Eleven commits of finished work were
+    stranded and one unit was built twice.
+
+    Joe, 25 August 2026: "that's not sustainable - we need to be autonomously cleaning up
+    worktrees and branches."
+
+    Nothing here is clever, deliberately. It removes only a DISPATCH workspace -- never a unit
+    worktree, never the main tree, never the orchestrator's own -- and only when that workspace
+    holds nothing at all: its directory is gone, or it is clean apart from the provisioning
+    probe marker AND carries no commit that HEAD does not already have.
+
+    A cleanup that discards a commit is worse than no cleanup, so anything failing either test
+    is left alone. It lives in the loop rather than in the driver because it is housekeeping and
+    because a destructive git sweep has no business running inside the driver's unit tests.
+
+    Unit BN is the full lifecycle -- create, use, release, prune, and refuse concurrent
+    duplicate-subsystem units. This is the floor that stops the failure recurring until BN
+    lands; BN was itself stranded by the workspace bug, so it has already been written once and
+    lost.
+    """
+    def git(*args, cwd=None, timeout=600):
+        return subprocess.run(
+            ["git", "-C", str(cwd or ROOT), *args],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=timeout,
+        )
+
+    try:
+        listing = git("worktree", "list", "--porcelain", timeout=900).stdout
+    except Exception:
+        return
+    entries = []
+    current = {}
+    for line in listing.splitlines():
+        if line.startswith("worktree "):
+            if current:
+                entries.append(current)
+            current = {"path": line.split(" ", 1)[1].strip()}
+        elif line.startswith("HEAD "):
+            current["head"] = line.split(" ", 1)[1].strip()
+        elif line.startswith("branch "):
+            current["branch"] = line.split(" ", 1)[1].strip()
+    if current:
+        entries.append(current)
+    if len(entries) <= PRUNE_CEILING:
+        return
+
+    head = git("rev-parse", "HEAD").stdout.strip()
+    removed = 0
+    kept_with_work = 0
+    for entry in entries:
+        path = entry.get("path", "")
+        if "/.harness/dispatch/" not in path.replace(chr(92), "/").lower():
+            continue
+        try:
+            if not pathlib.Path(path).exists():
+                git("worktree", "remove", "--force", path)
+                removed += 1
+                continue
+            dirty = [
+                ln
+                for ln in git("status", "--porcelain", cwd=path).stdout.splitlines()
+                if ln.strip() and ".consilient-workspace-probe-" not in ln
+            ]
+            if dirty:
+                continue
+            wt_head = entry.get("head", "")
+            if wt_head and head:
+                ahead = git("rev-list", "--count", head + ".." + wt_head).stdout.strip()
+                if ahead not in ("", "0"):
+                    kept_with_work += 1
+                    continue
+            if git("worktree", "remove", "--force", path).returncode == 0:
+                removed += 1
+                branch = entry.get("branch", "")
+                if branch.startswith("refs/heads/consilient-ws-"):
+                    git("branch", "-D", branch.split("refs/heads/", 1)[1], timeout=300)
+        except Exception:
+            continue
+    if removed:
+        git("worktree", "prune", timeout=900)
+        log.write(
+            "loop: pruned " + str(removed) + " spent dispatch worktree(s) from "
+            + str(len(entries)) + "; kept " + str(kept_with_work) + " carrying work" + chr(10)
+        )
 
 
 def self_heal(log) -> None:
@@ -198,6 +298,8 @@ def main() -> int:
             # operation by a dispatched agent. A repair that only runs at startup cannot fix a
             # fault that appears after startup, which is precisely what happened here.
             self_heal(handle)
+            handle.flush()
+            prune_spent_workspaces(handle)
             handle.flush()
             try:
                 subprocess.run(

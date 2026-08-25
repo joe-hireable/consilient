@@ -472,3 +472,66 @@ def test_the_counted_set_does_not_grow_without_bound(tmp_path, monkeypatch) -> N
     state["in_flight"] = {}
     driver.crashed_dispatches(state)
     assert "U3" not in state["crash_counted"]
+
+
+
+# --- autonomous workspace pruning lives in the loop, 25 August 2026 ------------
+#
+# 547 worktrees and 673 stale branches accumulated with nothing pruning them, .git reached
+# 136 MB, and provisioning began to fail -- which sent every dispatch to a fallback form whose
+# commits cannot be harvested. Eleven commits of finished work were stranded and one unit was
+# built twice.
+#
+# It sits in build_loop, not build_driver, because it is housekeeping and because a destructive
+# git sweep has no business running inside the driver's unit tests -- the first attempt did
+# exactly that and started removing real worktrees during a test run.
+
+
+def _loop_source() -> str:
+    return (ROOT / ".harness" / "build_loop.py").read_text(encoding="utf-8")
+
+
+def test_the_loop_prunes_spent_workspaces_every_tick() -> None:
+    tree = ast.parse(_loop_source())
+    main = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "main"
+    )
+    loops = [n for n in ast.walk(main) if isinstance(n, (ast.While, ast.For))]
+    assert any(
+        isinstance(inner, ast.Call)
+        and isinstance(inner.func, ast.Name)
+        and inner.func.id == "prune_spent_workspaces"
+        for loop in loops
+        for inner in ast.walk(loop)
+    ), "build_loop.main() does not prune inside the tick loop; accumulation broke provisioning once already"
+
+
+def test_the_prune_refuses_to_touch_anything_but_a_dispatch_workspace() -> None:
+    """The safety rules are what make an autonomous sweep acceptable at all."""
+    source = _loop_source()
+    start = source.index("def prune_spent_workspaces(")
+    body = source[start : source.index("\ndef self_heal(", start)]
+
+    assert "/.harness/dispatch/" in body, (
+        "the prune no longer restricts itself to dispatch workspaces -- a unit worktree or the "
+        "main tree could be removed"
+    )
+    assert "rev-list" in body and "ahead" in body, (
+        "the prune no longer checks whether a workspace carries commits HEAD lacks; a cleanup "
+        "that discards a commit is worse than no cleanup"
+    )
+    assert "status" in body and "--porcelain" in body, (
+        "the prune no longer checks for uncommitted work"
+    )
+    assert "consilient-workspace-probe-" in body, (
+        "the prune no longer ignores the provisioning probe marker, so every workspace will "
+        "look dirty and nothing will ever be pruned"
+    )
+
+
+def test_the_prune_has_a_ceiling_so_an_ordinary_tick_pays_nothing() -> None:
+    source = _loop_source()
+    assert "PRUNE_CEILING" in source
+    start = source.index("def prune_spent_workspaces(")
+    body = source[start : source.index("\ndef self_heal(", start)]
+    assert "PRUNE_CEILING" in body, "the ceiling is defined but not consulted"
