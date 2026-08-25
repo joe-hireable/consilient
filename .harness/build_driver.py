@@ -24,6 +24,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -253,20 +254,50 @@ def load(path, default):
         ) from exc
 
 
-def live_dispatchers() -> int:
-    r = sh(
-        [
-            "powershell",
-            "-NoProfile",
-            "-Command",
-            "@(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-            "Where-Object { $_.CommandLine -match 'dispatch.py' }).Count",
-        ]
-    )
-    try:
-        return int(r.stdout.strip() or 0)
-    except ValueError:
-        return 0
+RESTART_WINDOW_S = 600
+MAX_RESTARTS = 6
+MAX_REVIEW_ATTEMPTS = 3
+
+
+def quarantine_unit(state: dict, uid: str) -> bool:
+    """Quarantine once; ordinary recovery must never make it dispatchable again."""
+    quarantined = state.setdefault("quarantined", [])
+    if uid in quarantined:
+        return False
+    quarantined.append(uid)
+    state.setdefault("quarantine_escalated", []).append(uid)
+    return True
+
+
+def clear_quarantine_after_landed_check(state: dict, uid: str) -> None:
+    """A SOUND, identity-bound review is the automatic quarantine recovery path."""
+    quarantined = state.setdefault("quarantined", [])
+    if uid in quarantined:
+        quarantined.remove(uid)
+
+
+def record_restart(state: dict, uid: str, *, now: float) -> bool:
+    """Record every repair attempt, including failures refundable to the unit budget."""
+    restarts = state.setdefault("total_restarts", {}).setdefault(uid, [])
+    restarts[:] = [timestamp for timestamp in restarts if now - timestamp <= RESTART_WINDOW_S]
+    restarts.append(now)
+    return len(restarts) > MAX_RESTARTS and quarantine_unit(state, uid)
+
+
+def review_dispatch_allowed(state: dict, uid: str) -> bool:
+    """Refuse a fourth review attempt and emit its escalation only once."""
+    attempts = state.setdefault("review_attempts", {}).get(uid, 0)
+    if attempts < MAX_REVIEW_ATTEMPTS:
+        return True
+    escalated = state.setdefault("review_escalated", [])
+    if uid not in escalated:
+        escalated.append(uid)
+    return False
+
+
+def live_dispatchers(state: dict) -> int:
+    """Count only dispatches this driver recorded, never machine-wide process names."""
+    return len(state.get("in_flight", {}))
 
 
 def suite_green() -> bool:
@@ -480,6 +511,13 @@ def consume_review_verdict(
     except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
         pass
 
+    if outcome != "SOUND" and record_restart(state, uid, now=time.time()):
+        print(
+            "driver: ESCALATION -- "
+            + uid
+            + " exceeded the restart intensity limit. Auto-repair stopped; "
+            "it needs a person."
+        )
     record = {
         "unit": uid,
         "artefact": artefact,
@@ -494,6 +532,7 @@ def consume_review_verdict(
     if uid in dispatched:
         dispatched.remove(uid)
     if outcome == "SOUND":
+        clear_quarantine_after_landed_check(state, uid)
         state.setdefault("done", [])
         if uid not in state["done"]:
             state["done"].append(uid)
@@ -742,6 +781,13 @@ def reclaim_expired_slots(state: dict) -> list[str]:
 
         if expired or stale:
             inflight.pop(uid, None)
+            if record_restart(state, uid, now=now):
+                print(
+                    "driver: ESCALATION -- "
+                    + uid
+                    + " exceeded the restart intensity limit. Auto-repair stopped; "
+                    "it needs a person."
+                )
             attempts = state.setdefault("attempts", {})
             attempts[uid] = max(0, attempts.get(uid, 1) - 1)
             freed.append(uid + ("" if expired else " (silent)"))
@@ -1469,6 +1515,7 @@ def main() -> int:
             print("driver: " + kind + " " + uid + " -- " + why[:160])
             seen = crash_log.setdefault(uid, [])
             seen.append(why[:200])
+            restart_quarantined = record_restart(state, uid, now=time.time())
             # An infrastructure death is not evidence about the work, so it must not spend a
             # retry -- F-05. But a repeated identical death IS evidence, and auto-repair that
             # silently retries a systematic defect is how a system ships with its own bugs built
@@ -1484,15 +1531,30 @@ def main() -> int:
                 if uid in bucket:
                     bucket.remove(uid)
             if len(seen) >= 3 and len(set(seen[-3:])) == 1:
+                if restart_quarantined:
+                    print(
+                        "driver: ESCALATION -- "
+                        + uid
+                        + " exceeded the restart intensity limit. Auto-repair stopped; "
+                        "it needs a person."
+                    )
+                elif quarantine_unit(state, uid):
+                    print(
+                        "driver: ESCALATION -- "
+                        + uid
+                        + " has died the same way "
+                        + str(len(seen))
+                        + " times. This is a defect, not bad luck. Auto-repair "
+                        "stopped; it needs a person."
+                    )
+                continue
+            elif restart_quarantined:
                 print(
                     "driver: ESCALATION -- "
                     + uid
-                    + " has died the same way "
-                    + str(len(seen))
-                    + " times. This is a defect, not bad luck. Auto-repair "
-                    "stopped; it needs a person."
+                    + " exceeded the restart intensity limit. Auto-repair stopped; "
+                    "it needs a person."
                 )
-                continue
             state.setdefault("attempts", {})[uid] = max(
                 0, state.get("attempts", {}).get(uid, 1) - 1
             )
@@ -1613,7 +1675,7 @@ def main() -> int:
                 f"driver: {_uid} conflict was stale -- it merges cleanly against current HEAD"
             )
     _now_m = _time_m.time()
-    _dispatchers_alive = live_dispatchers()
+    _dispatchers_alive = live_dispatchers(state)
     # Every unmerged worktree, not just the in-flight ones. A unit that finished, dropped out of
     # in_flight when its leash expired, and still held unmerged commits was never revisited: the
     # merge loop only ever looked at in_flight, so its output was stranded exactly as F-02
@@ -1673,9 +1735,10 @@ def main() -> int:
         u
         for u in sorted(state.setdefault("built", []))
         if u not in state.setdefault("review_dispatched", [])
+        and u not in state.setdefault("quarantined", [])
     ]
 
-    live = live_dispatchers()
+    live = live_dispatchers(state)
     # Reviews ALREADY outstanding count against MAX_REVIEWS. This started at 0 each tick, so it
     # counted only what this tick launched and never what was still running: every tick added up
     # to twelve more on top of the backlog. MEASURED 24 Aug 2026 -- 64 reviews in flight against
@@ -1695,6 +1758,14 @@ def main() -> int:
             continue
         artefact = artefact_identity(units[uid])
         if artefact is None:
+            continue
+        review_escalated = uid in state.setdefault("review_escalated", [])
+        if not review_dispatch_allowed(state, uid):
+            if not review_escalated:
+                print(
+                    f"driver: ESCALATION -- review of {uid} reached "
+                    f"{MAX_REVIEW_ATTEMPTS} attempts; refusing another dispatch"
+                )
             continue
         rh, rm, rl = reviewers[0]
         attempt = state.setdefault("review_attempts", {}).get(uid, 0) + 1
@@ -1776,6 +1847,7 @@ def main() -> int:
         and u not in inflight
         and u not in built_unmerged
         and attempts.get(u, 0) < 3
+        and u not in state.setdefault("quarantined", [])
     ]
     candidates.sort(key=lambda u: (PHASE.get(u[0], 9), u))
 
@@ -1873,7 +1945,12 @@ def main() -> int:
     for uid, why in sorted(conflicts.items()):
         if launched >= MAX_BUILDS or live + launched >= MAX_CONCURRENT:
             break
-        if uid in resolving or uid in done or (WORKTREES / uid).exists() is False:
+        if (
+            uid in resolving
+            or uid in done
+            or uid in state.setdefault("quarantined", [])
+            or (WORKTREES / uid).exists() is False
+        ):
             continue
         unit = units.get(uid)
         if not unit:
