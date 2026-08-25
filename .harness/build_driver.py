@@ -2487,6 +2487,44 @@ def main() -> int:
     if built_unmerged:
         print(f"driver: built and awaiting merge: {' '.join(sorted(built_unmerged))}")
 
+    # A unit whose claimed path is absent from HEAD can NEVER retire, and said so nowhere.
+    #
+    # `artefact_identity` hashes `git rev-parse HEAD:<path>` for every claimed path and returns
+    # None if any one of them fails; `retired_units` requires a non-None identity. So such a unit
+    # is structurally incapable of retiring however good its review is -- and the failure is
+    # SILENT: it simply never appears in `done`, which is indistinguishable from not having been
+    # reviewed yet.
+    #
+    # MEASURED 25 August 2026: 43 of 147 units claim a path absent from HEAD. For a unit not yet
+    # built that is ordinary -- the missing file is the one it exists to create. For a unit
+    # already BUILT it is a trap, and seven were in it: A03, AU, D01, O01, Q01, S03, T02. Either
+    # the work did not land where the plan says, or the plan names a path the unit never creates.
+    # Both need a person; neither is fixed by another review, and a review spent on one is spent
+    # for nothing.
+    #
+    # This reports; it changes no behaviour. The point is that the trap stops being silent.
+    unretirable = []
+    for uid in sorted(built_unmerged | set(state.setdefault("built", []))):
+        unit = units.get(uid)
+        if unit is None or artefact_identity(unit) is not None:
+            continue
+        claims = unit.get("claims") if isinstance(unit.get("claims"), list) else []
+        absent = [
+            path
+            for path in claims
+            if isinstance(path, str)
+            and sh(["git", "rev-parse", "HEAD:" + path]).returncode != 0
+        ]
+        unretirable.append((uid, absent))
+    if unretirable:
+        print(
+            f"driver: {len(unretirable)} built unit(s) CANNOT retire -- a claimed path is "
+            "absent from HEAD, so no identity can be derived and no verdict can bind:"
+        )
+        for uid, absent in unretirable:
+            shown = ", ".join(absent[:3]) or "(claims unreadable)"
+            print(f"driver:   {uid} -- missing {len(absent)}: {shown}")
+
     candidates = [
         u
         for u in units
