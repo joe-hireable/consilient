@@ -1,0 +1,4323 @@
+{
+  "checks_source": "exp47-2026-08-20-composite-survivor",
+  "exclusion_counts": {
+    "multiline": 16,
+    "not_uniquely_locatable": 50
+  },
+  "exclusions": [
+    {
+      "file": "src/consilient/beta.py",
+      "line": 196,
+      "operator": "comparison_swap",
+      "reason": "multiline",
+      "source_id": 64
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 184,
+      "operator": "comparison_swap",
+      "reason": "multiline",
+      "source_id": 412
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 210,
+      "operator": "comparison_swap",
+      "reason": "multiline",
+      "source_id": 555
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 212,
+      "operator": "expression_mutation",
+      "reason": "multiline",
+      "source_id": 556
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 220,
+      "operator": "expression_mutation",
+      "reason": "multiline",
+      "source_id": 572
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 261,
+      "operator": "expression_mutation",
+      "reason": "multiline",
+      "source_id": 661
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 286,
+      "operator": "expression_mutation",
+      "reason": "multiline",
+      "source_id": 710
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 374,
+      "operator": "constant_literal_mutation",
+      "reason": "multiline",
+      "source_id": 947
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 153,
+      "operator": "boolean_logical_swap",
+      "reason": "multiline",
+      "source_id": 1386
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 155,
+      "operator": "boolean_logical_swap",
+      "reason": "multiline",
+      "source_id": 1387
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 154,
+      "operator": "boolean_logical_swap",
+      "reason": "multiline",
+      "source_id": 1388
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 197,
+      "operator": "comparison_swap",
+      "reason": "multiline",
+      "source_id": 1434
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 208,
+      "operator": "boolean_logical_swap",
+      "reason": "multiline",
+      "source_id": 1451
+    },
+    {
+      "file": "src/consilient/projection.py",
+      "line": 111,
+      "operator": "boolean_logical_swap",
+      "reason": "multiline",
+      "source_id": 1743
+    },
+    {
+      "file": "src/consilient/projection.py",
+      "line": 174,
+      "operator": "boolean_logical_swap",
+      "reason": "multiline",
+      "source_id": 1839
+    },
+    {
+      "file": "src/consilient/projection.py",
+      "line": 208,
+      "operator": "constant_literal_mutation",
+      "reason": "multiline",
+      "source_id": 1884
+    },
+    {
+      "file": "src/consilient/beta.py",
+      "line": 209,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 103
+    },
+    {
+      "file": "src/consilient/beta.py",
+      "line": 210,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 104
+    },
+    {
+      "file": "src/consilient/beta.py",
+      "line": 215,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 107
+    },
+    {
+      "file": "src/consilient/beta.py",
+      "line": 221,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 119
+    },
+    {
+      "file": "src/consilient/beta.py",
+      "line": 222,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 120
+    },
+    {
+      "file": "src/consilient/beta.py",
+      "line": 237,
+      "operator": "boolean_logical_swap",
+      "reason": "not_uniquely_locatable",
+      "source_id": 141
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 44,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 226
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 44,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 227
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 44,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 228
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 209,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 554
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 209,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 559
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 209,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 560
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 258,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 658
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 258,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 662
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 258,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 663
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 296,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 749
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 296,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 750
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 302,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 770
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 302,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 771
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 318,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 821
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 318,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 822
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 318,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 823
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 332,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 841
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 332,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 842
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 332,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 843
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 334,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 847
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 334,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 848
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 334,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 849
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 338,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 856
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 338,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 857
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 338,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 858
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 384,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 976
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 391,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 994
+    },
+    {
+      "file": "src/consilient/cli.py",
+      "line": 469,
+      "operator": "expression_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1205
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 327,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1593
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 327,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1595
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 331,
+      "operator": "control_flow_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1603
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 336,
+      "operator": "control_flow_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1614
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 341,
+      "operator": "control_flow_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1625
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 375,
+      "operator": "comparison_swap",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1641
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 375,
+      "operator": "comparison_swap",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1642
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 376,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1643
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 376,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1645
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 377,
+      "operator": "comparison_swap",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1649
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 377,
+      "operator": "comparison_swap",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1650
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 380,
+      "operator": "control_flow_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1656
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 383,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1661
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 385,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1663
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 396,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1665
+    },
+    {
+      "file": "src/consilient/events.py",
+      "line": 396,
+      "operator": "constant_literal_mutation",
+      "reason": "not_uniquely_locatable",
+      "source_id": 1667
+    }
+  ],
+  "experiment_id": "EXP-08",
+  "n_pairs": 120,
+  "pairs": [
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "946e4d85f7301323d3328a4f541e50173d884af965e86b3c0eaaf8f855ea87ea"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 43,
+      "line": 39,
+      "mut_snippet": "\"A2\": \"replay reproduces an identical canonical state digest\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"A2\": \"Replay reproduces an identical canonical state digest\",",
+      "pair_id": "0001",
+      "seed": 8,
+      "source_id": 202,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "3ecd7beebbfe47e15b2e75df929b1cb145e2d06513245b263c5ddfb27398d7a2"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 127,
+      "line": 123,
+      "mut_snippet": "\"XXquarantinedXX\": [",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"quarantined\": [",
+      "pair_id": "0002",
+      "seed": 8,
+      "source_id": 322,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "3ed49da4df1514fdf1938ed124fb86ac1a47b4bd96e11d6ea5a2f3c64d80e860"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 204,
+      "line": 198,
+      "mut_snippet": "b1 = _condition(\"B1\", \"unknown\", \"XXAdapter-two outcome is not recorded.XX\", register)",
+      "operator": "comparison_swap",
+      "orig_snippet": "b1 = _condition(\"B1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
+      "pair_id": "0003",
+      "seed": 8,
+      "source_id": 503,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "2e07faac37d8a38ea70891614fadce8654c70696e1e720aef121aaafae7cde93"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 316,
+      "line": 310,
+      "mut_snippet": "return _condition(\"B4\", \"unknown\", \"the structural analysis is unavailable.\")",
+      "operator": "comparison_swap",
+      "orig_snippet": "return _condition(\"B4\", \"unknown\", \"The structural analysis is unavailable.\")",
+      "pair_id": "0004",
+      "seed": 8,
+      "source_id": 800,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "eeca871406f4255deeb6aa9282762413ef30d21f9dd239138a61abf7ed442e97"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 322,
+      "line": 316,
+      "mut_snippet": "\"structurally_unsatisfiable\" if established else \"UNKNOWN\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"structurally_unsatisfiable\" if established else \"unknown\",",
+      "pair_id": "0005",
+      "seed": 8,
+      "source_id": 820,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "59f79ba2f81bd93e2348b4d93f5a4d7a32e009ee77205271e6d48734f34229c4"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 363,
+      "line": 357,
+      "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"XXB1XX\", \"B2\", \"B3\", \"B4\"}}",
+      "operator": "expression_mutation",
+      "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "pair_id": "0006",
+      "seed": 8,
+      "source_id": 907,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "2880e12fa7daf7a732af78fc6f417b3b778593ac77339b949e9c941015797786"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 377,
+      "line": 371,
+      "mut_snippet": "return f\"recorded {result['XXeventXX']} -> {result['file']}\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "return f\"recorded {result['event']} -> {result['file']}\"",
+      "pair_id": "0007",
+      "seed": 8,
+      "source_id": 938,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "88260a8738776550e1d5027e29955452eadf08746b81461d56d4183cfe7f3e18"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 387,
+      "line": 381,
+      "mut_snippet": "mark = \"identical\" if result[\"identical\"] else \"diverged\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "mark = \"identical\" if result[\"identical\"] else \"DIVERGED\"",
+      "pair_id": "0008",
+      "seed": 8,
+      "source_id": 967,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "03cc08dfc1e06d96c230125fce148865d74958abdc8f4bc4c7a2fe56d90a6860"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 393,
+      "line": 387,
+      "mut_snippet": "for r in result[\"XXquarantinedXX\"]:",
+      "operator": "comparison_swap",
+      "orig_snippet": "for r in result[\"quarantined\"]:",
+      "pair_id": "0009",
+      "seed": 8,
+      "source_id": 978,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9f33ffd56c08268b82019c9fa67d929680188043113d25b088e301ae0891cfb4"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 410,
+      "line": 404,
+      "mut_snippet": "interval=tuple(result[\"INTERVAL\"]) if result[\"interval\"] else None,",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "interval=tuple(result[\"interval\"]) if result[\"interval\"] else None,",
+      "pair_id": "0010",
+      "seed": 8,
+      "source_id": 1033,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "3e11838345df29a065450d26aadf26cf2af28d5f25086ad13e59fc4eb16ed593"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 416,
+      "line": 410,
+      "mut_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace(None, '-').upper()}\")",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('_', '-').upper()}\")",
+      "pair_id": "0011",
+      "seed": 8,
+      "source_id": 1049,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "72c1d2f0d784bf55535a6c7dcc34061a9ef6fc6184e2948aa1df0b739a9ca9db"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 416,
+      "line": 410,
+      "mut_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('-').upper()}\")",
+      "operator": "expression_mutation",
+      "orig_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('_', '-').upper()}\")",
+      "pair_id": "0012",
+      "seed": 8,
+      "source_id": 1051,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "a047e71b38a8e1c835786146d5a01354d9931aac75ad1dd3f6f1437301d0309e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 416,
+      "line": 410,
+      "mut_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('_', 'XX-XX').upper()}\")",
+      "operator": "expression_mutation",
+      "orig_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('_', '-').upper()}\")",
+      "pair_id": "0013",
+      "seed": 8,
+      "source_id": 1056,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "462c6c18a31158b79cb387566bf5413e1211cfa7e109e2682f6c0b8b18d37573"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 418,
+      "line": 412,
+      "mut_snippet": "mark = condition[\"status\"].replace(\"_\", ).upper()",
+      "operator": "expression_mutation",
+      "orig_snippet": "mark = condition[\"status\"].replace(\"_\", \"-\").upper()",
+      "pair_id": "0014",
+      "seed": 8,
+      "source_id": 1064,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "b2ccd2b4afbee169b63dbf795f9d377172ab282555daefff5f7f25b03a706b8a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 423,
+      "line": 417,
+      "mut_snippet": "evidence = \", \".join(condition[\"EVIDENCE\"]) or \"none\"",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "evidence = \", \".join(condition[\"evidence\"]) or \"none\"",
+      "pair_id": "0015",
+      "seed": 8,
+      "source_id": 1082,
+      "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
+      "unit_id": "AC"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "ca299f8f16a2f4a0207da4999f1becef2624609341c91966792129311ad26025"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 59,
+      "line": 55,
+      "mut_snippet": "return {\"recorded\": False, \"file\": str(path), \"event\": event[\"event\"]}",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"event\"]}",
+      "pair_id": "0016",
+      "seed": 8,
+      "source_id": 249,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "f09ee4ec1cc8299e7195368edb5b8a788fbd8fdee2717b02443ff6a2f106742f"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 186,
+      "line": 180,
+      "mut_snippet": "\"unknown\" if a1_status is None else \"PASS\" if a1_status.startswith(\"DONE\") else \"fail\",",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"unknown\" if a1_status is None else \"pass\" if a1_status.startswith(\"DONE\") else \"fail\",",
+      "pair_id": "0017",
+      "seed": 8,
+      "source_id": 419,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "b8ceb706740c7560d3f6953e85bc63e99daee31a858bc281bef95a26f84524c9"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 201,
+      "line": 195,
+      "mut_snippet": "elif b1_status.startswith(\"DONE\") or no_redesign:",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "elif b1_status.startswith(\"DONE\") and no_redesign:",
+      "pair_id": "0018",
+      "seed": 8,
+      "source_id": 467,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "38708d261515bfaa56e2053ba60c15dda518bb882044a0c7e05d46e3360ecaa7"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 204,
+      "line": 198,
+      "mut_snippet": "b1 = _condition(\"B1\", \"Adapter-two outcome is not recorded.\", register)",
+      "operator": "comparison_swap",
+      "orig_snippet": "b1 = _condition(\"B1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
+      "pair_id": "0019",
+      "seed": 8,
+      "source_id": 496,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "293e3e9d8a41c319e384fa613a3ccd256e324e3a8277665c79f55b2ce9b0ace4"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 242,
+      "line": 236,
+      "mut_snippet": "\"is identical.\" if identical else \"DIVERGED.\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"is identical.\" if identical else \"diverged.\"",
+      "pair_id": "0020",
+      "seed": 8,
+      "source_id": 614,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "ff3bf808adcc7055b13fd919705347a03a5f068e0d9392ded65fa42cac7b78e1"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 341,
+      "line": 335,
+      "mut_snippet": "elif statuses != {\"pass\"}:",
+      "operator": "comparison_swap",
+      "orig_snippet": "elif statuses == {\"pass\"}:",
+      "pair_id": "0021",
+      "seed": 8,
+      "source_id": 850,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "79494358190042be2f863bfc627c390132f6ec65ca3aec1dd73a4347b2dca4d1"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 388,
+      "line": 382,
+      "mut_snippet": "line = f\"replayed {result['EVENTS']} events; state {mark} ({result['digest'][:12]})\"",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "line = f\"replayed {result['events']} events; state {mark} ({result['digest'][:12]})\"",
+      "pair_id": "0022",
+      "seed": 8,
+      "source_id": 970,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "01e8933cf29ea1fc314fc4687fde1e6f72c9ecc4da10e37e20e3d422448b3d67"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 399,
+      "line": 393,
+      "mut_snippet": "\"WRITTEN BY APPEND(), SO VALIDATE() NEVER RAN ON THEM\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"written by append(), so validate() never ran on them\"",
+      "pair_id": "0023",
+      "seed": 8,
+      "source_id": 999,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "ba4d8987f8a817bfec96001e1ea1e2bffc05eacd119676dc2674588e5b30f812"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 415,
+      "line": 409,
+      "mut_snippet": "for name, gate in result[\"XXgatesXX\"].items():",
+      "operator": "comparison_swap",
+      "orig_snippet": "for name, gate in result[\"gates\"].items():",
+      "pair_id": "0024",
+      "seed": 8,
+      "source_id": 1045,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "3ad94b80d61f32f29ad01ca60a6272bd7a08e7960f1a1a0e22de41103307a84b"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 449,
+      "line": 443,
+      "mut_snippet": "sub = parser.add_subparsers(dest=\"command\", )",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "sub = parser.add_subparsers(dest=\"command\", required=True)",
+      "pair_id": "0025",
+      "seed": 8,
+      "source_id": 1142,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "a4bed26866ea6ccb75827326313864972b5eb78159eb552467819d99e9a80f43"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 494,
+      "line": 488,
+      "mut_snippet": "json.dumps({\"ERROR\": str(exc)}) if args.json else f\"error: {exc}\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "json.dumps({\"error\": str(exc)}) if args.json else f\"error: {exc}\",",
+      "pair_id": "0026",
+      "seed": 8,
+      "source_id": 1244,
+      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
+      "unit_id": "AN"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "e20dcc65284f95f9c630b49c0c1e2b4f9e22c1d6a674360cfda134817cc6f9fa"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 45,
+      "line": 41,
+      "mut_snippet": "\"B1\": \"EXP-05 COMPLETE AND ADAPTER TWO REQUIRED NO SHARED-INTERFACE REDESIGN\",",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "\"B1\": \"EXP-05 complete and adapter two required no shared-interface redesign\",",
+      "pair_id": "0027",
+      "seed": 8,
+      "source_id": 213,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "2915fe593dab1d4b2c1941521898994cdeae713bea1e6410f6baa3751a4b72a6"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 136,
+      "line": 132,
+      "mut_snippet": "result = beta_mod.from_connection(conn, args.task_family, )",
+      "operator": "expression_mutation",
+      "orig_snippet": "result = beta_mod.from_connection(conn, args.task_family, args.verifier_version)",
+      "pair_id": "0028",
+      "seed": 8,
+      "source_id": 345,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "cc7014d631480fe958a0774a5d1ad371e44ab6ad882f417c95248e0e2082370c"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 183,
+      "line": 177,
+      "mut_snippet": "a1_status, _ = _experiment_entry(\"exp-01\")",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "a1_status, _ = _experiment_entry(\"EXP-01\")",
+      "pair_id": "0029",
+      "seed": 8,
+      "source_id": 404,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "f0cf233d262dc94b03f7d214669f9761fd7ce1d748b2e626fef7ffb80f5c9a1a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 186,
+      "line": 180,
+      "mut_snippet": "\"unknown\" if a1_status is None else \"pass\" if a1_status.startswith(\"XXDONEXX\") else \"fail\",",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"unknown\" if a1_status is None else \"pass\" if a1_status.startswith(\"DONE\") else \"fail\",",
+      "pair_id": "0030",
+      "seed": 8,
+      "source_id": 421,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9748767561c864d6ba8013c9d44196d079b14fc0fd39fb2b148b01316d50a44a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 187,
+      "line": 181,
+      "mut_snippet": "\"no exp-01 result is recorded.\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"No EXP-01 result is recorded.\"",
+      "pair_id": "0031",
+      "seed": 8,
+      "source_id": 426,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "59e89d806eb1c1ffe1af55ca2dfb1cf11ac838d4cb743f889239a3e4fa2183fd"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 211,
+      "line": 205,
+      "mut_snippet": "b2 = _condition(\"B2\", \"UNKNOWN\", \"No EXP-08 result is recorded.\")",
+      "operator": "comparison_swap",
+      "orig_snippet": "b2 = _condition(\"B2\", \"unknown\", \"No EXP-08 result is recorded.\")",
+      "pair_id": "0032",
+      "seed": 8,
+      "source_id": 535,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "7f057e11eed6f869b7b59fd291e9f41d8987580b086be2ce19a0c4260d318e64"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 233,
+      "line": 227,
+      "mut_snippet": "status = \"pass\" if identical is True else \"FAIL\" if identical is False else \"unknown\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
+      "pair_id": "0033",
+      "seed": 8,
+      "source_id": 591,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "e9d020557f282670e91e534f77bbe9b91bf6aec6ec172c71ee8328ee4683573a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 236,
+      "line": 230,
+      "mut_snippet": "f\"State covers {replay['events_projected']} of {replay['EVENTS']} events; not compared.\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "f\"State covers {replay['events_projected']} of {replay['events']} events; not compared.\"",
+      "pair_id": "0034",
+      "seed": 8,
+      "source_id": 601,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "34fd229c1ad8e402c2ead776f68b9b4c808a478fb234f59e7b8c865ed70278b6"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 336,
+      "line": 330,
+      "mut_snippet": "status = None",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "status = \"structurally_unsatisfiable\"",
+      "pair_id": "0035",
+      "seed": 8,
+      "source_id": 835,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "798867a66aa2478d170fccf298bfa16d835388a471ebb333f44e5c4c807be9e0"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 363,
+      "line": 357,
+      "mut_snippet": "expected = {\"A\": {\"XXA1XX\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "operator": "expression_mutation",
+      "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "pair_id": "0036",
+      "seed": 8,
+      "source_id": 899,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "1f1e21c7eccb03390aec8de733d515a548b5550cb4e1ba3e7122824dd3c958e9"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 363,
+      "line": 357,
+      "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"XXB3XX\", \"B4\"}}",
+      "operator": "expression_mutation",
+      "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "pair_id": "0037",
+      "seed": 8,
+      "source_id": 911,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "7b1907c2993c6421f5dd40ade7ebe1546efb6846cf51c1652aeffe3bdc9f480e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 367,
+      "line": 361,
+      "mut_snippet": "condition[\"status\"] == \"PASS\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "condition[\"status\"] == \"pass\"",
+      "pair_id": "0038",
+      "seed": 8,
+      "source_id": 928,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "a1268501cb5af169ee77df944fb6fd7324ed6db056596d0324b28e37ccd68e79"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 416,
+      "line": 410,
+      "mut_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('XX_XX', '-').upper()}\")",
+      "operator": "expression_mutation",
+      "orig_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('_', '-').upper()}\")",
+      "pair_id": "0039",
+      "seed": 8,
+      "source_id": 1055,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "f1b0efa8980e241068273dd5b83ea4dffa9783840db42ead6cfd8bd6a381f03c"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 425,
+      "line": 419,
+      "mut_snippet": "enabled = \"XXyesXX\" if result[\"routing_orchestration_enabled\"] else \"no\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "enabled = \"yes\" if result[\"routing_orchestration_enabled\"] else \"no\"",
+      "pair_id": "0040",
+      "seed": 8,
+      "source_id": 1087,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "cb7e57572b3d5dda19447bc989e2cca9ac750f9897d0ed9c145892a280e0338b"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 425,
+      "line": 419,
+      "mut_snippet": "enabled = \"yes\" if result[\"XXrouting_orchestration_enabledXX\"] else \"no\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "enabled = \"yes\" if result[\"routing_orchestration_enabled\"] else \"no\"",
+      "pair_id": "0041",
+      "seed": 8,
+      "source_id": 1089,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "97924e5ece0409f87f07f83ccadec84673f6801a9c5d844b0adb20546df59139"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 445,
+      "line": 439,
+      "mut_snippet": "",
+      "operator": "expression_mutation",
+      "orig_snippet": "prog=\"consil\",",
+      "pair_id": "0042",
+      "seed": 8,
+      "source_id": 1130,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "486d50fd78cd9a939c0072eadd16cdb6b74bde21fdafa9b3a57d2a2d2ec018a1"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 140,
+      "line": 136,
+      "mut_snippet": "if contributors is None and \"contributors\" not in event:",
+      "operator": "comparison_swap",
+      "orig_snippet": "if contributors is None and \"contributors\" in event:",
+      "pair_id": "0043",
+      "seed": 8,
+      "source_id": 1362,
+      "unit_commit": "ac42881fdf0dfee1eef3478da12a3b0f5ccc594f",
+      "unit_id": "C02"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "7baed83de0d5c6e25ddf7c7237d8d68006405478242d61339b41625367455224"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 43,
+      "line": 39,
+      "mut_snippet": "\"XXspend_authorisationXX\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"spend_authorisation\",",
+      "pair_id": "0044",
+      "seed": 8,
+      "source_id": 1305,
+      "unit_commit": "af0394d1a5155b0242c14cf9aac05961d286ec3f",
+      "unit_id": "D01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "91638aedbc4c7e1ec9d58d90176e565860db1b26c44795958555e78dcc2c9448"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 158,
+      "line": 154,
+      "mut_snippet": "contributor.get(\"XXlogical_identityXX\")",
+      "operator": "expression_mutation",
+      "orig_snippet": "contributor.get(\"logical_identity\")",
+      "pair_id": "0045",
+      "seed": 8,
+      "source_id": 1390,
+      "unit_commit": "af0394d1a5155b0242c14cf9aac05961d286ec3f",
+      "unit_id": "D01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "3c042af60f057ba4ac5208347a4ce094837f94e6da3e00f6754afbe6a6fde77f"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 280,
+      "line": 276,
+      "mut_snippet": "MAX_CLOCK_SKEW_S = 15 * 61",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "MAX_CLOCK_SKEW_S = 15 * 60",
+      "pair_id": "0046",
+      "seed": 8,
+      "source_id": 1543,
+      "unit_commit": "af0394d1a5155b0242c14cf9aac05961d286ec3f",
+      "unit_id": "D01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "0533aba3558cc3b02d6348d6774f46ff80fcfc4cb5032a3c33b0ba854f9407c4"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 167,
+      "line": 167,
+      "mut_snippet": "spread = z * math.sqrt(p * (1 - p) * trials + z * z / (4 * trials * trials)) / denom",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "spread = z * math.sqrt(p * (1 - p) / trials + z * z / (4 * trials * trials)) / denom",
+      "pair_id": "0047",
+      "seed": 8,
+      "source_id": 39,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "d09485ce9cf4411a88a0f96c74bbb2243a51cf94aa528712f135a8a735f8170d"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 197,
+      "line": 197,
+      "mut_snippet": "and (verifier_version is None or r.get(\"XXverifier_versionXX\") == verifier_version)",
+      "operator": "comparison_swap",
+      "orig_snippet": "and (verifier_version is None or r.get(\"verifier_version\") == verifier_version)",
+      "pair_id": "0048",
+      "seed": 8,
+      "source_id": 74,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "d4abd6184e9e449bad8242c47d88338bceddab3055638f2134613fbe70b84108"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 47,
+      "line": 43,
+      "mut_snippet": "\"B3\": \"XXA one-command bare-Claude-Code fallback is exercised weeklyXX\",",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"B3\": \"A one-command bare-Claude-Code fallback is exercised weekly\",",
+      "pair_id": "0049",
+      "seed": 8,
+      "source_id": 221,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "35bbb1e0fc45e9bece408ed733cc6b79866a746aa10a77727e5bf755ce787235"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 57,
+      "line": 53,
+      "mut_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:11]}.jsonl\"",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:10]}.jsonl\"",
+      "pair_id": "0050",
+      "seed": 8,
+      "source_id": 242,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "d0edf41cd6d0e623c1dba1966dc60724129a703c9dd373abc564bab882eda8e9"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 87,
+      "line": 83,
+      "mut_snippet": "None",
+      "operator": "comparison_swap",
+      "orig_snippet": "f\"state at {db} is not a readable database: {exc}\"",
+      "pair_id": "0051",
+      "seed": 8,
+      "source_id": 272,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "3831d382e558eac12d91645abf2c9e273a59234445217c6c102fb05f312a9a6b"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 187,
+      "line": 181,
+      "mut_snippet": "\"XXNo EXP-01 result is recorded.XX\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"No EXP-01 result is recorded.\"",
+      "pair_id": "0052",
+      "seed": 8,
+      "source_id": 425,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "199c9e96b83fcabf6e85fab813c4f29f9b29797a707144d9040f85abd4359d5d"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 188,
+      "line": 182,
+      "mut_snippet": "if a1_status is not None",
+      "operator": "comparison_swap",
+      "orig_snippet": "if a1_status is None",
+      "pair_id": "0053",
+      "seed": 8,
+      "source_id": 428,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "5b2b0ead9e3c3977d16adc2d0d9b5bbe2e7906cba2c663d8a72b62edb390302a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 204,
+      "line": 198,
+      "mut_snippet": "b1 = _condition(\"b1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
+      "operator": "comparison_swap",
+      "orig_snippet": "b1 = _condition(\"B1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
+      "pair_id": "0054",
+      "seed": 8,
+      "source_id": 500,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "6492088a23904e128fa94759ba3127430097ee72ce4cb28ccc23c6476387c555"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 211,
+      "line": 205,
+      "mut_snippet": "b2 = _condition(\"B2\", \"unknown\", \"NO EXP-08 RESULT IS RECORDED.\")",
+      "operator": "comparison_swap",
+      "orig_snippet": "b2 = _condition(\"B2\", \"unknown\", \"No EXP-08 result is recorded.\")",
+      "pair_id": "0055",
+      "seed": 8,
+      "source_id": 538,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9f79913adf79d6fb4e10f564af4eabfc63637cc5c8074ba89ed34fed985defd6"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 233,
+      "line": 227,
+      "mut_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is not False else \"unknown\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
+      "pair_id": "0056",
+      "seed": 8,
+      "source_id": 592,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "e71d928970493de0a11bc95dfab01aa1099df67f9a612730c4b98ee5523480fc"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 309,
+      "line": 303,
+      "mut_snippet": "reason = \"XXA scheduled workflow exists, but no machine-readable fallback result exists.XX\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "reason = \"A scheduled workflow exists, but no machine-readable fallback result exists.\"",
+      "pair_id": "0057",
+      "seed": 8,
+      "source_id": 773,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "eed402cd77dc9692cc72156fa2e88c9ca2bb153c5320d1aeba91b2e3c4559535"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 336,
+      "line": 330,
+      "mut_snippet": "status = \"XXstructurally_unsatisfiableXX\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "status = \"structurally_unsatisfiable\"",
+      "pair_id": "0058",
+      "seed": 8,
+      "source_id": 836,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "3c03b04d110ca419b2634ff2759ccb0d9f47f98fd262ce43a7db354d99753331"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 342,
+      "line": 336,
+      "mut_snippet": "status = \"PASS\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "status = \"pass\"",
+      "pair_id": "0059",
+      "seed": 8,
+      "source_id": 855,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "c55630e5a9f33e34217640344545912eb27a270c773c0c67623b1ff0661c4b11"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 411,
+      "line": 405,
+      "mut_snippet": "window=None,",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "window=tuple(result[\"window\"]) if result[\"window\"] else None,",
+      "pair_id": "0060",
+      "seed": 8,
+      "source_id": 1010,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "fc59a8a225daaac4042c2b393fa5a0a1dff4764fa45769d6d4df2e97302815f6"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 445,
+      "line": 439,
+      "mut_snippet": "prog=\"XXconsilXX\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "prog=\"consil\",",
+      "pair_id": "0061",
+      "seed": 8,
+      "source_id": 1133,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9921ca538ed3234428da568e3e885826171a55f7039e63059c6457b86443182f"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/events.py",
+      "index": 146,
+      "line": 142,
+      "mut_snippet": "raise EventError(\"XXcontributors must be a listXX\")",
+      "operator": "control_flow_mutation",
+      "orig_snippet": "raise EventError(\"contributors must be a list\")",
+      "pair_id": "0062",
+      "seed": 8,
+      "source_id": 1370,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "841c7246fd7898c4546b319e470f99e5c4934e78eaa735565131b347dbad70bd"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 110,
+      "line": 111,
+      "mut_snippet": "None, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "pair_id": "0063",
+      "seed": 8,
+      "source_id": 1736,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "5b0540ba27902a5d46c067f6c6123b8b5d8ea14c3a626deccb21e503b5f4f31e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 110,
+      "line": 111,
+      "mut_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\"XX,XX\", \":\")",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "pair_id": "0064",
+      "seed": 8,
+      "source_id": 1746,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "868f682154114006646f800aae5f3e109028a7428f24f40cdce7b97dda149865"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 302,
+      "line": 298,
+      "mut_snippet": "f\"event ts {event['ts']} is {skew * 60:.0f} minutes from the current clock, \"",
+      "operator": "comparison_swap",
+      "orig_snippet": "f\"event ts {event['ts']} is {skew / 60:.0f} minutes from the current clock, \"",
+      "pair_id": "0065",
+      "seed": 8,
+      "source_id": 1556,
+      "unit_commit": "15d72ced02920a513b76adb0148caa92b4a71fa0",
+      "unit_id": "F02"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "1b180a547e1dad3fffbee3079c6e49137e14e23f4df5539813542252035a7fc6"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 305,
+      "line": 301,
+      "mut_snippet": "\"XXthat happened earlier, put the occurrence time in `data` and let `ts` record XX\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"that happened earlier, put the occurrence time in `data` and let `ts` record \"",
+      "pair_id": "0066",
+      "seed": 8,
+      "source_id": 1563,
+      "unit_commit": "15d72ced02920a513b76adb0148caa92b4a71fa0",
+      "unit_id": "F02"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "26a7c610bc9454c44eaa6ef4597aa1b112a3014ab1b44c1933cdeb14c22d49ff"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 409,
+      "line": 405,
+      "mut_snippet": "return hashlib.sha256(\"XX\\nXX\".join(lines).encode(\"utf-8\")).hexdigest()",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "return hashlib.sha256(\"\\n\".join(lines).encode(\"utf-8\")).hexdigest()",
+      "pair_id": "0067",
+      "seed": 8,
+      "source_id": 1680,
+      "unit_commit": "7764502d188fa1efc7eab6c20385aaca47c2255d",
+      "unit_id": "F03"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "554e5735e7a8d440b01f4937e26724b4116531576b66d4a7b9edca03412f670e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 103,
+      "line": 99,
+      "mut_snippet": "raise EventError(f\"missing required field(s): {'XX, XX'.join(missing)}\")",
+      "operator": "control_flow_mutation",
+      "orig_snippet": "raise EventError(f\"missing required field(s): {', '.join(missing)}\")",
+      "pair_id": "0068",
+      "seed": 8,
+      "source_id": 1317,
+      "unit_commit": "bfc7835764c0b966f62b38a86666b155d6174ac6",
+      "unit_id": "G01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "5402fc81ba5a57ecdaf6114eac6065c2d9b77fea3492303be3331b2e463f1197"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 110,
+      "line": 111,
+      "mut_snippet": "raw, ensure_ascii=False, separators=(\",\", \":\")",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "pair_id": "0069",
+      "seed": 8,
+      "source_id": 1742,
+      "unit_commit": "bfc7835764c0b966f62b38a86666b155d6174ac6",
+      "unit_id": "G01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "6d6598857f1868b37b09c975191fde427c24231352cf4e46a0f43f44ac85e6b2"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 238,
+      "line": 239,
+      "mut_snippet": "hasher.update((\"XX|XX\".join(columns) + \"\\x00\").encode())",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "hasher.update((\"|\".join(columns) + \"\\x00\").encode())",
+      "pair_id": "0070",
+      "seed": 8,
+      "source_id": 1912,
+      "unit_commit": "57b86d76c26540d481c57fed6b9df40d165d65da",
+      "unit_id": "M02"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9e4cfb9d072adc60d7faebf7fbc85b39051825f8f43742c569c98dcc4a4f00c5"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 247,
+      "line": 243,
+      "mut_snippet": "elif decision != \"XXverdictXX\":",
+      "operator": "comparison_swap",
+      "orig_snippet": "elif decision != \"verdict\":",
+      "pair_id": "0071",
+      "seed": 8,
+      "source_id": 1495,
+      "unit_commit": "0895ddbc707d402090d561a70df49e64fda50f71",
+      "unit_id": "M03"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9d514f9c3979f36d05df080e9b7e200aa8e6b7ec7376d389075e1622176c94b7"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 160,
+      "line": 156,
+      "mut_snippet": "or \"CONTRIBUTOR\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "or \"contributor\"",
+      "pair_id": "0072",
+      "seed": 8,
+      "source_id": 1396,
+      "unit_commit": "0d088db533767ad434834955b39d6237f0f8c3aa",
+      "unit_id": "M04"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "b075dd99e83eb25023915f8df615b31652017a3944c2359a5eb0baf6cc7183c8"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 404,
+      "line": 400,
+      "mut_snippet": "lines.append(line.lstrip(\"\\n\"))",
+      "operator": "expression_mutation",
+      "orig_snippet": "lines.append(line.rstrip(\"\\n\"))",
+      "pair_id": "0073",
+      "seed": 8,
+      "source_id": 1673,
+      "unit_commit": "f54bb9e380462d17145c74518f501072622ea81b",
+      "unit_id": "M05"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "546df1a1948569ff1d5a865ec1d065aea0c705005e6e1ec92da750b5d62d99b9"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 160,
+      "line": 160,
+      "mut_snippet": "def wilson(successes: int, trials: int, z: float = 2.96) -> tuple[float, float]:",
+      "operator": "comparison_swap",
+      "orig_snippet": "def wilson(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:",
+      "pair_id": "0074",
+      "seed": 8,
+      "source_id": 14,
+      "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
+      "unit_id": "P01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "695490b2659b5d9479d84ee23840a9cfb6d375cd6d65d6fc94d3fd7476468d62"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 168,
+      "line": 168,
+      "mut_snippet": "return max(0.0, centre - spread), min(2.0, centre + spread)",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "return max(0.0, centre - spread), min(1.0, centre + spread)",
+      "pair_id": "0075",
+      "seed": 8,
+      "source_id": 58,
+      "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
+      "unit_id": "P01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "5d358027e56ee487cc5b37a74b562b6f73d9e6efab7872ac78b347172b681dbf"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 196,
+      "line": 196,
+      "mut_snippet": "if (task_family is None or r.get(\"TASK_FAMILY\") == task_family)",
+      "operator": "comparison_swap",
+      "orig_snippet": "if (task_family is None or r.get(\"task_family\") == task_family)",
+      "pair_id": "0076",
+      "seed": 8,
+      "source_id": 69,
+      "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
+      "unit_id": "P01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "0b6b63db1c1260ebf6bdac1182f11718c6e6590fad4f7067603c26a89b53328e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 240,
+      "line": 241,
+      "mut_snippet": "f\"SELECT {', '.join(columns)} FROM {table} ORDER BY {columns[1]}\"",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "f\"SELECT {', '.join(columns)} FROM {table} ORDER BY {columns[0]}\"",
+      "pair_id": "0077",
+      "seed": 8,
+      "source_id": 1917,
+      "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
+      "unit_id": "P01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "04e886d7fdf7e68ca6f0d32c2c9da0ebfce1d25be4bde11c84d8f760ddc58c46"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+      },
+      "file": "src/consilient/events.py",
+      "index": 306,
+      "line": 302,
+      "mut_snippet": "\"XXwhen it was written.XX\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"when it was written.\"",
+      "pair_id": "0078",
+      "seed": 8,
+      "source_id": 1565,
+      "unit_commit": "af8b5fcce959356cd0da26f9fecc994bd2488870",
+      "unit_id": "Q01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "8c580c81770f2f8b9276f661ad97bbf1908291bc6a1efe21ea34eedda8edc63d"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+      },
+      "file": "src/consilient/events.py",
+      "index": 404,
+      "line": 400,
+      "mut_snippet": "lines.append(line.rstrip(None))",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "lines.append(line.rstrip(\"\\n\"))",
+      "pair_id": "0079",
+      "seed": 8,
+      "source_id": 1672,
+      "unit_commit": "af8b5fcce959356cd0da26f9fecc994bd2488870",
+      "unit_id": "Q01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "8f68ed6b9f52a759c81bdc525d865c35111ed34abbe05099ed9f388281945c07"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 108,
+      "line": 109,
+      "mut_snippet": "event.data.get(\"XXtaskXX\"),",
+      "operator": "expression_mutation",
+      "orig_snippet": "event.data.get(\"task\"),",
+      "pair_id": "0080",
+      "seed": 8,
+      "source_id": 1734,
+      "unit_commit": "af8b5fcce959356cd0da26f9fecc994bd2488870",
+      "unit_id": "Q01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "ccb4ef3af813f9df55d284183a4d8e9ffb5eb28f6134cc66359e72a122cb429e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 163,
+      "line": 163,
+      "mut_snippet": "raise ValueError(None)",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "raise ValueError(\"no trials\")",
+      "pair_id": "0081",
+      "seed": 8,
+      "source_id": 17,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "723d4f11d943a5350cb99bc31026b0214fbfad12b9efda4c0ebbce11de9f3895"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 241,
+      "line": 241,
+      "mut_snippet": "\"XXtsXX\": ts,",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"ts\": ts,",
+      "pair_id": "0082",
+      "seed": 8,
+      "source_id": 143,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "65128b49efbd02f07b1907e7940cf6b5fac6b89f75e2a7ed1c789cd1fd19b812"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 241,
+      "line": 241,
+      "mut_snippet": "\"TS\": ts,",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"ts\": ts,",
+      "pair_id": "0083",
+      "seed": 8,
+      "source_id": 144,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "df4d6be4dd82006cb282270f15cfa51280e5a5f6fb1792ee9ffe0a8e2c1a6d24"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 243,
+      "line": 243,
+      "mut_snippet": "\"VERIFIER_VERSION\": ver,",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"verifier_version\": ver,",
+      "pair_id": "0084",
+      "seed": 8,
+      "source_id": 148,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "7815826c2c4fa42968cd25a00ef31f2f98adccd9c1f0c237747d0ebfeeff7aad"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 57,
+      "line": 53,
+      "mut_snippet": "path = Path(args.log) / f\"{event.get('ts', )[:10]}.jsonl\"",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:10]}.jsonl\"",
+      "pair_id": "0085",
+      "seed": 8,
+      "source_id": 238,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "0b1dc109809c3a49c08480a777eba509cbaefbdb0ce33dd4436b9eebb87d127b"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 57,
+      "line": 53,
+      "mut_snippet": "path = Path(args.log) / f\"{event.get('TS', '')[:10]}.jsonl\"",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:10]}.jsonl\"",
+      "pair_id": "0086",
+      "seed": 8,
+      "source_id": 240,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "738d660a03886eebd769fbe7db6594709e1ab59d5761a9e6c3af164c1cf27ebe"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 59,
+      "line": 55,
+      "mut_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"EVENT\"]}",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"event\"]}",
+      "pair_id": "0087",
+      "seed": 8,
+      "source_id": 256,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "b5a743d00c05bb8baeb5be3f9cf26615d3aba6acd03c1b053e38428896e28b94"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 105,
+      "line": 101,
+      "mut_snippet": "preserved = \"\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "preserved = None",
+      "pair_id": "0088",
+      "seed": 8,
+      "source_id": 289,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "2e058db25388b471154e4e7943402fe1dde627ac94c0940628e9305541485582"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 211,
+      "line": 205,
+      "mut_snippet": "b2 = _condition(\"B2\", \"XXunknownXX\", \"No EXP-08 result is recorded.\")",
+      "operator": "comparison_swap",
+      "orig_snippet": "b2 = _condition(\"B2\", \"unknown\", \"No EXP-08 result is recorded.\")",
+      "pair_id": "0089",
+      "seed": 8,
+      "source_id": 534,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "78970a02f6e002805223f4ccc8051da24e35538a41533b9bf6695c211048bd6c"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 233,
+      "line": 227,
+      "mut_snippet": "status = \"XXpassXX\" if identical is True else \"fail\" if identical is False else \"unknown\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
+      "pair_id": "0090",
+      "seed": 8,
+      "source_id": 586,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "4e87fd2ffafe97adaaca26c45afae98338fa9ce16aa444d9a7c82fe787f5be91"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 233,
+      "line": 227,
+      "mut_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"XXunknownXX\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
+      "pair_id": "0091",
+      "seed": 8,
+      "source_id": 594,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "bff00a678486c1ac50f8d39cc9547287dfd777a9959e2554405b75a4806590a6"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 242,
+      "line": 236,
+      "mut_snippet": "\"XXis identical.XX\" if identical else \"diverged.\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"is identical.\" if identical else \"diverged.\"",
+      "pair_id": "0092",
+      "seed": 8,
+      "source_id": 611,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "e9e193e6a0c875360488a55a8008cb1a5cc8eec8321fc6ae075fb5560600945e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 265,
+      "line": 259,
+      "mut_snippet": "\"FAIL\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"fail\",",
+      "pair_id": "0093",
+      "seed": 8,
+      "source_id": 665,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "8dae1c14e7f76192691d1ac65e441be24a28b711618100860f7ab0da077fb333"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 304,
+      "line": 298,
+      "mut_snippet": "elif not any(re.search(r\"(?m)^\\s*schedule\\s*:\", text or \"XXXX\") for text in texts):",
+      "operator": "comparison_swap",
+      "orig_snippet": "elif not any(re.search(r\"(?m)^\\s*schedule\\s*:\", text or \"\") for text in texts):",
+      "pair_id": "0094",
+      "seed": 8,
+      "source_id": 764,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "ee757d197889627c9867fd97718054501100f4abb7f14604c54c7cd230d29e53"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 336,
+      "line": 330,
+      "mut_snippet": "status = \"STRUCTURALLY_UNSATISFIABLE\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "status = \"structurally_unsatisfiable\"",
+      "pair_id": "0095",
+      "seed": 8,
+      "source_id": 837,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "1e845147dfe93515a7fc58bd708ee9729b1df2adff3ea8b5b8c202110fad572d"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 339,
+      "line": 333,
+      "mut_snippet": "elif \"unknown\" not in statuses:",
+      "operator": "comparison_swap",
+      "orig_snippet": "elif \"unknown\" in statuses:",
+      "pair_id": "0096",
+      "seed": 8,
+      "source_id": 846,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "7b20132ca9a1ce50c683f237a47be78d4bd3d6efdf8487a6f2ca41d84bf7c612"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 345,
+      "line": 339,
+      "mut_snippet": "return {\"STATUS\": status, \"passed\": status == \"pass\", \"conditions\": conditions}",
+      "operator": "comparison_swap",
+      "orig_snippet": "return {\"status\": status, \"passed\": status == \"pass\", \"conditions\": conditions}",
+      "pair_id": "0097",
+      "seed": 8,
+      "source_id": 860,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "f94b51c4b969b9092c2521d6b0141e79bf1171d39d41bdc3a82afff50b85eafd"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 363,
+      "line": 357,
+      "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"b1\", \"B2\", \"B3\", \"B4\"}}",
+      "operator": "expression_mutation",
+      "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "pair_id": "0098",
+      "seed": 8,
+      "source_id": 908,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "5decde6231ba0701ef987aa65c48d0dd62c36d02871241a572815bc0a91d4cb9"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 363,
+      "line": 357,
+      "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"b4\"}}",
+      "operator": "expression_mutation",
+      "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "pair_id": "0099",
+      "seed": 8,
+      "source_id": 914,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "8909b830465538c8bb3ce878009c7755e386531970258942cd90f25e0f75826b"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 382,
+      "line": 376,
+      "mut_snippet": "\"EVENTS; REBUILT\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"events; rebuilt\"",
+      "pair_id": "0100",
+      "seed": 8,
+      "source_id": 953,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "4f3a7581a14ebdd883fef036a2ae240d06a38cc7f61b021ed6d10ad9d798be51"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 387,
+      "line": 381,
+      "mut_snippet": "mark = \"identical\" if result[\"identical\"] else \"XXDIVERGEDXX\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "mark = \"identical\" if result[\"identical\"] else \"DIVERGED\"",
+      "pair_id": "0101",
+      "seed": 8,
+      "source_id": 966,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "8f9d68e7045dacccc2a8feb8960c14959242093f56adf77494ceb5b95e6d4f75"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 394,
+      "line": 388,
+      "mut_snippet": "line += f\"\\n    {r['path']}:{r['XXlineXX']}  {r['reason']}\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "line += f\"\\n    {r['path']}:{r['line']}  {r['reason']}\"",
+      "pair_id": "0102",
+      "seed": 8,
+      "source_id": 984,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9dc5238ba11864c87affdef1838f6be40da6efc4784fe1f0618a01b84482257d"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 406,
+      "line": 400,
+      "mut_snippet": "verifier_version=None,",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "verifier_version=result[\"verifier_version\"],",
+      "pair_id": "0103",
+      "seed": 8,
+      "source_id": 1005,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "d3b2d99206527651a016df65b6f4251b6284b56df55e5894816e4d499de1af8a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 418,
+      "line": 412,
+      "mut_snippet": "mark = condition[\"STATUS\"].replace(\"_\", \"-\").upper()",
+      "operator": "expression_mutation",
+      "orig_snippet": "mark = condition[\"status\"].replace(\"_\", \"-\").upper()",
+      "pair_id": "0104",
+      "seed": 8,
+      "source_id": 1066,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "bdb8d377f718898ddf37ac038593f93ae9f7879dbce507651f8fe7252b8ae22f"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 445,
+      "line": 439,
+      "mut_snippet": "prog=None,",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "prog=\"consil\",",
+      "pair_id": "0105",
+      "seed": 8,
+      "source_id": 1127,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "d8e6023e46974cde1aa509561a6907c537d4a18f587925d65e8f6ef35e770991"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 494,
+      "line": 488,
+      "mut_snippet": "json.dumps({\"XXerrorXX\": str(exc)}) if args.json else f\"error: {exc}\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "json.dumps({\"error\": str(exc)}) if args.json else f\"error: {exc}\",",
+      "pair_id": "0106",
+      "seed": 8,
+      "source_id": 1243,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "8267178ec2bd88c6f297a0306401234b7c2a1c6ce5d27a7dea2311cc1e39e7f1"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 31,
+      "line": 27,
+      "mut_snippet": "VERDICT_CORRECTION_KIND = \"ATTEMPT.VERDICT.CORRECTION\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "VERDICT_CORRECTION_KIND = \"attempt.verdict.correction\"",
+      "pair_id": "0107",
+      "seed": 8,
+      "source_id": 1294,
+      "unit_commit": "106e77f43decf1596d9fd4833b2cef8ea74ebd1e",
+      "unit_id": "S03"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "85bb132f84a8ff21d4c361a63db628a0e359b373d7c9a0245abdd0727d15b634"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 120,
+      "line": 116,
+      "mut_snippet": "raise EventError(None)",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "raise EventError(\"data must be an object\")",
+      "pair_id": "0108",
+      "seed": 8,
+      "source_id": 1342,
+      "unit_commit": "106e77f43decf1596d9fd4833b2cef8ea74ebd1e",
+      "unit_id": "S03"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "82141933244e52285af84b3e3995ea499bc4c1f6db2c59756def817c5bcb5108"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 250,
+      "line": 246,
+      "mut_snippet": "\"a human verdict is a verdict and may not be filed as anything else (v0-18)\"",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"a human verdict is a verdict and may not be filed as anything else (V0-18)\"",
+      "pair_id": "0109",
+      "seed": 8,
+      "source_id": 1499,
+      "unit_commit": "106e77f43decf1596d9fd4833b2cef8ea74ebd1e",
+      "unit_id": "S03"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "e0352c853cedc9fadb3c226f2a6775add09a64d8913e7635fa56136e9d9a4607"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 35,
+      "line": 31,
+      "mut_snippet": "\"DOCS/DECISIONS/0037-REPLACE-GATE-B2-WITH-MEASURED-CRITIC-THROUGHPUT-GAIN.MD\"",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "\"docs/decisions/0037-replace-gate-b2-with-measured-critic-throughput-gain.md\"",
+      "pair_id": "0110",
+      "seed": 8,
+      "source_id": 184,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "21e8e85129a07d387a225b5f9360b186641b31042104244be260ada1a5abf39a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 46,
+      "line": 42,
+      "mut_snippet": "\"B2\": \"exp-08 measured critic throughput gain is at least 20%\",",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"B2\": \"EXP-08 measured critic throughput gain is at least 20%\",",
+      "pair_id": "0111",
+      "seed": 8,
+      "source_id": 217,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "0f8e88a00e6654b3f455d5c5e0ed471c05dd99914942747936d8a8cfcc9d028d"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 59,
+      "line": 55,
+      "mut_snippet": "return {\"recorded\": True, \"file\": str(None), \"event\": event[\"event\"]}",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"event\"]}",
+      "pair_id": "0112",
+      "seed": 8,
+      "source_id": 252,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "8c2c0b9361c88a19b282b149eb7632965e30749cebfb4951fc76dd03694d3f41"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 298,
+      "line": 292,
+      "mut_snippet": "return _condition(\"B3\", \"unknown\", \"no workflow evidence source exists.\")",
+      "operator": "control_flow_mutation",
+      "orig_snippet": "return _condition(\"B3\", \"unknown\", \"No workflow evidence source exists.\")",
+      "pair_id": "0113",
+      "seed": 8,
+      "source_id": 734,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "fc39b72cebb0bae2959e45cb1d2e57f5b75a30708ac7c334417042e53500bf51"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 325,
+      "line": 319,
+      "mut_snippet": "\"OWN CONDITION-FOUR EVIDENCE.\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"own condition-four evidence.\"",
+      "pair_id": "0114",
+      "seed": 8,
+      "source_id": 825,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "fa6e2b5fbe6aecb8b86b481ed14a72cf7d0b111198efee6b7f5f940201daad73"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 337,
+      "line": 331,
+      "mut_snippet": "elif \"FAIL\" in statuses:",
+      "operator": "comparison_swap",
+      "orig_snippet": "elif \"fail\" in statuses:",
+      "pair_id": "0115",
+      "seed": 8,
+      "source_id": 839,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "abe6dcf12812441da148169d48518c8c973f7cf266c042e585039d3ba5c0ad7e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 363,
+      "line": 357,
+      "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"b3\", \"B4\"}}",
+      "operator": "expression_mutation",
+      "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
+      "pair_id": "0116",
+      "seed": 8,
+      "source_id": 912,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "51007fb641a8cc4c5cfb512d9a7761b013127210b0adf65148d5e402dd7e5061"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 382,
+      "line": 376,
+      "mut_snippet": "\"XXevents; rebuiltXX\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"events; rebuilt\"",
+      "pair_id": "0117",
+      "seed": 8,
+      "source_id": 952,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "37baecbd61f9fb1dad606e4bab7b53daa5302fec83d70bf7d1ac2a9a058f2034"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 388,
+      "line": 382,
+      "mut_snippet": "line = f\"replayed {result['events']} events; state {mark} ({result['digest'][:13]})\"",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "line = f\"replayed {result['events']} events; state {mark} ({result['digest'][:12]})\"",
+      "pair_id": "0118",
+      "seed": 8,
+      "source_id": 973,
+      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
+      "unit_id": "V01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "49daeb0b45612e338f5de5d23ee4869cf353cfe4e84bc1c265ccfff39b03a465"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "bb70175e345b444b75738b84351ec3721bca20cc1946bd4ab39dda3ae17fb1f0"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 165,
+      "line": 165,
+      "mut_snippet": "denom = 1 + z / z / trials",
+      "operator": "arithmetic_binary_op",
+      "orig_snippet": "denom = 1 + z * z / trials",
+      "pair_id": "0119",
+      "seed": 8,
+      "source_id": 26,
+      "unit_commit": "8cfffa7948c60f145994b549c81f6d7fc3c4ddc3",
+      "unit_id": "Y04"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "d7af3cf8763c73c0b5bf12bedab9887d8e89f130ebbc7cf1aaadf59d41ae9c2e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "pass",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 43,
+      "line": 39,
+      "mut_snippet": "\"SPEND_AUTHORISATION\",",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"spend_authorisation\",",
+      "pair_id": "0120",
+      "seed": 8,
+      "source_id": 1306,
+      "unit_commit": "7eb86916f0e0d31e301a1e36122b53435e074533",
+      "unit_id": "Z05"
+    }
+  ],
+  "provenance": {
+    "equivalent_mutants_excluded_by_exp47": 60,
+    "non_equivalent_survivors": 586
+  },
+  "seed": 8,
+  "snapshot_rev": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+  "source_results": "docs/10-research/experiments/exp47/results-exp47-2026-08-20.json",
+  "source_results_reason": "Register live record, 20 Aug 2026: 1,931 mutants, 586 non-equivalent composite survivors. results-exp47.json is the 22 Aug re-run with pytest_survived 0 and empty weakest_guards \u2014 an empty corpus."
+}
