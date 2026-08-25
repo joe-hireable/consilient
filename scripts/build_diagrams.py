@@ -17,6 +17,7 @@ import ast
 import hashlib
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Iterable
@@ -419,10 +420,43 @@ def _module_id(path: Path, src: Path) -> str:
     return "_".join(path.relative_to(src).with_suffix("").parts)
 
 
+def _tracked_python(src: Path) -> set[Path] | None:
+    """Paths under `src` that git actually tracks, or None if git cannot answer.
+
+    MEASURED 24 and 25 August 2026, twice. `tests/test_commit_gate.py` uses fixture files
+    named `src/mine.py` and `src/x.py`, whose contents are the literal text
+    "content of src/mine.py". Those are not valid Python, and on two separate occasions they
+    were left behind in the working tree by a killed test run. Scanning the DISK meant this
+    generator then refused the whole repository -- "FAIL src/mine.py: invalid syntax" -- and
+    took the suite red with it, which in turn blocked retirement, merging and publication.
+
+    A stray scratch file that nothing tracks must not be able to stop the build. Tracked
+    files are the ones this repository is actually responsible for parsing.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(src.parent), "ls-files", "--", str(src.relative_to(src.parent))],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+    )
+    if result.returncode != 0:
+        return None
+    return {
+        (src.parent / line.strip()).resolve()
+        for line in result.stdout.splitlines()
+        if line.strip().endswith(".py")
+    }
+
+
 def _known_modules(src: Path) -> dict[str, Path]:
+    tracked = _tracked_python(src)
     modules: dict[str, Path] = {}
     for path in sorted(src.rglob("*.py")):
         if "__pycache__" in path.parts:
+            continue
+        if tracked is not None and path.resolve() not in tracked:
             continue
         modules[_module_id(path, src)] = path
     return modules
