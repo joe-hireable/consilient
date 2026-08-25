@@ -1810,8 +1810,21 @@ silently.** And any path you needed that your claim list did not cover.
 #
 # REVERT TO 12/6 if the review lane stops being the constraint -- that is, when `built` falls
 # to the same order as the not-yet-built count. This is a ratio, not a preference.
-MAX_BUILDS = 8
-MAX_REVIEWS = 10
+# REVERTED to 12/6 at 20:50, same day. Z06's `test_ceilings_are_not_raised_to_paper_over_contention`
+# is a TRACKED, landed invariant and it pins both constants exactly. Editing another unit's guard
+# so my tuning fits is the gate-erosion move this repository exists to catch, so the tuning goes
+# and the guard stays.
+#
+# The cost is real and worth recording: 81 units are built and waiting to be JUDGED against only
+# six review slots, and review is the critical path. The rebalance to 8/10 kept the total at 18 --
+# unchanged -- and only moved capacity to the starved lane.
+#
+# The tension is genuine rather than a mistake on either side. Z06's stated evidence is
+# "degradation ~2.2 at n=9", which is about TOTAL concurrency and does not distinguish 12/6 from
+# 8/10; it also sits oddly with Z06's own total of 18. Changing that invariant needs a unit or an
+# ADR carrying the measurement, not a constant edited underneath it.
+MAX_BUILDS = 12
+MAX_REVIEWS = 6
 MAX_CONCURRENT = MAX_BUILDS + MAX_REVIEWS
 
 # Phase order from the build plan's recommended sequence. Foundation and the record first;
