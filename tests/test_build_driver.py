@@ -402,3 +402,73 @@ def test_the_loop_calls_self_heal_every_tick() -> None:
         for loop in loops
         for inner in ast.walk(loop)
     ), "self_heal is called outside the tick loop; a startup-only repair cannot fix a fault that appears after startup"
+
+
+# --- a crash is evidence once, not once per tick, 25 August 2026 ---------------
+#
+# crashed_dispatches reads `<stem>.err` from disk, and that file persists until the next
+# dispatch for the same unit overwrites it. Every tick re-read the same stale traceback and
+# reported it as a fresh death: driver state recorded 4,531 "crashes" across 99 units, AL at
+# 102 and AJ at 95 -- tick counts, not failures.
+#
+# It is not just noise. The three-identical-deaths rule stops auto-repair and escalates, so one
+# historical crash re-read three times permanently escalated a unit and removed it from the
+# retry pool. That is one event wearing many hats, which is the false-accept shape this
+# repository exists to detect, occurring in its own supervisor.
+
+
+def _write_err(briefs, stem: str, text: str):
+    briefs.mkdir(parents=True, exist_ok=True)
+    (briefs / f"{stem}.err").write_text(text, encoding="utf-8")
+
+
+def test_an_unchanged_crash_file_is_counted_once(tmp_path, monkeypatch) -> None:
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    _write_err(briefs, "U1", "Traceback (most recent call last):\nRuntimeError: boom\n")
+
+    state = {"in_flight": {"U1": (0.0, 3600.0)}, "review_dispatched": []}
+
+    first = driver.crashed_dispatches(state)
+    assert [row[0] for row in first] == ["U1"], first
+
+    # Same file, three more ticks. Under the old behaviour this reported three more deaths and
+    # tripped the escalation that stops auto-repair.
+    for _ in range(3):
+        assert driver.crashed_dispatches(state) == []
+
+
+def test_a_new_crash_is_counted_again(tmp_path, monkeypatch) -> None:
+    """Deduplication must not blind the supervisor to a genuinely new failure."""
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    state = {"in_flight": {"U2": (0.0, 3600.0)}, "review_dispatched": []}
+
+    _write_err(briefs, "U2", "Traceback (most recent call last):\nRuntimeError: first\n")
+    assert [row[0] for row in driver.crashed_dispatches(state)] == ["U2"]
+    assert driver.crashed_dispatches(state) == []
+
+    # A later dispatch overwrites the file with a different failure: that IS new evidence.
+    _write_err(
+        briefs, "U2", "Traceback (most recent call last):\nValueError: second and different\n"
+    )
+    again = driver.crashed_dispatches(state)
+    assert [row[0] for row in again] == ["U2"], "a new crash must still be reported"
+
+
+def test_the_counted_set_does_not_grow_without_bound(tmp_path, monkeypatch) -> None:
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    _write_err(briefs, "U3", "Traceback\nRuntimeError: x\n")
+
+    state = {"in_flight": {"U3": (0.0, 3600.0)}, "review_dispatched": []}
+    driver.crashed_dispatches(state)
+    assert "U3" in state["crash_counted"]
+
+    # U3 is no longer watched; its marker must be dropped rather than accumulating for ever.
+    state["in_flight"] = {}
+    driver.crashed_dispatches(state)
+    assert "U3" not in state["crash_counted"]

@@ -976,8 +976,40 @@ def crashed_dispatches(state: dict) -> list[tuple[str, str, bool]]:
                     ).startswith("status: refused")
             except OSError:
                 pass
+            # A CRASH IS EVIDENCE ONCE, NOT ONCE PER TICK.
+            #
+            # This reads `<stem>.err` from disk, and that file persists until the NEXT dispatch
+            # for the same unit overwrites it. So every tick re-read the same stale traceback
+            # and reported it as a fresh death. MEASURED 25 August 2026: driver state recorded
+            # 4,531 "crashes" across 99 units, with AL at 102 and AJ at 95 -- those are TICK
+            # COUNTS, not failures. A monitor caught the same run ids being re-reported with
+            # nothing but the elapsed seconds changing.
+            #
+            # It is not merely noisy. The three-identical-deaths rule stops auto-repair and
+            # escalates "this is a defect, not bad luck" -- so a single historical crash, re-read
+            # three times, permanently escalated a unit and took it out of the retry pool. Units
+            # were escalated on evidence that was one event wearing many hats, which is the same
+            # false-accept shape this repository exists to detect, in its own supervisor.
+            #
+            # Identity is (stem, mtime, size): a NEW crash rewrites the file and is counted, an
+            # unchanged file is the crash already counted. Recorded in state so it survives the
+            # tick, and pruned to the watched set so it cannot grow without bound.
+            try:
+                stat = err.stat()
+                fingerprint = f"{stem}:{int(stat.st_mtime)}:{stat.st_size}"
+            except OSError:
+                fingerprint = None
+            counted = state.setdefault("crash_counted", {})
+            if fingerprint is not None:
+                if counted.get(stem) == fingerprint:
+                    break
+                counted[stem] = fingerprint
             dead.append((uid, lines[-1] if lines else "unknown failure", refused))
             break
+    counted = state.setdefault("crash_counted", {})
+    for stem in list(counted):
+        if stem.split("-")[0] not in watched:
+            counted.pop(stem, None)
     return dead
 
 
