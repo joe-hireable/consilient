@@ -268,6 +268,7 @@ def _tracked_python() -> frozenset[Path]:
             cwd=str(REPO_ROOT),
             capture_output=True,
             timeout=120,
+            env=GIT_ENV,
         )
     except (OSError, subprocess.SubprocessError):
         return frozenset()

@@ -11,7 +11,7 @@ Read it. This file adds session-start guidance only.
 the principal. Routing, blocking and orchestration behaviour may now be built and run. The
 repository holds the observe-only increment in `src/consilient/`, experimental adapters,
 research instruments, CI invariants, <!-- BEGIN GENERATED: scripts/build_counts.py#inventory -->
-104 ADRs and 114 registered experiments
+105 ADRs and 114 registered experiments
 <!-- END GENERATED: scripts/build_counts.py#inventory -->.
 
 **Entering the stage is not passing the gates**, and the distinction is the whole of your job
