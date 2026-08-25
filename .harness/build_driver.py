@@ -1296,8 +1296,29 @@ silently.** And any path you needed that your claim list did not cover.
 # consilient-w-a1..w-p5 — one tree per workstream, so a shared git index never arises. This
 # driver now does the same: every unit builds in its own worktree, so two units editing
 # different files cannot collide at all, and only the merge-back is serial.
-MAX_BUILDS = 24
-MAX_REVIEWS = 12
+# TEMPORARILY REDUCED, 25 August 2026, and to be restored to 24/12 once Z03 and Z06 land.
+# The principal's standing instruction is to maximise parallelism and never constrain it, and
+# this does not contradict it: at 36 the system was completing NOTHING, so 36 was not
+# parallelism, it was saturation past the knee.
+#
+# MEASURED at the moment of this change: 21 concurrent pytest processes, 27 dispatchers and 77
+# node processes at TWENTY PERCENT CPU. Nothing was computing; everything was blocked on the
+# shared trajectory's file locks. A driver tick that began at 09:31 was still in its publish
+# suite at 10:03, and this repository has already measured the amplification directly -- nine
+# concurrent pytest processes took the suite from 432 s to 961 s.
+#
+# That is the metastable state Huang et al. describe: goodput collapses and does not recover
+# when the trigger is removed, because the queue itself sustains the load. Their remedy, and
+# the only one that works, is to SHED LOAD. Throughput at 12 is higher than throughput at 36
+# when throughput at 36 is zero.
+#
+# The real fixes are queued and are not this: Z06 gives builds and reviews separate admission
+# pools so neither starves the other, and Z03 checkpoints the tick and bounds every subprocess
+# so a killed one stops costing its whole tick. Both were blocked behind a dispatch path that
+# could not start work; that is now fixed, so they can be built -- and this constant goes back
+# to 24/12 when they land.
+MAX_BUILDS = 8
+MAX_REVIEWS = 4
 MAX_CONCURRENT = MAX_BUILDS + MAX_REVIEWS
 
 # Phase order from the build plan's recommended sequence. Foundation and the record first;
