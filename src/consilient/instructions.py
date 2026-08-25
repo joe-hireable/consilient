@@ -115,7 +115,9 @@ ADAPTED_LIMIT_CHARS = 4000
 CORE_HEADER = "# Invariant core — never adapted, never learned, never overridden"
 SKILLS_HEADER = "# Skills selected for this task"
 RECALL_HEADER = "# Recall pack — verbatim, bounded"
-ADAPTED_HEADER = "# Adapted layer — learned about this user; changes only on a measured promoter β"
+ADAPTED_HEADER = (
+    "# Adapted layer — learned about this user; changes only on a measured promoter β"
+)
 
 INERT_NOTICE = (
     "No adaptation has ever been promoted, so this layer is empty. Adaptation is "
@@ -139,16 +141,70 @@ TRI_STATES = frozenset({"true", "false", "unknown"})
 # with its matched tokens, so a bad match is auditable rather than hidden.
 _STOPWORDS = frozenset(
     {
-        "about", "after", "again", "against", "also", "always", "before", "being",
-        "below", "between", "could", "does", "doing", "done", "each", "every",
-        "from", "have", "here", "into", "just", "like", "made", "make", "more",
-        "most", "must", "never", "only", "over", "same", "shall", "should", "some",
-        "such", "than",         "that", "their", "them", "then", "there", "these", "they",
-        "this", "those", "through", "under", "until", "upon", "used", "uses",
-        "what", "when", "where", "which", "while", "will", "with", "would", "your",
+        "about",
+        "after",
+        "again",
+        "against",
+        "also",
+        "always",
+        "before",
+        "being",
+        "below",
+        "between",
+        "could",
+        "does",
+        "doing",
+        "done",
+        "each",
+        "every",
+        "from",
+        "have",
+        "here",
+        "into",
+        "just",
+        "like",
+        "made",
+        "make",
+        "more",
+        "most",
+        "must",
+        "never",
+        "only",
+        "over",
+        "same",
+        "shall",
+        "should",
+        "some",
+        "such",
+        "than",
+        "that",
+        "their",
+        "them",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "those",
+        "through",
+        "under",
+        "until",
+        "upon",
+        "used",
+        "uses",
+        "what",
+        "when",
+        "where",
+        "which",
+        "while",
+        "will",
+        "with",
+        "would",
+        "your",
         # Generic in THIS corpus: every skill description talks about the user and
         # the system, so neither token discriminates one skill from another.
-        "system", "user",
+        "system",
+        "user",
     }
 )
 
@@ -417,9 +473,7 @@ def _question_open(index: IndexLookup | None) -> str:
     return "true"
 
 
-def _wrong_costs_more(
-    rework: CostCeiling | None, protocol: CostCeiling | None
-) -> str:
+def _wrong_costs_more(rework: CostCeiling | None, protocol: CostCeiling | None) -> str:
     if rework is None or protocol is None:
         return "unknown"
     if not rework.policy_version or not protocol.policy_version:
@@ -499,7 +553,11 @@ def render(
     it is the first thing in the text and no parameter of this function can reach it
     (V0-46)."""
     parts = [_render_core(core_version)]
-    note = f" ({skills_omitted} further matched skill(s) omitted by the budget)" if skills_omitted else ""
+    note = (
+        f" ({skills_omitted} further matched skill(s) omitted by the budget)"
+        if skills_omitted
+        else ""
+    )
     parts.append(f"\n{SKILLS_HEADER}{note}\n")
     for skill in skills:
         parts.append(f"\n## {skill.name}\n\n{skill.body.rstrip()}\n")
@@ -549,7 +607,9 @@ def _omission_rows(selection: recall.Selection) -> list[dict[str, object]]:
 def _omitted_digest(rows: Sequence[Mapping[str, object]]) -> str:
     """Digest the omission set. Key order cannot matter -- `canonical` sorts."""
     return promote.digest(
-        canonical({"omitted": [{k: row.get(k) for k in _OMISSION_FIELDS} for row in rows]})
+        canonical(
+            {"omitted": [{k: row.get(k) for k in _OMISSION_FIELDS} for row in rows]}
+        )
     )
 
 
@@ -617,12 +677,76 @@ def _guard_privileged_selection(
     return selection
 
 
+# The newest events the recall scan starts from. Protected events are always included on top
+# of this, whatever their age, so the bound cannot hide one.
+#
+# MEASURED 25 August 2026, and it had stopped the harness dispatching at all. `assemble` reads
+# the whole trajectory and hands it to this function, which began its scan at EVERY event. The
+# trajectory had reached 48 MB across ~3,100 events -- 283 of them over 80 KB each, because
+# until Z01 landed every `instructions.assembled` event inlined its full omitted list -- and a
+# full-window scan then took OVER TEN MINUTES.
+#
+# `dispatch.py` calls `instructions.assemble(...)` immediately BEFORE it writes `brief.md`, so
+# every dispatch sat in this scan and never wrote the brief the agent was told to read. The
+# agent had nothing to do, produced nothing, and the driver recorded
+# "START_FAILED -- no artefact within the start window (0 bytes after 3711.74s)". Ten runs
+# died that way in one night, each burning an hour, and the units they carried never started.
+#
+# Z01 stopped the log growing -- 25 August's file is 627 KB against the 24th's 48 MB -- but an
+# append-only log never shrinks, so the cost of reading it can only be bounded here. A scan
+# that grows without limit is a dispatch cost that grows without limit.
+#
+# This is not a weakened check. `scan_complete` becomes False, which is an outcome the receipt
+# already models: the selection records `context_complete: false` and a continuation event id,
+# so a bounded scan is declared rather than silently passed off as a whole one. `verify`
+# replays through this same function, so both sides bound identically and the digests still
+# agree.
+RECALL_SCAN_EVENTS = 400
+
+# How many BULK-protected events the scan starts from. Rank 4 (active commitments) and rank 3
+# (committed work, and turns linked to it) are never bounded -- those are few, and dropping one
+# would lose something the context genuinely depends on. This bounds rank 2 only: the
+# always-include AUDIT kinds.
+#
+# MEASURED 25 August 2026. `_protected_event_indexes` returned 1,544 of 5,311 events, and
+# because protected events are added to the candidate REGARDLESS of the scan window, the
+# candidate was 1,877 events and 13.2 MILLION characters however small the window got. Where
+# that came from:
+#
+#     dispatch.outcome   845 events   6,778,908 chars   51.4%
+#     capability.gap     578 events   4,657,831 chars   35.3%
+#     dispatch.refused   118 events   1,333,841 chars   10.1%
+#
+# 97% of the scan, and all three are in ALWAYS_INCLUDE_KINDS. Every dispatch WRITES a
+# dispatch.outcome, so every dispatch then had to rescan all 845 previous ones: the cost of
+# starting work grew linearly with the amount of work already done. `select_events` took 164 s
+# per attempt and raised ValueError because the protected floor alone could not fit the
+# character limit -- so the shrink loop halved the window, which changes nothing about the
+# floor, and tried again. Twelve times. Over ten minutes, every dispatch, before the brief was
+# written.
+#
+# "Always include" cannot mean "include every one ever recorded" in an append-only log; that is
+# not a policy, it is an unbounded scan wearing a policy's clothes. Recency is the honest bound,
+# and the receipt already models the consequence: an omission carries `protected: true`, so a
+# dropped protected event is DECLARED rather than quietly dropped.
+PROTECTED_SCAN_EVENTS = 200
+
+
+def _bounded_protection(events: Sequence[Event]) -> frozenset[int]:
+    """Protected indexes, with the bulk audit kinds bounded to the most recent."""
+    ranks = recall._protection_ranks(events)
+    keep = {index for index, rank in enumerate(ranks) if rank >= 3}
+    bulk = [index for index, rank in enumerate(ranks) if rank == 2]
+    keep.update(bulk[-PROTECTED_SCAN_EVENTS:])
+    return frozenset(keep)
+
+
 def _select_recall(
     events: Sequence[Event], *, query: str, limit_chars: int
 ) -> recall.Selection:
     """Shrink the scan window until its honest receipt fits, then return its provenance."""
-    window = len(events)
-    protected = recall._protected_event_indexes(events)
+    window = min(len(events), RECALL_SCAN_EVENTS)
+    protected = _bounded_protection(events)
     while True:
         candidate = (
             events
@@ -696,11 +820,12 @@ def _adapted_from_events(events: Sequence[Event]) -> AdaptedLayer:
                 continue
             if candidate_id not in accepted or candidate_id in reversed_ids:
                 continue
-            if accepted[candidate_id] != text_digest or promote.digest(text) != text_digest:
+            if (
+                accepted[candidate_id] != text_digest
+                or promote.digest(text) != text_digest
+            ):
                 continue
-            applied = [
-                layer for layer in applied if layer.candidate_id != candidate_id
-            ]
+            applied = [layer for layer in applied if layer.candidate_id != candidate_id]
             applied.append(AdaptedLayer(ACTIVE, text, candidate_id))
     return applied[-1] if applied else _INERT_LAYER
 
@@ -852,7 +977,9 @@ def propose_adaptation(
     )
     decision = promote.decide(candidate, measured_beta, enabled=enabled)
     event = promote.record(log_dir, decision)
-    return ProposalOutcome(decision=decision, event=event, explanation=_explain(decision))
+    return ProposalOutcome(
+        decision=decision, event=event, explanation=_explain(decision)
+    )
 
 
 def record_adapted(log_dir: Path, *, candidate_id: str, text: str) -> EventPayload:
@@ -927,7 +1054,11 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
         return Reconstruction(
             assembly_id,
             False,
-            (LayerReport("event", False, "no instructions.assembled event carries this id"),),
+            (
+                LayerReport(
+                    "event", False, "no instructions.assembled event carries this id"
+                ),
+            ),
         )
     data = events[index].data
     reports: list[LayerReport] = []
@@ -947,7 +1078,9 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
         )
     elif promote.digest(_render_core(CORE_VERSION)) != expected_core_sha:
         reports.append(
-            LayerReport("core", False, "the rendered core digest does not match the record")
+            LayerReport(
+                "core", False, "the rendered core digest does not match the record"
+            )
         )
     else:
         reports.append(LayerReport("core", True, f"v{CORE_VERSION} digest matches"))
@@ -991,7 +1124,9 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
 
     recall_data = data.get("recall")
     if not isinstance(recall_data, dict):
-        reports.append(LayerReport("recall", False, "the record carries no recall layer"))
+        reports.append(
+            LayerReport("recall", False, "the record carries no recall layer")
+        )
     else:
         source_events = recall_data.get("source_events")
         source_digest = recall_data.get("source_digest")
@@ -1005,7 +1140,9 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
             and isinstance(limit_chars, int)
             and isinstance(recorded_pack_sha, str)
         ):
-            reports.append(LayerReport("recall", False, "the recall record is malformed"))
+            reports.append(
+                LayerReport("recall", False, "the recall record is malformed")
+            )
         elif len(events) < source_events:
             reports.append(
                 LayerReport(
@@ -1018,7 +1155,9 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
         elif _source_digest(events[:source_events]) != source_digest:
             reports.append(
                 LayerReport(
-                    "recall", False, "the pinned log prefix no longer digests to the record"
+                    "recall",
+                    False,
+                    "the pinned log prefix no longer digests to the record",
                 )
             )
         else:
@@ -1028,12 +1167,15 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
             pack = selection.text
             if promote.digest(pack) != recorded_pack_sha:
                 reports.append(
-                    LayerReport("recall", False, "the replayed pack does not match the record")
+                    LayerReport(
+                        "recall", False, "the replayed pack does not match the record"
+                    )
                 )
             elif any(
-                key in recall_data
-                for key in (*_RECEIPT_FIELDS, "omitted")
-            ) and _selection_receipt(selection) != _recorded_selection_receipt(recall_data):
+                key in recall_data for key in (*_RECEIPT_FIELDS, "omitted")
+            ) and _selection_receipt(selection) != _recorded_selection_receipt(
+                recall_data
+            ):
                 reports.append(
                     LayerReport(
                         "recall",
@@ -1052,7 +1194,9 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
 
     recorded_adapted = data.get("adapted")
     if not isinstance(recorded_adapted, dict):
-        reports.append(LayerReport("adapted", False, "the record carries no adapted layer"))
+        reports.append(
+            LayerReport("adapted", False, "the record carries no adapted layer")
+        )
     else:
         replayed = _adapted_from_events(events[:index])
         if (
@@ -1130,10 +1274,16 @@ def _require_reconstructed_skill(
     if match.get("path") != required.path:
         raise InstructionError("the recorded skill path does not match the pinned tree")
     if match.get("sha256") != required.sha256:
-        raise InstructionError("the recorded skill digest does not match the pinned body")
-    replayed = _skill_file(skills_dir, BETTER_THAN_BEST_NAME).read_text(encoding="utf-8")
+        raise InstructionError(
+            "the recorded skill digest does not match the pinned body"
+        )
+    replayed = _skill_file(skills_dir, BETTER_THAN_BEST_NAME).read_text(
+        encoding="utf-8"
+    )
     if replayed != required.body or promote.digest(replayed) != required.sha256:
-        raise InstructionError("the reconstructed skill body does not match the pinned body")
+        raise InstructionError(
+            "the reconstructed skill body does not match the pinned body"
+        )
 
 
 def bind_protocol(
@@ -1158,7 +1308,11 @@ def bind_protocol(
         raise ValueError("an assembly serves a task; the task text may not be empty")
     prefix = list(events) if events is not None else read_all(log_dir)[0]
     if not threshold.selects:
-        if bar_ref is not None or search_ref is not None or killing_check_ref is not None:
+        if (
+            bar_ref is not None
+            or search_ref is not None
+            or killing_check_ref is not None
+        ):
             raise InstructionError(
                 "a non-firing threshold cannot carry a completion artefact"
             )
