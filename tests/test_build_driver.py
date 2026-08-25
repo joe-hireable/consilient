@@ -5,7 +5,9 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -536,3 +538,210 @@ def test_the_prune_has_a_ceiling_so_an_ordinary_tick_pays_nothing() -> None:
     start = source.index("def prune_spent_workspaces(")
     body = source[start : source.index("\ndef self_heal(", start)]
     assert "PRUNE_CEILING" in body, "the ceiling is defined but not consulted"
+
+
+# --- BL: classify conflicts by content, clear them on retirement, gate merges --
+#
+# The already-landed detector used to grep commit SUBJECTS. Over 646 commits this
+# repository reused 14 subjects; 9 of the top 12 reused subjects carry different
+# patch content [measured, 24 August 2026]. A subject hit retired the unit. That
+# is a false-accept in the driver's own classifier, and it is how harness.py
+# acquired a duplicate 313-line block.
+#
+# These four tests are the unit's done criteria (A1, A2, A5-driver-half, F).
+
+
+_GIT_ENV = {
+    key: value
+    for key, value in os.environ.items()
+    if key not in {"GIT_DIR", "GIT_WORK_TREE"}
+}
+
+
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=_GIT_ENV,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    return result
+
+
+def _init_repo(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    _git(path, "init")
+    _git(path, "config", "user.email", "bl@test")
+    _git(path, "config", "user.name", "BL")
+
+
+def _commit_file(repo: Path, rel: str, body: str, subject: str) -> str:
+    target = repo / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    _git(repo, "add", rel)
+    _git(repo, "commit", "-m", subject)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _isolate_driver(driver, repo: Path, monkeypatch) -> None:
+    monkeypatch.setattr(driver, "ROOT", repo)
+    monkeypatch.setattr(driver, "WORKTREES", repo / ".harness" / "unit-worktrees")
+    monkeypatch.setattr(driver, "STATE", repo / ".harness" / "driver-state.json")
+
+    def isolated_sh(args, **kw):
+        return subprocess.run(
+            args,
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=_GIT_ENV,
+            **kw,
+        )
+
+    monkeypatch.setattr(driver, "sh", isolated_sh)
+
+
+def test_classifier_does_not_retire_on_subject_reuse(tmp_path: Path, monkeypatch) -> None:
+    """A1: identical subject, different content — the second stays escalated."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit_file(repo, "mod.py", "base = 0\n", "init")
+    default = _git(repo, "branch", "--show-current").stdout.strip()
+    first_lines = "\n".join(f"FIRST_{i} = {i}" for i in range(25)) + "\n"
+    second_lines = "\n".join(f"SECOND_{i} = {i}" for i in range(25)) + "\n"
+    _git(repo, "checkout", "-b", "first")
+    _commit_file(repo, "mod.py", first_lines, "feat: shared subject")
+    _git(repo, "checkout", default)
+    _git(repo, "checkout", "-b", "second")
+    second_sha = _commit_file(repo, "mod.py", second_lines, "feat: shared subject")
+    _git(repo, "checkout", default)
+    _git(repo, "merge", "--no-ff", "first", "-m", "land first")
+
+    driver = _load_driver()
+    _isolate_driver(driver, repo, monkeypatch)
+    state: dict[str, object] = {
+        "conflicts": {
+            "U2": f"CONFLICT cherry-picking {second_sha[:9]} for U2 (0 applied); needs resolution"
+        },
+        "force_done": [],
+        "built": [],
+        "done": [],
+    }
+    retired = driver.retest_conflicts(state)
+    assert retired == 0
+    assert "U2" in state["conflicts"]
+
+
+def test_conflict_cleared_on_retire() -> None:
+    """A2: no uid may sit in both conflicts and force_done — that was K01 live."""
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "conflicts": {"K01": "CONFLICT cherry-picking deadbeef for K01"},
+        "force_done": ["K01", "T01"],
+        "built": [],
+        "done": [],
+    }
+    driver.clear_retired_conflicts(state)
+    overlap = set(state["conflicts"]) & set(state["force_done"])
+    assert overlap == set(), overlap
+
+
+def test_failed_gate_reverts_cherry_pick(tmp_path: Path, monkeypatch) -> None:
+    """A cherry-pick whose result fails the gate is undone and the unit escalates."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    pre = _commit_file(repo, "ok.py", "VALUE = 1\n", "init")
+    default = _git(repo, "branch", "--show-current").stdout.strip()
+    _git(repo, "checkout", "-b", "unit")
+    _commit_file(repo, "ok.py", "VALUE = 2\n", "feat: change value")
+    _git(repo, "checkout", default)
+    worktree = repo / ".harness" / "unit-worktrees" / "U1"
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    _git(repo, "worktree", "add", str(worktree), "unit")
+
+    driver = _load_driver()
+    _isolate_driver(driver, repo, monkeypatch)
+    monkeypatch.setattr(
+        driver, "gate_merged_tree", lambda _touched: "ruff: simulated gate failure"
+    )
+
+    msg = driver.merge_unit_worktree("U1")
+    assert msg.startswith("CONFLICT"), msg
+    assert "gate" in msg.lower()
+    assert _git(repo, "rev-parse", "HEAD").stdout.strip() == pre
+
+
+def test_classifier_does_not_grep_subjects() -> None:
+    """The false-accept path was `git log --grep <subject>`. It must stay gone."""
+    source = DRIVER.read_text(encoding="utf-8")
+    assert "--grep" not in source
+    assert "--merge-base=" in source
+    assert "retired without review" in source
+    assert "--config-file" in source and "mypy.ini" in source
+    gate = source.split("def gate_merged_tree", 1)[1].split("\ndef ", 1)[0]
+    assert "--config-file" in gate and "mypy.ini" in gate
+    assert "--strict" not in gate.replace("never bare `--strict`", "")
+
+
+def test_escalation_banner_counts_retirements(tmp_path: Path, monkeypatch, capsys) -> None:
+    """F: the banner grows when the classifier retires, it does not shrink."""
+    driver = _load_driver()
+    units = {f"E{i}": {"title": "held", "claims": []} for i in range(5)}
+    units["T02"] = {"title": "landed", "claims": []}
+    units["K01"] = {"title": "landed", "claims": []}
+    remaining = {
+        f"E{i}": f"CONFLICT cherry-picking {'abcdabcd'[:7]}{i} for E{i}"
+        for i in range(5)
+    }
+    state: dict[str, object] = {
+        "conflicts": {**remaining, "T02": "CONFLICT cherry-picking deadbee1 for T02", "K01": "CONFLICT cherry-picking deadbee2 for K01"},
+        "force_done": [],
+        "built": [],
+        "done": [],
+        "in_flight": {},
+        "attempts": {},
+    }
+    monkeypatch.setattr(
+        driver, "load", lambda path, _default: units if path == driver.UNITS else state
+    )
+    monkeypatch.setattr(driver, "committed", lambda _uid, _unit: False)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: None)
+    monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
+    monkeypatch.setattr(driver, "save_state", lambda _state: None)
+    monkeypatch.setattr(driver, "live_dispatchers", lambda _state: 1)
+    monkeypatch.setattr(driver, "publish_if_ready", lambda _state, _green: "")
+    monkeypatch.setattr(driver, "ready", lambda *_a, **_k: False)
+    monkeypatch.setattr(driver.subprocess, "Popen", lambda *_a, **_k: None)
+
+    def fake_retest(current: dict) -> int:
+        for uid in ("T02", "K01"):
+            current.get("conflicts", {}).pop(uid, None)
+            built = current.setdefault("built", [])
+            if uid not in built:
+                built.append(uid)
+        return 2
+
+    monkeypatch.setattr(driver, "retest_conflicts", fake_retest)
+    monkeypatch.setattr(driver, "clear_retired_conflicts", lambda _state: None)
+    monkeypatch.setattr(
+        driver,
+        "merge_unit_worktree",
+        lambda uid, quiescent=False: current_conflict(uid),
+    )
+
+    def current_conflict(uid: str) -> str:
+        if uid in ("T02", "K01"):
+            return "no worktree"
+        return state["conflicts"].get(uid, "CONFLICT leftover")
+
+    assert driver.main() == 0
+    out = capsys.readouterr().out
+    assert "5 escalated, 2 retired without review" in out

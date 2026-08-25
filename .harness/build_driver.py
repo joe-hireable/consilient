@@ -775,8 +775,8 @@ def downstream_count(uid: str, units: dict) -> int:
     return len(seen)
 
 
-def _content_landed(sha: str) -> bool:
-    """Are this commit's added lines already present in HEAD, line for line?
+def _content_landed(shas: str | list[str]) -> bool:
+    """Are these commits' added lines already present in HEAD, line for line?
 
     Identity of WORK, not of commit message. A subject is not identity: 14 subjects recur in
     this repository's history and one recurs 24 times [measured 24 August 2026]. A patch-id is
@@ -789,18 +789,21 @@ def _content_landed(sha: str) -> bool:
     retire. The thresholds are the discriminator -- below twenty added lines a diff is too small
     to tell "landed" from "coincidentally similar", so it stays escalated rather than guessing.
     """
-    show = sh(["git", "show", "--format=", "-U0", sha])
-    if show.returncode != 0:
-        return False
+    if isinstance(shas, str):
+        shas = [shas]
     added: dict[str, list[str]] = {}
-    path = None
-    for line in show.stdout.splitlines():
-        if line.startswith("+++ b/"):
-            path = line[6:].strip()
-        elif line.startswith("+") and not line.startswith("+++") and path:
-            body = line[1:].strip()
-            if body:
-                added.setdefault(path, []).append(body)
+    for sha in shas:
+        show = sh(["git", "show", "--format=", "-U0", sha])
+        if show.returncode != 0:
+            continue
+        path = None
+        for line in show.stdout.splitlines():
+            if line.startswith("+++ b/"):
+                path = line[6:].strip()
+            elif line.startswith("+") and not line.startswith("+++") and path:
+                body = line[1:].strip()
+                if body:
+                    added.setdefault(path, []).append(body)
     total = sum(len(v) for v in added.values())
     if total < 20:
         return False
@@ -811,6 +814,146 @@ def _content_landed(sha: str) -> bool:
         present = {ln.strip() for ln in blob.splitlines()}
         absent += sum(1 for ln in lines if ln not in present)
     return (total - absent) / total >= 0.99
+
+
+def _cherry_and_diff_match(worktree_head: str, touched: list[str]) -> bool:
+    """Cheap first rung: patch already upstream AND the touched paths match HEAD.
+
+    `git cherry` alone must never retire a unit. patch-id normalises whitespace, and in
+    Python whitespace is the language. Both halves are required.
+    """
+    if not worktree_head or not touched:
+        return False
+    cherry = sh(["git", "cherry", "HEAD", worktree_head])
+    if cherry.returncode != 0:
+        return False
+    if any(line.startswith("+") for line in cherry.stdout.splitlines()):
+        return False
+    diff = sh(["git", "diff", "--quiet", worktree_head, "HEAD", "--", *touched])
+    return diff.returncode == 0
+
+
+def _unit_own_shas(uid: str, fallback_sha: str) -> tuple[str | None, list[str], list[str]]:
+    """The unit's own commits, preferring the worktree head over the conflict sha."""
+    worktree = WORKTREES / uid
+    head = fallback_sha
+    if worktree.exists():
+        resolved = sh(["git", "-C", str(worktree), "rev-parse", "HEAD"]).stdout.strip()
+        if resolved:
+            head = resolved
+    own = [
+        line.strip()
+        for line in sh(["git", "rev-list", "--reverse", f"HEAD..{head}"]).stdout.splitlines()
+        if line.strip()
+    ]
+    if not own and fallback_sha:
+        own = [fallback_sha]
+    touched: list[str] = []
+    seen: set[str] = set()
+    for sha in own:
+        for line in sh(["git", "show", "--name-only", "--format=", sha]).stdout.splitlines():
+            path = line.strip()
+            if path and path not in seen:
+                seen.add(path)
+                touched.append(path)
+    worktree_head = head if (WORKTREES / uid).exists() else None
+    return worktree_head, own, touched
+
+
+def clear_retired_conflicts(state: dict) -> None:
+    """A conflict entry is re-earned each tick. Retirement clears it.
+
+    K01 sat in force_done and on the escalation banner at once because only the
+    re-test loop popped conflicts [measured 24 August 2026].
+    """
+    retired: set[str] = set()
+    for key in ("force_done", "done", "built"):
+        value = state.get(key) or []
+        if isinstance(value, list):
+            retired.update(str(item) for item in value)
+    conflicts = state.get("conflicts")
+    if not isinstance(conflicts, dict):
+        return
+    for uid in list(conflicts):
+        if uid in retired:
+            conflicts.pop(uid, None)
+
+
+def retest_conflicts(state: dict) -> int:
+    """Re-earn every escalation. Return how many retired as already-landed."""
+    conflicts = state.setdefault("conflicts", {})
+    if not isinstance(conflicts, dict):
+        return 0
+    retired_without_review = 0
+    for uid, why in sorted(list(conflicts.items())):
+        match = re.search(r"cherry-picking ([0-9a-f]{7,40})", why or "")
+        if not match:
+            continue
+        sha = match.group(1)
+        if sh(["git", "merge-base", "--is-ancestor", sha, "HEAD"]).returncode == 0:
+            conflicts.pop(uid, None)
+            print(f"driver: {uid} conflict cleared -- already in the tree")
+            continue
+        worktree_head, own, touched = _unit_own_shas(uid, sha)
+        landed = _content_landed(own)
+        if not landed and worktree_head is not None:
+            landed = _cherry_and_diff_match(worktree_head, touched)
+        if landed:
+            conflicts.pop(uid, None)
+            built = state.setdefault("built", [])
+            if uid not in built:
+                built.append(uid)
+            if uid in state.setdefault("resolve_dispatched", []):
+                state["resolve_dispatched"].remove(uid)
+            print(
+                f"driver: {uid} already landed -- its added lines are present in HEAD; retiring"
+            )
+            retired_without_review += 1
+            continue
+        tree = sh(
+            [
+                "git",
+                "merge-tree",
+                "--write-tree",
+                "--name-only",
+                f"--merge-base={sha}^",
+                "HEAD",
+                sha,
+            ]
+        )
+        if tree.returncode == 0 and tree.stdout.count("CONFLICT") == 0:
+            conflicts.pop(uid, None)
+            if uid in state.setdefault("resolve_dispatched", []):
+                state["resolve_dispatched"].remove(uid)
+            print(
+                f"driver: {uid} conflict was stale -- it merges cleanly against current HEAD"
+            )
+    return retired_without_review
+
+
+def gate_merged_tree(touched: list[str]) -> str | None:
+    """Run the existing merge gate on the files this cherry-pick touched.
+
+    Scoped to `touched` so a pre-existing red file does not block an unrelated merge.
+    mypy is invoked with `--config-file mypy.ini`, never bare `--strict`: warn_unreachable
+    lives in the ini [measured 24 August 2026, T01 specimen].
+    """
+    existing = [path for path in touched if path and (ROOT / path).exists()]
+    if not existing:
+        return None
+    checks: list[list[str]] = [
+        ["ruff", "check", *existing],
+        [sys.executable, "-m", "mypy", "--config-file", "mypy.ini", *existing],
+    ]
+    acceptance = ROOT / ".github" / "scripts" / "check_merge_acceptance.py"
+    if acceptance.is_file():
+        checks.append([sys.executable, str(acceptance), "--files", *existing])
+    for command in checks:
+        result = sh(command)
+        if result.returncode != 0:
+            output = ((result.stdout or "") + (result.stderr or "")).strip()
+            return output or " ".join(command)
+    return None
 
 
 def reclaim_expired_slots(state: dict) -> list[str]:
@@ -1130,6 +1273,7 @@ def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
     if clash:
         return f"deferred {uid}: {len(clash)} path(s) dirty in the main tree ({sorted(clash)[0]})"
 
+    pre_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
     applied = 0
     already = 0
     for sha in own:
@@ -1158,6 +1302,14 @@ def merge_unit_worktree(uid: str, quiescent: bool = False) -> str:
                 return merge_unit_worktree(uid, quiescent=False)
             return f"CONFLICT cherry-picking {sha[:9]} for {uid} ({applied} applied); needs resolution"
         applied += 1
+    if applied:
+        gate_fail = gate_merged_tree(sorted(touched))
+        if gate_fail:
+            sh(["git", "reset", "--hard", pre_sha])
+            return (
+                f"CONFLICT gate failed for {uid} after cherry-pick; needs resolution\n"
+                + gate_fail
+            )
     # Distinguish landed from already-there. "applied 1" over a commit that was merely
     # already present reads as progress that did not happen, which is the ambiguity this
     # repository exists to refuse.
@@ -1823,6 +1975,7 @@ def main() -> int:
     built = set(state.setdefault("built", []))
     state["done"] = sorted(done)
     state["built"] = sorted(built)
+    clear_retired_conflicts(state)
 
     import time as _time_m
 
@@ -1833,71 +1986,14 @@ def main() -> int:
     # waiting on a collision that no longer existed, and each was holding a resolver slot for it.
     # Re-testing is cheap (`git merge-tree` writes nothing) and it is the difference between a
     # queue that drains and one that only grows.
-    for _uid, _why in sorted(list(conflicts.items())):
-        _m = re.search(r"cherry-picking ([0-9a-f]{7,40})", _why or "")
-        if not _m:
-            continue
-        _sha = _m.group(1)
-        if sh(["git", "merge-base", "--is-ancestor", _sha, "HEAD"]).returncode == 0:
-            conflicts.pop(_uid, None)
-            print(f"driver: {_uid} conflict cleared -- already in the tree")
-            continue
-        # A unit dispatched twice -- a retry after its slot was reclaimed -- builds twice. One
-        # attempt merges and the driver goes on retrying the OTHER sha for ever, because work is
-        # identified here by commit id rather than by what the commit says. MEASURED 24 August
-        # 2026: NINE of twelve units reported as unmergeable had already landed under a different
-        # sha with an identical subject, including T01, which gates 22 units and had been
-        # "blocked" for hours on a merge that had already happened.
-        # Retire on CONTENT, never on a commit subject. MEASURED 24 August 2026: across 646
-        # commits there are 590 distinct subjects and 14 reused ones -- a single subject appears
-        # 24 TIMES and another 18, carrying different patch content. Grepping the subject and
-        # retiring on any hit is therefore a false-accept path in the driver's own classifier: a
-        # check accepting "this work has landed" when it has not. It demonstrably did so --
-        # src/consilient/harness.py carries a duplicated block, `_validate_instance` bound at
-        # both 292 and 605 and `grammar_accepts` at 344 and 657, giving 17 mypy no-redef errors
-        # in the product tree.
-        #
-        # Content coverage instead: take the unit's own added lines and ask whether they are
-        # actually present in HEAD's copy of the same file. Retire only at >= 99% coverage AND
-        # at least 20 added lines -- below either bar it falls through and stays escalated,
-        # because a small diff cannot distinguish "landed" from "coincidentally similar".
-        _covered = _content_landed(_sha)
-        if _covered:
-            # Record it as BUILT, not force_done. MEASURED 24 August 2026: force_done is written
-            # here and read nowhere -- `done` is derived from consumed review receipts alone --
-            # so the conflict was popped and then RE-ADDED by the merge loop later in the same
-            # tick, which still had the unit in `mergeable`. Eight units cycled that way
-            # indefinitely. `built` is the set the merge loop actually skips, and it is the
-            # honest description: the work IS in the tree, it simply has not been verified.
-            #
-            # This also reconciles two detectors that disagreed by construction. `committed()`
-            # prefix-matches the subject the PLAN specifies; this loop matches the subject the
-            # cherry-picked COMMIT carries. Six of eight units had landed under a subject the
-            # agent chose rather than the one the plan named -- AT's plan says "admit ssh-signed
-            # verdicts", it landed as "recognise signed ssh_sig verdicts as authenticated" -- so
-            # committed() said no while this loop said yes. Only this loop was right.
-            conflicts.pop(_uid, None)
-            state.setdefault("built", [])
-            if _uid not in state["built"]:
-                state["built"].append(_uid)
-            if _uid in state.setdefault("resolve_dispatched", []):
-                state["resolve_dispatched"].remove(_uid)
-            print(
-                f"driver: {_uid} already landed -- its added lines are present in HEAD; retiring"
-            )
-            continue
-        if (
-            sh(
-                ["git", "merge-tree", "--write-tree", "--name-only", "HEAD", _sha]
-            ).stdout.count("CONFLICT")
-            == 0
-        ):
-            conflicts.pop(_uid, None)
-            if _uid in state.setdefault("resolve_dispatched", []):
-                state["resolve_dispatched"].remove(_uid)
-            print(
-                f"driver: {_uid} conflict was stale -- it merges cleanly against current HEAD"
-            )
+    #
+    # Retirement clears the conflict on every path, not only here. K01 was in force_done and
+    # still on the banner because only this loop popped the entry.
+    clear_retired_conflicts(state)
+    retired_without_review = retest_conflicts(state)
+    conflicts = state.setdefault("conflicts", {})
+    built = set(state.setdefault("built", []))
+    state["built"] = sorted(built)
     _now_m = _time_m.time()
     _dispatchers_alive = live_dispatchers(state)
     # Every unmerged worktree, not just the in-flight ones. A unit that finished, dropped out of
@@ -1924,10 +2020,10 @@ def main() -> int:
                 conflicts[uid] = msg
             else:
                 conflicts.pop(uid, None)
-    if conflicts:
+    if conflicts or retired_without_review:
         print(
-            f"driver: ESCALATION — {len(conflicts)} unit(s) cannot merge without help: "
-            f"{' '.join(sorted(conflicts))}"
+            f"driver: ESCALATION -- {len(conflicts)} escalated, "
+            f"{retired_without_review} retired without review"
         )
 
     green = None
@@ -1948,6 +2044,7 @@ def main() -> int:
                 built_by.setdefault(uid, state.get("last_arm", {}).get(uid, "codex"))
                 state.setdefault("built", []).append(uid)
                 built.add(uid)
+                conflicts.pop(uid, None)
                 print(
                     f"driver: {uid} built (plan commit present, suite green) — awaiting review"
                 )
