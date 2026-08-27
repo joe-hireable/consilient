@@ -111,7 +111,9 @@ def test_identity_matched_sound_retires_once_and_records_trajectory(
     assert len(recorded) == 1
 
 
-def test_defective_review_requeues_repair_with_findings(tmp_path: Path, monkeypatch) -> None:
+def test_defective_review_requeues_repair_with_findings(
+    tmp_path: Path, monkeypatch
+) -> None:
     """Changing DEFECTIVE into pass must retire a known-bad artefact."""
     driver, recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
@@ -206,9 +208,7 @@ def test_refused_dispatch_is_dispatch_refused(tmp_path: Path, monkeypatch) -> No
     assert state["done"] == []
 
 
-def test_json_refused_dispatch_is_dispatch_refused(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_json_refused_dispatch_is_dispatch_refused(tmp_path: Path, monkeypatch) -> None:
     driver, recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
     _write_dispatch(tmp_path, {"status": "refused", "reason": "claim collision"})
@@ -230,9 +230,7 @@ def test_failed_dispatch_is_dispatch_failed(tmp_path: Path, monkeypatch) -> None
     assert state["done"] == []
 
 
-def test_mismatched_artefact_is_receipt_mismatched(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_mismatched_artefact_is_receipt_mismatched(tmp_path: Path, monkeypatch) -> None:
     driver, recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
     _write_dispatch(tmp_path, _ok_envelope())
@@ -361,17 +359,29 @@ def test_a_silent_review_does_not_spend_an_attempt(tmp_path: Path, monkeypatch) 
     state["review_attempts"] = {"AV": 2}
 
     assert driver.consume_review_verdict(state, "AV", UNIT) == "no_dispatch"
-    assert state["review_attempts"]["AV"] == 1, "a silent review consumed a review attempt"
+    assert state["review_attempts"]["AV"] == 1, (
+        "a silent review consumed a review attempt"
+    )
 
 
-def test_a_reviewer_that_spoke_badly_does_spend_an_attempt(
+def test_a_reviewer_that_spoke_but_left_no_receipt_does_not_spend_an_attempt(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Deduplication of infrastructure must not become a free pass for a bad reviewer."""
+    """`no_receipt_file` is a dispatch-environment loss, not evidence about the work.
+
+    commit 51198db (F-05, 26 Aug 2026) widened `_INFRASTRUCTURE_LOSS` to all six outcomes
+    `consume_review_verdict` can see, `no_receipt_file` included: AT's reviewer said "SOUND"
+    in its own stdout, but the receipt never landed at the WSL-translated path the brief
+    demanded, and that spent a strike for a dispatch problem, not a code problem. This test
+    used to assert the pre-fix behaviour (that a reviewer which ran but wrote no receipt
+    still spends its attempt) for exactly that scenario, which is the bug 51198db fixed.
+    """
     driver, _recorded = _prepare(tmp_path, monkeypatch)
     state = _state()
     state["review_attempts"] = {"AV": 2}
     _write_dispatch(tmp_path, {"status": "ok", "stdout_tail": "it seems fine to me."})
 
     assert driver.consume_review_verdict(state, "AV", UNIT) == "no_receipt_file"
-    assert state["review_attempts"]["AV"] == 2, "a reviewer that ran must still spend its attempt"
+    assert state["review_attempts"]["AV"] == 1, (
+        "a reviewer that ran but left no receipt is an infrastructure loss and must be refunded"
+    )

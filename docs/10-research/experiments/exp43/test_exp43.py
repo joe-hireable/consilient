@@ -158,27 +158,6 @@ class TestExp43(unittest.TestCase):
             self.assertEqual(pairs[0], {"child": "c1", "parent": "p1"})
             self.assertEqual(pairs[1], {"child": "c2", "parent": "p3"})
 
-    def test_stale_lock_takeover(self):
-        stale_payload = json.dumps({"pid": 99998, "run_id": "stale-run", "started_epoch": time.time() - 500})
-        LOCK.write_text(stale_payload, encoding="utf-8")
-        self.assertTrue(acquire_lock("new-run", cap_s=300))
-        held = json.loads(LOCK.read_text(encoding="utf-8"))
-        self.assertEqual(held["run_id"], "new-run")
-        release_lock()
-
-    def test_kill_tree_handles_nonexistent_pid(self):
-        # Should not raise exception
-        kill_tree(9999999)
-
-    def test_get_merge_commits_parser(self):
-        mock_output = "c1 p1 p2\nc2 p3\n"
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=mock_output, returncode=0)
-            pairs = get_merge_commits(Path("/fake"), limit=2)
-            self.assertEqual(len(pairs), 2)
-            self.assertEqual(pairs[0], {"child": "c1", "parent": "p1"})
-            self.assertEqual(pairs[1], {"child": "c2", "parent": "p3"})
-
     def test_classification_defect(self):
         with patch("run_exp43.run_commit_test") as mock_test:
             mock_test.side_effect = [

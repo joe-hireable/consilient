@@ -111,6 +111,16 @@ red-cells-evidence.json
 # Local EXP-96 corpus clones and lock files. The runner is tracked; the pin is not.
 .harness/exp96-candidate-*/
 docs/10-research/experiments/*/results-*.json.lock
+# INSTANCE audit scratch output. MEASURED 26 Aug 2026: a mislabelled commit tracked 338
+# duplicate files here (repeated docs/ADR copies), inflating the foreign-identifier count
+# past its ceiling and tripping the tracked-file spend scanner on quoted example API names.
+.harness/al-audit-scratch/
+# INSTANCE timestamped plan-state backups.
+.harness/plan-backups/
+# INSTANCE one-shot scratch script (its own docstring: "Not product code"). MEASURED
+# 26 Aug 2026: untracked once already by a4f446e with no gitignore entry, so a later
+# broad `git add` re-tracked it. The entry is what a4f446e was missing.
+.harness/classify_verify_out.py
 
 # Unit worktrees are git worktrees, not content. An agent ran a bulk `git add` on
 # 24 August 2026 and staged 65,923 files from under here; committing that would have

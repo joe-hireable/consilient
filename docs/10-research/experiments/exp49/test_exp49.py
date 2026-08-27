@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from run_exp49 import (  # noqa: E402
+from run_exp49 import (
     _WindowsJob,
     _kill_process_tree,
     ROOT,

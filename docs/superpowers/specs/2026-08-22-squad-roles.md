@@ -1,5 +1,11 @@
 # Squad roles: exact rights, structural consultation, preserved dissent
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 9 (EXP-107).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Corrections:** the brief's exposure statement is too strong: ADR-0077 makes the current candidate
 ceiling at most one for `epsilon <= 0.40`, and zero below the recorded `beta_upper`; a model-family
 difference alone is `unmeasured`, not a different evidence class; and ADR-0020 already retains an

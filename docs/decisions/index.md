@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `9d0c1b58993415e66621c5774ffe1061aa2d279676168b1c85f696f81b298a18`
+> **Source SHA-256:** `5be7b95fe9b7bad844f9c02316b4b5b76d780cc7e4629a6a00b1727926d8c249`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -109,6 +109,7 @@
 | [0102](0102-keep-telephony-out-of-the-open-source-tree-at-launch.md) | Keep telephony out of the open-source tree at launch | ACCEPTED | — |
 | [0103](0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md) | Make contract-β the gate quantity, and keep human-β as alignment rather than a blocker | PROVISIONAL | — |
 | [0104](0104-re-derive-both-halves-of-beta-star-from-evidence.md) | Re-derive both halves of β\\\* from evidence, and let the arithmetic fall where it does | PROVISIONAL | — |
-| [0105](0105-baseline-the-22-august-capture-loss.md) | Baseline the 22 August capture loss | ACCEPTED | — |
+| [0105](0105-baseline-the-22-august-capture-loss.md) | Baseline the 22 August capture loss under its own pinned ratchet | ACCEPTED | — |
 | [0106](0106-admit-third-party-maintainer-verdicts-as-human-beta.md) | Admit identified third-party maintainer verdicts as human-β authors | PROPOSED | — |
 | [0107](0107-a-unit-may-merge-into-a-red-tree-but-nothing-may-publish-from-one.md) | A unit may merge into a red tree; nothing may publish from one | ACCEPTED | — |
+| [0108](0108-rotate-dispatch-across-a-users-own-accounts-per-harness.md) | Rotate dispatch across a user's own accounts, per harness, where the vendor allows it | PROVISIONAL | — |

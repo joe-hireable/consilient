@@ -18,8 +18,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from consilient.beta import INSUFFICIENT, MEASURED  # noqa: E402
-from consilient.synthetic import (  # noqa: E402
+from consilient.beta import INSUFFICIENT, MEASURED
+from consilient.synthetic import (
     SYNTHETIC_OUTCOMES,
     VERIFIER_BETA_UNMEASURED,
     Finding,

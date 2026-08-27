@@ -13,7 +13,6 @@ from consilient.work_items import (
     DISPATCH_CLAIM_SCHEMA,
     STATE,
     STATE_GROUPS,
-    WORK_MODEL_SCHEMA,
     WORK_STATE_DEFINITIONS,
     comment,
     complete_item,

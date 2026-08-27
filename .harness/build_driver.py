@@ -22,9 +22,11 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import time
+import uuid
 from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -122,22 +124,49 @@ ORDER = [
 # measured headroom. Restore the two ("claude", None, 3600) entries after the reset — reviewer
 # selection needs the anthropic family to exist, or a cross-family review of cursor or codex work
 # has one fewer family to draw from.
-ARMS = [
-    # The principal's routing, 24 August 2026: Cursor Grok 4.6 High Fast, Composer 2.5,
-    # Codex and SuperGrok Heavy, all of which have quota to spare. Claude is deliberately
-    # absent -- it is orchestrating, not building.
-    ("cursor-composer", "cursor-grok-4.6-high-fast", 3600),
+ARMS: list[tuple[str, str | None, int]] = [
+    # CURSOR RESTORED, 27 August 2026, after the principal reauthenticated it from a near-spent
+    # account to one with headroom. The account itself is not named here: a pre-publication audit
+    # the same day found this comment carrying an operational account's address on the private
+    # commercial product's own domain, together with the minute it was created -- an identity and
+    # a timeline that a source comment does not need and a public repository should not carry.
+    # `cursor-agent status` is where the current identity is read from, and it is not tracked.
+    # Restored on the artefact, not on the account page: four live dispatches through the
+    # real path returned `produced an artefact` with the expected string in stdout, one per
+    # model id below plus the two grok-backed ids, in 20-34s each. That is the same bar the
+    # 23 August grok restoration had to clear, and it is the bar because a harness that starts
+    # and dies looks identical to one that found nothing. [measured]
+    #
+    # ALL FOUR CURSOR ARMS NAME A COMPOSER MODEL, AND THAT IS THE POINT. Reviewer selection is
+    # `FAMILY.get(a[0]) != FAMILY.get(builder)`, keyed on the HARNESS ID alone -- so
+    # `("cursor-composer", "cursor-grok-4.6-high-fast", ...)` is offered as a cross-family
+    # check on grok-built work while running xAI's Grok 4.6. The map says "cursor"; the model
+    # is the builder's own. Four of the six cursor arms withdrawn on 26 August were exactly
+    # that, so for as long as they ran, a share of cross-family review was agreement between
+    # two instances of the same model. AGENTS.md principle 6: agreement between agents that
+    # share evidence is not consilience, it is echo -- and Whewell's test needs "another
+    # DIFFERENT class". A nominal family is not a different class. Composer is Cursor's own
+    # model, so a composer arm makes the cursor family real rather than declared.
+    # `test_cursor_arms_do_not_borrow_another_familys_model` enforces this, because a rule
+    # this file states and nothing checks is how the last four of these got there.
+    #
+    # Even 4/4/4, not the 6/4/2 of 26 August. That weighting was tuned to headroom measured on
+    # 23 August -- cursor 2%, grok 17% -- and every one of those accounts has since been
+    # replaced. A weighting whose evidence no longer exists is a guess with a history, so the
+    # split is even until there is something to measure. Codex is the only pool exposing a
+    # verified counter (2.0% used, resets 3 September); cursor and grok report `unknown`.
     ("codex", None, 3600),
-    ("cursor-composer", "composer-2.5-fast", 3600),
     ("grok", None, 3600),
-    ("cursor-composer", "cursor-grok-4.6-high-fast", 3600),
-    ("codex", None, 3600),
     ("cursor-composer", "composer-2.5", 3600),
+    ("codex", None, 3600),
     ("grok", None, 3600),
-    ("cursor-composer", "cursor-grok-4.6-medium-fast", 3600),
+    ("cursor-composer", "composer-2.5-fast", 3600),
     ("codex", None, 3600),
-    ("cursor-composer", "cursor-grok-4.6-high-fast", 3600),
+    ("grok", None, 3600),
+    ("cursor-composer", "composer-2.5", 3600),
     ("codex", None, 3600),
+    ("grok", None, 3600),
+    ("cursor-composer", "composer-2.5-fast", 3600),
 ]
 
 
@@ -156,8 +185,131 @@ CURSOR_CONCURRENCY = (
     6  # startup-scoped lock since 24 Aug; runs overlap after ~20s settle
 )
 
+# MEASURED 27 August 2026: both remaining arms (codex, grok) were simultaneously out of
+# usage -- Codex's own app-server reported `rateLimitReachedType` set, and a live Grok call
+# inside a dispatch's own test run returned "API error (status 402 Payment Required): Grok
+# Build usage balance exhausted" -- while `pick_arm` kept rotating into both anyway, spending
+# slots on dispatches with no usable model behind them. Reactive rather than a live probe per
+# arm: there is no lightweight balance check for every provider (headroom.py's own probe
+# explicitly excludes grok), but every dispatch that hits an exhausted provider says so in its
+# own stdout/stderr, so recognising a small set of narrow, unambiguous phrases there covers any
+# arm uniformly without a bespoke integration per provider. Bare status codes ("429", "402") are
+# deliberately excluded -- they were false positives (line numbers, commit-ish fragments) in a
+# real transcript scan.
+ARM_EXHAUSTION_PHRASES = (
+    "usage balance exhausted",
+    "rate limit reached",
+    "ratelimitreached",
+    "spend-control",
+    "spend control reached",
+    "quota exhausted",
+    "quota exceeded",
+    "payment required",
+)
+# Conservative guess, not a measured reset cadence -- there is no live per-arm balance check to
+# confirm recovery, so this only bounds how long a stale cooldown can block a recovered arm.
+ARM_COOLDOWN_S = 1800
 
-def pick_arm(index: int, state: dict) -> tuple:
+
+def _tail_text(path: pathlib.Path, max_bytes: int = 8192) -> str:
+    """Up to the last `max_bytes` of a file, read as text. Empty string if unreadable."""
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as fh:
+            if size > max_bytes:
+                fh.seek(-max_bytes, os.SEEK_END)
+            return fh.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def detect_exhausted_arms(state: dict) -> None:
+    """Cool down an arm whose most recent dispatch reports it is out of usage.
+
+    Scans the same watched set `crashed_dispatches` does (in-flight, review, resolve), but
+    independently: an exhaustion signal can appear inside a dispatch that otherwise COMPLETED
+    (exit 0) -- N03's build finished normally on 27 August 2026 while its own internal test run
+    hit Grok's 402, so this cannot be folded into crash detection without missing exactly the
+    case that motivated it. [measured]
+
+    AN EXHAUSTION SIGNAL IS EVIDENCE ONCE, NOT ONCE PER TICK. `<stem>.out`/`.err` persist
+    until the NEXT dispatch for that unit overwrites them, so re-reading a historical 402
+    every tick and re-stamping `cooldown[harness] = now` pins the arm in a cooldown that can
+    never expire -- the arm is dead forever on the strength of one old line. That is exactly
+    the defect `crashed_dispatches` already carries a fingerprint to prevent (it counted 4,531
+    "crashes" that were tick counts), and it bites harder here: on 27 August 2026 Joe moved
+    every harness onto a fresh second account, and a stale 402 from the RETIRED grok account
+    re-cooled the NEW one 11 minutes after it authenticated. Identity is (stem, mtime, size),
+    same shape as `crash_counted`: a genuinely new report rewrites the file and is counted, an
+    unchanged file is the report already counted. [measured]
+    """
+    watched = (
+        set(state.get("in_flight", {}))
+        | set(state.get("review_dispatched") or [])
+        | set(state.get("resolve_dispatched") or [])
+    )
+    arms_by_unit = state.get("last_arm", {})
+    cooldown = state.setdefault("arm_cooldown", {})
+    counted = state.setdefault("arm_exhaustion_counted", {})
+    now = time.time()
+    for uid in sorted(watched):
+        harness = arms_by_unit.get(uid)
+        if not harness:
+            continue
+        for stem in (uid, uid + "-resolve", uid + "-verify"):
+            fingerprint = []
+            newest = 0.0
+            for ext in (".err", ".out"):
+                try:
+                    st = (BRIEFS / f"{stem}{ext}").stat()
+                    fingerprint.append(f"{ext}:{int(st.st_mtime)}:{st.st_size}")
+                    newest = max(newest, st.st_mtime)
+                except OSError:
+                    continue
+            # AN EXHAUSTION REPORT OLDER THAN THE COOLDOWN HAS ALREADY EXPIRED AS EVIDENCE.
+            # The fingerprint above stops the same report being counted twice while its unit
+            # stays watched, but `arm_exhaustion_counted` is pruned for any stem that leaves
+            # the watched set -- and the `<stem>.out` file is not, because nothing overwrites
+            # it until that unit dispatches again. So a unit that leaves and re-enters arrives
+            # with its memory erased and its evidence intact, and the old line counts afresh.
+            # MEASURED 27 August 2026: `AP-verify.out` carried a "Payment Required" written at
+            # 23:34 the previous night, from the grok account since retired. It cooled grok at
+            # 12:57 the next day, 13.5 hours later. Worse, `last_arm["AP"]` had by then moved to
+            # codex, so the next re-entry would have cooled CODEX -- the one arm still working,
+            # measured at 0.0% of its weekly pool -- on the strength of a different account's
+            # bill from the day before.
+            # Age is the check that does not depend on bookkeeping surviving. A report older
+            # than ARM_COOLDOWN_S describes a cooldown that would already have elapsed, so
+            # acting on it can only re-impose a window the arm has served.
+            if newest and now - newest > ARM_COOLDOWN_S:
+                continue
+            text = (
+                _tail_text(BRIEFS / f"{stem}.err") + _tail_text(BRIEFS / f"{stem}.out")
+            ).lower()
+            if not text:
+                continue
+            hit = next((p for p in ARM_EXHAUSTION_PHRASES if p in text), None)
+            if hit is None:
+                continue
+            mark = "|".join(fingerprint)
+            if mark and counted.get(stem) == mark:
+                break
+            if mark:
+                counted[stem] = mark
+            print(
+                f"driver: ARM COOLDOWN -- {harness} reported {hit!r} via {uid}; "
+                f"skipping for {ARM_COOLDOWN_S}s"
+            )
+            cooldown[harness] = now
+            break
+    # Bounded, like `crash_counted`: a stem no longer watched is forgotten, so this cannot
+    # grow without limit and a unit that reports exhaustion again later is counted again.
+    for stem in list(counted):
+        if stem.split("-")[0] not in watched:
+            counted.pop(stem, None)
+
+
+def pick_arm(index: int, state: dict) -> tuple | None:
     """Choose an arm, refusing to oversubscribe one that serialises.
 
     `scripts/dispatch.py` takes an EXCLUSIVE FILE LOCK around every cursor-composer run
@@ -188,14 +340,21 @@ def pick_arm(index: int, state: dict) -> tuple:
     cursor_live = sum(
         1 for uid in cursor_units if arms_by_unit.get(uid) == "cursor-composer"
     )
+    cooldown = state.get("arm_cooldown", {})
+    now = time.time()
     for offset in range(len(ARMS)):
         harness, model, leash = ARMS[(index + offset) % len(ARMS)]
         if harness == "cursor-composer" and cursor_live >= CURSOR_CONCURRENCY:
             continue
+        cooled_at = cooldown.get(harness)
+        if cooled_at is not None and now - cooled_at < ARM_COOLDOWN_S:
+            continue
         return harness, model, leash
-    # Every arm is a saturated cursor slot. Return the nominal one and let dispatch refuse loudly
-    # rather than inventing a harness that was not configured.
-    return ARMS[index % len(ARMS)]
+    # Every arm is either a saturated cursor slot or in an exhaustion cooldown -- a saturated
+    # cursor slot alone would not empty this loop, since the other arms are what it fell through
+    # to. Refuse to invent a harness that cannot do the work rather than spend a slot proving
+    # that again; the caller reports this once and skips the dispatch for this tick.
+    return None
 
 
 def sh(args, **kw):
@@ -317,6 +476,52 @@ def reset_review_attempts_on_new_artefact(state: dict, uid: str, artefact: str) 
     return changed
 
 
+def clear_escalations_whose_artefact_moved(
+    state: dict, units: dict, pending_review: list[str]
+) -> list[str]:
+    """Un-escalate every unit whose claimed code has moved since its last review attempt.
+
+    BOOKKEEPING IS NOT A RESOURCE, AND THE REVIEW LOOP TREATED IT AS ONE.
+
+    `reset_review_attempts_on_new_artefact` is what releases a unit whose finding has since
+    been fixed. It costs no review slot, no 136 MB clone and no dispatch -- only a hash of the
+    claimed blobs. But it was called from inside the review DISPATCH loop, after
+    `admit_review`'s `break`. So whenever the review lane sat at its ceiling, that loop broke
+    on its FIRST iteration and no unit's artefact was ever recomputed: an escalation could not
+    clear no matter how completely the defect behind it had been repaired.
+
+    MEASURED 27 August 2026. BK was escalated carrying a DEFECTIVE verdict that named a
+    DDL-detection bypass in `check_merge_acceptance.py` -- `sql_shaped` required
+    lstrip-startswith("create table") and vetoed any backslash. Commit 6322d3b fixed exactly
+    that on 26 August. BK's artefact identity duly moved, 06d792af -> e54878b3, and BK stayed
+    escalated anyway: `reviews_out` was 6 against `MAX_REVIEWS` 6, so the loop printed "review
+    lane at ceiling" and broke. 76 units were pending review; the number whose artefact was
+    examined was zero, including the one sitting first in the list.
+
+    This is the F-08 lesson in a new place -- capacity that cannot be used is not capacity --
+    inverted: work that needs no capacity must not be queued behind the thing that has none.
+
+    Restricted to units the reset can actually report on. It returns False unless
+    `review_attempts[uid] > 0` or the unit is escalated, so recomputing the rest would spend two
+    `git rev-parse` calls each to learn nothing. On the live state that is 11 units, not 76.
+    """
+    escalated = state.setdefault("review_escalated", [])
+    attempts = state.setdefault("review_attempts", {})
+    cleared = []
+    for uid in pending_review:
+        if uid not in escalated and attempts.get(uid, 0) <= 0:
+            continue
+        unit = units.get(uid)
+        if unit is None:
+            continue
+        artefact = artefact_identity(unit)
+        if artefact is None:
+            continue
+        if reset_review_attempts_on_new_artefact(state, uid, artefact):
+            cleared.append(uid)
+    return cleared
+
+
 def review_dispatch_allowed(state: dict, uid: str) -> bool:
     """Refuse a fourth review attempt and emit its escalation only once."""
     attempts = state.setdefault("review_attempts", {}).get(uid, 0)
@@ -386,7 +591,9 @@ def suite_green() -> bool:
     # as passing, and `publish_if_ready` already refuses on a false. So the cost of the bound is
     # a tick that declines to publish; the cost of no bound is a tick that never ends.
     try:
-        r = sh([sys.executable, "-m", "pytest", "tests/", "-q"], timeout=SUITE_TIMEOUT_S)
+        r = sh(
+            [sys.executable, "-m", "pytest", "tests/", "-q"], timeout=SUITE_TIMEOUT_S
+        )
     except subprocess.TimeoutExpired:
         print(
             f"driver: suite did not finish within {SUITE_TIMEOUT_S}s -- treating as NOT GREEN "
@@ -485,7 +692,26 @@ def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> se
     return retired
 
 
-_INFRASTRUCTURE_LOSS = frozenset({"no_dispatch", "dispatch_refused"})
+_INFRASTRUCTURE_LOSS = frozenset(
+    {
+        "no_dispatch",
+        "dispatch_refused",
+        "dispatch_failed",
+        "no_receipt_file",
+        "receipt_unparseable",
+        "receipt_mismatched",
+    }
+)
+# MEASURED 26 August 2026: this set had only ever grown to two of the six outcomes its own
+# neighbouring docstrings already named -- `clear_stale_review_memos` (below) and the comment
+# in `consume_review_verdict` both list all six as infrastructure losses, but only
+# "no_dispatch"/"dispatch_refused" were ever actually refunded. Two live units (AC, AT) had a
+# real, well-formed verdict silently orphaned by this gap: AC's DEFECTIVE receipt arrived 37
+# minutes after the driver had already given up and recorded `dispatch_failed`, spending a
+# strike for a verdict that existed and was simply late; AT's reviewer reported SOUND but
+# never produced a receipt at the WSL-translated path the brief demanded, and `no_receipt_file`
+# spent a strike for a dispatch problem, not a code problem. Both escalated to a human on the
+# strength of infrastructure noise, which is exactly what F-05 says must not happen.
 
 
 def _outer_status(text: str) -> str:
@@ -685,7 +911,9 @@ def review_receipt_is_finished(uid: str, expected: dict[str, Any]) -> bool:
     except OSError:
         pass
     try:
-        candidate = json.loads((BRIEFS / f"{uid}-verdict.json").read_text(encoding="utf-8"))
+        candidate = json.loads(
+            (BRIEFS / f"{uid}-verdict.json").read_text(encoding="utf-8")
+        )
     except (OSError, json.JSONDecodeError):
         return False
     return (
@@ -694,6 +922,39 @@ def review_receipt_is_finished(uid: str, expected: dict[str, Any]) -> bool:
         and candidate.get("attempt") == expected.get("attempt")
         and candidate.get("artefact") == expected.get("artefact")
     )
+
+
+# MEASURED 26 August 2026: escalated under the two-outcome `_INFRASTRUCTURE_LOSS` gap fixed
+# immediately above -- each reached 3 review attempts, but every one of those attempts was an
+# infrastructure loss against an UNCHANGED artefact, not a genuine repeated defect:
+#   AC  a well-formed DEFECTIVE receipt arrived 37 minutes after the driver had already given up
+#       and recorded `dispatch_failed` for the same attempt.
+#   AT  the reviewer's own stdout said "AT is SOUND", but the receipt never reached the
+#       WSL-translated path the brief demanded, and the driver recorded `no_receipt_file`.
+#   B01 a genuinely dead dispatch (silent envelope, no verdict) -- nothing recoverable, but
+#       F-05 says an infrastructure death must not spend a retry regardless of whether
+#       anything is recoverable from it.
+# One-time, hardcoded migration for these three specific units, found by direct forensic
+# reading of their receipt files -- `review_results` only retains the latest outcome per uid,
+# so which of a unit's PAST attempts were infrastructure losses cannot be reconstructed from
+# state alone. Safe to run every tick: a no-op once none of the three remain escalated.
+_UNJUSTLY_ESCALATED = frozenset({"AC", "AT", "B01"})
+
+
+def clear_unjustly_escalated_reviews(state: dict[str, Any]) -> list[str]:
+    """Un-escalate units whose 3-attempt cap was reached entirely by infrastructure losses.
+
+    See `_UNJUSTLY_ESCALATED` for the specific units and the forensic evidence for each.
+    """
+    cleared: list[str] = []
+    escalated = state.setdefault("review_escalated", [])
+    attempts = state.setdefault("review_attempts", {})
+    for uid in _UNJUSTLY_ESCALATED:
+        if uid in escalated:
+            escalated.remove(uid)
+            attempts[uid] = 0
+            cleared.append(uid)
+    return cleared
 
 
 def clear_stale_review_memos(state: dict[str, Any], units: dict[str, Any]) -> list[str]:
@@ -934,8 +1195,7 @@ def rebase_mergeable_worktrees(
             continue
         if rebase_worktree(uid, path):
             print(
-                f"driver: rebased {uid} onto HEAD "
-                f"({len(commits)} commit(s) replayed)"
+                f"driver: rebased {uid} onto HEAD ({len(commits)} commit(s) replayed)"
             )
         else:
             print(
@@ -1047,6 +1307,13 @@ def _content_landed(shas: str | list[str]) -> bool:
     HEAD matches the commit. A unit whose work landed and was then built upon should still
     retire. The thresholds are the discriminator -- below twenty added lines a diff is too small
     to tell "landed" from "coincidentally similar", so it stays escalated rather than guessing.
+
+    Indentation-sensitive, not just whitespace-sensitive [measured 26 August 2026]: comparing
+    with `.strip()` on both sides discards LEADING whitespace too, so a commit that re-indents
+    an existing block (moves it into a loop, a conditional, a different scope) reads as
+    "already present" even though the code now means something else. Only trailing
+    whitespace/newline is stripped here -- the same class of bug this repository already
+    rejected for `git patch-id` in the docstring above.
     """
     if isinstance(shas, str):
         shas = [shas]
@@ -1060,8 +1327,8 @@ def _content_landed(shas: str | list[str]) -> bool:
             if line.startswith("+++ b/"):
                 path = line[6:].strip()
             elif line.startswith("+") and not line.startswith("+++") and path:
-                body = line[1:].strip()
-                if body:
+                body = line[1:].rstrip()
+                if body.strip():
                     added.setdefault(path, []).append(body)
     total = sum(len(v) for v in added.values())
     if total < 20:
@@ -1070,7 +1337,7 @@ def _content_landed(shas: str | list[str]) -> bool:
     for file_path, lines in added.items():
         head = sh(["git", "show", f"HEAD:{file_path}"])
         blob = head.stdout if head.returncode == 0 else ""
-        present = {ln.strip() for ln in blob.splitlines()}
+        present = {ln.rstrip() for ln in blob.splitlines()}
         absent += sum(1 for ln in lines if ln not in present)
     return (total - absent) / total >= 0.99
 
@@ -1115,7 +1382,9 @@ def _cherry_and_diff_match(worktree_head: str, touched: list[str]) -> bool:
     return diff.returncode == 0
 
 
-def _unit_own_shas(uid: str, fallback_sha: str) -> tuple[str | None, list[str], list[str]]:
+def _unit_own_shas(
+    uid: str, fallback_sha: str
+) -> tuple[str | None, list[str], list[str]]:
     """The unit's own commits, preferring the worktree head over the conflict sha."""
     worktree = WORKTREES / uid
     head = fallback_sha
@@ -1125,7 +1394,9 @@ def _unit_own_shas(uid: str, fallback_sha: str) -> tuple[str | None, list[str], 
             head = resolved
     own = [
         line.strip()
-        for line in sh(["git", "rev-list", "--reverse", f"HEAD..{head}"]).stdout.splitlines()
+        for line in sh(
+            ["git", "rev-list", "--reverse", f"HEAD..{head}"]
+        ).stdout.splitlines()
         if line.strip()
     ]
     if not own and fallback_sha:
@@ -1133,7 +1404,9 @@ def _unit_own_shas(uid: str, fallback_sha: str) -> tuple[str | None, list[str], 
     touched: list[str] = []
     seen: set[str] = set()
     for sha in own:
-        for line in sh(["git", "show", "--name-only", "--format=", sha]).stdout.splitlines():
+        for line in sh(
+            ["git", "show", "--name-only", "--format=", sha]
+        ).stdout.splitlines():
             path = line.strip()
             if path and path not in seen:
                 seen.add(path)
@@ -1213,12 +1486,77 @@ def retest_conflicts(state: dict) -> int:
     return retired_without_review
 
 
-def gate_merged_tree(touched: list[str]) -> str | None:
+def _mypy_error_count(text: str) -> int:
+    return text.count(": error:")
+
+
+def _mypy_gate(python_files: list[str], baseline: str) -> str | None:
+    """mypy on `python_files`, refusing only a genuine increase over `baseline`.
+
+    MEASURED 26 August 2026: a bare zero-tolerance mypy check meant ANY commit touching a file
+    carrying pre-existing type debt could never pass this gate, regardless of whether the commit
+    fixed the debt, worsened it, or never touched the offending lines at all. build_driver.py
+    itself carries roughly 87 long-accepted mypy errors (untyped `sh()` calls, bare `dict`
+    generics -- an established, tracked pattern all through this build, never a surprise). BO's
+    own merge-event-recording fix was refused by this exact gate despite a by-hand check showing
+    its error delta was zero (verified: only +3 calls to the same already-accepted untyped `sh()`
+    pattern). A gate that can never pass for a file is not a gate -- it is a permanent block, the
+    same class of failure this function already names for `.gitignore`-as-Python.
+
+    `baseline` is materialised via a real `git worktree add` rather than loose file copies in a
+    scratch directory, so mypy's own import resolution (`mypy_path = src`, cross-module checks)
+    sees a genuine checkout and not a directory structure that never existed. Only invoked when
+    the plain mypy check already failed, so a clean file pays no extra cost.
+    """
+    after = sh(
+        [sys.executable, "-m", "mypy", "--config-file", "mypy.ini", *python_files]
+    )
+    if after.returncode == 0:
+        return None
+    after_text = (after.stdout or "") + (after.stderr or "")
+    after_count = _mypy_error_count(after_text)
+    scratch = ROOT / ".harness" / f"gate-baseline-{uuid.uuid4().hex[:8]}"
+    added = sh(["git", "worktree", "add", "--detach", str(scratch), baseline])
+    if added.returncode != 0:
+        # Can't establish a baseline -- fail closed on the original zero-tolerance result rather
+        # than silently letting anything through.
+        return after_text.strip() or " ".join(
+            [sys.executable, "-m", "mypy", "--config-file", "mypy.ini", *python_files]
+        )
+    try:
+        before_files = [
+            str(scratch / path) for path in python_files if (scratch / path).exists()
+        ]
+        before_count = 0
+        if before_files:
+            before_ini = scratch / "mypy.ini"
+            config = str(before_ini) if before_ini.exists() else "mypy.ini"
+            before = sh(
+                [sys.executable, "-m", "mypy", "--config-file", config, *before_files]
+            )
+            before_count = _mypy_error_count(
+                (before.stdout or "") + (before.stderr or "")
+            )
+        if after_count > before_count:
+            return (
+                f"mypy regressed on {', '.join(python_files)}: {before_count} error(s) at "
+                f"{baseline} -> {after_count} now\n{after_text.strip()}"
+            )
+        return None
+    finally:
+        removed = sh(["git", "worktree", "remove", "--force", str(scratch)])
+        if removed.returncode != 0:
+            shutil.rmtree(scratch, ignore_errors=True)
+
+
+def gate_merged_tree(touched: list[str], baseline: str) -> str | None:
     """Run the existing merge gate on the files this cherry-pick touched.
 
     Scoped to `touched` so a pre-existing red file does not block an unrelated merge.
     mypy is invoked with `--config-file mypy.ini`, never bare `--strict`: warn_unreachable
-    lives in the ini [measured 24 August 2026, T01 specimen].
+    lives in the ini [measured 24 August 2026, T01 specimen]. `baseline` is the tree this
+    cherry-pick started from -- `_mypy_gate` compares against it rather than demanding zero
+    errors, so a file's pre-existing debt does not permanently block every future merge to it.
     """
     existing = [path for path in touched if path and (ROOT / path).exists()]
     if not existing:
@@ -1238,9 +1576,6 @@ def gate_merged_tree(touched: list[str]) -> str | None:
     checks: list[list[str]] = []
     if python_files:
         checks.append(["ruff", "check", *python_files])
-        checks.append(
-            [sys.executable, "-m", "mypy", "--config-file", "mypy.ini", *python_files]
-        )
     acceptance = ROOT / ".github" / "scripts" / "check_merge_acceptance.py"
     if acceptance.is_file():
         checks.append([sys.executable, str(acceptance), "--files", *existing])
@@ -1249,6 +1584,10 @@ def gate_merged_tree(touched: list[str]) -> str | None:
         if result.returncode != 0:
             output = ((result.stdout or "") + (result.stderr or "")).strip()
             return output or " ".join(command)
+    if python_files:
+        mypy_fail = _mypy_gate(python_files, baseline)
+        if mypy_fail:
+            return mypy_fail
     return None
 
 
@@ -1356,10 +1695,18 @@ def publish_if_ready(state: dict, green: bool | None) -> str:
         green = suite_green()
     if not green:
         return f"publish held: {ahead} commit(s) ready, suite not green"
+    # MEASURED 27 August 2026. This list had four entries and the `pre-push` hook runs FIVE --
+    # it also runs `check_private_repo_names`, the ratchet on unpinned private-repository names.
+    # So the driver's pre-flight could report every gate passing on a tree the hook would then
+    # refuse, which is exactly what happened: a push of 294 commits was declined on a new file
+    # in `docs/10-research/` that this list could not see. A pre-flight that is weaker than the
+    # thing it is a pre-flight for is not a pre-flight; it is a second opinion that always
+    # agrees. Any gate the hook runs belongs here.
     gates = [
         (".github/scripts/check_foreign_identifiers.py", []),
         (".github/scripts/check_secrets.py", []),
         (".github/scripts/check_private_corpus.py", []),
+        (".github/scripts/check_private_repo_names.py", []),
         (".github/scripts/check_generated_documents.py", ["--check"]),
     ]
     for script, args in gates:
@@ -1574,7 +1921,27 @@ def merge_unit_worktree(uid: str) -> str:
     applied = 0
     already = 0
     for sha in own:
-        r = sh(["git", "cherry-pick", "--allow-empty", "-x", sha])
+        # DCO requires a `Signed-off-by:` trailer on every commit that reaches `main`, and a
+        # dispatched worker's own commit is not guaranteed to carry one -- the workers run
+        # arbitrary shells across several harnesses, and asking each one to remember `--signoff`
+        # is a prompt-level fix the Engineering Ratchet rejects. This is the one chokepoint every
+        # unit's work must pass through before landing, so the sign-off is stamped here instead:
+        # `--signoff` adds a trailer for the CURRENTLY CONFIGURED identity (the one performing the
+        # merge), which DCO accepts alongside the original author already preserved by cherry-pick.
+        # [measured 26 August 2026] -- CI's "v0 invariants"/DCO check failed on every recent push
+        # with "no sign-off found" for that exact reason.
+        # NO `--allow-empty`. MEASURED 27 August 2026 against real git. The flag does not do
+        # what it was assumed to: a commit whose CONTENT is already in HEAD still exits
+        # non-zero with "the previous cherry-pick is now empty" either way, and the branch
+        # below handles it. What the flag actually permits is replaying a source commit that
+        # was empty TO BEGIN WITH as a fresh empty commit, exit 0, counted as `applied`.
+        # That case cannot terminate: the replay gets a new sha, so `HEAD..unit_head` still
+        # lists the original next tick, and an empty commit leaves no content for git to
+        # recognise as already present -- so it lands again, once per tick, forever. Two units
+        # did exactly this; 189 of one 200-commit window were two zero-diff messages
+        # repeating. Without the flag an empty source commit takes the already-applied path
+        # and nothing lands, which is the honest outcome for a commit that changes nothing.
+        r = sh(["git", "cherry-pick", "--signoff", "-x", sha])
         if r.returncode != 0:
             # ALREADY APPLIED is not a conflict. A unit's work often lands under a different sha —
             # cherry-picked with -x, rebased, or resolved by hand — and `HEAD..worktree_head` still
@@ -1598,7 +1965,7 @@ def merge_unit_worktree(uid: str) -> str:
         applied += 1
         post_pick_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
     if applied:
-        gate_fail = gate_merged_tree(sorted(touched))
+        gate_fail = gate_merged_tree(sorted(touched), pre_sha)
         if gate_fail:
             # `reset --hard pre_sha` discards EVERYTHING committed since pre_sha was read, not
             # only this unit's cherry-picks. That assumption -- nothing else commits to this
@@ -2128,9 +2495,7 @@ SUBSYSTEM_JACCARD_THRESHOLD = float(
     os.environ.get("CONSILIENT_SUBSYSTEM_JACCARD_THRESHOLD", "0.18")
 )
 if not 0.0 <= SUBSYSTEM_JACCARD_THRESHOLD <= 1.0:
-    raise ValueError(
-        "CONSILIENT_SUBSYSTEM_JACCARD_THRESHOLD must be between 0 and 1"
-    )
+    raise ValueError("CONSILIENT_SUBSYSTEM_JACCARD_THRESHOLD must be between 0 and 1")
 
 SUBSYSTEM_STOP_WORDS = frozenset(
     "a an the and or of to for in on with by that it its is are be not no "
@@ -2294,11 +2659,7 @@ def _handle_crashed_dispatches(state: dict) -> None:
         state.setdefault("verified", [])
     freed = release_dead_claims({u for u, _, _ in dead})
     if freed:
-        print(
-            "driver: released "
-            + str(freed)
-            + " claim(s) held by runs that are gone"
-        )
+        print("driver: released " + str(freed) + " claim(s) held by runs that are gone")
 
 
 def main() -> int:
@@ -2394,6 +2755,7 @@ def main() -> int:
     # this after finding three of them himself: "this needs to be reported and auto-fixed to
     # orchestrators in real time not discovered during a check in."
     _handle_crashed_dispatches(state)
+    detect_exhausted_arms(state)
 
     # A review process owns the output until it exits. Once none is live, consume every receipt;
     # malformed, stale and failed output are explicit check errors and will be retried.
@@ -2410,6 +2772,13 @@ def main() -> int:
     # that made the tail-only parser fail is what makes this safe. A non-empty artefact means
     # that review's process has written its final report and let go of the file. A torn read
     # fails json.loads, becomes a check_error, and is retried, so the race fails closed.
+    cleared_escalations = clear_unjustly_escalated_reviews(state)
+    if cleared_escalations:
+        print(
+            "driver: un-escalated "
+            + " ".join(sorted(cleared_escalations))
+            + " -- their 3-attempt cap was reached entirely by infrastructure losses"
+        )
     stale_memos = clear_stale_review_memos(state, units)
     if stale_memos:
         print(
@@ -2474,10 +2843,24 @@ def main() -> int:
     # merge loop only ever looked at in_flight, so its output was stranded exactly as F-02
     # describes. V01 sat built-and-unmergeable this way while the tick reported it every time and
     # did nothing about it. [measured 23 Aug 2026]
+    #
+    # Not `uid not in built` either. `built` records that the plan commit landed once; it is
+    # never cleared by new commits a fork adds to the SAME worktree afterwards (a merge-conflict
+    # or review fix landing after the unit was already marked built). Excluding built units here
+    # stranded exactly that work forever, with no tick ever looking at the worktree again. AN, AJ
+    # and AL each sat this way with a fork's fix committed and never merged. [measured 26 August
+    # 2026] `merge_unit_worktree`'s own `HEAD..head` rev-list is the cheap no-op check -- a
+    # built unit with nothing new past HEAD costs one rev-parse and one rev-list, not a gate run.
+    # `force_done` is a permanent, manually-decided retirement -- not the review pipeline's
+    # doing, so `done` (which only reads `review_results`) never covers it. Without this
+    # exclusion a force_done unit stayed in `mergeable` forever and could have `conflicts[uid]`
+    # rewritten on every tick, resurrecting an escalation for work that is not coming back.
+    # [measured 26 August 2026]
+    force_done = set(state.get("force_done") or [])
     mergeable = [
         uid
         for uid in units
-        if uid not in done and uid not in built and (WORKTREES / uid).exists()
+        if uid not in done and uid not in force_done and (WORKTREES / uid).exists()
     ]
     rebase_mergeable_worktrees(mergeable, state, _now_m, _dispatchers_alive)
     for uid in mergeable:
@@ -2488,7 +2871,7 @@ def main() -> int:
             conflicts[uid] = msg
         else:
             conflicts.pop(uid, None)
-    if conflicts:
+    if conflicts or retired_without_review:
         print(
             f"driver: ESCALATION -- {len(conflicts)} escalated, "
             f"{retired_without_review} retired without review"
@@ -2558,6 +2941,15 @@ def main() -> int:
     # enough that none of them finish, which is why the verification tier produced almost nothing
     # while looking maximally busy. MAX_REVIEWS was always meant to be a concurrency cap -- the
     # name says so -- and this makes it one instead of a per-tick rate.
+    # Before the ceiling, not behind it: releasing a unit whose code has moved spends no
+    # review slot, and running it inside the loop below meant it never ran at all while the
+    # lane was full. See `clear_escalations_whose_artefact_moved`.
+    for cleared_uid in clear_escalations_whose_artefact_moved(state, units, pending_review):
+        print(
+            f"driver: {cleared_uid}'s artefact changed since its last review attempt; "
+            "review budget reset"
+        )
+
     reviews_out = len(state.setdefault("review_dispatched", []))
     for uid in pending_review:
         if not admit_review(reviews_out):
@@ -2572,11 +2964,6 @@ def main() -> int:
         artefact = artefact_identity(units[uid])
         if artefact is None:
             continue
-        if reset_review_attempts_on_new_artefact(state, uid, artefact):
-            print(
-                f"driver: {uid}'s artefact changed since its last review attempt; "
-                "review budget reset"
-            )
         review_escalated = uid in state.setdefault("review_escalated", [])
         if not review_dispatch_allowed(state, uid):
             if not review_escalated:
@@ -2766,8 +3153,18 @@ def main() -> int:
         n = attempts.get(uid, 0)
         brief = write_brief(uid, unit, state.setdefault("repair_findings", {}).get(uid))
         rot = state.get("arm_rotation", 0)
-        harness, model, leash = pick_arm(rot + n, state)
+        picked = pick_arm(rot + n, state)
         state["arm_rotation"] = rot + 1
+        if picked is None:
+            if not state.get("_all_arms_exhausted_reported"):
+                print(
+                    "driver: ALL ARMS EXHAUSTED -- every configured harness is cooling down "
+                    "or saturated; no build dispatched this tick"
+                )
+                state["_all_arms_exhausted_reported"] = True
+            break
+        harness, model, leash = picked
+        state["_all_arms_exhausted_reported"] = False
         args = [
             sys.executable,
             "scripts/dispatch.py",
@@ -2830,8 +3227,18 @@ def main() -> int:
             continue
         rbrief = write_resolve_brief(uid, unit, why)
         rot = state.get("arm_rotation", 0)
-        harness, model, leash = pick_arm(rot, state)
+        picked = pick_arm(rot, state)
         state["arm_rotation"] = rot + 1
+        if picked is None:
+            if not state.get("_all_arms_exhausted_reported"):
+                print(
+                    "driver: ALL ARMS EXHAUSTED -- every configured harness is cooling down "
+                    "or saturated; no resolve dispatched this tick"
+                )
+                state["_all_arms_exhausted_reported"] = True
+            break
+        harness, model, leash = picked
+        state["_all_arms_exhausted_reported"] = False
         rargs = [
             sys.executable,
             "scripts/dispatch.py",

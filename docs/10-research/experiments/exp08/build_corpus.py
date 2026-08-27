@@ -22,7 +22,11 @@ import hashlib
 import json
 import os
 import random
+import re
+import shutil
 import subprocess
+import sys
+import uuid
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -30,8 +34,20 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 CORPUS = HERE / "corpus-exp08.json"
-SOURCE_RESULTS = ROOT / "docs/10-research/experiments/exp47/results-exp47-2026-08-20.json"
-PLAN_UNITS = ROOT / ".harness/plan-units.json"
+SOURCE_RESULTS = (
+    ROOT / "docs/10-research/experiments/exp47/results-exp47-2026-08-20.json"
+)
+# Claims for the 34 eligible units, frozen at the moment this corpus's regeneration
+# bug was fixed [measured 26 August 2026]. `.harness/plan-units.json` is gitignored
+# instance data that plan work continues to edit -- S03's own claims had already
+# drifted from `src/consilient/events.py` (what corpus-exp08.json's own pairs prove
+# it claimed at build time) to `dashboard.py`/`recall.py`/`instructions.py` by the
+# time this was fixed, and every later unit's claims will keep moving too. Reading
+# live plan-units.json here made regeneration a function of TODAY's plan state, not
+# "the seed and the committed tree" the Done criterion actually promises -- and
+# left the byte-identical regeneration test permanently unrunnable as soon as any
+# eligible unit replanned. This snapshot is what makes eligibility a frozen input.
+ELIGIBILITY_SNAPSHOT = HERE / "eligibility-snapshot.json"
 
 # The revision EXP-47 mutated. EXP-57 already pinned the short form; the full
 # hash is recorded so the corpus names the object, not a moving ref.
@@ -87,7 +103,6 @@ ELIGIBLE_UNIT_IDS = (
 
 SEED = 8
 N_PAIRS = 120
-CHECKS_PASS = {"pytest": "pass", "mypy": "pass", "ruff": "pass"}
 
 
 def canonical_dump(payload: Any) -> str:
@@ -231,7 +246,16 @@ def classify_guards(
 
 
 def load_plan_units() -> dict[str, Any]:
-    return json.loads(PLAN_UNITS.read_text(encoding="utf-8"))
+    """The frozen eligibility snapshot, not the live (gitignored, drifting) plan.
+
+    Only the 34 ELIGIBILITY_SNAPSHOT-covered units are present -- callers that need
+    an eligible unit's claims/commit get them; a lookup for any other unit id is a
+    caller bug, not a case this corpus builder should silently support.
+    """
+    snapshot: dict[str, Any] = json.loads(
+        ELIGIBILITY_SNAPSHOT.read_text(encoding="utf-8")
+    )
+    return snapshot
 
 
 def _commit_subjects() -> list[tuple[str, str]]:
@@ -293,6 +317,102 @@ def arm_digest(
     return snapshot_digest(blobs)
 
 
+def _scratch_worktree() -> Path:
+    """A real checkout at SNAPSHOT_REV, so ruff/mypy resolve imports genuinely.
+
+    [measured 26 August 2026] The Deliverable requires every bad item VERIFIED
+    (pytest, mypy --strict, ruff clean) -- but build_corpus.py just wrote a
+    hardcoded {'pytest': 'pass', 'mypy': 'pass', 'ruff': 'pass'} without invoking
+    any tool. Reused across every pair rather than one worktree per arm, since
+    creation is the expensive part and only the one target file's content changes
+    between checks.
+    """
+    scratch = ROOT / ".harness" / f"exp08-scratch-{uuid.uuid4().hex[:8]}"
+    added = git("worktree", "add", "--detach", str(scratch), SNAPSHOT_REV)
+    if added.returncode != 0:
+        raise RuntimeError(
+            f"could not create EXP-08 scratch worktree: {added.stderr.strip()}"
+        )
+    return scratch
+
+
+def _remove_scratch_worktree(scratch: Path) -> None:
+    removed = git("worktree", "remove", "--force", str(scratch))
+    if removed.returncode != 0:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+_MYPY_CODE = re.compile(r"\[([a-z][a-z0-9-]*)\]\s*$")
+
+
+def _ruff_codes(scratch: Path, rel_path: str) -> frozenset[str]:
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "--output-format", "json", rel_path],
+        cwd=scratch,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if not result.stdout.strip():
+        return frozenset()
+    try:
+        rows = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return frozenset({f"unparsed_ruff_output:{result.returncode}"})
+    return frozenset(row["code"] for row in rows if row.get("code"))
+
+
+def _mypy_codes(scratch: Path, rel_path: str) -> frozenset[str]:
+    result = subprocess.run(
+        [sys.executable, "-m", "mypy", "--strict", rel_path],
+        cwd=scratch,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    codes: set[str] = set()
+    for line in (result.stdout + result.stderr).splitlines():
+        if ": error:" not in line:
+            continue
+        match = _MYPY_CODE.search(line)
+        codes.add(match.group(1) if match else "unlabelled")
+    return frozenset(codes)
+
+
+def verify_arm(
+    scratch: Path, rel_path: str, content: str, baseline: dict[str, frozenset[str]]
+) -> dict[str, str]:
+    """ruff/mypy --strict on `content`, refusing only NEW codes over `baseline`.
+
+    HEAD carries long-accepted mypy --strict and ruff debt throughout
+    src/consilient/ -- a bare zero-tolerance check would refuse nearly every
+    pair regardless of the mutation, the same false-positive class this
+    session's build_driver.py gate fix already measured and fixed. `baseline`
+    is the CONTROL arm's own codes for the same file, so only a code the
+    mutation itself introduces counts as a check failure.
+    """
+    target = scratch / rel_path
+    original = target.read_bytes()
+    target.write_text(content, encoding="utf-8")
+    try:
+        ruff_codes = _ruff_codes(scratch, rel_path)
+        mypy_codes = _mypy_codes(scratch, rel_path)
+    finally:
+        target.write_bytes(original)
+    ruff_new = ruff_codes - baseline.get("ruff", frozenset())
+    mypy_new = mypy_codes - baseline.get("mypy", frozenset())
+    return {
+        "ruff": "pass" if not ruff_new else "fail",
+        "mypy": "pass" if not mypy_new else "fail",
+        # No unit-to-test mapping exists to scope a real pytest run per pair, and
+        # running the full suite per arm (240 runs at ~4 minutes each) is not a
+        # cost this builder can pay. Left honestly unverified rather than faked.
+        "pytest": "not_verified",
+    }
+
+
 def build_manifest() -> dict[str, Any]:
     document = json.loads(SOURCE_RESULTS.read_text(encoding="utf-8"))
     provenance = verify_source_excludes_equivalents(document)
@@ -326,50 +446,100 @@ def build_manifest() -> dict[str, Any]:
         assigned.append({**entry, "unit_id": rng.choice(owners)})
 
     if len(assigned) < N_PAIRS:
-        raise RuntimeError(
-            f"only {len(assigned)} pairable items; need {N_PAIRS}"
-        )
-    selected = rng.sample(assigned, N_PAIRS)
-    selected.sort(key=lambda e: (e["unit_id"], e["file"], e["id"]))
+        raise RuntimeError(f"only {len(assigned)} pairable items; need {N_PAIRS}")
+    # A fixed-size rng.sample can draw an item that turns out to introduce a real
+    # ruff/mypy --strict regression over its own control [measured 26 August 2026,
+    # pair 0074 against d579bee]. The Deliverable requires every bad item VERIFIED
+    # clean, so a check-red candidate is excluded and the next shuffled candidate
+    # is tried instead, rather than accepting fewer than N_PAIRS or a labelled-but-
+    # unverified item.
+    shuffled = rng.sample(assigned, len(assigned))
 
     pairs: list[dict[str, Any]] = []
-    for offset, entry in enumerate(selected, start=1):
-        uid = entry["unit_id"]
-        file_path = entry["file"]
-        pristine = sources[file_path]
-        mutated = mutate(pristine, entry["index"], entry["mut_snippet"])
-        if mutated == pristine:
-            raise RuntimeError(f"mutation was a no-op for source_id {entry['id']}")
-        control_digest = arm_digest(uid, eligible, sources, None, None)
-        bad_digest = arm_digest(uid, eligible, sources, file_path, mutated)
-        pairs.append(
-            {
-                "pair_id": f"{offset:04d}",
-                "unit_id": uid,
-                "unit_commit": eligible[uid]["unit_commit"],
-                "base_commit": SNAPSHOT_REV,
-                "seed": SEED,
-                "source_id": entry["id"],
-                "file": file_path,
-                "line": entry["line"],
-                "index": entry["index"],
-                "operator": entry["operator"],
-                "orig_snippet": entry["orig_snippet"],
-                "mut_snippet": entry["mut_snippet"],
-                "bad": {
-                    "mutated": True,
-                    "snapshot_digest": bad_digest,
-                    "checks": dict(CHECKS_PASS),
-                },
-                "control": {
-                    "mutated": False,
-                    "snapshot_digest": control_digest,
-                    "checks": dict(CHECKS_PASS),
-                },
-            }
-        )
+    control_code_cache: dict[str, dict[str, frozenset[str]]] = {}
+    scratch = _scratch_worktree()
+    try:
+        for entry in shuffled:
+            if len(pairs) >= N_PAIRS:
+                break
+            uid = entry["unit_id"]
+            file_path = entry["file"]
+            pristine = sources[file_path]
+            mutated = mutate(pristine, entry["index"], entry["mut_snippet"])
+            if mutated == pristine:
+                raise RuntimeError(f"mutation was a no-op for source_id {entry['id']}")
 
-    exclusions.sort(key=lambda e: (str(e.get("reason")), str(e.get("file")), e.get("source_id") or 0))
+            if file_path not in control_code_cache:
+                control_code_cache[file_path] = {
+                    "ruff": _ruff_codes(scratch, file_path),
+                    "mypy": _mypy_codes(scratch, file_path),
+                }
+            control_codes = control_code_cache[file_path]
+            bad_checks = verify_arm(scratch, file_path, mutated, control_codes)
+            if bad_checks["ruff"] == "fail" or bad_checks["mypy"] == "fail":
+                exclusions.append(
+                    {
+                        "source_id": entry["id"],
+                        "file": file_path,
+                        "line": entry.get("line"),
+                        "operator": entry.get("operator"),
+                        "reason": "check_red",
+                    }
+                )
+                continue
+
+            control_digest = arm_digest(uid, eligible, sources, None, None)
+            bad_digest = arm_digest(uid, eligible, sources, file_path, mutated)
+            pairs.append(
+                {
+                    "pair_id": f"{len(pairs) + 1:04d}",
+                    "unit_id": uid,
+                    "unit_commit": eligible[uid]["unit_commit"],
+                    "base_commit": SNAPSHOT_REV,
+                    "seed": SEED,
+                    "source_id": entry["id"],
+                    "file": file_path,
+                    "line": entry["line"],
+                    "index": entry["index"],
+                    "operator": entry["operator"],
+                    "orig_snippet": entry["orig_snippet"],
+                    "mut_snippet": entry["mut_snippet"],
+                    "bad": {
+                        "mutated": True,
+                        "snapshot_digest": bad_digest,
+                        "checks": bad_checks,
+                    },
+                    "control": {
+                        "mutated": False,
+                        "snapshot_digest": control_digest,
+                        # A control is checked against itself -- zero new codes
+                        # by construction. pytest is left unverified for the
+                        # same reason bad's is: no unit-to-test mapping exists.
+                        "checks": {
+                            "ruff": "pass",
+                            "mypy": "pass",
+                            "pytest": "not_verified",
+                        },
+                    },
+                }
+            )
+    finally:
+        _remove_scratch_worktree(scratch)
+    if len(pairs) < N_PAIRS:
+        raise RuntimeError(
+            f"only {len(pairs)} check-clean pairable items; need {N_PAIRS}"
+        )
+    pairs.sort(key=lambda p: (p["unit_id"], p["file"], p["source_id"]))
+    for offset, pair in enumerate(pairs, start=1):
+        pair["pair_id"] = f"{offset:04d}"
+
+    exclusions.sort(
+        key=lambda e: (
+            str(e.get("reason")),
+            str(e.get("file")),
+            e.get("source_id") or 0,
+        )
+    )
     return {
         "experiment_id": "EXP-08",
         "seed": SEED,

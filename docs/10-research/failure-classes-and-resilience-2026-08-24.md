@@ -519,7 +519,7 @@ Property: escalation must free capacity, not annotate a transcript. There are 23
 in `build_driver.py`, two labelled ESCALATION, writing to a loop transcript with no reader;
 `grep "def escalat"` over `src/consilient/` returns nothing. Check: an escalated unit consumes
 no slot, and a bare `print` containing ESCALATION is a lint failure so the chokepoint cannot be
-bypassed the way jobboard-v2's LLM boundary was. The delivery channel already exists and needs
+bypassed the way the prior private repository's LLM boundary was (the case is `AGENTS.md` working principle 3; the repository is not named here because `check_private_repo_names` is a ratchet and this file is not on it). The delivery channel already exists and needs
 no new module: append the escalation to the trajectory, which `consil record` and
 `consil dashboard` already read. **Explicitly not the remedy: enlarging `MAX_CONCURRENT` to fit
 the backlog.**

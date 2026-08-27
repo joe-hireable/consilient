@@ -18,8 +18,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from consilient import events  # noqa: E402
-from consilient.events import EventError  # noqa: E402
+from consilient import events
+from consilient.events import EventError
 
 ROOT = Path(__file__).resolve().parent.parent
 

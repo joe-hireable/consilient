@@ -151,6 +151,35 @@ def _git(args: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+class _BlobResult:
+    def __init__(self, returncode: int, stdout: str) -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+
+
+def _blob(sha: str, rel: str) -> _BlobResult:
+    """Like `_git(["show", ...])`, but for file content a settled-record comparison reads.
+
+    Passing `text=True` to `subprocess.run` always applies universal-newline translation
+    with no way to opt out (unlike `open()`, `Popen` takes no `newline` argument) -- so
+    \\r\\n silently becomes \\n before this checker ever sees it, making a CRLF-to-LF-only
+    mutation of a settled record invisible to every content comparison below. Capturing raw
+    bytes and decoding by hand keeps the exact line endings a blob actually carries. Scoped
+    to blob reads only: git's own log/diff STRUCTURE (SHAs, name lists, diff headers) is
+    parsed elsewhere by `_git` and depends on universal-newline splitting behaving as before.
+    [measured 26 August 2026]
+    """
+    result = subprocess.run(
+        ["git", "show", f"{sha}:{rel}"],
+        cwd=ROOT,
+        env=GIT_ENV,
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    return _BlobResult(result.returncode, result.stdout.decode("utf-8", errors="replace"))
+
+
 def _experiment_entries(text: str) -> list[tuple[str, int, str, bool]]:
     """Return (id, ordinal, exact section, settled) for ordered EXP headings."""
     starts = list(EXPERIMENT_HEADING.finditer(text))
@@ -174,22 +203,32 @@ def _experiment_entries(text: str) -> list[tuple[str, int, str, bool]]:
 
 
 def _settled_experiment_violation(parent: str, child: str) -> str | None:
+    """A settled entry is identified by (id, ordinal) -- the Nth heading with that id --
+    never by its raw position in the file. Matching by file position let a prior entry
+    with the same id inserted ahead of a settled one silently take over that position,
+    while the untouched settled text merely shifted down: exactly the "replace via a
+    prior entry" laundering this check exists to catch. [measured 25 August 2026]
+    """
     parent_entries = _experiment_entries(parent)
-    child_entries = _experiment_entries(child)
-    for index, (experiment_id, ordinal, entry, settled) in enumerate(parent_entries):
+    child_by_key = {
+        (experiment_id, ordinal): entry
+        for experiment_id, ordinal, entry, _ in _experiment_entries(child)
+    }
+    for experiment_id, ordinal, entry, settled in parent_entries:
         if not settled:
             continue
-        if index >= len(child_entries):
-            return f"{experiment_id}#{ordinal}"
-        child_id, _, child_entry, _ = child_entries[index]
-        if child_id != experiment_id or not child_entry.startswith(entry):
+        child_entry = child_by_key.get((experiment_id, ordinal))
+        if child_entry is None or not child_entry.startswith(entry):
             return f"{experiment_id}#{ordinal}"
     return None
 
 
 def _correction_line(parent: str, child: str) -> int:
-    parent_lines = parent.splitlines()
-    child_lines = child.splitlines()
+    # keepends=True: a bare .splitlines() discards \r\n/\n entirely, so a CRLF-to-LF-only
+    # mutation compares as identical line-for-line and this reports EOF (past the last real
+    # line) instead of the true first differing line. [measured 26 August 2026]
+    parent_lines = parent.splitlines(keepends=True)
+    child_lines = child.splitlines(keepends=True)
     for index, line in enumerate(parent_lines):
         if index >= len(child_lines) or child_lines[index] != line:
             return index + 1
@@ -253,8 +292,8 @@ def check_history() -> tuple[list[str], list[str]]:
             continue
         for rel in adr_paths:
             kind = _record_kind(rel)
-            parent = _git(["show", f"{sha}^:{rel}"])
-            child = _git(["show", f"{sha}:{rel}"])
+            parent = _blob(f"{sha}^", rel)
+            child = _blob(sha, rel)
             if kind == "experiment":
                 if parent.returncode == 0:
                     locator = _settled_experiment_violation(
@@ -292,8 +331,8 @@ def check_history() -> tuple[list[str], list[str]]:
                         if _record_kind(old_rel) == "adr":
                             kind = "adr"
                             rel = old_rel
-                            parent = _git(["show", f"{sha}^:{rel}"])
-                            child = _git(["show", f"{sha}:{rel}"])
+                            parent = _blob(f"{sha}^", rel)
+                            child = _blob(sha, rel)
                         break
             if kind is None:
                 continue

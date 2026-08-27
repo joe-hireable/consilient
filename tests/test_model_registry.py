@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from consilient.harness import (  # noqa: E402
+from consilient.harness import (
     MODELS,
     ModelOption,
     cursor_models_pool_ids,

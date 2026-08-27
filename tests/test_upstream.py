@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from consilient.beta import HUMAN_VERDICT_BETA, admits_human_beta_row, admits_sizing_input
+from consilient.beta import (
+    HUMAN_VERDICT_BETA,
+    UPSTREAM_MAINTAINER_PROXY_BETA,
+    admits_human_beta_row,
+    admits_sizing_input,
+)
 from consilient.harvest import DEFAULT_RELATIVE as HARVEST_DEST
 from consilient.harvest import HarvestError
 from consilient.upstream import (
@@ -32,7 +39,6 @@ from consilient.upstream import (
     submit_contribution,
     verify_host_ci,
 )
-
 
 ROOT = Path(__file__).resolve().parent.parent
 PROHIBITED_CONTRIBUTING = (
@@ -261,10 +267,15 @@ def test_false_accept_among_accepted_is_not_beta_and_cannot_enter_the_gate() -> 
     row = as_meter_row(outcomes[1])
     assert row["estimand_kind"] == ESTIMAND_KIND
     assert row["estimand_kind"] != HUMAN_VERDICT_BETA
+    assert row["estimand_kind"] != UPSTREAM_MAINTAINER_PROXY_BETA
+    assert ESTIMAND_KIND != UPSTREAM_MAINTAINER_PROXY_BETA
+    assert "beta" not in ESTIMAND_KIND.casefold()
     assert not admits_human_beta_row(row)
     assert not admits_sizing_input(row)
     with pytest.raises(UpstreamError, match="not beta"):
         as_meter_row(outcomes[1], estimand_kind=HUMAN_VERDICT_BETA)
+    with pytest.raises(UpstreamError, match="not beta"):
+        as_meter_row(outcomes[1], estimand_kind=UPSTREAM_MAINTAINER_PROXY_BETA)
 
 
 def test_non_response_is_not_evidence_of_quality() -> None:
@@ -283,6 +294,34 @@ def test_non_response_is_not_evidence_of_quality() -> None:
     assert report.verdict == "insufficient_data"
 
 
+def test_silence_is_not_an_accept_or_reject_on_the_meter() -> None:
+    """A PR nobody judged is not evidence of quality, including as a meter row."""
+    silent = record_outcome(
+        contribution_id="c-silence-meter",
+        repository="example/lib",
+        outcome_class="non_response",
+        maintainer_words="",
+        dest=Path("."),
+        root=ROOT,
+        persist=False,
+    )
+    stale = record_outcome(
+        contribution_id="c-stale-meter",
+        repository="example/lib",
+        outcome_class="closed_without_decision",
+        maintainer_words="Closing as stale.",
+        dest=Path("."),
+        root=ROOT,
+        persist=False,
+    )
+    for outcome in (silent, stale):
+        row = as_meter_row(outcome)
+        assert row["human_verdict"] not in {"accept", "reject"}
+        assert row["estimand_kind"] == ESTIMAND_KIND
+        assert not admits_human_beta_row(row)
+        assert not admits_sizing_input(row)
+
+
 def test_harvested_outcomes_are_untracked_instance_data() -> None:
     ignored = Path(".gitignore").read_text(encoding="utf-8")
     assert ".harness/training/" in ignored
@@ -290,6 +329,18 @@ def test_harvested_outcomes_are_untracked_instance_data() -> None:
 
     assert DEFAULT_RELATIVE == HARVEST_DEST
     assert DEFAULT_RELATIVE.as_posix() == ".harness/training"
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    tracked = subprocess.run(
+        ["git", "ls-files", ".harness/training/"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=True,
+        cwd=ROOT,
+    ).stdout.split()
+    assert tracked == []
 
 
 def test_persist_refuses_a_path_git_would_publish(tmp_path: Path) -> None:

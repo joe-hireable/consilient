@@ -91,7 +91,10 @@ def _commitment(domain: str) -> dict[str, str]:
 
 
 def _broker(name: str) -> dict[str, str]:
-    return {"kind": "broker_reference", "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}"}
+    return {
+        "kind": "broker_reference",
+        "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}",
+    }
 
 
 def _manifest(
@@ -177,6 +180,34 @@ def _import_statement_modules(source: str) -> set[str]:
     return found
 
 
+def _call_import_target(node: ast.Call) -> str | None:
+    """The module name a `__import__(...)` / `importlib.import_module(...)` call names.
+
+    MEASURED 26 August 2026: `_LIVE = __import__('subprocess')` reaches the exact same
+    live handle as `import subprocess`, but is a Call node, not Import/ImportFrom, so the
+    statement-only scan below missed it entirely -- the same class of gap the module
+    docstring already names for the getframe escape, except this one governs the product
+    tree's own "no live handle" claim, which the suite does not treat as an honest residual.
+    """
+    func = node.func
+    name = None
+    if isinstance(func, ast.Name) and func.id == "__import__":
+        name = "__import__"
+    elif (
+        isinstance(func, ast.Attribute)
+        and func.attr == "import_module"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "importlib"
+    ):
+        name = "import_module"
+    if name is None or not node.args:
+        return None
+    arg = node.args[0]
+    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+        return arg.value.split(".", 1)[0]
+    return None
+
+
 def _product_imports(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     found: set[str] = set()
@@ -185,6 +216,10 @@ def _product_imports(path: Path) -> set[str]:
             found.update(alias.name.split(".", 1)[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             found.add(node.module.split(".", 1)[0])
+        elif isinstance(node, ast.Call):
+            target = _call_import_target(node)
+            if target:
+                found.add(target)
     return found
 
 
@@ -301,7 +336,9 @@ def test_unknown_tool_is_class_4_even_when_it_looks_harmless() -> None:
     assert classify_reversibility("", "read") == 4
 
 
-def test_every_registered_pair_still_classifies_under_adversarial_default_facts() -> None:
+def test_every_registered_pair_still_classifies_under_adversarial_default_facts() -> (
+    None
+):
     for (kind, name), family in REGISTERED_TOOLS.items():
         assert classify_reversibility(kind, name) == _default_class(family)
 
@@ -325,10 +362,30 @@ def test_product_classifier_and_admission_have_no_live_irreversible_handle() -> 
     banned = {"subprocess", "socket", "http", "urllib", "requests", "httpx"}
     for name in ("capabilities.py", "effects.py"):
         imported = _product_imports(PRODUCT / name)
-        assert not (imported & banned), f"{name} grew a live handle: {imported & banned}"
+        assert not (imported & banned), (
+            f"{name} grew a live handle: {imported & banned}"
+        )
     assert classify_reversibility.__code__.co_consts is not None
     # A label, not a callable tool: no handle is returned.
     assert classify_reversibility("tool", "webfetch") == 4
+
+
+def test_product_scan_catches_a_dunder_import_live_handle(tmp_path: Path) -> None:
+    """MEASURED 26 August 2026: `_LIVE = __import__('subprocess')` reached a live
+    subprocess handle in the product tree while the full 52-test suite stayed green,
+    because `_product_imports` walked only Import/ImportFrom. The scan now also follows
+    `__import__(...)` and `importlib.import_module(...)` calls.
+    """
+    live_handle = tmp_path / "planted.py"
+    live_handle.write_text("_LIVE = __import__('subprocess')\n", encoding="utf-8")
+    assert _product_imports(live_handle) == {"subprocess"}
+
+    import_module_handle = tmp_path / "planted_importlib.py"
+    import_module_handle.write_text(
+        "import importlib\n_LIVE = importlib.import_module('socket')\n",
+        encoding="utf-8",
+    )
+    assert "socket" in _product_imports(import_module_handle)
 
 
 def test_classifier_is_not_an_admission_chokepoint() -> None:
@@ -361,7 +418,9 @@ def test_admission_residual_network_call_can_execute_as_observation() -> None:
     assert result.disposition == "execute"
 
 
-def test_protected_irreversible_effects_do_not_execute_without_standing_authority() -> None:
+def test_protected_irreversible_effects_do_not_execute_without_standing_authority() -> (
+    None
+):
     for effect in (
         "money.commit",
         "message.send",

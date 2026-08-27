@@ -1,5 +1,11 @@
 # Autonomous QA: one command, defect classes, personas, bounded adversarial generation
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 3 (personas as falsifiers) and EXP-96's unclassifiable threshold.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 - **Status:** implemented in `scripts/qa_battery.py` and `scripts/persona_qa.py`; R34 remains
   **PARTIAL** until sandboxes and a first-class `consil` surface ship. [measured]
 - **Satisfies:** R34 obligation for a QA R&D pipeline with synthetic users, seeded faults and
@@ -49,7 +55,7 @@ A finding is a **failing check with a reproduction**, or it is not reported as a
 
 ## 3. Personas (falsifiers, not confirmers)
 
-Four principal-named types exercise the **product** through real CLI surfaces. Each records:
+Four principal-named types exercise the **product** through real CLI surfaces. Each records: [asserted]
 
 - **attempted** — the wrong answer it tried to get accepted
 - **system_response** — what the system did
@@ -63,7 +69,7 @@ Four principal-named types exercise the **product** through real CLI surfaces. E
 | researcher | Cite register figure without reproducible script | Reference vs artefact execution |
 | operator | Accept false-zero beta or undocumented ceilings | CLI state vs documentation |
 
-`operator` cold-directory check: `consil beta` must refuse (exit 2), not report zero.
+`operator` cold-directory check: `consil beta` must refuse (exit 2), not report zero. [asserted]
 
 ## 4. Adversarial generation (bounded)
 

@@ -48,7 +48,50 @@ def test_email_without_egress_authorisation_does_not_send() -> None:
             subject="s",
             text="hello",
             authorise_egress="",
+            disclosure="told the recipient in advance",
             environ=_email_env(),
+            sender=sender,
+        )
+    assert calls == []
+
+
+def test_email_without_disclosure_does_not_send() -> None:
+    """B1: disclosure is required for every outbound message.send effect."""
+    calls: list[int] = []
+
+    def sender(**_kwargs: object) -> str:
+        calls.append(1)
+        return "<id@x>"
+
+    with pytest.raises(OutboundError, match="disclosure"):
+        send_email(
+            to="a@b.c",
+            subject="s",
+            text="hello",
+            authorise_egress="notify",
+            disclosure="",
+            environ=_email_env(),
+            sender=sender,
+        )
+    assert calls == []
+
+
+def test_sms_without_disclosure_does_not_send() -> None:
+    """B1: disclosure is required for every outbound message.send effect."""
+    calls: list[int] = []
+
+    def sender(**_kwargs: object) -> str:
+        calls.append(1)
+        return "SMxxx"
+
+    with pytest.raises(OutboundError, match="disclosure"):
+        send_sms(
+            to="+447000000001",
+            text="hello",
+            authorise_egress="wake Joe",
+            authorise_spend="Twilio SMS 0.04 GBP",
+            disclosure="",
+            environ=_sms_env(),
             sender=sender,
         )
     assert calls == []
@@ -67,6 +110,7 @@ def test_sms_without_spend_authorisation_does_not_send() -> None:
             text="hello",
             authorise_egress="wake Joe",
             authorise_spend=None,
+            disclosure="told the recipient in advance",
             environ=_sms_env(),
             sender=sender,
         )
@@ -80,6 +124,7 @@ def test_sms_spend_note_must_name_twilio_and_an_amount() -> None:
             text="hello",
             authorise_egress="wake Joe",
             authorise_spend="just send it",
+            disclosure="told the recipient in advance",
             environ=_sms_env(),
             sender=lambda **_k: "SMxxx",
         )
@@ -92,6 +137,7 @@ def test_missing_credentials_fail_closed() -> None:
             subject="s",
             text="hello",
             authorise_egress="notify",
+            disclosure="told the recipient in advance",
             environ={},
             sender=lambda **_k: "<id@x>",
         )
@@ -101,6 +147,7 @@ def test_missing_credentials_fail_closed() -> None:
             text="hello",
             authorise_egress="wake Joe",
             authorise_spend="Twilio SMS 0.04 GBP",
+            disclosure="told the recipient in advance",
             environ={},
             sender=lambda **_k: "SMxxx",
         )
@@ -113,6 +160,7 @@ def test_verdict_shaped_body_is_refused() -> None:
             subject="s",
             text=json.dumps({"human_decision": "verdict", "human_verdict": "accept"}),
             authorise_egress="notify",
+            disclosure="told the recipient in advance",
             environ=_email_env(),
             sender=lambda **_k: "<id@x>",
         )
@@ -122,6 +170,7 @@ def test_verdict_shaped_body_is_refused() -> None:
             text=json.dumps({"event": "approval"}),
             authorise_egress="wake Joe",
             authorise_spend="Twilio SMS 0.04 GBP",
+            disclosure="told the recipient in advance",
             environ=_sms_env(),
             sender=lambda **_k: "SMxxx",
         )
@@ -139,6 +188,7 @@ def test_dry_run_does_not_call_the_sender() -> None:
         text="hello",
         authorise_egress="wake Joe",
         authorise_spend="Twilio SMS 0.04 GBP",
+        disclosure="told the recipient in advance",
         environ=_sms_env(),
         sender=sender,
         dry_run=True,
@@ -155,12 +205,14 @@ def test_email_records_message_id_artefact() -> None:
         subject="harvest ran",
         text="32 examples written",
         authorise_egress="notify Joe the harvest ran",
+        disclosure="told the recipient in advance",
         environ=_email_env(),
         sender=lambda **_k: "<abc@consilient.local>",
     )
     assert event["event"] == "transport.outbound"
     assert event["data"]["artefact"] == "<abc@consilient.local>"
     assert event["data"]["transport_name"] == "email"
+    assert event["data"]["disclosure"] == "told the recipient in advance"
     assert "human_decision" not in event["data"]
     assert "human_verdict" not in event["data"]
 
@@ -171,14 +223,18 @@ def test_sms_records_sid_artefact() -> None:
         text="harvest ran",
         authorise_egress="wake Joe",
         authorise_spend="Twilio SMS notification 0.04 GBP",
+        disclosure="told the recipient in advance",
         environ=_sms_env(),
         sender=lambda **_k: "SMrealartefact",
     )
     assert event["data"]["artefact"] == "SMrealartefact"
     assert event["data"]["authorise_spend"].startswith("Twilio")
+    assert event["data"]["disclosure"] == "told the recipient in advance"
 
 
-def test_cli_appends_only_when_not_dry_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_appends_only_when_not_dry_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from consilient_connectors import outbound as ob
 
     captured: dict[str, object] = {}
@@ -190,6 +246,7 @@ def test_cli_appends_only_when_not_dry_run(tmp_path: Path, monkeypatch: pytest.M
             subject=str(kwargs["subject"]),
             text=str(kwargs["text"]),
             authorise_egress=str(kwargs["authorise_egress"]),
+            disclosure=str(kwargs["disclosure"]),
             environ=_email_env(),
             sender=lambda **_k: "<cli@consilient.local>",
             dry_run=bool(kwargs["dry_run"]),
@@ -207,6 +264,8 @@ def test_cli_appends_only_when_not_dry_run(tmp_path: Path, monkeypatch: pytest.M
             "hello",
             "--authorise-egress",
             "notify",
+            "--disclosure",
+            "told the recipient in advance",
             "--log",
             str(tmp_path),
             "--dry-run",
@@ -226,6 +285,8 @@ def test_cli_appends_only_when_not_dry_run(tmp_path: Path, monkeypatch: pytest.M
             "hello",
             "--authorise-egress",
             "notify",
+            "--disclosure",
+            "told the recipient in advance",
             "--log",
             str(tmp_path),
         ]

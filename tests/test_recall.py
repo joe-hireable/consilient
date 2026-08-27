@@ -312,7 +312,10 @@ def test_limit_chars_must_be_positive(tmp_path):
     with pytest.raises(ValueError, match="limit_chars"):
         pack(log_dir, query="", limit_chars=0)
 
-def test_assemble_shrinks_its_scan_window_rather_than_dying_on_a_long_trajectory(tmp_path):
+
+def test_assemble_shrinks_its_scan_window_rather_than_dying_on_a_long_trajectory(
+    tmp_path,
+):
     """A growing trajectory must not kill every dispatch at startup.
 
     The recall receipt carries one entry per omitted event, so it grows with the whole log.
@@ -326,40 +329,363 @@ def test_assemble_shrinks_its_scan_window_rather_than_dying_on_a_long_trajectory
     """
     from consilient import instructions
 
-    log = tmp_path / 'log'
+    log = tmp_path / "log"
     log.mkdir()
-    day = log / '2026-08-23.jsonl'
-    lines = [json.dumps({
-        'v': events.SCHEMA_VERSION,
-        'ts': '2026-08-23T11:59:59+00:00',
-        'event': 'review.recorded',
-        'actor': 'test',
-        'data': {'dissent': 'protected dissent survives the scan window'},
-    })]
+    day = log / "2026-08-23.jsonl"
+    lines = [
+        json.dumps(
+            {
+                "v": events.SCHEMA_VERSION,
+                "ts": "2026-08-23T11:59:59+00:00",
+                "event": "review.recorded",
+                "actor": "test",
+                "data": {"dissent": "protected dissent survives the scan window"},
+            }
+        )
+    ]
     for i in range(899):
-        lines.append(json.dumps({
-            'v': events.SCHEMA_VERSION,
-            'ts': '2026-08-23T12:00:00+00:00',
-            'event': 'note.recorded',
-            'actor': 'test',
-            'data': {'text': 'padding ' * 20, 'n': i},
-        }))
-    day.write_text(chr(10).join(lines) + chr(10), encoding='utf-8')
+        lines.append(
+            json.dumps(
+                {
+                    "v": events.SCHEMA_VERSION,
+                    "ts": "2026-08-23T12:00:00+00:00",
+                    "event": "note.recorded",
+                    "actor": "test",
+                    "data": {"text": "padding " * 20, "n": i},
+                }
+            )
+        )
+    day.write_text(chr(10).join(lines) + chr(10), encoding="utf-8")
 
-    skills = tmp_path / 'skills'
+    skills = tmp_path / "skills"
     skills.mkdir()
-    assembly = instructions.assemble(skills, log, task='a task that needs recent history')
+    assembly = instructions.assemble(
+        skills, log, task="a task that needs recent history"
+    )
     assert assembly is not None
 
     text = None
-    for attr in ('recall', 'recall_pack', 'recall_text'):
+    for attr in ("recall", "recall_pack", "recall_text"):
         if hasattr(assembly, attr):
             text = getattr(assembly, attr)
             break
-    assert text, 'the assembly must carry a recall pack'
-    assert 'protected dissent survives the scan window' in text
+    assert text, "the assembly must carry a recall pack"
+    assert "protected dissent survives the scan window" in text
     got = parse_receipt(text)
-    assert got['scan_complete'] is False, (
-        'a window smaller than the log must not be reported as a complete scan'
+    assert got["scan_complete"] is False, (
+        "a window smaller than the log must not be reported as a complete scan"
     )
-    assert 0 < got['scanned_universe_count'] < 900
+    scanned_universe_count = got["scanned_universe_count"]
+    assert isinstance(scanned_universe_count, int)
+    assert 0 < scanned_universe_count < 900
+
+
+def _skills_dir(root: Path) -> Path:
+    skills = root / "skills"
+    skills.mkdir()
+    return skills
+
+
+def _oversized_dispatch_outcome(
+    *, event_id: str, padding: int = 9000, **data: object
+) -> Event:
+    payload: dict[str, object] = {
+        "supervised": True,
+        "unit": "Z07",
+        "harness": "cursor-composer",
+        "status": "failed",
+        "reason": "START_FAILED -- no artefact within the start window",
+        "task": "make the recall pack carry something",
+        "padding": "x" * padding,
+    }
+    payload.update(data)
+    return Event(
+        _event(
+            event_id=event_id,
+            event="dispatch.outcome",
+            actor="consilient.dispatch",
+            data=payload,
+        )
+    )
+
+
+def _oversized_capability_gap(*, event_id: str, padding: int = 9000) -> Event:
+    return Event(
+        _event(
+            event_id=event_id,
+            event="capability.gap",
+            actor="consilient.dispatch",
+            data={
+                "asked": "assemble a brief",
+                "attempted": "recall.pack_events",
+                "failure": "not_implemented",
+                "detail": "selection dropped every candidate",
+                "repair": "project a summary when the full event does not fit",
+                "run_id": "20260825T181844-f65a16fcf4",
+                "source": "dispatch.outcome",
+                "closure": "escalate",
+                "padding": "y" * padding,
+            },
+        )
+    )
+
+
+def test_oversized_event_is_represented_by_a_summary_rather_than_dropped() -> None:
+    event_id = "00000000-0000-4000-8000-000000000107"
+    event = _oversized_dispatch_outcome(event_id=event_id)
+    formatted = recall._format_event(event)
+    assert len(formatted) > 8000
+
+    selection = recall.select_events([event], query="", limit_chars=8000)
+
+    assert event_id in selection.selected_event_ids
+    assert selection.selected_forms == (recall.SUMMARY_FORM,)
+    assert "cursor-composer" in selection.text
+    assert "START_FAILED -- no artefact within the start window" in selection.text
+    assert "Z07" in selection.text
+    assert "(summary)" in selection.text
+    assert ("x" * 200) not in selection.text
+    receipt = parse_receipt(selection.text)
+    assert receipt["selected_ids"] == [event_id]
+    assert receipt["selected_forms"] == [recall.SUMMARY_FORM]
+    full_digest = recall._selected_digest([event], (recall.FULL_FORM,))
+    assert selection.selected_digest != full_digest
+    assert selection.selected_digest == recall._selected_digest(
+        [event], (recall.SUMMARY_FORM,)
+    )
+
+
+def test_capability_gap_summary_carries_capability_and_gap() -> None:
+    event_id = "00000000-0000-4000-8000-000000000108"
+    event = _oversized_capability_gap(event_id=event_id)
+    selection = recall.select_events([event], query="", limit_chars=8000)
+    assert event_id in selection.selected_event_ids
+    assert selection.selected_forms == (recall.SUMMARY_FORM,)
+    assert "recall.pack_events" in selection.text
+    assert "selection dropped every candidate" in selection.text
+    assert ("y" * 200) not in selection.text
+
+
+def test_empty_pack_while_events_were_available_is_a_reported_outcome() -> None:
+    event = Event(
+        _event(
+            event_id="00000000-0000-4000-8000-000000000109",
+            event="note.recorded",
+            data={"topic": "crowd", "padding": "z" * 9000},
+        )
+    )
+    selection = recall.select_events([event], query="crowd", limit_chars=8000)
+    assert selection.selected_event_ids == ()
+    assert selection.empty_while_available is True
+    assert "empty_while_available" in selection.text
+    receipt = parse_receipt(selection.text)
+    assert receipt["semantic_status"] == "empty_while_available"
+    assert receipt["selected_ids"] == []
+
+
+def test_privileged_event_is_not_admitted_as_a_summary() -> None:
+    event = _oversized_dispatch_outcome(
+        event_id="00000000-0000-4000-8000-000000000110",
+        sentinel_score=1,
+    )
+    selection = recall.select_events([event], query="", limit_chars=8000)
+    assert selection.selected_event_ids == ()
+    assert all(omission.reason == "sentinel" for omission in selection.omissions)
+    assert "(summary)" not in selection.text
+
+
+def test_assemble_returns_a_non_empty_pack_for_oversized_always_include_events(
+    tmp_path: Path,
+) -> None:
+    from consilient import instructions
+
+    log = tmp_path / "log"
+    log.mkdir()
+    events.append(
+        log / "2026-08-25.jsonl",
+        _oversized_dispatch_outcome(
+            event_id="00000000-0000-4000-8000-000000000111"
+        ).raw,
+    )
+    events.append(
+        log / "2026-08-25.jsonl",
+        _oversized_capability_gap(event_id="00000000-0000-4000-8000-000000000112").raw,
+    )
+    assembly = instructions.assemble(
+        _skills_dir(tmp_path), log, task="carry a recall sentence"
+    )
+    assert assembly.recall_selection.selected_event_ids
+    assert recall.SUMMARY_FORM in assembly.recall_selection.selected_forms
+    assert "cursor-composer" in assembly.recall_pack
+    assert len(assembly.recall_pack.strip()) > 160
+
+
+def test_reconstruct_matches_a_full_event_and_a_summary_event(tmp_path: Path) -> None:
+    """`instructions.verify` is not a symbol; reconstruct is the replay check."""
+    from consilient import instructions
+
+    log = tmp_path / "log"
+    log.mkdir()
+    skills = _skills_dir(tmp_path)
+    events.append(
+        log / "2026-08-25.jsonl",
+        _event(
+            event_id="00000000-0000-4000-8000-000000000113",
+            event="note.recorded",
+            data={"body": "small enough to travel as a full event"},
+        ),
+    )
+    before = instructions.assemble(skills, log, task="small enough to travel")
+    instructions.record_assembly(log, before, task="small enough to travel")
+    replayed_before = instructions.reconstruct(log, skills, before.sha256)
+    assert replayed_before.ok, [
+        layer for layer in replayed_before.layers if not layer.ok
+    ]
+    assert before.recall_selection.selected_forms in ((), (recall.FULL_FORM,))
+
+    events.append(
+        log / "2026-08-25.jsonl",
+        _oversized_dispatch_outcome(
+            event_id="00000000-0000-4000-8000-000000000114"
+        ).raw,
+    )
+    after = instructions.assemble(skills, log, task="small enough to travel")
+    instructions.record_assembly(log, after, task="small enough to travel")
+    replayed_after = instructions.reconstruct(log, skills, after.sha256)
+    assert replayed_after.ok, [layer for layer in replayed_after.layers if not layer.ok]
+    assert recall.SUMMARY_FORM in after.recall_selection.selected_forms
+
+
+def test_many_oversized_events_still_select_summaries() -> None:
+    """A fat receipt must not evict every summary. [measured] live scan: 201 omitted."""
+    crowd = [
+        _oversized_dispatch_outcome(
+            event_id=f"00000000-0000-4000-8000-{index:012d}",
+            padding=9000,
+        )
+        for index in range(201)
+    ]
+    selection = recall.select_events(crowd, query="", limit_chars=8000)
+    assert selection.selected_event_ids, (
+        "an empty pack while 201 oversized outcomes were available is the defect"
+    )
+    assert recall.SUMMARY_FORM in selection.selected_forms
+    assert "cursor-composer" in selection.text
+
+
+def _live_shaped_dispatch_outcome(
+    *, event_id: str, task: str, harness: str = "grok"
+) -> Event:
+    """Match the measured live schema: no `unit`, `task` is the whole brief."""
+    return Event(
+        _event(
+            event_id=event_id,
+            event="dispatch.outcome",
+            actor="consilient.dispatch",
+            data={
+                "artefact_bytes": 0,
+                "assembly_id": "assembly-live-shape",
+                "command": ["grok", "--always-approve"],
+                "cwd": ".",
+                "diff_bytes": 0,
+                "duration_s": 1.0,
+                "exit_code": 0,
+                "family": "grok",
+                "harness": harness,
+                "output_records": 0,
+                "pool": "grok",
+                "reason": "produced an artefact",
+                "run_id": "20260826T195704-4516332bf0",
+                "status": "ok",
+                "supervised": True,
+                "task": task,
+                "timed_out": False,
+            },
+        )
+    )
+
+
+def test_summary_does_not_inline_a_task_field_larger_than_the_budget() -> None:
+    """Live dispatch.outcome has no `unit`; `task` is the brief, often >8 KB.
+
+    Measured 26 August 2026 over 1,476 outcomes: zero carry `unit`, task median
+    5,079 characters / max 16,923, 677 exceed RECALL_LIMIT_CHARS. Falling back to
+    the full task makes the 'summary' larger than the pack, so the shrink loop
+    still drops every candidate. [measured]
+    """
+    title = "# Build Z07 exactly as the plan specifies. Test-first, one commit."
+    body = "brief-body-padding " * 500
+    event = _live_shaped_dispatch_outcome(
+        event_id="00000000-0000-4000-8000-000000000201",
+        task=f"{title}\n\n{body}",
+    )
+    assert len(event.data["task"]) > 8000
+
+    selection = recall.select_events([event], query="", limit_chars=8000)
+
+    assert event.raw["event_id"] in selection.selected_event_ids
+    assert selection.selected_forms == (recall.SUMMARY_FORM,)
+    assert "grok" in selection.text
+    assert "produced an artefact" in selection.text
+    assert title in selection.text
+    assert "brief-body-padding " * 8 not in selection.text
+    assert len(selection.text) <= 8000
+
+
+def test_a_single_line_task_larger_than_the_budget_is_clipped_not_dropped() -> None:
+    event = _live_shaped_dispatch_outcome(
+        event_id="00000000-0000-4000-8000-000000000202",
+        task="T" * 9000,
+    )
+    selection = recall.select_events([event], query="", limit_chars=8000)
+    assert event.raw["event_id"] in selection.selected_event_ids
+    assert selection.selected_forms == (recall.SUMMARY_FORM,)
+    assert ("T" * 400) not in selection.text
+    assert "T" * 40 in selection.text
+
+
+def test_capability_gap_summary_clips_an_oversized_detail_field() -> None:
+    event = Event(
+        _event(
+            event_id="00000000-0000-4000-8000-000000000203",
+            event="capability.gap",
+            actor="consilient.dispatch",
+            data={
+                "asked": "A" * 9000,
+                "attempted": "recall.pack_events",
+                "failure": "not_implemented",
+                "detail": "selection dropped every candidate\n"
+                + ("gap-detail-padding " * 500),
+                "repair": "project a summary when the full event does not fit",
+                "run_id": "20260826T195704-4516332bf0",
+                "source": "dispatch.outcome",
+                "closure": "escalate",
+            },
+        )
+    )
+    selection = recall.select_events([event], query="", limit_chars=8000)
+    assert event.raw["event_id"] in selection.selected_event_ids
+    assert selection.selected_forms == (recall.SUMMARY_FORM,)
+    assert "recall.pack_events" in selection.text
+    assert "gap-detail-padding " * 8 not in selection.text
+    assert ("A" * 400) not in selection.text
+
+
+def test_live_shaped_crowd_is_not_an_empty_pack() -> None:
+    """The 201-omission live scan is this shape, not a short unit plus padding."""
+    title = "# Build Z07 exactly as the plan specifies. Test-first, one commit."
+    crowd = [
+        _live_shaped_dispatch_outcome(
+            event_id=f"00000000-0000-4000-8000-{index:012d}",
+            task=f"{title}\n\n" + ("brief-body-padding " * 500),
+        )
+        for index in range(201)
+    ]
+    selection = recall.select_events(crowd, query="", limit_chars=8000)
+    assert selection.selected_event_ids, (
+        "an empty pack while 201 live-shaped outcomes were available is the defect"
+    )
+    assert recall.SUMMARY_FORM in selection.selected_forms
+    assert title in selection.text
+    assert "brief-body-padding " * 8 not in selection.text
+    assert len(selection.selected_event_ids) > 1

@@ -43,6 +43,8 @@ import sys
 from pathlib import Path
 
 # Forty hex characters, delimited so ordinary hex blobs and digests do not match by accident.
+from urllib.parse import unquote
+
 SHA_RE = re.compile(r"(?<![0-9a-fA-F])[0-9a-f]{40}(?![0-9a-fA-F])")
 
 # Paths whose whole purpose is to record identifiers of THIS repository, or to document the rule.
@@ -223,6 +225,19 @@ def scan(paths: list[str]) -> list[tuple[str, set[str]]]:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        # PERCENT-DECODE FIRST. MEASURED 27 August 2026 by a pre-publication audit: a tracked
+        # document carried a 40-hex upstream revision with its final character written `%39`,
+        # and said in plain prose on the same line that it was encoded "so the public-repository
+        # foreign-identifier gate does not mistake cited upstream provenance for a private
+        # commit". A working, documented technique for evading the one check that exists because
+        # 71 private commit identifiers leaked. It defeated an independent hand-written sweep the
+        # same day for the identical reason: `[0-9a-f]{40}` does not match across a `%39`.
+        #
+        # The encoding was not even necessary -- `strip_public_citations` already exempts a
+        # permalink into a public forge, which is what that line was. But a gate that any
+        # contributor can step around by escaping one character is not a gate, and the escape
+        # was written down where the next person would copy it.
+        text = unquote(text)
         text, cited_here = strip_public_citations(text)
         cited.update(cited_here)
         foreign = set()

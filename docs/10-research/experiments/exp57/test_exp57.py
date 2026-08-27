@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import run_exp57 as R  # noqa: E402
+import run_exp57 as R
 
 
 # ------------------------------------------------------------------------- statistics

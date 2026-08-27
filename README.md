@@ -144,7 +144,7 @@ it cannot route, block or accept anything, and a test asserts the CLI exposes no
 could. Everything past instrumentation is gated on ADR-0015 Gate A, which has not been passed.
 
 <!-- BEGIN GENERATED: scripts/build_counts.py#inventory -->
-105 ADRs, 114 registered experiments, 13 invariant checks in CI.
+106 ADRs, 116 registered experiments, 13 invariant checks in CI.
 <!-- END GENERATED: scripts/build_counts.py#inventory -->
 
 ## What it is for
@@ -198,7 +198,7 @@ to recover. It assumes none of the vocabulary below.
 3. [`docs/10-research/findings.md`](docs/10-research/findings.md) — the simulations
 4. [`docs/10-research/experiment-register.md`](docs/10-research/experiment-register.md) —
 <!-- BEGIN GENERATED: scripts/build_counts.py#experiments -->
-114 experiments with stopping rules
+116 experiments with stopping rules
 <!-- END GENERATED: scripts/build_counts.py#experiments -->
 5. [`docs/00-context/open-questions.md`](docs/00-context/open-questions.md) — what's still open
 

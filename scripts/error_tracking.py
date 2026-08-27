@@ -181,7 +181,7 @@ def sentry_request(record: object, dsn: str) -> Request:
 
 def send(request: Request, *, timeout: float = 5.0) -> None:
     """Send one optional export after its local record has been persisted."""
-    with urlopen(request, timeout=timeout) as response:  # noqa: S310 - URL is explicit
+    with urlopen(request, timeout=timeout) as response:
         status = getattr(response, "status", 200)
         if not 200 <= status < 300:
             raise ErrorRecordError(f"export returned HTTP {status}")

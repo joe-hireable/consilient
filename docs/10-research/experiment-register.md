@@ -6450,6 +6450,57 @@ procedural defences are weaker than structural ones. [asserted]
 
 **Status:** BLOCKED on the guard backlog. [measured 23 August 2026]
 
+### EXP-144 · Can β be measured on upstream maintainer verdicts when submission is decoupled from the composite verifier? `BLOCKED: upstream contribution collector and maintainer verdict join`
+
+**Decides:** whether the admission-bar protocol yields an honestly declarable β among changes
+submitted to external projects after passing a minimal bar that is **not** our composite verifier.
+[asserted] It does not decide whether third-party maintainer verdicts feed Gate A — that is ADR-0106
+and remains the principal's until accepted. It does not open any gate.
+
+**Why this exists.** Submitting only what our composite verifier accepted conditions the sample on
+the verifier's own outcome: every rejected row carries `verifier_accept=True` and β is 1 by
+construction — `beta.py` names that failure and the rendered output prints
+`NOT a bound: sampling not declared unconditioned on the verifier`. [measured] The fix is to decide
+to submit **before** the composite verifier runs, while still gating submission on a pre-declared
+**admission bar** that is explicitly not the composite verifier: the host project's CI passes, the
+change builds, and the contribution is one that project actually wants. The composite verifier
+verdict is recorded separately and must not influence whether we submit.
+
+**Estimand.** β conditional on passing the admission bar, among contributions to named external
+repositories in task family `upstream_contribution`. Rows are recorded under estimand kind
+`upstream_maintainer_proxy_beta` until ADR-0106 is accepted; they cannot reach the gate quantity
+without a one-line kind switch.
+
+**Admission bar (pre-registered).** An artefact is admitted when all hold: (1) it builds under the
+host project's toolchain; (2) the host project's existing automated suite passes on the submission
+commit; (3) the change is a contribution the project solicits (not drive-by or unwanted); (4) the
+submission timestamp is recorded before the composite verifier verdict timestamp. Abuse prohibition:
+never submit work that is not wanted on its own merits; never weaken a contribution to see whether
+the verifier catches it — deliberately weak PRs are not drawn from the harness distribution and
+measure nothing.
+
+**Classification rule.** Three fields are stored separately: `verifier_accept` (composite
+verifier), `upstream_ci_outcome` (`pass` | `fail`), and `human_decision` (`merge` | `reject` | …).
+Only a maintainer's correctness rejection enters the β numerator. A PR closed because upstream CI
+went red is **not** a human correctness verdict. Rejections for scope, roadmap, staleness,
+duplication or house style are judgements of **fit** (`rejection_kind=fit`) and are excluded. The
+maintainer's own words are stored verbatim; the agent that authored the PR may not classify its own
+rejection.
+
+**Self-check — rejection-fraction floor.** Report with every figure the fraction of **admitted**
+artefacts that the composite verifier rejects. If the admission bar is nearly as strong as the
+composite verifier, that fraction approaches zero, variation collapses, and β returns to 1 by a
+slower route. **Floor: 0.05** — below this the honest output is `insufficient_data` and the protocol
+is declared failed, not reported with a caveat. [asserted] Do not lower `MIN_REJECTIONS` to make a
+figure reportable.
+
+**Stopping rule, fixed in advance.** Report β with a Wilson interval only when there are at least
+30 maintainer correctness rejections among admitted rows **and** the composite rejection fraction
+is at or above 0.05. Kill the protocol if the rejection fraction stays below 0.05 after 50 admitted
+submissions. Report inconclusive if 50 admitted rows accumulate without 30 correctness rejections.
+
+**Status:** BLOCKED on collector and maintainer-verdict join. [asserted]
+
 ### EXP-142 - Are a held-out contract suite's errors independent of the checks' errors, or do they fail on the same artefacts? `BLOCKED: no held-out contract exists, and no isolation check enforces that a builder cannot read one`
 
 **Decides:** whether ADR-0103's contract-beta is admissible as the Gate A1 quantity, or is biased in
@@ -6755,4 +6806,96 @@ stand in for harness-family β. [asserted]
 
 **Status:** READY — the collector and its refusal tests exist; no live row has been recorded.
 [measured 25 August 2026]
+
+### EXP-146 · Does `CLAUDE_CONFIG_DIR` isolate a Claude Code sign-in session, or does it leak through `~/.claude.json`? `IN PROGRESS`
+
+**Allocated 26 August 2026**, alongside ADR-0108's registration of harness account rotation as
+PROVISIONAL. [asserted] This is the one open technical fact ADR-0108's Claude support rests
+on; nothing routes a second Claude account into dispatch until this returns clean. [asserted]
+
+**Decides:** whether `CLAUDE_CONFIG_DIR` alone gives two independently-authenticated Claude
+accounts full isolation on one machine, or whether the sign-in session recorded in
+`~/.claude.json` (a file the documented env var's own description does not clearly claim to
+relocate) is shared regardless of the setting — which would mean two accounts pointed at
+different `CLAUDE_CONFIG_DIR` values are silently the same authenticated identity. [asserted]
+It does not decide whether this repository should build the feature; ADR-0108's Enforcement
+section does that, gated on this result. [asserted]
+
+**Procedure.**
+
+1. On a machine with two already-authenticated Claude accounts (or two fresh ones logged in
+   for this test), set `CLAUDE_CONFIG_DIR=/tmp/exp146-a` and run `claude auth status`; record
+   the reported account identity.
+2. Set `CLAUDE_CONFIG_DIR=/tmp/exp146-b` (a directory never authenticated) and run
+   `claude auth status` in the same shell, same `HOME`, without touching `~/.claude.json`.
+3. If step 2 reports the account from step 1 as still signed in, the session lives outside
+   `CLAUDE_CONFIG_DIR` and leaks across it — `protocol_failed` in the sense that the isolation
+   this whole feature needs does not exist via this variable alone.
+4. If step 2 reports no session (forces a fresh login), repeat with `HOME` also overridden to
+   an isolated directory per account, and confirm two accounts can run non-interactive `-p`
+   dispatches concurrently, each correctly attributed, with neither `auth status` call ever
+   showing the other's identity.
+
+**Measures.** A single pass/fail per configuration tried (`CLAUDE_CONFIG_DIR` alone;
+`CLAUDE_CONFIG_DIR` + `HOME` together), plus the exact file(s) that turned out to hold the
+session. [asserted] Not a rate, not an interval — this is a mechanism check, not a population
+measurement, and one clean run genuinely closes it because the question is "does this file
+respect this variable," not "how often."
+
+**Stopping rule.** Stop after the first configuration that cleanly isolates two concurrent
+non-interactive dispatches, or after `CLAUDE_CONFIG_DIR` alone and `CLAUDE_CONFIG_DIR` + `HOME`
+have both been tried and neither isolates the session — in which case report `protocol_failed`
+and ADR-0108's Claude support stays unimplemented until a different mechanism is found.
+[asserted]
+
+**Result, 27 August 2026 — mechanism half PASSES on all four harnesses; concurrency half not
+yet run.** [measured] The premise the entry was written on is wrong in the project's favour:
+`CLAUDE_CONFIG_DIR` does *not* leave the session behind in `~/.claude.json`, it **relocates that
+file**, and it relocates the credential with it.
+
+Probed live on this machine, 27 August 2026, Claude Code 2.1.247 / codex-cli 0.150.1 /
+grok 1.0.5 / cursor-agent 2026.08.25. Each row is the same three-step check: read the identity
+the default configuration reports, repeat with the candidate variable pointed at a
+never-authenticated directory, and confirm the home configuration was not written to.
+
+| Harness | Isolating variable | Fresh directory reports | Session state it relocates |
+| --- | --- | --- | --- |
+| Claude Code | `CLAUDE_CONFIG_DIR` | `{"loggedIn": false, "authMethod": "none"}` | `.claude.json` **and** `.credentials.json` |
+| Codex | `CODEX_HOME` | `Not logged in` | `auth.json` under the named directory |
+| Grok | `GROK_HOME` | config sources empty — `~/.grok/config.toml` no longer read | the `~/.grok` tree |
+| Cursor | `HOME` (inside WSL) | `Not logged in` | `~/.cursor/cli-config.json` |
+
+Three findings that change how the feature must be built, none of them anticipated by the
+procedure as written. [measured]
+
+1. **The Claude credential is a file, not a keychain entry.** It is
+   `<config-dir>/.credentials.json`; Windows Credential Manager holds no Claude or Anthropic
+   entry. Placing an authenticated `.credentials.json` inside an isolated `CLAUDE_CONFIG_DIR`
+   flips that directory's `claude auth status` from `loggedIn: false` to `loggedIn: true` —
+   the positive control the procedure did not specify. Isolation is not merely "the fresh
+   directory reports nothing", it is "the directory is the thing consulted".
+2. **`auth status` under an isolated directory reports `email: null` until a real login has
+   completed there.** Account identity lives in `.claude.json`, the credential in
+   `.credentials.json`. A directory carrying only a copied credential authenticates but cannot
+   be *attributed*. Per-account verification must therefore assert against a directory that was
+   logged into properly, never one seeded by copying.
+3. **`CODEX_HOME` refuses to create its PATH helper binaries under `%TEMP%`**, warning rather
+   than failing. A second Codex account's home must be a durable directory outside the
+   temporary tree.
+
+Also measured, and load-bearing for the Grok row: overriding `HOME` and `USERPROFILE` on Windows
+does **not** move Grok's configuration — `grok inspect` still reads the user's `~/.grok/config.toml`.
+Only `GROK_HOME` moves it. The reverse holds for Cursor, which exposes no such variable and is
+isolated by `HOME` precisely because `cursor-agent` runs under WSL, where `HOME` is honoured.
+No single mechanism covers all four; per-harness isolation is not a convenience here, it is forced.
+
+**What is not yet measured.** Step 4's second clause — two accounts running concurrent
+non-interactive dispatches, each correctly attributed, with neither `auth status` call ever
+showing the other's identity. That needs a second account actually signed in per harness, and
+signing in is interactive, so it is the principal's step, not the orchestrator's. The stopping
+rule is therefore **not yet satisfied**. Nothing routes a second account into dispatch until it
+is. [asserted]
+
+**Status:** IN PROGRESS — mechanism confirmed for all four harnesses; concurrent dual-account
+attribution outstanding, blocked on an interactive second sign-in. [measured 27 August 2026]
 

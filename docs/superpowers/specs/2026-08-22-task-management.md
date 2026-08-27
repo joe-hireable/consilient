@@ -1,5 +1,11 @@
 # Task management: evidence-bearing work items across dependent streams
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 11 (EXP-98 and EXP-19).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 - **Date:** 2026-08-22
 - **Status:** Specification. Decided provisionally by ADR-0072; EXP-98 tests the stream mechanism,
   EXP-19 tests the human-load boundary, and EXP-53 tests the signature primitive for trusted

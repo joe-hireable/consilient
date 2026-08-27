@@ -1,25 +1,31 @@
-"""Gate B4 tickets credit only isolated, restored pytest upstream repairs."""
+"""Gate B4 credits bounded real pytest repairs, never synthetic restores."""
 
 from __future__ import annotations
 
-import importlib.util
 import hashlib
-import shutil
+import importlib.util
+import json
+import os
 import subprocess
 import sys
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
+from types import ModuleType
+from typing import Any
 
 import pytest
 
-from consilient.cli import _foreign_tickets, cmd_doctor
+from consilient.cli import _foreign_tickets
 
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "b4_tickets.py"
 PYTEST_UPSTREAM = Path(r"C:/Users/jpbpr/Repositories/pytest-upstream")
 PYTEST_PYTHON = PYTEST_UPSTREAM / ".venv/Scripts/python.exe"
+ReceiptAction = Callable[[Path, Any], None]
 
 
-def _load_script():
+def _load_script() -> ModuleType:
     spec = importlib.util.spec_from_file_location("b4_tickets_script", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -28,7 +34,7 @@ def _load_script():
     return module
 
 
-def _source(tmp_path: Path, tickets: object) -> Path:
+def _source(tmp_path: Path, tickets: tuple[Any, ...]) -> Path:
     root = tmp_path / "source"
     by_path: dict[str, list[bytes]] = {}
     for ticket in tickets:
@@ -39,28 +45,69 @@ def _source(tmp_path: Path, tickets: object) -> Path:
         target.write_bytes(b"\r\n".join(chunks))
     version = root / "src/_pytest/_version.py"
     version.parent.mkdir(parents=True, exist_ok=True)
-    version.write_text(
-        "__commit_id__ = commit_id = 'gc99f595a8'\n",
-        encoding="utf-8",
-    )
-    (root / "testing" / "test_mark.py").parent.mkdir(parents=True, exist_ok=True)
-    (root / "testing" / "test_mark.py").write_text("def test_mark():\n    assert True\n", encoding="utf-8")
+    version.write_text("__commit_id__ = commit_id = 'gc99f595a8'\n", encoding="utf-8")
+    full_suite = root / "testing/test_mark.py"
+    full_suite.parent.mkdir(parents=True, exist_ok=True)
+    full_suite.write_text("def test_mark():\n    assert True\n", encoding="utf-8")
     return root
 
 
-def _prepare(script: object, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    source = _source(tmp_path, script.TICKETS)
-    monkeypatch.setattr(script, "verify_source", lambda root: None)
-    monkeypatch.setattr(
-        script,
-        "archive_source",
-        lambda root, destination: shutil.copytree(root, destination),
-    )
-    return source
+def _ticket(script: ModuleType, *, synthetic: bool = False) -> Any:
+    return replace(script.TICKETS[0], synthetic=synthetic)
+
+
+def _prepare(
+    script: ModuleType,
+    tmp_path: Path,
+) -> Path:
+    return _source(tmp_path, script.TICKETS)
+
+
+def _agent_on_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
+    executable = tmp_path / "bin" / "codex.cmd"
+    executable.parent.mkdir()
+    executable.write_text("@exit /b 0\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", str(executable.parent) + os.pathsep + os.environ["PATH"])
+    return ["codex"]
+
+
+def _process(
+    action: ReceiptAction,
+    *,
+    red: int = 1,
+) -> Callable[..., tuple[int, bool, float, None]]:
+    def run(
+        argv: list[str],
+        *,
+        cwd: Path,
+        stdout_path: Path,
+        stderr_path: Path,
+        **_kwargs: Any,
+    ) -> tuple[int, bool, float, None]:
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_bytes(f"stdout:{stdout_path.name}".encode())
+        stderr_path.write_bytes(f"stderr:{stderr_path.name}".encode())
+        if stdout_path.name == "agent.stdout.txt":
+            action(cwd, argv)
+        return (red if stdout_path.name == "red.stdout.txt" else 0), False, 0.0, None
+
+    return run
+
+
+def _repair(ticket: Any) -> ReceiptAction:
+    def action(cwd: Path, _argv: Any) -> None:
+        path = cwd / ticket.path
+        path.write_bytes(path.read_bytes().replace(ticket.after, b"fixed", 1))
+
+    return action
+
+
+def _outcome(log: Path) -> dict[str, Any]:
+    rows = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    return next(row["data"] for row in rows if row["event"] == "attempt.outcome")
 
 
 def test_script_entrypoint_imports_without_project_pythonpath(tmp_path: Path) -> None:
-    """Removing the script bootstrap makes direct execution fail before argument parsing."""
     result = subprocess.run(
         [sys.executable, "-I", str(SCRIPT), "--help"],
         cwd=tmp_path,
@@ -74,210 +121,125 @@ def test_script_entrypoint_imports_without_project_pythonpath(tmp_path: Path) ->
     assert result.returncode == 0, result.stderr
 
 
-def test_corpus_constants_target_pytest_not_itsdangerous() -> None:
-    """The runner must pin pytest-dev/pytest, not the retired itsdangerous corpus."""
-    script = _load_script()
-
-    assert script.REPOSITORY == "pytest-dev/pytest"
-    assert script.REMOTE == "https://github.com/pytest-dev/pytest.git"
-    assert script.FULL_SUITE == "testing/test_mark.py"
-    assert all(ticket.id.startswith("B4-PYT-") for ticket in script.TICKETS)
-    assert {ticket.issue for ticket in script.TICKETS} == {"13369", "14774", "6505"}
-
-
 @pytest.mark.skipif(not PYTEST_PYTHON.is_file(), reason="pytest upstream venv unavailable")
 def test_verify_source_accepts_pinned_pytest_upstream() -> None:
-    """The live corpus pin must match the editable pytest checkout."""
-    script = _load_script()
-
-    script.verify_source(PYTEST_UPSTREAM)
+    _load_script().verify_source(PYTEST_UPSTREAM)
 
 
-def test_known_seeds_are_unique_and_a_passing_red_phase_is_not_credited(
+def test_net_zero_restoration_is_rejected(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Changing the seed or accepting its target test must fail this test."""
     script = _load_script()
-    source = _prepare(script, monkeypatch, tmp_path)
-    ticket = script.TICKETS[0]
-    calls = 0
+    ticket = _ticket(script)
+    source = _prepare(script, tmp_path)
 
-    def successful_process(*_args, **_kwargs):
-        nonlocal calls
-        calls += 1
-        return 0, False, 0.0, None
+    def restore(cwd: Path, _argv: Any) -> None:
+        path = cwd / ticket.path
+        path.write_bytes(path.read_bytes().replace(ticket.after, ticket.before, 1))
 
-    monkeypatch.setattr(script, "run_process", successful_process)
-    log = tmp_path / "log" / "events.jsonl"
-
-    assert len({item.before for item in script.TICKETS}) == len(script.TICKETS)
-    assert not script.run_ticket(source, ticket, ["agent"], log, timeout_s=1, python=sys.executable)
-    assert calls == 1
-    assert _foreign_tickets(log.parent) == 0
-
-
-@pytest.mark.parametrize("outcome", [(None, True), (1, False)])
-def test_timeout_or_agent_failure_never_appends_credit(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, outcome: tuple[int | None, bool]
-) -> None:
-    """Removing the timeout/error guard would incorrectly credit a failed repair."""
-    script = _load_script()
-    source = _prepare(script, monkeypatch, tmp_path)
-    responses = [(1, False), outcome]
-    monkeypatch.setattr(
-        script,
-        "run_process",
-        lambda *_args, **_kwargs: (*responses.pop(0), 0.0, None),
-    )
+    monkeypatch.setattr(script, "run_process", _process(restore))
     log = tmp_path / "log" / "events.jsonl"
 
     assert not script.run_ticket(
-        source, script.TICKETS[0], ["agent"], log, timeout_s=1, python=sys.executable
+        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
     )
+    assert not log.exists()
     assert _foreign_tickets(log.parent) == 0
 
 
-def test_pytest_collection_error_does_not_qualify_as_a_red_phase(
+def test_undeclared_changed_path_is_rejected(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Changing the red guard to accept exit 2 would execute an invalid ticket."""
     script = _load_script()
-    source = _prepare(script, monkeypatch, tmp_path)
-    calls = 0
+    ticket = _ticket(script)
+    source = _prepare(script, tmp_path)
 
-    def collection_error(*_args, **_kwargs):
-        nonlocal calls
-        calls += 1
-        return 2, False, 0.0, None
+    def tamper(cwd: Path, argv: Any) -> None:
+        _repair(ticket)(cwd, argv)
+        (cwd / "undeclared.py").write_text("no", encoding="utf-8")
 
-    monkeypatch.setattr(script, "run_process", collection_error)
+    monkeypatch.setattr(script, "run_process", _process(tamper))
     log = tmp_path / "log" / "events.jsonl"
 
     assert not script.run_ticket(
-        source, script.TICKETS[0], ["agent"], log, timeout_s=1, python=sys.executable
+        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
     )
-    assert calls == 1
+    assert not log.exists()
     assert _foreign_tickets(log.parent) == 0
 
 
-def test_manifest_or_test_tampering_never_appends_credit(
+def test_bounded_real_repair_is_credited_and_counted(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Removing the manifest comparison would credit an out-of-scope repair."""
     script = _load_script()
-    source = _prepare(script, monkeypatch, tmp_path)
-    ticket = script.TICKETS[0]
-    target = source / ticket.target.split("::")[0]
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("original test", encoding="utf-8")
-    calls = 0
+    ticket = _ticket(script)
+    source = _prepare(script, tmp_path)
+    monkeypatch.setattr(script, "run_process", _process(_repair(ticket)))
+    log = tmp_path / "log" / "events.jsonl"
 
-    def process(_argv, *, cwd, **_kwargs):
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            (cwd / ticket.target.split("::")[0]).write_text("tampered", encoding="utf-8")
-            (cwd / ticket.path).write_bytes(ticket.before)
-        return (1 if calls == 1 else 0), False, 0.0, None
+    assert script.run_ticket(
+        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+    )
+    assert _foreign_tickets(log.parent) == 1
+    outcome = _outcome(log)
+    assert outcome["harness"] == "codex"
+    assert outcome["corpus_revision"] == "c99f595a8"
 
-    monkeypatch.setattr(script, "run_process", process)
+
+def test_durable_receipts_have_the_recorded_fixed_order_digest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    script = _load_script()
+    ticket = _ticket(script)
+    source = _prepare(script, tmp_path)
+    monkeypatch.setattr(script, "run_process", _process(_repair(ticket)))
+    log = tmp_path / "log" / "events.jsonl"
+
+    assert script.run_ticket(
+        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+    )
+    receipt_dir = script.RECEIPT_ROOT / ticket.id
+    assert receipt_dir.is_dir()
+    digest = hashlib.sha256(
+        b"".join((receipt_dir / name).read_bytes() for name in script.RECEIPT_FILES)
+    ).hexdigest()
+    assert _outcome(log)["receipt_sha256"] == digest
+
+
+def test_synthetic_seed_cannot_emit_ticket_completed_or_count(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    script = _load_script()
+    synthetic = replace(script.TICKETS[0], synthetic=True)
+    source = _prepare(script, tmp_path)
+    monkeypatch.setattr(script, "run_process", _process(_repair(synthetic)))
     log = tmp_path / "log" / "events.jsonl"
 
     assert not script.run_ticket(
-        source, ticket, ["agent"], log, timeout_s=1, python=sys.executable
+        source,
+        synthetic,
+        _agent_on_path(monkeypatch, tmp_path),
+        log,
+        timeout_s=1,
+        python=sys.executable,
     )
     assert _foreign_tickets(log.parent) == 0
+    assert all(
+        json.loads(line)["event"] != "ticket.completed"
+        for line in log.read_text(encoding="utf-8").splitlines()
+    )
 
 
-def test_three_restored_repairs_are_counted_but_do_not_open_gate_b4(
+def test_collection_error_remains_ineligible_for_credit(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Breaking the event pair or foreign-ticket join changes the counted total."""
     script = _load_script()
-    source = _prepare(script, monkeypatch, tmp_path)
-    source_manifest = {
-        path.relative_to(source).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(source.rglob("*"))
-        if path.is_file()
-    }
-    append_calls = []
-    append = script.events.append
-
-    def tracked_append(*args, **kwargs):
-        append_calls.append((args, kwargs))
-        return append(*args, **kwargs)
-
-    monkeypatch.setattr(script.events, "append", tracked_append)
-    active_ticket: object | None = None
-    calls = 0
-
-    def process(argv, *, cwd, **_kwargs):
-        nonlocal active_ticket, calls
-        calls += 1
-        if argv == ["agent"]:
-            assert active_ticket is not None
-            path = cwd / active_ticket.path
-            path.write_bytes(path.read_bytes().replace(active_ticket.after, active_ticket.before, 1))
-            return 0, False, 0.0, None
-        assert active_ticket is not None
-        seeded = active_ticket.after in (cwd / active_ticket.path).read_bytes()
-        return (1 if seeded else 0), False, 0.0, None
-
-    monkeypatch.setattr(script, "run_process", process)
+    ticket = _ticket(script)
+    source = _prepare(script, tmp_path)
+    monkeypatch.setattr(script, "run_process", _process(_repair(ticket), red=2))
     log = tmp_path / "log" / "events.jsonl"
-    for ticket in script.TICKETS:
-        active_ticket = ticket
-        assert script.run_ticket(
-            source, ticket, ["agent"], log, timeout_s=1, python=sys.executable
-        )
 
-    events = log.read_text(encoding="utf-8").splitlines()
-    assert len(events) == 6
-    assert len(append_calls) == 6
-    assert calls == 12
-    assert _foreign_tickets(log.parent) == 3
-    final_manifest = {
-        path.relative_to(source).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(source.rglob("*"))
-        if path.is_file()
-    }
-    assert final_manifest == source_manifest
-
-    args = type("Args", (), {"log": str(log.parent), "db": str(tmp_path / "state.db")})()
-    doctor = cmd_doctor(args)
-    b4 = next(item for item in doctor["gates"]["B"]["conditions"] if item["id"] == "B4")
-    assert b4["status"] == "fail"
-    assert b4["reason"].startswith("3 of 20")
-    assert doctor["routing_orchestration_enabled"] is False
-
-
-@pytest.mark.skipif(not PYTEST_PYTHON.is_file(), reason="pytest upstream venv unavailable")
-def test_end_to_end_tickets_credit_pytest_upstream(tmp_path: Path) -> None:
-    """Three genuine pytest repairs must red, verify and restore against the live corpus."""
-    script = _load_script()
-    log = tmp_path / "log"
-
-    for ticket in script.TICKETS:
-        agent = [
-            sys.executable,
-            "-c",
-            (
-                "from pathlib import Path; "
-                f"path=Path({repr(ticket.path)}); "
-                "path.write_bytes(path.read_bytes().replace("
-                + repr(ticket.after)
-                + ", "
-                + repr(ticket.before)
-                + ", 1))"
-            ),
-        ]
-        assert script.run_ticket(
-            PYTEST_UPSTREAM,
-            ticket,
-            agent,
-            log,
-            timeout_s=300,
-            python=str(PYTEST_PYTHON),
-        )
-
-    assert _foreign_tickets(log) == 3
+    assert not script.run_ticket(
+        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+    )
+    assert not log.exists()

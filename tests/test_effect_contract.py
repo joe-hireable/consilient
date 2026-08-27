@@ -11,13 +11,18 @@ import pytest
 
 from consilient import effects as effects_mod
 from consilient import events as events_mod
+from consilient.capabilities import CapabilityEntry, Gate
 from consilient.effects import (
     EFFECT_CLASSES,
+    EFFECT_INTENT,
+    EFFECT_RECEIPT,
     MUTATION_EFFECTS,
     OUTBOUND_EFFECTS,
     READ_ONLY_EFFECTS,
+    AdmissionFacts,
     EffectError,
     EffectManifest,
+    derive_admission,
     receipt_chain_validator,
 )
 from consilient.events import (
@@ -84,7 +89,9 @@ def manifest() -> EffectManifest:
     )
 
 
-def intent_data(manifest_value: EffectManifest, *, observation: bool = False) -> dict[str, object]:
+def intent_data(
+    manifest_value: EffectManifest, *, observation: bool = False
+) -> dict[str, object]:
     return {
         "intent_id": "intent-1",
         "manifest": manifest_value.binding(),
@@ -104,7 +111,9 @@ def intent_data(manifest_value: EffectManifest, *, observation: bool = False) ->
     }
 
 
-def receipt_data(*, receipt_id: str, status: str, supersedes: str | None = None) -> dict[str, object]:
+def receipt_data(
+    *, receipt_id: str, status: str, supersedes: str | None = None
+) -> dict[str, object]:
     data: dict[str, object] = {
         "receipt_id": receipt_id,
         "intent_id": "intent-1",
@@ -177,17 +186,47 @@ def test_effect_classes_are_exact_and_manifest_digest_is_set_canonical() -> None
         "operations": ["read", "inspect"],
         "declared_residuals": ["logs", "elapsed_time"],
     }
-    assert EffectManifest.from_record(composite).digest == EffectManifest.from_record(
-        reversed_composite
-    ).digest
+    assert (
+        EffectManifest.from_record(composite).digest
+        == EffectManifest.from_record(reversed_composite).digest
+    )
 
-    for malformed in ([], ["Data.Read"], [" data.read"], ["unknown.effect"], ["data.read", "data.read"], [1]):
+    for malformed in (
+        [],
+        ["Data.Read"],
+        [" data.read"],
+        ["unknown.effect"],
+        ["data.read", "data.read"],
+        [1],
+    ):
         with pytest.raises(EffectError, match="effect|empty|duplicate"):
             EffectManifest.from_record({**manifest().to_record(), "effects": malformed})
     missing = manifest().to_record()
     del missing["effects"]
     with pytest.raises(EffectError, match="missing"):
         EffectManifest.from_record(missing)
+
+
+def test_a_composite_manifest_retains_every_applicable_effect_class() -> None:
+    """A01's review found this failing: truncating a composite manifest's `effects` --
+    or dropping `effects` from `canonical()` entirely -- left `python -m pytest
+    tests/test_effect_contract.py -q` passing regardless, because the only existing
+    composite check compares digests of reversed class order, which stay equal after both
+    sides are truncated or after both drop the field the same way."""
+    two_classes = EffectManifest.from_record(
+        {**manifest().to_record(), "effects": ["data.read", "network.call"]}
+    )
+    two_classes_effects = two_classes.to_record()["effects"]
+    assert isinstance(two_classes_effects, (list, tuple))
+    assert set(two_classes_effects) == {"data.read", "network.call"}
+
+    one_class = EffectManifest.from_record(
+        {**manifest().to_record(), "effects": ["data.read"]}
+    )
+    assert two_classes.digest != one_class.digest, (
+        "truncating a composite manifest's effect classes -- or dropping 'effects' from "
+        "canonical() entirely, which would erase this same difference -- must change its digest"
+    )
 
 
 def test_manifest_rejects_non_finite_ceilings() -> None:
@@ -281,14 +320,19 @@ def test_receipt_binds_the_manifest_digest_of_its_intent(tmp_path) -> None:
         append(path, event("effect.receipt", mismatch))
 
 
-def test_receipt_chain_allows_one_unknown_resolution_and_refuses_a_fork(tmp_path) -> None:
+def test_receipt_chain_allows_one_unknown_resolution_and_refuses_a_fork(
+    tmp_path,
+) -> None:
     """Production break caught: two receipt heads can claim incompatible outcomes."""
     value = manifest()
     append_transaction(
         tmp_path,
         [
             event("effect.intent", intent_data(value)),
-            event("effect.receipt", receipt_data(receipt_id="receipt-unknown", status="unknown")),
+            event(
+                "effect.receipt",
+                receipt_data(receipt_id="receipt-unknown", status="unknown"),
+            ),
         ],
         lambda prefix, rejections, candidates: None,
     )
@@ -306,7 +350,10 @@ def test_receipt_chain_allows_one_unknown_resolution_and_refuses_a_fork(tmp_path
     with pytest.raises(EventError, match="receipt chain"):
         append(
             tmp_path / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl",
-            event("effect.receipt", receipt_data(receipt_id="receipt-fork", status="succeeded")),
+            event(
+                "effect.receipt",
+                receipt_data(receipt_id="receipt-fork", status="succeeded"),
+            ),
         )
 
 
@@ -338,7 +385,9 @@ def test_outbound_effect_refuses_missing_disclosure_for_any_operation_label() ->
         {"kind": "prompt", "text": "I am an AI"},
     ],
 )
-def test_outbound_effect_refuses_plaintext_or_malformed_disclosure(disclosure: object) -> None:
+def test_outbound_effect_refuses_plaintext_or_malformed_disclosure(
+    disclosure: object,
+) -> None:
     """Production break caught: a prompt-shaped disclosure can be stripped by injection."""
     with pytest.raises(EffectError, match="disclosure"):
         EffectManifest.from_record(outbound_record(disclosure=disclosure))
@@ -396,7 +445,9 @@ def test_intent_calls_observation_predicate() -> None:
     assert "_observation_predicate" in names
 
 
-def test_receipt_chain_resolves_an_unknown_across_daily_logs(tmp_path, monkeypatch) -> None:
+def test_receipt_chain_resolves_an_unknown_across_daily_logs(
+    tmp_path, monkeypatch
+) -> None:
     """Production break caught: midnight turns one operation into two receipt chains."""
     monkeypatch.setattr(events_mod, "_check_clock", lambda event: None)
     value = manifest()
@@ -428,10 +479,30 @@ def test_receipt_chain_resolves_an_unknown_across_daily_logs(tmp_path, monkeypat
     )
 
 
-def test_receipt_chain_refuses_a_rejected_history_line() -> None:
+def test_receipt_chain_refuses_a_rejected_effect_history_line() -> None:
     """Production break caught: a corrupt earlier record is ignored while a new chain is admitted."""
     with pytest.raises(EffectError, match="rejected"):
-        receipt_chain_validator((), (Rejection("effect.jsonl", 1, "malformed"),), ())
+        receipt_chain_validator(
+            (),
+            (Rejection("effect.jsonl", 1, "malformed", event_kind=EFFECT_INTENT),),
+            (),
+        )
+    with pytest.raises(EffectError, match="rejected"):
+        receipt_chain_validator(
+            (),
+            (Rejection("effect.jsonl", 1, "malformed", event_kind=EFFECT_RECEIPT),),
+            (),
+        )
+
+
+def test_receipt_chain_ignores_a_rejection_unrelated_to_the_effect_chain() -> None:
+    """A01's review found this failing: a rejected line of *any* kind sharing the log
+    directory blocked every write-ahead effect intent, including one with no relation to
+    the effect chain at all."""
+    receipt_chain_validator((), (Rejection("log.jsonl", 1, "malformed"),), ())
+    receipt_chain_validator(
+        (), (Rejection("log.jsonl", 1, "malformed", event_kind="note.made"),), ()
+    )
 
 
 def test_effect_records_require_a_jsonl_authority_path(tmp_path) -> None:
@@ -440,3 +511,101 @@ def test_effect_records_require_a_jsonl_authority_path(tmp_path) -> None:
     with pytest.raises(EventError, match="JSONL"):
         append(path, event("effect.intent", intent_data(manifest())))
     assert not path.exists()
+
+
+def _admitted_capability(*, effects: tuple[str, ...], operations: tuple[str, ...]) -> CapabilityEntry:
+    return CapabilityEntry(
+        kind="tool",
+        name="pytest",
+        available=True,
+        provenance=("probe:tool:pytest",),
+        gate=Gate(
+            state="admitted",
+            reason="exact_grant",
+            grant_kind="principal_authority",
+            authority_event=None,
+            decision_id=None,
+            recovery_proof_ref=None,
+            scope=("workspace",),
+            operations=operations,
+            effect_classes=effects,
+            expires_at="2099-01-01T00:00:00+00:00",
+        ),
+    )
+
+
+def _manifest_with(*, effects: tuple[str, ...], operations: tuple[str, ...]) -> EffectManifest:
+    record = manifest().to_record()
+    record["effects"] = list(effects)
+    record["operations"] = list(operations)
+    if set(effects) & OUTBOUND_EFFECTS:
+        record["disclosure"] = "9" * 64
+    return EffectManifest.from_record(record)
+
+
+def test_material_choice_flag_cannot_cover_uncovered_money_commit() -> None:
+    """Caller-supplied is_material_choice must not execute unprotected spend."""
+    result = derive_admission(
+        _manifest_with(effects=("money.commit",), operations=("spend",)),
+        _admitted_capability(effects=("money.commit",), operations=("spend",)),
+        AdmissionFacts(is_material_choice=True, authority_standing=False),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+
+
+def test_proof_operation_flag_cannot_cover_uncovered_money_commit() -> None:
+    """Caller-supplied is_proof_operation must not execute unprotected spend."""
+    result = derive_admission(
+        _manifest_with(effects=("money.commit",), operations=("spend",)),
+        _admitted_capability(effects=("money.commit",), operations=("spend",)),
+        AdmissionFacts(is_proof_operation=True, contained=True, authority_standing=False),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+
+
+def test_proof_operation_flag_cannot_uncontain_process_run() -> None:
+    """Caller-supplied is_proof_operation must not execute an uncontained process."""
+    result = derive_admission(
+        _manifest_with(effects=("process.run",), operations=("run",)),
+        _admitted_capability(effects=("process.run",), operations=("run",)),
+        AdmissionFacts(is_proof_operation=True, contained=False),
+    )
+    assert result.admission == "capability_gap"
+    assert result.disposition == "refuse"
+    assert result.reason == "process_not_contained"
+
+
+def test_planning_operations_cannot_launder_protected_effects() -> None:
+    """A plan operation on money.commit is still a protected class."""
+    result = derive_admission(
+        _manifest_with(effects=("money.commit",), operations=("plan",)),
+        _admitted_capability(effects=("money.commit",), operations=("plan",)),
+        AdmissionFacts(is_material_choice=True, authority_standing=False),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+
+
+def test_classify_admission_conjoins_flags_with_manifest_predicates() -> None:
+    """A bare flag short-circuit can be deleted only if this call is required."""
+    source = Path(effects_mod.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    names = {
+        node.func.id
+        for node in ast.walk(_function_def(tree, "_classify_admission"))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "_privileged_admission_class" in names
+    helper = _function_def(tree, "_privileged_admission_class")
+    helper_calls = {
+        node.func.id
+        for node in ast.walk(helper)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "_planning_predicate" in helper_calls
+    assert "_proof_predicate" in helper_calls
+    attrs = {node.attr for node in ast.walk(helper) if isinstance(node, ast.Attribute)}
+    assert "is_material_choice" in attrs
+    assert "is_proof_operation" in attrs

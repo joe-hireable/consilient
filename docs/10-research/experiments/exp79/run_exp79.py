@@ -72,7 +72,6 @@ def utc_ts(offset_s: int = 0) -> str:
 
 def derive_kind_mix() -> KindMix:
     """Derive synthesis weights from the live trajectory log."""
-    from consilient.events import read_all
 
     events, _ = read_all(REAL_LOG)
     counts = Counter(e.kind for e in events)

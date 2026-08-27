@@ -1,5 +1,11 @@
 # Answer quality: one useful answer with checks that touched the world
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-128 (named here; register entry still unwritten) kills the visible-quality claim if users do not prefer the evidence-bearing primary response.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** all 17 pre-existing specifications named by the brief were read; none specifies the final
 user-visible answer or measures perceived quality against a strong single-model answer, but several
 do specify internal mechanisms that could improve quality, so the broader claim that none explains
@@ -143,7 +149,6 @@ primary response. Harness and model names may appear in provenance details, not 
 
 ```text
 Recommendation: choose A — [the useful answer and its shortest decisive reason].
-
 Checked · 3/3 material claims linked to primary sources · acceptance check passed [receipt]
 Compared · B failed the same requirement: [decision-relevant reason]
 Could change this · [specific future observation and reversal]

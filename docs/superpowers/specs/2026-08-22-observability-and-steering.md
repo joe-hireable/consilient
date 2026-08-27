@@ -1,5 +1,11 @@
 # Observability and steering: pull the record, write every intervention before it acts
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-108 kills the live-projection claim if the registered comparison fails.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** ADR-0071 is PROVISIONAL, not accepted; its checkpoint and fencing mechanism is not
 implemented, ADR-0077 has superseded the brief's logarithmic candidate-ceiling formula with the
 dependence-robust union bound `n_max = floor(epsilon / beta_upper)`, and the killed claims observed

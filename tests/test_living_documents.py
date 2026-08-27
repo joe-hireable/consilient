@@ -9,7 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -333,7 +332,7 @@ def test_counts_include_zeros_and_check_flag_is_required(tmp_path: Path) -> None
     assert missing.returncode == 2
 
 
-def test_first_tranche_passes_and_outside_specs_are_not_admitted() -> None:
+def test_first_tranche_passes_independently() -> None:
     assert CHECKER.is_file()
     run = subprocess.run(
         [sys.executable, str(CHECKER), "--check", *FIRST_TRANCHE],
@@ -365,13 +364,6 @@ def test_first_tranche_passes_and_outside_specs_are_not_admitted() -> None:
         assert "22 August 2026" in text
         assert "Falsifier:" in text or "falsif" in text.lower()
 
-    specs_root = ROOT / "docs" / "superpowers" / "specs"
-    outside = sorted(
-        path.relative_to(ROOT).as_posix()
-        for path in specs_root.glob("2026-08-22-*.md")
-        if path.relative_to(ROOT).as_posix() not in FIRST_TRANCHE
-    )
-    assert outside, "L05's remaining files must exist and stay unadmitted"
-    sample = ROOT / outside[0]
-    text = sample.read_text(encoding="utf-8")
-    assert "Document class: W" not in text
+    # L05 admits the remaining 2026-08-22 specifications. This test still
+    # proves the first tranche is admitted on its own; the exact twenty-one
+    # inventory lives in tests/test_living_document_inventory.py.

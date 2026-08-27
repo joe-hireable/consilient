@@ -239,6 +239,30 @@ INTENT_STARVED_KIND = "intent.starved"
 SCHEDULER_ACTOR = "consilient.scheduler"
 INTENT_RECORDED_FIELDS = frozenset({"tick", "selected", "not_selected"})
 INTENT_STARVED_FIELDS = frozenset({"unit", "reason", "ticks", "since"})
+ESCALATION_ATTEMPTED_KIND = "escalation.attempted"
+ESCALATION_ACTOR = "consilient.escalation"
+ESCALATION_ATTEMPT_FIELDS = frozenset(
+    {
+        "root_cause",
+        "escalation_class",
+        "what_stopped",
+        "what_it_is_holding",
+        "what_i_need",
+        "default_if_no_reply",
+        "evidence",
+        "disposition",
+        "refusal_reason",
+        "decision_changed",
+    }
+)
+ESCALATION_CLASSES = PROTECTED_DECISION_CLASSES
+ESCALATION_BUDGET = 3
+ESCALATION_WINDOW = timedelta(hours=24)
+ESCALATION_PRECISION_WINDOW = 20
+ESCALATION_PRECISION_FLOOR = 0.7
+ESCALATION_REFUSAL_REASONS = frozenset(
+    {"duplicate_root_cause", "budget_exhausted", "out_of_set_class"}
+)
 # The four non-selection reasons of the supervision specification, section 2.1, and no
 # fifth. A bench recorded under an unnamed reason is the failure the record exists to
 # make visible.
@@ -413,12 +437,20 @@ class Rejection:
 
     A rejection is never silently dropped: it is excluded from the projection AND carried
     back to the caller, and every CLI command reports the count.
+
+    `event_kind` is the rejected line's own `"event"` field when it could be read at all
+    (`None` for a line that was not even valid JSON, or that parsed to something with no
+    such field). A01's review found `receipt_chain_validator` refusing to start a
+    write-ahead intent in any log directory that already held one quarantined line of *any*
+    kind -- a rejected `note.made` line blocked an unrelated `effect.intent`. `event_kind`
+    lets that validator refuse only on a rejection that is actually part of its own chain.
     """
 
     path: str
     line: int
     reason: str
     content_digest: str = ""
+    event_kind: str | None = None
 
 
 @dataclass(frozen=True)
@@ -745,6 +777,7 @@ def validate(event: object) -> EventPayload:
     _check_acquisition_contract(event)
     _check_capability_gap_contract(event)
     _check_intent_contract(event)
+    _check_escalation_contract(event)
     _check_attempt_identity(event)
     _check_attempt_contract(event)
     _check_verification_outcome_contract(event)
@@ -1726,6 +1759,77 @@ def _check_intent_contract(event: EventPayload) -> None:
         )
 
 
+def _check_escalation_contract(event: EventPayload) -> None:
+    """ADR-0075: one exact, closed principal-interruption record."""
+    if event["event"] != ESCALATION_ATTEMPTED_KIND:
+        return
+    data = event["data"]
+    actual = set(data)
+    if actual != ESCALATION_ATTEMPT_FIELDS:
+        missing = sorted(ESCALATION_ATTEMPT_FIELDS - actual)
+        unexpected = sorted(actual - ESCALATION_ATTEMPT_FIELDS)
+        detail = []
+        if missing:
+            detail.append(f"missing {missing}")
+        if unexpected:
+            detail.append(f"unexpected {unexpected}")
+        raise EventError(
+            f"{ESCALATION_ATTEMPTED_KIND} body fields are fixed: {'; '.join(detail)}"
+        )
+    for field in (
+        "root_cause",
+        "escalation_class",
+        "what_stopped",
+        "what_it_is_holding",
+        "what_i_need",
+        "evidence",
+    ):
+        _canonical_token(data[field], f"{ESCALATION_ATTEMPTED_KIND} {field}")
+    default = data["default_if_no_reply"]
+    if not isinstance(default, dict) or set(default) != {"default", "fires_at"}:
+        raise EventError(
+            f"{ESCALATION_ATTEMPTED_KIND} default_if_no_reply must contain default and fires_at"
+        )
+    _canonical_token(
+        default["default"], f"{ESCALATION_ATTEMPTED_KIND} default_if_no_reply.default"
+    )
+    _intent_timestamp(
+        default["fires_at"], f"{ESCALATION_ATTEMPTED_KIND} default_if_no_reply.fires_at"
+    )
+
+    disposition = data["disposition"]
+    if disposition not in {"delivered", "refused"}:
+        raise EventError(
+            f"{ESCALATION_ATTEMPTED_KIND} disposition must be delivered or refused"
+        )
+    decision_changed = data["decision_changed"]
+    if decision_changed is not None and not isinstance(decision_changed, bool):
+        raise EventError(
+            f"{ESCALATION_ATTEMPTED_KIND} decision_changed must be boolean or null"
+        )
+    refusal_reason = data["refusal_reason"]
+    escalation_class = data["escalation_class"]
+    if escalation_class not in ESCALATION_CLASSES:
+        if disposition == "delivered" and refusal_reason is None:
+            # The locked writer below converts raw candidates to refusal.
+            return
+        if disposition != "refused" or refusal_reason != "out_of_set_class":
+            raise EventError(
+                f"{ESCALATION_ATTEMPTED_KIND} out-of-set classes must be refused"
+            )
+        return
+    if disposition == "delivered":
+        if refusal_reason is not None:
+            raise EventError(
+                f"{ESCALATION_ATTEMPTED_KIND} delivered attempts carry no refusal_reason"
+            )
+        return
+    if refusal_reason not in ESCALATION_REFUSAL_REASONS - {"out_of_set_class"}:
+        raise EventError(
+            f"{ESCALATION_ATTEMPTED_KIND} refused attempts require a machine-readable reason"
+        )
+
+
 def _intent_runs(
     prefix: Sequence[Event],
 ) -> dict[str, tuple[str, datetime, datetime, int]]:
@@ -1834,6 +1938,106 @@ def record_intent(
             )
         )
     return written
+
+
+def _escalation_budget(history: Sequence[Event]) -> int:
+    resolved = sorted(
+        (
+            event
+            for event in history
+            if event.kind == ESCALATION_ATTEMPTED_KIND
+            and event.data["disposition"] == "delivered"
+            and event.data["decision_changed"] is not None
+        ),
+        key=lambda event: _intent_timestamp(
+            event.raw["ts"], f"{ESCALATION_ATTEMPTED_KIND} ts"
+        ),
+    )
+    if len(resolved) < ESCALATION_PRECISION_WINDOW:
+        return ESCALATION_BUDGET
+    window = resolved[-ESCALATION_PRECISION_WINDOW:]
+    precision = sum(event.data["decision_changed"] is True for event in window) / len(
+        window
+    )
+    if precision < ESCALATION_PRECISION_FLOOR:
+        return ESCALATION_BUDGET // 2
+    return ESCALATION_BUDGET
+
+
+def _delivered_in_window(
+    history: Sequence[Event], occurred_at: datetime
+) -> list[Event]:
+    delivered: list[Event] = []
+    for event in history:
+        if (
+            event.kind != ESCALATION_ATTEMPTED_KIND
+            or event.data["disposition"] != "delivered"
+        ):
+            continue
+        elapsed = occurred_at - _intent_timestamp(
+            event.raw["ts"], f"{ESCALATION_ATTEMPTED_KIND} ts"
+        )
+        if timedelta(0) <= elapsed < ESCALATION_WINDOW:
+            delivered.append(event)
+    return delivered
+
+
+def _escalation_disposition(
+    history: Sequence[Event], candidate: EventPayload
+) -> tuple[str, str | None]:
+    """Derive one attempt's disposition from authoritative event timestamps."""
+    data = candidate["data"]
+    escalation_class = data["escalation_class"]
+    if escalation_class not in ESCALATION_CLASSES:
+        return "refused", "out_of_set_class"
+    occurred_at = _intent_timestamp(candidate["ts"], f"{ESCALATION_ATTEMPTED_KIND} ts")
+    delivered = _delivered_in_window(history, occurred_at)
+    if any(event.data["root_cause"] == data["root_cause"] for event in delivered):
+        return "refused", "duplicate_root_cause"
+    if len(delivered) >= _escalation_budget(history):
+        return "refused", "budget_exhausted"
+    return "delivered", None
+
+
+def record_escalation(
+    path: Path,
+    *,
+    ts: str,
+    root_cause: str,
+    escalation_class: str,
+    what_stopped: str,
+    what_it_is_holding: str,
+    what_i_need: str,
+    default_if_no_reply: Mapping[str, str],
+    evidence: str,
+    decision_changed: bool | None = None,
+    actor: str = ESCALATION_ACTOR,
+) -> EventPayload:
+    """Append one delivered or refused escalation attempt through the single writer."""
+    data: EventPayload = {
+        "root_cause": root_cause,
+        "escalation_class": escalation_class,
+        "what_stopped": what_stopped,
+        "what_it_is_holding": what_it_is_holding,
+        "what_i_need": what_i_need,
+        "default_if_no_reply": dict(default_if_no_reply),
+        "evidence": evidence,
+        "disposition": "delivered",
+        "refusal_reason": None,
+        "decision_changed": decision_changed,
+    }
+    attempt: EventPayload = {
+        "v": SCHEMA_VERSION,
+        "ts": ts,
+        "event": ESCALATION_ATTEMPTED_KIND,
+        "actor": actor,
+        "data": data,
+    }
+    if escalation_class not in ESCALATION_CLASSES:
+        data["disposition"] = "refused"
+        data["refusal_reason"] = "out_of_set_class"
+    validate(attempt)
+    return append(path, attempt)
 
 
 def _check_evidence_class(event: EventPayload) -> None:
@@ -3518,19 +3722,43 @@ def _transaction(
     accepting competing heads. This is a kernel-backed directory lock, not a
     touch-lock: process death releases it. It introduces no effect store.
     """
-    effect_kinds = {candidate["event"] for candidate in candidates} & {
+    kinds = {candidate["event"] for candidate in candidates}
+    effect_kinds = kinds & {
         effects.EFFECT_INTENT,
         effects.EFFECT_RECEIPT,
     }
-    if not effect_kinds:
+    escalation_kinds = kinds & {ESCALATION_ATTEMPTED_KIND}
+    if not effect_kinds and not escalation_kinds:
         return _transaction_one_log(path, candidates, validator)
+    if effect_kinds and escalation_kinds:
+        raise EventError("one transaction cannot mix effect and escalation records")
     if path.suffix != ".jsonl":
-        raise EventError("effect records require a JSONL authority path")
+        raise EventError("governed records require a JSONL authority path")
     path.parent.mkdir(parents=True, exist_ok=True)
-    lock_fd = os.open(path.parent / ".effects.chain.lock", _TRANSACTION_OPEN_FLAGS)
+    lock_name = ".effects.chain.lock" if effect_kinds else ".escalation.chain.lock"
+    lock_fd = os.open(path.parent / lock_name, _TRANSACTION_OPEN_FLAGS)
     try:
         _lock_file(lock_fd)
-        return _transaction_one_log(path, candidates, validator)
+        written = candidates
+        if escalation_kinds:
+            events, _rejected = read_all(path.parent)
+            history = list(events)
+            written = []
+            for candidate in candidates:
+                if candidate["event"] != ESCALATION_ATTEMPTED_KIND:
+                    written.append(candidate)
+                    continue
+                disposition, refusal_reason = _escalation_disposition(
+                    history, candidate
+                )
+                data = dict(cast(EventPayload, candidate["data"]))
+                data["disposition"] = disposition
+                data["refusal_reason"] = refusal_reason
+                resolved = {**candidate, "data": data}
+                validate(resolved)
+                history.append(Event(resolved))
+                written.append(resolved)
+        return _transaction_one_log(path, written, validator)
     finally:
         _unlock_file(lock_fd)
         os.close(lock_fd)
@@ -3653,7 +3881,10 @@ def append(path: Path, event: EventPayload) -> EventPayload:
                 return _write_validated(path, event)
         except FileExistsError as exc:
             raise EventError("the budget trajectory is busy") from exc
-    if event["event"] in _TRANSITION_VALIDATORS:
+    if (
+        event["event"] in _TRANSITION_VALIDATORS
+        or event["event"] == ESCALATION_ATTEMPTED_KIND
+    ):
         # A governed kind takes the same transaction as a batch, so the domain
         # rule runs against the locked prefix whichever door the caller took.
         return _transaction(path, [event], None)[0]
@@ -3734,7 +3965,10 @@ def _classify_lines(
         try:
             validate(raw)
         except EventError as exc:
-            rejected.append(Rejection(path_label, number, str(exc), content_digest))
+            event_kind = raw.get("event") if isinstance(raw, dict) else None
+            rejected.append(
+                Rejection(path_label, number, str(exc), content_digest, event_kind)
+            )
             continue
         events.append(Event(raw, path_label, number))
     return events, rejected
@@ -3851,6 +4085,7 @@ def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
                 "duplicate event_id "
                 f"{event_id!r}; first appeared at {first.path}:{first.line}",
                 event_sha256(event.raw),
+                event.kind,
             )
         )
     return events, rejected

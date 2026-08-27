@@ -32,7 +32,7 @@ from consilient.events import (  # noqa: E402
     KNOWLEDGE_RETRIEVED_KIND,
     SCHEMA_VERSION,
     append,
-)  # noqa: E402
+)
 from knowledge_policy import (  # noqa: E402
     DEFAULT_SOURCES,
     KnowledgeSource,

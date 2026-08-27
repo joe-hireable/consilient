@@ -1,5 +1,11 @@
 # Memory and capability accretion: durable records, bounded recall, versioned reuse
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-101 kills automatic capability reuse.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** Consilient already implements deterministic skill selection and a private,
 trajectory-backed adapted-instruction layer, but neither is wired into dispatch; the trajectory is
 not durability-perfect or retrieval-complete, and EXP-45's committed 20 August snapshot reported

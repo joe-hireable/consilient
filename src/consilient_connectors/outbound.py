@@ -2,7 +2,9 @@
 
 Credentials come from the process environment only. Nothing here reads a file
 in the repository. SMS is spend and requires an explicit authorise-spend note
-that names Twilio and an amount. Both channels require authorise-egress.
+that names Twilio and an amount. Both channels require authorise-egress and
+disclosure -- what was disclosed to the recipient before send (B1,
+observability-steering-and-embodiment-2026-08-23) -- and refuse without either.
 A verdict-shaped body is refused: untrusted transports still cannot deliver
 human decisions, and the CLI will not launder one through an SMS.
 """
@@ -55,7 +57,9 @@ def _env(name: str, environ: Mapping[str, str]) -> str:
     return value
 
 
-def _refuse_verdict(channel: str, text: str, extra: Mapping[str, Any] | None = None) -> None:
+def _refuse_verdict(
+    channel: str, text: str, extra: Mapping[str, Any] | None = None
+) -> None:
     payload: dict[str, Any] = {"transport_name": channel, "text": text}
     if extra:
         payload.update(dict(extra))
@@ -82,6 +86,16 @@ def _require_egress(note: str) -> str:
             "(ADR-0042)"
         )
     return note.strip()
+
+
+def _require_disclosure(disclosure: str) -> str:
+    if not disclosure.strip():
+        raise OutboundError(
+            "disclosure is required for every outbound message.send effect: pass "
+            "--disclosure naming what was disclosed to the recipient before send "
+            "(observability-steering-and-embodiment-2026-08-23 B1)"
+        )
+    return disclosure.strip()
 
 
 def _require_sms_spend(note: str | None) -> str:
@@ -140,9 +154,9 @@ def twilio_send(
         f"https://api.twilio.com/2010-04-01/Accounts/{urllib.parse.quote(account_sid)}"
         "/Messages.json"
     )
-    data = urllib.parse.urlencode(
-        {"From": from_number, "To": to, "Body": body}
-    ).encode("utf-8")
+    data = urllib.parse.urlencode({"From": from_number, "To": to, "Body": body}).encode(
+        "utf-8"
+    )
     password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
     password_mgr.add_password(None, url, account_sid, auth_token)
     opener = urllib.request.build_opener(
@@ -154,12 +168,16 @@ def twilio_send(
             payload = json.loads(response.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise OutboundError(f"Twilio refused the send ({exc.code}): {detail[:400]}") from exc
+        raise OutboundError(
+            f"Twilio refused the send ({exc.code}): {detail[:400]}"
+        ) from exc
     except urllib.error.URLError as exc:
         raise OutboundError(f"Twilio was unreachable: {exc}") from exc
     sid = payload.get("sid")
     if not isinstance(sid, str) or not sid.strip():
-        raise OutboundError("Twilio returned no Message SID; nothing to record as artefact")
+        raise OutboundError(
+            "Twilio returned no Message SID; nothing to record as artefact"
+        )
     return sid.strip()
 
 
@@ -169,6 +187,7 @@ def send_email(
     subject: str,
     text: str,
     authorise_egress: str,
+    disclosure: str,
     environ: Mapping[str, str] | None = None,
     sender: EmailSender | None = None,
     dry_run: bool = False,
@@ -176,6 +195,7 @@ def send_email(
     env = environ if environ is not None else os.environ
     _refuse_verdict("email", text, {"subject": subject})
     purpose = _require_egress(authorise_egress)
+    disclosed = _require_disclosure(disclosure)
     if not to.strip() or not subject.strip() or not text.strip():
         raise OutboundError("email requires --to, --subject and a non-empty body")
     host = _env(EMAIL_HOST, env)
@@ -210,6 +230,7 @@ def send_email(
         artefact=artefact,
         dry_run=dry_run,
         authorise_egress=purpose,
+        disclosure=disclosed,
         extra={"subject": subject.strip(), "from": mail_from},
     )
 
@@ -220,6 +241,7 @@ def send_sms(
     text: str,
     authorise_egress: str,
     authorise_spend: str | None,
+    disclosure: str,
     environ: Mapping[str, str] | None = None,
     sender: SmsSender | None = None,
     dry_run: bool = False,
@@ -228,6 +250,7 @@ def send_sms(
     _refuse_verdict("sms", text)
     purpose = _require_egress(authorise_egress)
     spend = _require_sms_spend(authorise_spend)
+    disclosed = _require_disclosure(disclosure)
     if not to.strip() or not text.strip():
         raise OutboundError("sms requires --to and a non-empty body")
     sid = _env(TWILIO_SID, env)
@@ -253,6 +276,7 @@ def send_sms(
         artefact=artefact,
         dry_run=dry_run,
         authorise_egress=purpose,
+        disclosure=disclosed,
         extra={"from": from_number, "authorise_spend": spend},
     )
 
@@ -265,6 +289,7 @@ def _event(
     artefact: str,
     dry_run: bool,
     authorise_egress: str,
+    disclosure: str,
     extra: Mapping[str, str],
 ) -> EventPayload:
     now = datetime.now(timezone.utc).isoformat()
@@ -276,6 +301,7 @@ def _event(
         "via": "cli",
         "dry_run": dry_run,
         "authorise_egress": authorise_egress,
+        "disclosure": disclosure,
     }
     data.update(dict(extra))
     return {
@@ -311,6 +337,11 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="required for SMS: must name Twilio and an amount",
     )
+    parser.add_argument(
+        "--disclosure",
+        default="",
+        help="required: what was disclosed to the recipient before send",
+    )
     parser.add_argument("--log", default=".harness/log")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -322,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
                 subject=args.subject,
                 text=args.body,
                 authorise_egress=args.authorise_egress,
+                disclosure=args.disclosure,
                 dry_run=args.dry_run,
             )
         else:
@@ -330,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
                 text=args.body,
                 authorise_egress=args.authorise_egress,
                 authorise_spend=args.authorise_spend or None,
+                disclosure=args.disclosure,
                 dry_run=args.dry_run,
             )
     except OutboundError as exc:
@@ -339,7 +372,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(event, ensure_ascii=False, indent=2, sort_keys=True))
         else:
-            print(f"dry-run: {event['data']['transport_name']} to {event['data']['to']}")
+            print(
+                f"dry-run: {event['data']['transport_name']} to {event['data']['to']}"
+            )
         return 0
     log = Path(args.log)
     log.mkdir(parents=True, exist_ok=True)

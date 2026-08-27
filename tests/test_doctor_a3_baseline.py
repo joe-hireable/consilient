@@ -3,23 +3,17 @@
 ADR-0105 extends ADR-0043: three invalid JSON lines on 2026-08-22 (lines 27, 35,
 45) are permanent refusals written before unit AB shipped torn-append refusal.
 
-HALF OF THAT IS APPLIED, AND THE HALF THAT IS NOT IS DELIBERATE. 24 August 2026.
+BOTH HALVES ARE NOW APPLIED. RESOLVED 26 August 2026.
 
-Two things ADR-0105 conflates are separate acts, and only one of them is taken here:
+ADR-0105 conflates two separate acts:
 
   * PINNING the incident — recording the exact file, line and digest of the three
-    torn lines so the quarantine cannot drift silently. Applied, enforced below by
-    `test_real_trajectory_rejections_still_match_the_pin`, and not in dispute.
+    torn lines so the quarantine cannot drift silently. Applied since 24 August,
+    enforced below by `test_real_trajectory_rejections_still_match_the_pin`, and
+    never in dispute.
   * WIDENING the operational A3 tolerance — adding those digests to
     `cli.HISTORICAL_REFUSAL_DIGESTS`, which raises the number of refusals Gate A
-    condition 3 forgives from three to six. NOT applied.
-
-`tests/test_v0_invariants.py::test_historical_refusal_digests_pin_real_log_rejections`
-already refuses this exact widening, in prose and in an assertion: "Their exact
-filename, line and digest belong here, NOT in the operational A3 tolerance", and it
-pins the tolerance to the 2026-08-20 rejections alone. That guard was written before
-ADR-0105 and anticipates it. Two tests in this file assert the opposite, so the suite
-could not be green with both as written.
+    condition 3 forgives from three to six. Applied 26 August 2026.
 
 What was checked, 24 August 2026, rather than assumed:
 
@@ -32,25 +26,21 @@ What was checked, 24 August 2026, rather than assumed:
     the tree: `events.py` now writes under a kernel-backed per-log lock, fsyncs, and
     rolls back a partial line so it is never acknowledged. Its test passes.
 
-So the FACTS behind ADR-0105 are sound. What could not be corroborated is the
-AUTHORISATION. The ADR records "Accepted by Joe Brown, 24 August 2026, in the
-orchestration chat"; the available transcript contains no such acceptance, and the
-nearest candidate, "a3. Yes I accept", follows a menu about merge-conflict resolution
-rather than Gate A condition 3. The transcript is demonstrably incomplete, so this is
-weak evidence — it is simply not evidence OF acceptance.
+So the FACTS behind ADR-0105 were sound from 24 August. What could not be corroborated
+until 26 August was the AUTHORISATION. An earlier version of the ADR claimed "Accepted
+by Joe Brown, 24 August 2026, in the orchestration chat"; the available transcript
+contained no such acceptance, and the nearest candidate, "a3. Yes I accept", followed a
+menu about merge-conflict resolution rather than Gate A condition 3. That claim was
+withdrawn, and the widening below was withheld pending a real principal event.
 
-Widening A3 makes Gate A easier to pass. AGENTS.md reserves that to the principal:
-"do not repair a condition by loosening it without an ADR the principal accepts", and
-this repository's own history records a loosening filed under his signature that an
-audit later had to undo. Holding at three costs an overnight A3 failure and one commit
-to reverse; applying it on an uncorroborated signature would be the exact failure this
-project exists to detect, committed by the harness itself. The directions of error are
-not symmetric, so the strict one is held.
-
-TO RESOLVE: if Joe confirms he accepted ADR-0105, restore the three 2026-08-22 digests
-to `cli.HISTORICAL_REFUSAL_DIGESTS`, delete the `UNDECIDED` marker below, and update the
-guard in `test_v0_invariants.py` to cite ADR-0105. If he did not, ADR-0105's status is
-what needs correcting, and this file's two marked tests should go with it.
+RESOLVED 26 August 2026: Joe authorised the widening directly ("Set it back to
+accepted."), recorded as `decision.gate_amendment` in `.harness/log/2026-08-26.jsonl`,
+actor and principal "joe-brown", via "cli" (V0-28: only a locally-recorded event is
+accepted; the chat source is named in the event's own `source` field). `cli.
+HISTORICAL_REFUSAL_DIGESTS` now carries all six digests, and `test_v0_invariants.py::
+test_the_capture_refusal_baseline_may_only_fall` and
+`test_historical_refusal_digests_pin_real_log_rejections` are updated to permit and
+verify six rather than three, citing ADR-0105.
 """
 
 from __future__ import annotations
@@ -88,16 +78,6 @@ AUGUST_22_DIGESTS: frozenset[str] = frozenset(
 BASELINE_DIGESTS = AUGUST_20_DIGESTS | AUGUST_22_DIGESTS
 
 
-UNDECIDED = pytest.mark.skip(
-    reason=(
-        "ADR-0105's OPERATIONAL widening is not applied; awaiting the principal. "
-        "See the module docstring. The incident pin is intact and enforced by "
-        "test_real_trajectory_rejections_still_match_the_pin below."
-    )
-)
-
-
-@UNDECIDED
 def test_historical_refusal_digests_cover_both_baselines():
     """ADR-0043 pins three refusals from 2026-08-20; ADR-0105 adds three from 2026-08-22."""
     assert HISTORICAL_REFUSAL_DIGESTS == BASELINE_DIGESTS
@@ -107,7 +87,6 @@ def test_historical_refusal_digests_cover_both_baselines():
         assert digest in HISTORICAL_REFUSAL_DIGESTS
 
 
-@UNDECIDED
 def test_pinned_trajectory_rejections_match_operational_baseline():
     """Every pinned rejection digest must be in the operational tolerance, and no others."""
     pinned_digests = {digest for _file, _line, digest in PINNED_TRAJECTORY_REJECTIONS}

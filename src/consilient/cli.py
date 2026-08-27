@@ -62,25 +62,24 @@ GATE_B_CIRCULARITY = Path("docs/00-context/gate-b-cannot-be-passed-2026-08-20.md
 # after unit AB shipped torn-append refusal. THEY ARE NOT ADDED HERE, and the reason is the
 # whole point of this constant.
 #
-# The three digests are real: verified 24 August 2026 against .harness/log/2026-08-22.jsonl,
-# where they hash lines 27, 35 and 45 exactly, and those lines are genuinely torn. The factual
-# basis is sound. What could not be corroborated is the AUTHORISATION. ADR-0105 records
-# "Accepted by Joe Brown, 24 August 2026, in the orchestration chat", and the available
-# transcript contains no such acceptance -- the nearest candidate, "a3. Yes I accept", follows
-# a menu about merge-conflict resolution, not Gate A condition 3. The transcript is incomplete,
-# so this is weak evidence either way; it is not evidence of acceptance.
-#
-# Adding them RAISES A3's tolerance. `test_the_capture_refusal_baseline_may_only_fall` exists
-# because ADR-0043 permits this number to fall and never to rise, and AGENTS.md reserves gate
-# changes to the principal: "do not repair a condition by loosening it without an ADR the
-# principal accepts." A gate that passes because someone widened it is the failure this
-# repository is about. So the tolerance stays at three until Joe says otherwise -- one commit
-# either way, and the cheap direction to be wrong in is the strict one.
+# ADR-0105 accepted 26 August 2026: `decision.gate_amendment` recorded in
+# `.harness/log/2026-08-26.jsonl`, actor and principal "joe-brown", authority "Set it back
+# to accepted." The three digests below the 20 August set are real -- verified 24 August
+# 2026 against `.harness/log/2026-08-22.jsonl`, where they hash lines 27, 35 and 45 exactly,
+# and those lines are genuinely torn. What could not be corroborated until 26 August was the
+# AUTHORISATION: an earlier version of ADR-0105 claimed "Accepted by Joe Brown, 24 August
+# 2026, in the orchestration chat" with no matching trajectory event, and that claim was
+# withdrawn. `test_the_capture_refusal_baseline_may_only_fall` still forbids this number
+# rising WITHOUT a principal event backing it -- it now permits <= 6, not <= 3, because one
+# exists.
 HISTORICAL_REFUSAL_DIGESTS: frozenset[str] = frozenset(
     {
         "0fb234324063389745b5e79be163b8b6e3988a955d2a2fbd19f4036e225a7b90",
         "6921e71b2c687dd2f1f816410d20f53e106db1126bbf39fceeec02e33204f260",
         "65df9c30eeaf7095072eaada45ce276cbaca877b9540c48c519bcfdc729eb300",
+        "305cfe4853e3d9576fd186f86cac2f3900805c44a75a41b0642a27e1da5741d3",
+        "3769e62caa9131bb916fef24b40d46d70b49e19ee59a0686aa106b66eed15387",
+        "6511adf8d1b5ef4aea3f542d610d261572c6a103d630775ce785ab2395a187ec",
     }
 )
 CAPTURE_REFUSAL_BASELINE = len(HISTORICAL_REFUSAL_DIGESTS)
@@ -254,6 +253,16 @@ def _copy_event_prefix(src: Path, dest: Path, count: int) -> None:
     Later lines are outside the high-water mark. Copying original file text, rather than
     re-serializing accepted events, keeps rejected lines in the prefix so the digest
     covers the same quarantine the projection had.
+
+    MEASURED 26 August 2026: the previous version copied the WHOLE current file whenever
+    `remaining >= len(file_events)` -- correct only if nothing had been appended since the
+    mark was taken. A refusal appended after the mark, with the accepted count unchanged,
+    landed inside the "pinned" prefix anyway and read as divergence against a log that had
+    not actually changed within the pinned window. Conversely, cutting only at the Nth
+    accepted event's own line (the other branch) dropped a genuine refusal that predated
+    the mark whenever later commits added MORE accepted events to the same file -- the log
+    is append-only, so anything strictly before the FIRST accepted event beyond the mark is
+    guaranteed to predate it, refusal or not, and belongs in the prefix regardless.
     """
     dest.mkdir(parents=True, exist_ok=True)
     remaining = count
@@ -261,18 +270,38 @@ def _copy_event_prefix(src: Path, dest: Path, count: int) -> None:
         if remaining <= 0:
             break
         file_events, _rejected = events_mod.read(path)
-        if remaining >= len(file_events):
+        if remaining < len(file_events):
+            # The mark completes partway through this file. Cut strictly before the first
+            # accepted event beyond it; everything before that line -- including any
+            # interleaved refusal -- necessarily predates it in an append-only log.
+            cutoff = file_events[remaining].line
+            if cutoff is None:
+                shutil.copy2(path, dest / path.name)
+                break
+            text = path.read_text(encoding="utf-8")
+            lines = text.splitlines(keepends=True)
+            (dest / path.name).write_text(
+                "".join(lines[: cutoff - 1]), encoding="utf-8"
+            )
+            break
+        remaining -= len(file_events)
+        if remaining > 0 or not file_events:
+            # Either more accepted events are still needed from a later file, or this file
+            # held none at all -- either way its whole content is chronologically earlier
+            # than the mark's eventual completion, refusals included.
             shutil.copy2(path, dest / path.name)
-            remaining -= len(file_events)
             continue
-        cutoff = file_events[remaining - 1].line
+        # remaining == 0 and file_events is non-empty: this file's last accepted event is
+        # exactly where the mark completes. Cut at ITS line, not "whatever this file
+        # currently contains" -- see the docstring measurement above.
+        cutoff = file_events[-1].line
         if cutoff is None:
             shutil.copy2(path, dest / path.name)
             break
         text = path.read_text(encoding="utf-8")
         lines = text.splitlines(keepends=True)
         (dest / path.name).write_text("".join(lines[:cutoff]), encoding="utf-8")
-        remaining = 0
+        break
 
 
 def _digest_of_pinned_prefix(
@@ -333,8 +362,14 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
         finally:
             existing.close()
 
+    version_changed = (
+        prior is not None and prior_version != projection.PROJECTION_VERSION
+    )
+
     prefix_identical: bool | None = None
-    if prior is not None and projected is not None:
+    if version_changed:
+        prefix_identical = None
+    elif prior is not None and projected is not None:
         if projected == 0:
             prefix_identical = True
         else:
@@ -346,9 +381,6 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
 
     read_events, rejected = read_all(log)
     events = len(read_events)
-    version_changed = (
-        prior is not None and prior_version != projection.PROJECTION_VERSION
-    )
 
     # Copy the on-disk state aside only when it disagrees about events it already
     # covers. A one-event lag is not drift; copying on every lag filled the disk
@@ -849,8 +881,12 @@ def _structural_condition(log: Path) -> CommandResult:
 def _foreign_tickets(log: Path) -> int:
     """Completed tickets in the trajectory naming a repository other than this one.
 
-    Counted over `append()`-validated events only. A ticket recorded by writing to the file
-    directly does not count, because nothing checked it.
+    This counter checks SHAPE and cannot check truth. A writer can always compute what a
+    check computes, so a hand-typed line that carries the three fields still counts. What
+    it enforces is that every counted row carries the three things a third party needs to
+    re-run the ticket and compare: `harness` (non-empty, the runtime that did the work),
+    `corpus_revision` (non-empty, the pin that was run against), and `receipt_sha256`
+    (64 lowercase hex identifying the receipt to compare).
 
     Gaming protection: counts distinct foreign tickets that carry verified execution evidence
     in the trajectory (an `attempt.outcome` event with `verifier_accept == True`). Bare
@@ -874,7 +910,18 @@ def _foreign_tickets(log: Path) -> int:
                 accept = data.get("verifier_accept")
                 task = str(data.get("task", "") or data.get("attempt_id", ""))
                 attempt_id = str(data.get("attempt_id", ""))
-                if accept is True or accept == 1:
+                harness = data.get("harness")
+                corpus_revision = data.get("corpus_revision")
+                receipt = data.get("receipt_sha256")
+                if (
+                    (accept is True or accept == 1)
+                    and isinstance(harness, str)
+                    and bool(harness.strip())
+                    and isinstance(corpus_revision, str)
+                    and bool(corpus_revision.strip())
+                    and isinstance(receipt, str)
+                    and events_mod.DIGEST_RE.fullmatch(receipt) is not None
+                ):
                     if task:
                         verified_attempts.add((repository, task))
                     if attempt_id:

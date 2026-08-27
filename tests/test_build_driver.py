@@ -5,11 +5,14 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
+import types
 from itertools import combinations
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -18,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DRIVER = ROOT / ".harness" / "build_driver.py"
 
 
-def _load_driver():
+def _load_driver() -> types.ModuleType:
     spec = importlib.util.spec_from_file_location("build_driver_test", DRIVER)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -1088,7 +1091,9 @@ def test_consume_review_verdict_only_memoises_a_terminal_outcome(
 
     unit = {"claims": ["a.py"]}
 
-    state: dict[str, object] = {"review_expected": {"U01": {"attempt": 1, "artefact": "x" * 64}}}
+    state: dict[str, object] = {
+        "review_expected": {"U01": {"attempt": 1, "artefact": "x" * 64}}
+    }
     driver.consume_review_verdict(state, "U01", unit)  # no files -> no_dispatch
     assert state["review_results"]["U01"]["outcome"] == "no_dispatch"
     assert "U01" not in state.get("review_consumed", {}), (
@@ -1098,10 +1103,16 @@ def test_consume_review_verdict_only_memoises_a_terminal_outcome(
     artefact = "y" * 64
     monkeypatch.setattr(driver, "artefact_identity", lambda _unit: artefact)
     (briefs / "U02-verdict.json").write_text(
-        json.dumps({
-            "v": 1, "unit": "U02", "artefact": artefact, "attempt": 1,
-            "verdict": "SOUND", "findings": [],
-        }),
+        json.dumps(
+            {
+                "v": 1,
+                "unit": "U02",
+                "artefact": artefact,
+                "attempt": 1,
+                "verdict": "SOUND",
+                "findings": [],
+            }
+        ),
         encoding="utf-8",
     )
     state2: dict[str, object] = {
@@ -1123,9 +1134,15 @@ def test_clear_stale_review_memos_recovers_units_stuck_by_the_old_semantics(
     driver = _load_driver()
     state: dict[str, object] = {
         "review_consumed": {
-            "A01": {"attempt": 1, "artefact": "a" * 64},   # stuck: non-terminal
-            "AF": {"attempt": 1, "artefact": "f" * 64},     # correctly terminal, must survive
-            "GONE": {"attempt": 1, "artefact": "g" * 64},   # not a real unit; must not be re-queued
+            "A01": {"attempt": 1, "artefact": "a" * 64},  # stuck: non-terminal
+            "AF": {
+                "attempt": 1,
+                "artefact": "f" * 64,
+            },  # correctly terminal, must survive
+            "GONE": {
+                "attempt": 1,
+                "artefact": "g" * 64,
+            },  # not a real unit; must not be re-queued
         },
         "review_results": {
             "A01": {"outcome": "no_dispatch"},
@@ -1140,9 +1157,13 @@ def test_clear_stale_review_memos_recovers_units_stuck_by_the_old_semantics(
 
     assert sorted(cleared) == ["A01", "GONE"]
     assert "A01" not in state["review_consumed"]
-    assert "A01" in state["review_dispatched"], "must be re-queued so it is looked at again"
+    assert "A01" in state["review_dispatched"], (
+        "must be re-queued so it is looked at again"
+    )
     assert "AF" in state["review_consumed"], "a terminal memo must not be disturbed"
-    assert "AF" not in state["review_dispatched"], "a correctly-consumed unit is not re-queued"
+    assert "AF" not in state["review_dispatched"], (
+        "a correctly-consumed unit is not re-queued"
+    )
     assert "GONE" not in state["review_dispatched"], (
         "a uid absent from the plan must not be queued for review"
     )
@@ -1235,7 +1256,9 @@ def test_a_crash_during_review_dispatch_refunds_the_review_attempt(
     briefs.mkdir()
     monkeypatch.setattr(driver, "BRIEFS", briefs)
     (briefs / "U01.err").write_text("boom\n", encoding="utf-8")
-    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [("U01", "boom", False)])
+    monkeypatch.setattr(
+        driver, "crashed_dispatches", lambda _state: [("U01", "boom", False)]
+    )
     monkeypatch.setattr(driver, "record_restart", lambda *_a, **_k: False)
     monkeypatch.setattr(driver, "release_dead_claims", lambda _uids: 0)
     monkeypatch.setattr(driver, "quarantine_unit", lambda *_a, **_k: False)
@@ -1250,7 +1273,9 @@ def test_a_crash_during_review_dispatch_refunds_the_review_attempt(
     driver._handle_crashed_dispatches(state)
 
     assert state["review_attempts"]["U01"] == 1, "the REVIEW attempt must be refunded"
-    assert state["attempts"]["U01"] == 5, "the unrelated BUILD counter must be untouched"
+    assert state["attempts"]["U01"] == 5, (
+        "the unrelated BUILD counter must be untouched"
+    )
     assert "U01" not in state["review_dispatched"]
 
 
@@ -1264,7 +1289,9 @@ def test_a_crash_during_build_dispatch_still_refunds_the_build_attempt(
     briefs.mkdir()
     monkeypatch.setattr(driver, "BRIEFS", briefs)
     (briefs / "U02.err").write_text("boom\n", encoding="utf-8")
-    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [("U02", "boom", False)])
+    monkeypatch.setattr(
+        driver, "crashed_dispatches", lambda _state: [("U02", "boom", False)]
+    )
     monkeypatch.setattr(driver, "record_restart", lambda *_a, **_k: False)
     monkeypatch.setattr(driver, "release_dead_claims", lambda _uids: 0)
     monkeypatch.setattr(driver, "quarantine_unit", lambda *_a, **_k: False)
@@ -1280,3 +1307,651 @@ def test_a_crash_during_build_dispatch_still_refunds_the_build_attempt(
 
     assert state["attempts"]["U02"] == 2, "the BUILD attempt must still be refunded"
     assert "U02" not in state["in_flight"]
+
+
+def test_merge_unit_worktree_signs_off_the_cherry_pick(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 26 August 2026: CI's DCO check failed on every recent push with "no sign-off
+    found" for every commit. A dispatched worker's own commit is not guaranteed to carry a
+    Signed-off-by trailer -- workers run arbitrary shells across several harnesses, and
+    asking each one to remember `--signoff` is a prompt-level fix. The sign-off is stamped
+    at the one chokepoint all unit work must pass through instead: the cherry-pick that
+    merges a unit's commits into the shared branch.
+    """
+    driver = _load_driver()
+    worktrees = tmp_path / "worktrees"
+    worktrees.mkdir()
+    (worktrees / "U01").mkdir()
+    monkeypatch.setattr(driver, "WORKTREES", worktrees)
+    monkeypatch.setattr(driver, "gate_merged_tree", lambda _touched, _baseline: "")
+
+    calls: list[list[str]] = []
+
+    class _Result:
+        def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_sh(args: list[str]) -> _Result:
+        calls.append(args)
+        if "-C" in args and "rev-parse" in args:
+            return _Result("unit-head-sha\n")
+        if args[:2] == ["git", "rev-parse"]:
+            return _Result("main-head-sha\n")
+        if "rev-list" in args:
+            return _Result("abc123\n")
+        if args[:3] == ["git", "show", "--name-only"]:
+            return _Result("some/file.py\n")
+        if "diff" in args and "--numstat" in args:
+            return _Result("")
+        if "cherry-pick" in args:
+            return _Result("", 0)
+        return _Result("")
+
+    monkeypatch.setattr(driver, "sh", fake_sh)
+
+    result = driver.merge_unit_worktree("U01")
+
+    assert result == "applied 1 commit(s) from U01"
+    cherry_pick_calls = [c for c in calls if "cherry-pick" in c]
+    assert cherry_pick_calls, "expected a cherry-pick call"
+    assert "--signoff" in cherry_pick_calls[0]
+
+
+def test_every_documented_infrastructure_loss_refunds_the_review_attempt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 26 August 2026: `_INFRASTRUCTURE_LOSS` only ever refunded two of the six
+    outcomes `clear_stale_review_memos`'s own docstring names as infrastructure losses.
+    Two live units (AC, AT) had a real verdict silently orphaned this way: AC's DEFECTIVE
+    receipt arrived after the driver had already recorded `dispatch_failed`; AT's SOUND
+    was lost to a WSL path-translation failure and recorded as `no_receipt_file`. Neither
+    is evidence about the code -- F-05 says an infrastructure death must not spend a retry,
+    for all six outcomes it names, not just two.
+    """
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    monkeypatch.setattr(driver, "append_review_outcome", lambda _record: None)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: "z" * 64)
+
+    unit = {"claims": ["a.py"]}
+    cases = {
+        "U_FAILED": ("status: failed\n", None),
+        "U_NORECEIPT": ("status: ok\n", None),
+        "U_UNPARSEABLE": ("status: ok\n", "not json"),
+        "U_MISMATCHED": (
+            "status: ok\n",
+            '{"v": 1, "unit": "WRONG", "artefact": "%s", "attempt": 1, '
+            '"verdict": "SOUND", "findings": []}' % ("z" * 64),
+        ),
+    }
+    for uid, (envelope, verdict_body) in cases.items():
+        (briefs / f"{uid}-verify.out").write_text(envelope, encoding="utf-8")
+        if verdict_body is not None:
+            (briefs / f"{uid}-verdict.json").write_text(verdict_body, encoding="utf-8")
+        state: dict[str, object] = {
+            "review_expected": {uid: {"attempt": 1, "artefact": "z" * 64}},
+            "review_attempts": {uid: 2},
+        }
+        outcome = driver.consume_review_verdict(state, uid, unit)
+        assert outcome in (
+            "dispatch_failed",
+            "no_receipt_file",
+            "receipt_unparseable",
+            "receipt_mismatched",
+        ), f"{uid}: unexpected outcome {outcome!r}"
+        assert state["review_attempts"][uid] == 1, (
+            f"{uid}: outcome {outcome!r} must refund the review attempt, not spend it"
+        )
+
+
+def test_clear_unjustly_escalated_reviews_frees_the_three_named_units() -> None:
+    """MEASURED 26 August 2026: AC, AT and B01 each reached the 3-attempt cap entirely on
+    infrastructure losses (a late-arriving receipt, a WSL path-translation failure, a dead
+    dispatch) against an unchanged artefact -- not a genuine repeated defect. Un-escalating
+    them gives each a fresh, real review rather than leaving a code bug's damage standing.
+    """
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "review_escalated": ["AC", "AT", "B01", "AJ", "AP"],
+        "review_attempts": {"AC": 3, "AT": 3, "B01": 3, "AJ": 3, "AP": 3},
+    }
+    cleared = driver.clear_unjustly_escalated_reviews(state)
+
+    assert sorted(cleared) == ["AC", "AT", "B01"]
+    for uid in ("AC", "AT", "B01"):
+        assert uid not in state["review_escalated"]
+        assert state["review_attempts"][uid] == 0
+    for uid in ("AJ", "AP"):
+        assert uid in state["review_escalated"], (
+            "genuinely escalated units must be untouched"
+        )
+        assert state["review_attempts"][uid] == 3
+
+
+def test_clear_unjustly_escalated_reviews_is_a_no_op_once_cleared() -> None:
+    driver = _load_driver()
+    state: dict[str, object] = {"review_escalated": [], "review_attempts": {}}
+    assert driver.clear_unjustly_escalated_reviews(state) == []
+    assert state["review_escalated"] == []
+
+
+def test_mypy_gate_does_not_refuse_a_files_own_pre_existing_debt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 26 August 2026: bare zero-tolerance mypy meant a file carrying pre-existing type
+    debt (build_driver.py itself, ~87 long-accepted errors) could never pass this gate for ANY
+    commit that touched it, regardless of whether the commit fixed, worsened, or never touched
+    the debt at all. BO's own verified-zero-delta fix was refused by this exact gate. The fix
+    compares against the tree the cherry-pick started from and refuses only a genuine increase.
+    """
+    driver = _load_driver()
+
+    calls: list[list[str]] = []
+
+    class _Result:
+        def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_sh(args: list[str]) -> _Result:
+        calls.append(args)
+        if "worktree" in args and "add" in args:
+            # _mypy_gate checks (scratch / path).exists() on real disk, so the fake
+            # worktree needs the same file physically present to be treated as
+            # carrying the same pre-existing debt as the working tree.
+            scratch = Path(args[args.index("--detach") + 1])
+            (scratch / "some").mkdir(parents=True)
+            (scratch / "some" / "file.py").write_text("", encoding="utf-8")
+            return _Result("", 0)
+        if "worktree" in args and "remove" in args:
+            return _Result("", 0)
+        if "mypy" in args:
+            # Both the "after" and any "before" mypy invocation land here; both see the
+            # same pre-existing debt, so no new error is introduced by this merge.
+            return _Result(
+                "some/file.py:1: error: fake pre-existing debt  [no-untyped-def]\n"
+                "Found 1 error in 1 file (checked 1 source file)\n",
+                1,
+            )
+        return _Result("", 0)
+
+    (tmp_path / "some").mkdir()
+    (tmp_path / "some" / "file.py").write_text("", encoding="utf-8")
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    monkeypatch.setattr(driver, "ROOT", tmp_path)
+
+    result = driver.gate_merged_tree(["some/file.py"], "deadbeef")
+
+    assert result is None, (
+        f"pre-existing debt with no new errors must not refuse the merge: {result}"
+    )
+    mypy_calls = [c for c in calls if "mypy" in c]
+    assert len(mypy_calls) == 2, "expected one 'after' and one 'before' mypy invocation"
+
+
+def test_mypy_gate_refuses_a_genuine_regression(tmp_path: Path, monkeypatch) -> None:
+    """The other half: if the touched file's error count is actually HIGHER than at the
+    baseline, the gate must still refuse -- this fix narrows what counts as a failure, it does
+    not remove the check.
+    """
+    driver = _load_driver()
+
+    class _Result:
+        def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_sh(args: list[str]) -> _Result:
+        if "worktree" in args and "add" in args:
+            scratch = Path(args[args.index("--detach") + 1])
+            (scratch / "some").mkdir(parents=True)
+            (scratch / "some" / "file.py").write_text("", encoding="utf-8")
+            return _Result("", 0)
+        if "worktree" in args and "remove" in args:
+            return _Result("", 0)
+        if "mypy" in args:
+            # The "before" call's file arguments point inside the scratch worktree
+            # (named "gate-baseline-<hex>"); the "after" call uses the plain relative
+            # path. That is the only reliable way to tell them apart here, since the
+            # scratch dir never actually gets its own mypy.ini written to disk.
+            if any("gate-baseline-" in arg for arg in args):
+                return _Result(
+                    "some/file.py:1: error: one pre-existing error  [no-untyped-def]\n",
+                    1,
+                )
+            return _Result(
+                "some/file.py:1: error: one pre-existing error  [no-untyped-def]\n"
+                "some/file.py:2: error: a brand new one  [no-untyped-def]\n",
+                1,
+            )
+        return _Result("", 0)
+
+    (tmp_path / "some").mkdir()
+    (tmp_path / "some" / "file.py").write_text("", encoding="utf-8")
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    monkeypatch.setattr(driver, "ROOT", tmp_path)
+
+    result = driver.gate_merged_tree(["some/file.py"], "deadbeef")
+
+    assert result is not None, (
+        "a genuine error-count increase must still refuse the merge"
+    )
+    assert "regressed" in result
+
+
+def test_mypy_gate_fails_closed_when_the_baseline_worktree_cannot_be_created(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """If the baseline can't be established at all, refuse rather than silently let anything
+    through -- the whole point is comparing against a known-good state, not skipping the check.
+    """
+    driver = _load_driver()
+
+    class _Result:
+        def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_sh(args: list[str]) -> _Result:
+        if "worktree" in args and "add" in args:
+            return _Result("fatal: could not create worktree", 1)
+        if "mypy" in args:
+            return _Result("some/file.py:1: error: whatever  [no-untyped-def]\n", 1)
+        return _Result("", 0)
+
+    (tmp_path / "some").mkdir()
+    (tmp_path / "some" / "file.py").write_text("", encoding="utf-8")
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    monkeypatch.setattr(driver, "ROOT", tmp_path)
+
+    result = driver.gate_merged_tree(["some/file.py"], "deadbeef")
+
+    assert result is not None, (
+        "an unestablished baseline must fail closed, not pass silently"
+    )
+
+
+def test_main_merges_a_built_units_worktree_when_it_gains_new_commits(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 26 August 2026: `mergeable` excluded any uid already in `built`, so a unit
+    whose worktree gained a genuinely new commit after being marked built (a fork's
+    conflict-resolution or review fix landing after the plan commit already merged) was
+    never revisited by any later tick. AN, AJ and AL each sat this way -- `built: true`, a
+    real new commit sitting in the worktree, zero merge attempts logged since. Excluding
+    built units from the merge loop was never the right check: `merge_unit_worktree`'s own
+    `HEAD..head` rev-list is the cheap no-op guard for a unit with nothing new to merge.
+    """
+    driver = _load_driver()
+    worktrees = tmp_path / "unit-worktrees"
+    (worktrees / "U01").mkdir(parents=True)
+    state: dict[str, object] = {
+        "in_flight": {},
+        "attempts": {},
+        "built": ["U01"],
+        "review_dispatched": ["U01"],
+    }
+    units = {
+        "U01": {
+            "title": "already built, worktree has a newer commit",
+            "commit": "feat(unit): already built",
+            "claims": [],
+            "deps": [],
+        }
+    }
+    calls: list[str] = []
+    monkeypatch.setattr(driver, "WORKTREES", worktrees)
+    monkeypatch.setattr(
+        driver, "load", lambda path, _default: units if path == driver.UNITS else state
+    )
+    monkeypatch.setattr(driver, "committed", lambda _uid, _unit: False)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: None)
+    monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
+    monkeypatch.setattr(driver, "save_state", lambda _state: None)
+    monkeypatch.setattr(driver, "record_tick_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        driver,
+        "merge_unit_worktree",
+        lambda uid: calls.append(uid) or "no commits",
+    )
+
+    assert driver.main() == 0
+
+    assert calls == ["U01"], (
+        "a built unit's worktree must still be checked for new commits to merge"
+    )
+
+
+# --- BL: classify conflicts by content, clear them on retirement, gate merges --
+#
+# The already-landed detector used to grep commit SUBJECTS. Over 646 commits this
+# repository reused 14 subjects; 9 of the top 12 reused subjects carry different
+# patch content [measured, 24 August 2026]. A subject hit retired the unit. That
+# is a false-accept in the driver's own classifier, and it is how harness.py
+# acquired a duplicate 313-line block.
+#
+# These four tests are the unit's done criteria (A1, A2, A5-driver-half, F).
+
+
+_GIT_ENV = {
+    key: value
+    for key, value in os.environ.items()
+    if key not in {"GIT_DIR", "GIT_WORK_TREE"}
+}
+
+
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=_GIT_ENV,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    return result
+
+
+def _init_repo(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    _git(path, "init")
+    _git(path, "config", "user.email", "bl@test")
+    _git(path, "config", "user.name", "BL")
+
+
+def _commit_file(repo: Path, rel: str, body: str, subject: str) -> str:
+    target = repo / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    _git(repo, "add", rel)
+    _git(repo, "commit", "-m", subject)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _isolate_driver(
+    driver: object, repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(driver, "ROOT", repo)
+    monkeypatch.setattr(driver, "WORKTREES", repo / ".harness" / "unit-worktrees")
+    monkeypatch.setattr(driver, "STATE", repo / ".harness" / "driver-state.json")
+
+    def isolated_sh(args: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            args,
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=_GIT_ENV,
+            **kw,
+        )
+
+    monkeypatch.setattr(driver, "sh", isolated_sh)
+
+
+def test_classifier_does_not_retire_on_subject_reuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A1: identical subject, different content — the second stays escalated."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit_file(repo, "mod.py", "base = 0\n", "init")
+    default = _git(repo, "branch", "--show-current").stdout.strip()
+    first_lines = "\n".join(f"FIRST_{i} = {i}" for i in range(25)) + "\n"
+    second_lines = "\n".join(f"SECOND_{i} = {i}" for i in range(25)) + "\n"
+    _git(repo, "checkout", "-b", "first")
+    _commit_file(repo, "mod.py", first_lines, "feat: shared subject")
+    _git(repo, "checkout", default)
+    _git(repo, "checkout", "-b", "second")
+    second_sha = _commit_file(repo, "mod.py", second_lines, "feat: shared subject")
+    _git(repo, "checkout", default)
+    _git(repo, "merge", "--no-ff", "first", "-m", "land first")
+
+    driver = _load_driver()
+    _isolate_driver(driver, repo, monkeypatch)
+    state: dict[str, object] = {
+        "conflicts": {
+            "U2": f"CONFLICT cherry-picking {second_sha[:9]} for U2 (0 applied); needs resolution"
+        },
+        "force_done": [],
+        "built": [],
+        "done": [],
+    }
+    retired = driver.retest_conflicts(state)
+    assert retired == 0
+    assert "U2" in cast("dict[str, str]", state["conflicts"])
+
+
+def test_conflict_cleared_on_retire() -> None:
+    """A2: no uid may sit in both conflicts and force_done — that was K01 live."""
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "conflicts": {"K01": "CONFLICT cherry-picking deadbeef for K01"},
+        "force_done": ["K01", "T01"],
+        "built": [],
+        "done": [],
+    }
+    driver.clear_retired_conflicts(state)
+    overlap = set(cast("dict[str, str]", state["conflicts"])) & set(
+        cast("list[str]", state["force_done"])
+    )
+    assert overlap == set(), overlap
+
+
+def test_failed_gate_reverts_cherry_pick(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cherry-pick whose result fails the gate is undone and the unit escalates."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    pre = _commit_file(repo, "ok.py", "VALUE = 1\n", "init")
+    default = _git(repo, "branch", "--show-current").stdout.strip()
+    _git(repo, "checkout", "-b", "unit")
+    _commit_file(repo, "ok.py", "VALUE = 2\n", "feat: change value")
+    _git(repo, "checkout", default)
+    worktree = repo / ".harness" / "unit-worktrees" / "U1"
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    _git(repo, "worktree", "add", str(worktree), "unit")
+
+    driver = _load_driver()
+    _isolate_driver(driver, repo, monkeypatch)
+    monkeypatch.setattr(
+        driver,
+        "gate_merged_tree",
+        lambda _touched, _baseline: "ruff: simulated gate failure",
+    )
+
+    msg = driver.merge_unit_worktree("U1")
+    assert msg.startswith("CONFLICT"), msg
+    assert "gate" in msg.lower()
+    assert _git(repo, "rev-parse", "HEAD").stdout.strip() == pre
+
+
+def test_classifier_does_not_grep_subjects() -> None:
+    """The false-accept path was `git log --grep <subject>`. It must stay gone."""
+    source = DRIVER.read_text(encoding="utf-8")
+    assert "--grep" not in source
+    assert "--merge-base=" in source
+    assert "retired without review" in source
+    assert "--config-file" in source and "mypy.ini" in source
+    gate = source.split("def gate_merged_tree", 1)[1].split("\ndef ", 1)[0]
+    assert "--config-file" in gate and "mypy.ini" in gate
+    assert "--strict" not in gate.replace("never bare `--strict`", "")
+
+
+def test_content_landed_is_indentation_sensitive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MEASURED 26 August 2026: `.strip()` on both sides discarded leading whitespace too, so
+    a commit that only re-indents an existing block (moves it into a loop or a conditional,
+    changing what it means) read as "already present". 25 unindented lines on HEAD, the same
+    25 lines each indented by 4 spaces in the unit's commit, must NOT be classified as landed.
+    """
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    driver = _load_driver()
+    _isolate_driver(driver, repo, monkeypatch)
+
+    flat_lines = "\n".join(f"LINE_{i} = {i}" for i in range(25)) + "\n"
+    indented_lines = "\n".join(f"    LINE_{i} = {i}" for i in range(25)) + "\n"
+    _commit_file(repo, "mod.py", flat_lines, "feat: flat lines land on HEAD")
+    default = _git(repo, "branch", "--show-current").stdout.strip()
+    _git(repo, "checkout", "-b", "reindented")
+    sha = _commit_file(repo, "mod.py", indented_lines, "feat: same lines, now indented")
+    _git(repo, "checkout", default)
+
+    assert driver._content_landed(sha) is False, (
+        "re-indented lines are not the same code and must not read as already landed"
+    )
+
+
+def test_escalation_banner_counts_retirements(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """F: the banner grows when the classifier retires, it does not shrink."""
+    driver = _load_driver()
+    units = {f"E{i}": {"title": "held", "claims": []} for i in range(5)}
+    units["T02"] = {"title": "landed", "claims": []}
+    units["K01"] = {"title": "landed", "claims": []}
+    remaining = {
+        f"E{i}": f"CONFLICT cherry-picking {'abcdabcd'[:7]}{i} for E{i}"
+        for i in range(5)
+    }
+    state: dict[str, object] = {
+        "conflicts": {
+            **remaining,
+            "T02": "CONFLICT cherry-picking deadbee1 for T02",
+            "K01": "CONFLICT cherry-picking deadbee2 for K01",
+        },
+        "force_done": [],
+        "built": [],
+        "done": [],
+        "in_flight": {},
+        "attempts": {},
+    }
+    monkeypatch.setattr(
+        driver, "load", lambda path, _default: units if path == driver.UNITS else state
+    )
+    monkeypatch.setattr(driver, "committed", lambda _uid, _unit: False)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: None)
+    monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
+    monkeypatch.setattr(driver, "save_state", lambda _state: None)
+    monkeypatch.setattr(driver, "live_dispatchers", lambda _state: 1)
+    monkeypatch.setattr(driver, "publish_if_ready", lambda _state, _green: "")
+    monkeypatch.setattr(driver, "ready", lambda *_a, **_k: False)
+    monkeypatch.setattr(driver.subprocess, "Popen", lambda *_a, **_k: None)
+    monkeypatch.setattr(driver, "rebase_mergeable_worktrees", lambda *_a, **_k: None)
+    # Isolates this test from whatever real unit worktrees the live driver has actually
+    # created on disk in this checkout -- without this, main()'s built-unmerged scan
+    # (WORKTREES / uid).exists() sees real T02/K01 worktrees and calls the real `sh()`,
+    # which crashes because `subprocess.Popen` above is mocked to return None.
+    monkeypatch.setattr(driver, "WORKTREES", tmp_path / "unit-worktrees")
+
+    def fake_retest(current: dict[str, object]) -> int:
+        for uid in ("T02", "K01"):
+            cast("dict[str, str]", current.get("conflicts", {})).pop(uid, None)
+            built = cast("list[str]", current.setdefault("built", []))
+            if uid not in built:
+                built.append(uid)
+        return 2
+
+    monkeypatch.setattr(driver, "retest_conflicts", fake_retest)
+    monkeypatch.setattr(driver, "clear_retired_conflicts", lambda _state: None)
+    monkeypatch.setattr(
+        driver,
+        "merge_unit_worktree",
+        lambda uid: current_conflict(uid),
+    )
+
+    def current_conflict(uid: str) -> str:
+        if uid in ("T02", "K01"):
+            return "no worktree"
+        return cast("dict[str, str]", state["conflicts"]).get(uid, "CONFLICT leftover")
+
+    assert driver.main() == 0
+    out = capsys.readouterr().out
+    assert "5 escalated, 2 retired without review" in out
+
+
+def test_an_originally_empty_unit_commit_lands_no_commit_at_all(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """MEASURED 27 August 2026, against real git, not a fake `sh`.
+
+    Two units (W07 among them) generated dozens of zero-diff commits -- at one point 189 of
+    the last 200 commits on this branch were two empty messages repeating. The cause is not
+    the one first suspected. `--allow-empty` does NOT make git swallow a commit whose content
+    is already in HEAD: that case still exits non-zero with "the previous cherry-pick is now
+    empty", which the already-applied branch below handles correctly. What `--allow-empty`
+    does is let a source commit that was empty *to begin with* be replayed as a fresh empty
+    commit, exit 0, and be counted as `applied`.
+
+    That one then cannot terminate. The replayed commit gets a new sha, so `HEAD..unit_head`
+    still lists the original on the next tick, and there is no content for git to recognise as
+    already present -- so it is cherry-picked again, and again, once per tick, forever.
+
+    Dropping the flag routes an empty source commit into the same already-applied path the
+    content case uses: git exits non-zero, the driver skips it, and nothing lands.
+    """
+    driver = _load_driver()
+
+    root = tmp_path / "main"
+    root.mkdir()
+
+    def git(*args: str, cwd: Path = root) -> str:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        ).stdout
+
+    git("init", "-q", "-b", "main", ".")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "Test")
+    git("config", "commit.gpgsign", "false")
+    (root / "f.txt").write_text("base\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+
+    worktrees = tmp_path / "worktrees"
+    worktrees.mkdir()
+    unit = worktrees / "U01"
+    git("worktree", "add", "-q", "-b", "unit", str(unit))
+    # The one thing this unit ever committed carries no content.
+    git("commit", "-q", "--allow-empty", "-m", "no-op from the harness", cwd=unit)
+
+    monkeypatch.setattr(driver, "ROOT", root)
+    monkeypatch.setattr(driver, "WORKTREES", worktrees)
+    monkeypatch.setattr(driver, "gate_merged_tree", lambda _touched, _baseline: "")
+
+    before = git("rev-parse", "HEAD").strip()
+    result = driver.merge_unit_worktree("U01")
+    after = git("rev-parse", "HEAD").strip()
+
+    assert after == before, (
+        f"an empty unit commit must not land a commit; HEAD moved {before[:9]} -> {after[:9]}\n"
+        f"driver said: {result}"
+    )
+    assert "applied 1" not in result, (
+        f"a commit that changed nothing must not be reported as applied: {result!r}"
+    )
+    # And it must be reported, not silently dropped -- the driver has to be able to say why a
+    # unit with commits merged nothing.
+    assert "already" in result or "no commits" in result, result

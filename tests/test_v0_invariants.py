@@ -1070,7 +1070,6 @@ TORN_APPEND_LOCATIONS: frozenset[tuple[str, int]] = frozenset(
 )
 
 
-
 def _read_live_trajectory(log):
     """Read the repository's own trajectory, or skip if it is momentarily unreadable.
 
@@ -1598,6 +1597,9 @@ def test_gate_b4_counts_only_validated_tickets_on_another_repository(
                     "attempt_id": f"att-{index}",
                     "task": f"ticket-{index}",
                     "verifier_accept": True,
+                    "harness": "cursor-grok",
+                    "corpus_revision": "test-fixture-pin-not-a-commit-sha",
+                    "receipt_sha256": "a" * 64,
                 },
             ),
         )
@@ -2441,13 +2443,16 @@ def test_the_capture_refusal_baseline_may_only_fall():
     """A ratchet on the tolerance itself, in the shape used for `append()` bypass.
 
     ADR-0043's own Evidence-against names the hazard: a ratchet with a non-zero floor can
-    normalise its floor. The number below is the measured past and raising it is the way this
-    amendment would quietly become "count nothing".
+    normalise its floor. ADR-0105 (accepted 26 August 2026, `decision.gate_amendment` in
+    `.harness/log/2026-08-26.jsonl`) raised the floor once, from three to six, to also
+    baseline the 22 August torn-append refusals. The number below is the measured ceiling
+    after that one authorised raise; it may fall from here but not rise again without a
+    further principal event.
     """
     from consilient.cli import CAPTURE_REFUSAL_BASELINE
 
-    assert CAPTURE_REFUSAL_BASELINE <= 3, (
-        "the A3 refusal tolerance was raised; ADR-0043 permits it to fall only"
+    assert CAPTURE_REFUSAL_BASELINE <= 6, (
+        "the A3 refusal tolerance was raised; ADR-0043/0105 permit it to fall only"
     )
 
 
@@ -3014,19 +3019,20 @@ def test_gate_b4_ignores_bare_ticket_completed_and_repo_aliases(
 
 
 def test_historical_refusal_digests_pin_real_log_rejections():
-    """Pin every rejection while keeping A3's tolerated baseline at its original three.
+    """Pin every rejection, and check the operational baseline against the full six-digest pin.
 
     Until 21 Aug 2026 this hashed `HISTORICAL_REFUSAL_LINES` from this file and checked the
     digests were in `cli.HISTORICAL_REFUSAL_DIGESTS` — two hand-written constants agreeing
     with each other. Both could drift from the log together and nothing would notice, while
     `_capture_condition` silently widened A3's tolerance. Three torn concurrent appends on
-    22 Aug are now also quarantined. Their exact filename, line and digest belong here, not
-    in the operational A3 tolerance. A new, removed or substituted rejection therefore fails.
+    22 Aug are also quarantined here, and since ADR-0105's acceptance on 26 August 2026 they
+    belong in the operational A3 tolerance too. A new, removed or substituted rejection among
+    either day's three still fails.
     """
     import hashlib
     from consilient.cli import HISTORICAL_REFUSAL_DIGESTS
 
-    assert len(HISTORICAL_REFUSAL_DIGESTS) == 3
+    assert len(HISTORICAL_REFUSAL_DIGESTS) == 6
     for line in HISTORICAL_REFUSAL_LINES:
         digest = hashlib.sha256(line.encode("utf-8")).hexdigest()
         assert digest in HISTORICAL_REFUSAL_DIGESTS, f"digest {digest} not in baseline"
@@ -3044,12 +3050,9 @@ def test_historical_refusal_digests_pin_real_log_rejections():
         "the trajectory's exact rejection set changed; inspect the quarantine before "
         "updating an immutable incident pin"
     )
-    a3_digests = {
-        digest
-        for filename, _line, digest in PINNED_TRAJECTORY_REJECTIONS
-        if filename == "2026-08-20.jsonl"
+    assert set(HISTORICAL_REFUSAL_DIGESTS) == {
+        digest for _filename, _line, digest in PINNED_TRAJECTORY_REJECTIONS
     }
-    assert a3_digests == set(HISTORICAL_REFUSAL_DIGESTS)
 
 
 # ------------------------------------------- publication safety, after the 21 Aug 2026 block
@@ -5490,3 +5493,121 @@ def test_review_queue_opened_freezes_candidate_exposure_contract() -> None:
     }
     with pytest.raises(EventError, match="eligible_universe_digest"):
         validate(queue)
+
+
+def test_no_effect_path_bypasses_action_and_decision_admission():
+    """ADR-0079: raw reach hosts must consume effects.admit_effect / dispatch admission."""
+
+    effects_source = Path("src/consilient/effects.py").read_text(encoding="utf-8")
+    dispatch_source = Path("scripts/dispatch.py").read_text(encoding="utf-8")
+    assert "def admit_effect" in effects_source
+    assert "run_admitted_fake_effect" in dispatch_source
+    assert "admit_effect(" in dispatch_source
+    assert "subprocess" not in effects_source
+    assert "urllib" not in effects_source
+    assert "smtplib" not in effects_source
+
+    # Outbound and computer-use migration are A05/A06; they remain listed here so the
+    # allowlist cannot silently grow. Dispatch is the only admitted fake host in A04.
+    assert Path("src/consilient_connectors/outbound.py").exists()
+
+    from consilient.effects import admit_effect
+    from tests.test_action_boundary import manifest_record
+
+    refusal = admit_effect(
+        manifest_record(),
+        disposition="execute",
+        prefix=(),
+        intent_id="ratchet-intent",
+        receipt_id="ratchet-receipt",
+    )
+    from consilient.effects import EffectAdmissionRefusal
+
+    assert isinstance(refusal, EffectAdmissionRefusal)
+
+
+def test_a_percent_encoded_identifier_cannot_walk_past_the_gate(tmp_path, monkeypatch) -> None:
+    """MEASURED 27 August 2026 by a pre-publication audit, in tracked content.
+
+    `docs/00-context/grok-arm-2026-08-23.md` carried a 40-hex upstream revision whose final
+    character was written `%39`, and said in plain prose on the same line that it was encoded
+    "so the public-repository foreign-identifier gate does not mistake cited upstream provenance
+    for a private commit". A working, documented technique for stepping around the one check
+    that exists because 71 private commit identifiers reached a results file.
+
+    It also defeated an independent hand-written sweep run the same day, for the identical
+    reason: `[0-9a-f]{40}` does not match across a `%39`. Two checks, one escape, both blind.
+
+    The escape was not even needed -- `strip_public_citations` already exempts a permalink into
+    a public forge, which that line was. But a gate a contributor can step around by escaping a
+    single character is not a gate, and this one had the escape written down beside it where the
+    next person would copy it.
+    """
+    gate = _load_gate("check_foreign_identifiers.py")
+
+    foreign = "d" * 40  # resolves in no repository
+    monkeypatch.setattr(gate, "ROOT", tmp_path)
+    monkeypatch.setattr(gate, "resolves_here", lambda _sha: False)
+
+    plain = tmp_path / "plain.md"
+    plain.write_text(f"see commit {foreign} upstream\n", encoding="utf-8")
+    assert gate.scan(["plain.md"]), "a bare foreign identifier must be caught"
+
+    # The same identifier, last character percent-encoded. This is the exact shape found.
+    encoded = tmp_path / "encoded.md"
+    encoded.write_text(f"see commit {foreign[:-1]}%64 upstream\n", encoding="utf-8")
+    assert gate.scan(["encoded.md"]), (
+        "a percent-encoded foreign identifier walked past the gate; the escape still works"
+    )
+
+    # And the legitimate case still passes: a permalink into a PUBLIC forge is a citation,
+    # whether or not anyone escaped a character in it.
+    cited = tmp_path / "cited.md"
+    cited.write_text(
+        f"[upstream](https://github.com/xai-org/grok-build/blob/{foreign}/src/x.rs)\n",
+        encoding="utf-8",
+    )
+    assert not gate.scan(["cited.md"]), (
+        "a public-forge permalink is a citation and must not need an escape to pass"
+    )
+
+
+def test_this_repository_does_not_commit_under_a_test_fixture_identity() -> None:
+    """MEASURED 27 August 2026 by a pre-publication audit, and it had been true for days.
+
+    The live worktree's LOCAL git config read `Fixture <fixture@example.invalid>` while the
+    global config was correct. `tests/test_supervision.py` sets that identity on a repository it
+    builds, and it reached the real one. Consequence: 280 of the 289 commits awaiting
+    publication were committed by a test fixture, and 63 were authored by one -- against roughly
+    10% of the already-published history, so the defect was recent and accelerating.
+
+    Publishing is one-way. Commit identity is part of the commit object, so a wrong committer
+    travels by construction and cannot be corrected afterwards without rewriting every sha. The
+    only cheap moment to catch this is before the push, which is exactly where nothing was
+    looking.
+
+    A `.invalid` address is the tell: RFC 2606 reserves that TLD precisely so it can never be a
+    real address, which makes it perfect for a fixture and disqualifying for a commit anyone is
+    meant to be able to trace.
+    """
+    import subprocess
+
+    ident = subprocess.run(
+        ["git", "var", "GIT_COMMITTER_IDENT"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    ).stdout.strip()
+    if not ident:  # pragma: no cover - not a git checkout
+        pytest.skip("git identity unavailable")
+
+    lowered = ident.lower()
+    assert ".invalid" not in lowered and "fixture" not in lowered, (
+        "this repository is configured to commit under a test-fixture identity "
+        f"({ident!r}). A test wrote it into the real config. Clear it with "
+        "`git config --local --unset user.name` and `--unset user.email` so the "
+        "global identity applies; every commit made meanwhile carries the wrong committer "
+        "and cannot be corrected after a push."
+    )

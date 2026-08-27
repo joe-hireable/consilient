@@ -18,7 +18,8 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
 from consilient import events  # noqa: E402
-from scripts.dispatch import run_process  # noqa: E402
+from consilient.harness import HARNESSES  # noqa: E402
+from scripts.dispatch import run_process, which_binary  # noqa: E402
 
 
 # The pin is written as a PUBLIC PERMALINK, not a bare forty-hex string, and that is not
@@ -41,6 +42,17 @@ _CORPUS_IGNORE = {
     ".mypy_cache",
     "node_modules",
 }
+RECEIPT_ROOT = ROOT / ".harness" / "objects" / "b4-receipts"
+RECEIPT_FILES = (
+    "red.stdout.txt",
+    "red.stderr.txt",
+    "agent.stdout.txt",
+    "agent.stderr.txt",
+    "target.stdout.txt",
+    "target.stderr.txt",
+    "full.stdout.txt",
+    "full.stderr.txt",
+)
 
 
 @dataclass(frozen=True)
@@ -51,40 +63,44 @@ class Ticket:
     before: bytes
     after: bytes
     issue: str
+    allowed_paths: tuple[str, ...]
+    synthetic: bool = False
 
 
+# Three currently-open pytest-dev/pytest issues, verified 26 August 2026 against the
+# pinned corpus: each reproduces deterministically on the pristine tree (no seeding
+# needed to create red -- the bug is already there), was root-caused, fixed and given a
+# permanent regression test added to the corpus alongside the fix. `before` and `after`
+# are identical: the pristine file already IS the buggy state for an unfixed issue, so
+# `_seed()` is a no-op here rather than a regression of an already-fixed file.
 TICKETS = (
     Ticket(
-        "B4-PYT-13369",
-        "src/_pytest/pytester.py",
-        "testing/test_pytester.py::test_assert_outcomes_after_pytest_error",
-        (
-            b"            raise ValueError(\r\n"
-            b'                "Pytest terminal summary report not found. "\r\n'
-            b'                "Plugins that modify pytest\'s terminal output can break outcome "\r\n'
-            b'                "parsing. Disable the plugin for the test run, for example with "\r\n'
-            b'                "`-p no:<plugin>`, or disable plugin autoloading with "\r\n'
-            b'                "`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`."\r\n'
-            b"            )"
-        ),
-        b'            raise ValueError("Pytest terminal summary report not found")',
-        "13369",
+        "B4-PYT-14324",
+        "src/_pytest/raises.py",
+        "testing/python/raises_group.py::test_check",
+        b'        # Only run `self.check` once we know `exception` is of the correct type.\r\n        if not self._check_check(exception):\r\n            reason = (\r\n                cast(str, self._fail_reason) + f" on the {type(exception).__name__}"\r\n            )\r\n            if (\r\n                len(actual_exceptions) == len(self.expected_exceptions) == 1\r\n                and isinstance(expected := self.expected_exceptions[0], type)\r\n                # we explicitly break typing here :)\r\n                and self._check_check(actual_exceptions[0])  # type: ignore[arg-type]\r\n            ):',
+        b'        # Only run `self.check` once we know `exception` is of the correct type.\r\n        if not self._check_check(exception):\r\n            reason = (\r\n                cast(str, self._fail_reason) + f" on the {type(exception).__name__}"\r\n            )\r\n            if (\r\n                len(actual_exceptions) == len(self.expected_exceptions) == 1\r\n                and isinstance(expected := self.expected_exceptions[0], type)\r\n                # we explicitly break typing here :)\r\n                and self._check_check(actual_exceptions[0])  # type: ignore[arg-type]\r\n            ):',
+        "14324",
+        ("src/_pytest/raises.py",),
     ),
     Ticket(
-        "B4-PYT-14774",
-        "src/_pytest/fixtures.py",
-        "testing/deprecated_test.py::test_higher_scope_instance_method_is_deprecated[Scope.Module]",
-        b"    if fixturedef._scope >= Scope.Class:",
-        b"    if fixturedef._scope is Scope.Class:",
-        "14774",
+        "B4-PYT-10644",
+        "src/_pytest/monkeypatch.py",
+        "testing/test_monkeypatch.py::"
+        "test_setattr_undo_does_not_freeze_inherited_attrs_into_instance_dict",
+        b'        # avoid class descriptors like staticmethod/classmethod\r\n        if inspect.isclass(target):\r\n            oldval = target.__dict__.get(name, NOTSET)\r\n        setattr(target, name, value)\r\n        self._setattr.append((target, name, oldval))',
+        b'        # avoid class descriptors like staticmethod/classmethod\r\n        if inspect.isclass(target):\r\n            oldval = target.__dict__.get(name, NOTSET)\r\n        setattr(target, name, value)\r\n        self._setattr.append((target, name, oldval))',
+        "10644",
+        ("src/_pytest/monkeypatch.py",),
     ),
     Ticket(
-        "B4-PYT-6505",
-        "src/_pytest/pytester.py",
-        "testing/test_pytester.py::test_parse_summary_line_always_plural",
-        b'            "warning": "warnings",',
-        b'            "warning": "warning",',
-        "6505",
+        "B4-PYT-12175",
+        "src/_pytest/_code/code.py",
+        "testing/code/test_excinfo.py::test_excinfo_exconly_tryshort_strips_via_for_later",
+        b'        """Like :func:`from_exception`, but using old-style exc_info tuple."""\r\n        _striptext = ""\r\n        if exprinfo is None and isinstance(exc_info[1], AssertionError):\r\n            exprinfo = getattr(exc_info[1], "msg", None)\r\n            if exprinfo is None:\r\n                exprinfo = saferepr(exc_info[1])\r\n            if exprinfo and exprinfo.startswith(cls._assert_start_repr):\r\n                _striptext = "AssertionError: "\r\n\r\n        return cls(exc_info, _striptext, _ispytest=True)',
+        b'        """Like :func:`from_exception`, but using old-style exc_info tuple."""\r\n        _striptext = ""\r\n        if exprinfo is None and isinstance(exc_info[1], AssertionError):\r\n            exprinfo = getattr(exc_info[1], "msg", None)\r\n            if exprinfo is None:\r\n                exprinfo = saferepr(exc_info[1])\r\n            if exprinfo and exprinfo.startswith(cls._assert_start_repr):\r\n                _striptext = "AssertionError: "\r\n\r\n        return cls(exc_info, _striptext, _ispytest=True)',
+        "12175",
+        ("src/_pytest/_code/code.py",),
     ),
 )
 
@@ -204,7 +220,41 @@ def _log_file(path: Path) -> Path:
     return path if path.suffix == ".jsonl" else path / f"{datetime.now(timezone.utc):%Y-%m-%d}.jsonl"
 
 
-def _credit(log: Path, ticket: Ticket) -> None:
+def _receipt_sha256(receipts: Path) -> str:
+    digest = hashlib.sha256()
+    for name in RECEIPT_FILES:
+        try:
+            digest.update((receipts / name).read_bytes())
+        except OSError as exc:
+            raise RuntimeError(f"receipt missing: {name}") from exc
+    return digest.hexdigest()
+
+
+def _changed_paths(before: dict[str, str], after: dict[str, str]) -> set[str]:
+    return {path for path in before.keys() | after.keys() if before.get(path) != after.get(path)}
+
+
+def _resolve_agent(agent_argv: list[str]) -> tuple[str, list[str]] | None:
+    if not agent_argv:
+        return None
+    resolved = which_binary(agent_argv[0])
+    if resolved is None:
+        return None
+    stem = Path(resolved).stem.lower()
+    for harness in HARNESSES:
+        if stem == Path(harness.binary).stem.lower():
+            return harness.id, [resolved, *agent_argv[1:]]
+    return None
+
+
+def _credit(
+    log: Path,
+    ticket: Ticket,
+    *,
+    harness: str,
+    corpus_revision: str,
+    receipt_sha256: str,
+) -> bool:
     timestamp = datetime.now(timezone.utc).isoformat()
     attempt_id = f"{ticket.id}:repair:1"
     base = {"v": events.SCHEMA_VERSION, "ts": timestamp, "actor": "scripts.b4_tickets"}
@@ -220,9 +270,14 @@ def _credit(log: Path, ticket: Ticket) -> None:
                 "attempt_lineage": ticket.id,
                 "issue": ticket.issue,
                 "verifier_accept": True,
+                "harness": harness,
+                "corpus_revision": corpus_revision,
+                "receipt_sha256": receipt_sha256,
             },
         },
     )
+    if ticket.synthetic:
+        return False
     events.append(
         log,
         {
@@ -237,6 +292,7 @@ def _credit(log: Path, ticket: Ticket) -> None:
             },
         },
     )
+    return True
 
 
 def run_ticket(
@@ -248,15 +304,20 @@ def run_ticket(
     timeout_s: int,
     python: str,
 ) -> bool:
-    """Credit one ticket only after red, repair, corpus verification and restoration."""
+    """Credit one ticket only after red, bounded repair and corpus verification."""
     if not agent_argv or timeout_s <= 0:
         return False
+    resolved_agent = _resolve_agent(agent_argv)
+    if resolved_agent is None:
+        return False
+    harness, resolved_argv = resolved_agent
     try:
         verify_source(source_root)
         with tempfile.TemporaryDirectory(prefix="b4-ticket-") as temporary:
             temporary_root = Path(temporary)
             isolated = temporary_root / "isolated"
-            receipts = temporary_root / "receipts"
+            receipts = RECEIPT_ROOT / ticket.id
+            receipts.mkdir(parents=True, exist_ok=True)
             archive_source(source_root, isolated)
             original = manifest(isolated)
             if not _seed(isolated, ticket):
@@ -272,7 +333,7 @@ def run_ticket(
             if timed_out or red != 1:
                 return False
             code, timed_out = _command(
-                agent_argv,
+                resolved_argv,
                 isolated,
                 receipts,
                 "agent",
@@ -296,14 +357,22 @@ def run_ticket(
                 )
                 if timed_out or code != 0:
                     return False
-            if manifest(isolated) != original:
+            changed = _changed_paths(original, manifest(isolated))
+            if not changed or not changed.issubset(ticket.allowed_paths):
                 return False
+            receipt_sha256 = _receipt_sha256(receipts)
+            corpus_revision = _read_commit_id(source_root)
     except (OSError, RuntimeError):
         return False
     log = _log_file(log_path)
     log.parent.mkdir(parents=True, exist_ok=True)
-    _credit(log, ticket)
-    return True
+    return _credit(
+        log,
+        ticket,
+        harness=harness,
+        corpus_revision=corpus_revision,
+        receipt_sha256=receipt_sha256,
+    )
 
 
 def run_tickets(

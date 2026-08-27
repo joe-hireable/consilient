@@ -56,6 +56,12 @@ def _write(repo: Path, rel: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _write_bytes(repo: Path, rel: str, text: str) -> None:
+    path = repo / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(text.encode("utf-8"))
+
+
 def _commit(repo: Path, message: str) -> str:
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", message)
@@ -66,6 +72,7 @@ def _repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     repo = tmp_path / "history"
     repo.mkdir()
     _git(repo, "init", "-q")
+    _git(repo, "config", "core.autocrlf", "false")
     _git(repo, "config", "user.email", "tests@example.invalid")
     _git(repo, "config", "user.name", "ADR Trail Tests")
     monkeypatch.setattr(CHECKER, "ROOT", repo)
@@ -253,6 +260,66 @@ def test_duplicate_experiment_ids_keep_their_ordinal(
     sha = _commit(repo, "change duplicate entries")
 
     assert any(sha in item and "EXP-14#1" in item for item in CHECKER.check_history()[1])
+
+
+def test_settled_experiment_cannot_be_replaced_by_a_prior_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path, monkeypatch)
+    rel = "docs/10-research/experiment-register.md"
+    parent = (
+        "### EXP-X — open `READY`\n\ndraft\n\n"
+        "### EXP-Y — settled `DONE`\n\nresult\n"
+    )
+    _write(repo, rel, parent)
+    _commit(repo, "record entries")
+    _pin_settled_records(repo, monkeypatch)
+
+    _write(
+        repo,
+        rel,
+        "### EXP-Y — replacement `READY`\n\ndraft\n\n"
+        "### EXP-Y — settled `DONE`\n\nresult\n",
+    )
+    sha = _commit(repo, "launder settled identity")
+
+    assert any(sha in item and "EXP-Y#1" in item for item in CHECKER.check_history()[1])
+
+
+@pytest.mark.parametrize(
+    ("rel", "parent", "child", "locator"),
+    [
+        (
+            "docs/10-research/experiment-register.md",
+            "### EXP-16 — test `DONE`\r\n\r\nresult\r\n",
+            "### EXP-16 — test `DONE`\n\nresult\n",
+            "EXP-16#1",
+        ),
+        (
+            "docs/00-context/corrections-2026-08-23.md",
+            "first correction\r\nsecond correction\r\n",
+            "first correction\nsecond correction\n",
+            "correction line 1",
+        ),
+    ],
+)
+def test_settled_records_reject_crlf_to_lf_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    rel: str,
+    parent: str,
+    child: str,
+    locator: str,
+) -> None:
+    repo = _repo(tmp_path, monkeypatch)
+    _write_bytes(repo, rel, parent)
+    _commit(repo, "record crlf")
+    _pin_settled_records(repo, monkeypatch)
+
+    _write_bytes(repo, rel, child)
+    sha = _commit(repo, "normalise line endings")
+
+    assert any(sha in item and locator in item for item in CHECKER.check_history()[1])
 
 
 def test_prepin_settled_record_violation_is_reported_not_failed(

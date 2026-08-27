@@ -1,5 +1,11 @@
 # Portable capabilities: compile to each harness and refuse semantic loss
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-110 kills automatic portable binding for the frozen two-harness case.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** portability is not an unoccupied product category. Rulesync v16.14.0 already
 generates rules, MCP configuration, commands, subagents, skills, hooks and permissions for Claude
 Code, Codex CLI, Cursor and Grok CLI, among many other targets; OpenAI also imports Claude Code and

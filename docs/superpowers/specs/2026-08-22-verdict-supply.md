@@ -1,5 +1,11 @@
 # Verdict supply: automate the preparation, never the principal
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-105 kills Tier 1 as a preparation signal if the registered agreement test fails.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction: a later repair does not make a consequence-derived rate a lower bound on
 human-verdict beta; at best it proves a lower-bound count for latent-contract false shipments in one
 frozen cohort, and the current CLI does not authenticate the principal.** [algebra] [measured]

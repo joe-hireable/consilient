@@ -42,7 +42,10 @@ a third-party maintainer verdict may ever become a human-β author. `[cited]` Th
 does not answer that question and does not add the rate to the gate.
 
 Non-response and closure without a decision are recorded, then excluded from the rate: a
-PR nobody looked at is not evidence of quality. `[asserted]`
+PR nobody looked at is not evidence of quality. `[asserted]` `as_meter_row` labels those
+classes `human_verdict=undecided`, so even a mis-piped row cannot enter `compute()` as
+an accept or a reject. The kind is also distinct from Z09's `upstream_maintainer_proxy_beta`.
+`[algebra]`
 
 ## What the capability does
 

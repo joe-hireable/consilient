@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from run_exp05 import GOAL, make_repo, verify  # noqa: E402
+from run_exp05 import GOAL, make_repo, verify
 
 GIT = shutil.which("git")
 

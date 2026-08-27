@@ -1,5 +1,11 @@
 # Self-improvement: experiments propose, the owner activates, the instrument stays sealed
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-104 kills active recursive promotion.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** a disabled native promoter already exists, and arXiv:2607.05904 measured judge
 reward hacking rather than improved self-consistency; what is absent is a
 registered-experiment-to-authenticated-owner promotion loop protected from its own instrument.

@@ -1,10 +1,18 @@
 {
   "checks_source": "exp47-2026-08-20-composite-survivor",
   "exclusion_counts": {
+    "check_red": 1,
     "multiline": 16,
     "not_uniquely_locatable": 50
   },
   "exclusions": [
+    {
+      "file": "src/consilient/projection.py",
+      "line": 108,
+      "operator": "constant_literal_mutation",
+      "reason": "check_red",
+      "source_id": 1730
+    },
     {
       "file": "src/consilient/beta.py",
       "line": 196,
@@ -475,7 +483,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -485,7 +493,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -507,7 +515,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -517,7 +525,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -539,31 +547,31 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "3ed49da4df1514fdf1938ed124fb86ac1a47b4bd96e11d6ea5a2f3c64d80e860"
+        "snapshot_digest": "8d96db24b919c24a24f7662cdd9696036e43d5bb648062072bdff6b4573b91a8"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
         "snapshot_digest": "21c15486d70df63dd97551339431aa77b9f552c52ecb8bbafb56be51e1935919"
       },
       "file": "src/consilient/cli.py",
-      "index": 204,
-      "line": 198,
-      "mut_snippet": "b1 = _condition(\"B1\", \"unknown\", \"XXAdapter-two outcome is not recorded.XX\", register)",
+      "index": 206,
+      "line": 200,
+      "mut_snippet": "b1 = _condition(\"B1\", \"fail\", f\"EXP-05 is recorded as {b1_status}.\", )",
       "operator": "comparison_swap",
-      "orig_snippet": "b1 = _condition(\"B1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
+      "orig_snippet": "b1 = _condition(\"B1\", \"fail\", f\"EXP-05 is recorded as {b1_status}.\", register)",
       "pair_id": "0003",
       "seed": 8,
-      "source_id": 503,
+      "source_id": 514,
       "unit_commit": "1a71fa6718fb0f94aa9c285a711c3d3b9154d86f",
       "unit_id": "AC"
     },
@@ -571,7 +579,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -581,7 +589,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -603,7 +611,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -613,7 +621,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -635,7 +643,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -645,7 +653,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -667,7 +675,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -677,7 +685,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -699,7 +707,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -709,7 +717,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -731,7 +739,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -741,7 +749,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -763,7 +771,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -773,7 +781,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -795,7 +803,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -805,7 +813,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -827,7 +835,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -837,7 +845,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -859,7 +867,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -869,7 +877,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -891,7 +899,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -901,7 +909,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -923,7 +931,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -933,7 +941,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -955,39 +963,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "ca299f8f16a2f4a0207da4999f1becef2624609341c91966792129311ad26025"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
-      },
-      "file": "src/consilient/cli.py",
-      "index": 59,
-      "line": 55,
-      "mut_snippet": "return {\"recorded\": False, \"file\": str(path), \"event\": event[\"event\"]}",
-      "operator": "boolean_logical_swap",
-      "orig_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"event\"]}",
-      "pair_id": "0016",
-      "seed": 8,
-      "source_id": 249,
-      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
-      "unit_id": "AN"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -997,7 +973,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1009,7 +985,7 @@
       "mut_snippet": "\"unknown\" if a1_status is None else \"PASS\" if a1_status.startswith(\"DONE\") else \"fail\",",
       "operator": "comparison_swap",
       "orig_snippet": "\"unknown\" if a1_status is None else \"pass\" if a1_status.startswith(\"DONE\") else \"fail\",",
-      "pair_id": "0017",
+      "pair_id": "0016",
       "seed": 8,
       "source_id": 419,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1019,7 +995,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1029,7 +1005,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1041,7 +1017,7 @@
       "mut_snippet": "elif b1_status.startswith(\"DONE\") or no_redesign:",
       "operator": "boolean_logical_swap",
       "orig_snippet": "elif b1_status.startswith(\"DONE\") and no_redesign:",
-      "pair_id": "0018",
+      "pair_id": "0017",
       "seed": 8,
       "source_id": 467,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1051,7 +1027,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1061,7 +1037,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1073,7 +1049,7 @@
       "mut_snippet": "b1 = _condition(\"B1\", \"Adapter-two outcome is not recorded.\", register)",
       "operator": "comparison_swap",
       "orig_snippet": "b1 = _condition(\"B1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
-      "pair_id": "0019",
+      "pair_id": "0018",
       "seed": 8,
       "source_id": 496,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1083,7 +1059,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1093,7 +1069,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1105,7 +1081,7 @@
       "mut_snippet": "\"is identical.\" if identical else \"DIVERGED.\"",
       "operator": "expression_mutation",
       "orig_snippet": "\"is identical.\" if identical else \"diverged.\"",
-      "pair_id": "0020",
+      "pair_id": "0019",
       "seed": 8,
       "source_id": 614,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1115,7 +1091,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1125,7 +1101,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1137,7 +1113,7 @@
       "mut_snippet": "elif statuses != {\"pass\"}:",
       "operator": "comparison_swap",
       "orig_snippet": "elif statuses == {\"pass\"}:",
-      "pair_id": "0021",
+      "pair_id": "0020",
       "seed": 8,
       "source_id": 850,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1147,7 +1123,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1157,7 +1133,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1169,7 +1145,7 @@
       "mut_snippet": "line = f\"replayed {result['EVENTS']} events; state {mark} ({result['digest'][:12]})\"",
       "operator": "constant_literal_mutation",
       "orig_snippet": "line = f\"replayed {result['events']} events; state {mark} ({result['digest'][:12]})\"",
-      "pair_id": "0022",
+      "pair_id": "0021",
       "seed": 8,
       "source_id": 970,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1179,31 +1155,31 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "01e8933cf29ea1fc314fc4687fde1e6f72c9ecc4da10e37e20e3d422448b3d67"
+        "snapshot_digest": "2a524ac0eb3d800d515f7103c4d4e67fac65839ddc57e9f06329b99ed1f96d1b"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
         "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
       },
       "file": "src/consilient/cli.py",
-      "index": 399,
-      "line": 393,
-      "mut_snippet": "\"WRITTEN BY APPEND(), SO VALIDATE() NEVER RAN ON THEM\"",
-      "operator": "expression_mutation",
-      "orig_snippet": "\"written by append(), so validate() never ran on them\"",
-      "pair_id": "0023",
+      "index": 423,
+      "line": 417,
+      "mut_snippet": "evidence = \"XX, XX\".join(condition[\"evidence\"]) or \"none\"",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "evidence = \", \".join(condition[\"evidence\"]) or \"none\"",
+      "pair_id": "0022",
       "seed": 8,
-      "source_id": 999,
+      "source_id": 1080,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
       "unit_id": "AN"
     },
@@ -1211,39 +1187,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "ba4d8987f8a817bfec96001e1ea1e2bffc05eacd119676dc2674588e5b30f812"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
-      },
-      "file": "src/consilient/cli.py",
-      "index": 415,
-      "line": 409,
-      "mut_snippet": "for name, gate in result[\"XXgatesXX\"].items():",
-      "operator": "comparison_swap",
-      "orig_snippet": "for name, gate in result[\"gates\"].items():",
-      "pair_id": "0024",
-      "seed": 8,
-      "source_id": 1045,
-      "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
-      "unit_id": "AN"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1253,7 +1197,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1265,7 +1209,7 @@
       "mut_snippet": "sub = parser.add_subparsers(dest=\"command\", )",
       "operator": "boolean_logical_swap",
       "orig_snippet": "sub = parser.add_subparsers(dest=\"command\", required=True)",
-      "pair_id": "0025",
+      "pair_id": "0023",
       "seed": 8,
       "source_id": 1142,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1275,7 +1219,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1285,7 +1229,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1297,7 +1241,7 @@
       "mut_snippet": "json.dumps({\"ERROR\": str(exc)}) if args.json else f\"error: {exc}\",",
       "operator": "expression_mutation",
       "orig_snippet": "json.dumps({\"error\": str(exc)}) if args.json else f\"error: {exc}\",",
-      "pair_id": "0026",
+      "pair_id": "0024",
       "seed": 8,
       "source_id": 1244,
       "unit_commit": "1bc4a327ffac702a59baf2d3b1b01b2d138c04c3",
@@ -1307,7 +1251,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1317,7 +1261,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1329,7 +1273,7 @@
       "mut_snippet": "\"B1\": \"EXP-05 COMPLETE AND ADAPTER TWO REQUIRED NO SHARED-INTERFACE REDESIGN\",",
       "operator": "boolean_logical_swap",
       "orig_snippet": "\"B1\": \"EXP-05 complete and adapter two required no shared-interface redesign\",",
-      "pair_id": "0027",
+      "pair_id": "0025",
       "seed": 8,
       "source_id": 213,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1339,7 +1283,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1349,7 +1293,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1361,7 +1305,7 @@
       "mut_snippet": "result = beta_mod.from_connection(conn, args.task_family, )",
       "operator": "expression_mutation",
       "orig_snippet": "result = beta_mod.from_connection(conn, args.task_family, args.verifier_version)",
-      "pair_id": "0028",
+      "pair_id": "0026",
       "seed": 8,
       "source_id": 345,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1371,7 +1315,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1381,7 +1325,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1393,7 +1337,7 @@
       "mut_snippet": "a1_status, _ = _experiment_entry(\"exp-01\")",
       "operator": "constant_literal_mutation",
       "orig_snippet": "a1_status, _ = _experiment_entry(\"EXP-01\")",
-      "pair_id": "0029",
+      "pair_id": "0027",
       "seed": 8,
       "source_id": 404,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1403,7 +1347,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1413,7 +1357,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1425,7 +1369,7 @@
       "mut_snippet": "\"unknown\" if a1_status is None else \"pass\" if a1_status.startswith(\"XXDONEXX\") else \"fail\",",
       "operator": "comparison_swap",
       "orig_snippet": "\"unknown\" if a1_status is None else \"pass\" if a1_status.startswith(\"DONE\") else \"fail\",",
-      "pair_id": "0030",
+      "pair_id": "0028",
       "seed": 8,
       "source_id": 421,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1435,7 +1379,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1445,7 +1389,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1457,7 +1401,7 @@
       "mut_snippet": "\"no exp-01 result is recorded.\"",
       "operator": "comparison_swap",
       "orig_snippet": "\"No EXP-01 result is recorded.\"",
-      "pair_id": "0031",
+      "pair_id": "0029",
       "seed": 8,
       "source_id": 426,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1467,7 +1411,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1477,7 +1421,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1489,7 +1433,7 @@
       "mut_snippet": "b2 = _condition(\"B2\", \"UNKNOWN\", \"No EXP-08 result is recorded.\")",
       "operator": "comparison_swap",
       "orig_snippet": "b2 = _condition(\"B2\", \"unknown\", \"No EXP-08 result is recorded.\")",
-      "pair_id": "0032",
+      "pair_id": "0030",
       "seed": 8,
       "source_id": 535,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1499,7 +1443,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1509,7 +1453,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1521,7 +1465,7 @@
       "mut_snippet": "status = \"pass\" if identical is True else \"FAIL\" if identical is False else \"unknown\"",
       "operator": "comparison_swap",
       "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
-      "pair_id": "0033",
+      "pair_id": "0031",
       "seed": 8,
       "source_id": 591,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1531,7 +1475,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1541,7 +1485,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1553,7 +1497,7 @@
       "mut_snippet": "f\"State covers {replay['events_projected']} of {replay['EVENTS']} events; not compared.\"",
       "operator": "expression_mutation",
       "orig_snippet": "f\"State covers {replay['events_projected']} of {replay['events']} events; not compared.\"",
-      "pair_id": "0034",
+      "pair_id": "0032",
       "seed": 8,
       "source_id": 601,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1563,7 +1507,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1573,7 +1517,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1585,7 +1529,7 @@
       "mut_snippet": "status = None",
       "operator": "constant_literal_mutation",
       "orig_snippet": "status = \"structurally_unsatisfiable\"",
-      "pair_id": "0035",
+      "pair_id": "0033",
       "seed": 8,
       "source_id": 835,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1595,7 +1539,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1605,7 +1549,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1617,7 +1561,7 @@
       "mut_snippet": "expected = {\"A\": {\"XXA1XX\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
       "operator": "expression_mutation",
       "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
-      "pair_id": "0036",
+      "pair_id": "0034",
       "seed": 8,
       "source_id": 899,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1627,7 +1571,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1637,7 +1581,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1649,7 +1593,7 @@
       "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"XXB3XX\", \"B4\"}}",
       "operator": "expression_mutation",
       "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
-      "pair_id": "0037",
+      "pair_id": "0035",
       "seed": 8,
       "source_id": 911,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1659,7 +1603,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1669,7 +1613,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1681,7 +1625,7 @@
       "mut_snippet": "condition[\"status\"] == \"PASS\"",
       "operator": "comparison_swap",
       "orig_snippet": "condition[\"status\"] == \"pass\"",
-      "pair_id": "0038",
+      "pair_id": "0036",
       "seed": 8,
       "source_id": 928,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1691,7 +1635,39 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "14d3474f5c21a5b4cd13b7a6be083e184bcaf7528121c906fb6506743809b0bc"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "73e7d496754b0f123dbfca61dbc738cc208bc55a44c56035fd1f372c2816da2a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 394,
+      "line": 388,
+      "mut_snippet": "line += f\"\\n    {r['path']}:{r['LINE']}  {r['reason']}\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "line += f\"\\n    {r['path']}:{r['line']}  {r['reason']}\"",
+      "pair_id": "0037",
+      "seed": 8,
+      "source_id": 985,
+      "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
+      "unit_id": "AO"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1701,7 +1677,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1713,7 +1689,7 @@
       "mut_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('XX_XX', '-').upper()}\")",
       "operator": "expression_mutation",
       "orig_snippet": "lines.append(f\"Gate {name}: {gate['status'].replace('_', '-').upper()}\")",
-      "pair_id": "0039",
+      "pair_id": "0038",
       "seed": 8,
       "source_id": 1055,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1723,7 +1699,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1733,7 +1709,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1745,7 +1721,7 @@
       "mut_snippet": "enabled = \"XXyesXX\" if result[\"routing_orchestration_enabled\"] else \"no\"",
       "operator": "expression_mutation",
       "orig_snippet": "enabled = \"yes\" if result[\"routing_orchestration_enabled\"] else \"no\"",
-      "pair_id": "0040",
+      "pair_id": "0039",
       "seed": 8,
       "source_id": 1087,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1755,7 +1731,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1765,7 +1741,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1777,7 +1753,7 @@
       "mut_snippet": "enabled = \"yes\" if result[\"XXrouting_orchestration_enabledXX\"] else \"no\"",
       "operator": "expression_mutation",
       "orig_snippet": "enabled = \"yes\" if result[\"routing_orchestration_enabled\"] else \"no\"",
-      "pair_id": "0041",
+      "pair_id": "0040",
       "seed": 8,
       "source_id": 1089,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1787,7 +1763,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1797,7 +1773,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1809,7 +1785,7 @@
       "mut_snippet": "",
       "operator": "expression_mutation",
       "orig_snippet": "prog=\"consil\",",
-      "pair_id": "0042",
+      "pair_id": "0041",
       "seed": 8,
       "source_id": 1130,
       "unit_commit": "61819966da713e7be058c2b6fb24c3e2c2476f0e",
@@ -1819,7 +1795,71 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "31d220f34be29f8c7853320cda40c6f0784ad1482e8031a8796e8e2c920c9088"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "d5c8b7220947882e7eb7ca3afdfd56d9cf96047467a00c1f08296cc5b7db24a3"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 66,
+      "line": 67,
+      "mut_snippet": "db_path.parent.mkdir(parents=False, exist_ok=True)",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "db_path.parent.mkdir(parents=True, exist_ok=True)",
+      "pair_id": "0042",
+      "seed": 8,
+      "source_id": 1688,
+      "unit_commit": "458e5b376343963b949344fd5cad0708da0f166c",
+      "unit_id": "B04"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "dc5ab7a439577cecd846e23c6969a8cd82c35a747088ad17ec5ca1c7657006c4"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "d5c8b7220947882e7eb7ca3afdfd56d9cf96047467a00c1f08296cc5b7db24a3"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 244,
+      "line": 245,
+      "mut_snippet": "json.dumps(list(row), ensure_ascii=False, separators=(\",\", \"XX:XX\"))",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "json.dumps(list(row), ensure_ascii=False, separators=(\",\", \":\"))",
+      "pair_id": "0043",
+      "seed": 8,
+      "source_id": 1929,
+      "unit_commit": "458e5b376343963b949344fd5cad0708da0f166c",
+      "unit_id": "B04"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1829,7 +1869,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1841,7 +1881,7 @@
       "mut_snippet": "if contributors is None and \"contributors\" not in event:",
       "operator": "comparison_swap",
       "orig_snippet": "if contributors is None and \"contributors\" in event:",
-      "pair_id": "0043",
+      "pair_id": "0044",
       "seed": 8,
       "source_id": 1362,
       "unit_commit": "ac42881fdf0dfee1eef3478da12a3b0f5ccc594f",
@@ -1851,7 +1891,39 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "e2317eb29659ce58e1aa9c66380e0047cb169d453dc63d2b8abd46c20e416e7b"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 304,
+      "line": 300,
+      "mut_snippet": "\"XXclock rather than writing the time you believe it to be. To record something XX\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"clock rather than writing the time you believe it to be. To record something \"",
+      "pair_id": "0045",
+      "seed": 8,
+      "source_id": 1560,
+      "unit_commit": "ac42881fdf0dfee1eef3478da12a3b0f5ccc594f",
+      "unit_id": "C02"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1861,7 +1933,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1873,7 +1945,7 @@
       "mut_snippet": "\"XXspend_authorisationXX\",",
       "operator": "expression_mutation",
       "orig_snippet": "\"spend_authorisation\",",
-      "pair_id": "0044",
+      "pair_id": "0046",
       "seed": 8,
       "source_id": 1305,
       "unit_commit": "af0394d1a5155b0242c14cf9aac05961d286ec3f",
@@ -1883,7 +1955,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1893,7 +1965,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1905,7 +1977,7 @@
       "mut_snippet": "contributor.get(\"XXlogical_identityXX\")",
       "operator": "expression_mutation",
       "orig_snippet": "contributor.get(\"logical_identity\")",
-      "pair_id": "0045",
+      "pair_id": "0047",
       "seed": 8,
       "source_id": 1390,
       "unit_commit": "af0394d1a5155b0242c14cf9aac05961d286ec3f",
@@ -1915,39 +1987,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "3c042af60f057ba4ac5208347a4ce094837f94e6da3e00f6754afbe6a6fde77f"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
-      },
-      "file": "src/consilient/events.py",
-      "index": 280,
-      "line": 276,
-      "mut_snippet": "MAX_CLOCK_SKEW_S = 15 * 61",
-      "operator": "arithmetic_binary_op",
-      "orig_snippet": "MAX_CLOCK_SKEW_S = 15 * 60",
-      "pair_id": "0046",
-      "seed": 8,
-      "source_id": 1543,
-      "unit_commit": "af0394d1a5155b0242c14cf9aac05961d286ec3f",
-      "unit_id": "D01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1957,7 +1997,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -1969,7 +2009,7 @@
       "mut_snippet": "spread = z * math.sqrt(p * (1 - p) * trials + z * z / (4 * trials * trials)) / denom",
       "operator": "arithmetic_binary_op",
       "orig_snippet": "spread = z * math.sqrt(p * (1 - p) / trials + z * z / (4 * trials * trials)) / denom",
-      "pair_id": "0047",
+      "pair_id": "0048",
       "seed": 8,
       "source_id": 39,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -1979,7 +2019,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -1989,7 +2029,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2001,7 +2041,7 @@
       "mut_snippet": "and (verifier_version is None or r.get(\"XXverifier_versionXX\") == verifier_version)",
       "operator": "comparison_swap",
       "orig_snippet": "and (verifier_version is None or r.get(\"verifier_version\") == verifier_version)",
-      "pair_id": "0048",
+      "pair_id": "0049",
       "seed": 8,
       "source_id": 74,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2011,7 +2051,39 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "86ec0c23827145fa1d32537dd4f9c000839550a625d56eb133deb91c3475edd7"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/beta.py",
+      "index": 252,
+      "line": 252,
+      "mut_snippet": "return compute(rows, None, verifier_version, min_rejections)",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "return compute(rows, task_family, verifier_version, min_rejections)",
+      "pair_id": "0050",
+      "seed": 8,
+      "source_id": 162,
+      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
+      "unit_id": "E01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2021,7 +2093,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2033,7 +2105,7 @@
       "mut_snippet": "\"B3\": \"XXA one-command bare-Claude-Code fallback is exercised weeklyXX\",",
       "operator": "comparison_swap",
       "orig_snippet": "\"B3\": \"A one-command bare-Claude-Code fallback is exercised weekly\",",
-      "pair_id": "0049",
+      "pair_id": "0051",
       "seed": 8,
       "source_id": 221,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2043,7 +2115,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2053,7 +2125,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2065,7 +2137,7 @@
       "mut_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:11]}.jsonl\"",
       "operator": "arithmetic_binary_op",
       "orig_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:10]}.jsonl\"",
-      "pair_id": "0050",
+      "pair_id": "0052",
       "seed": 8,
       "source_id": 242,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2075,39 +2147,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "d0edf41cd6d0e623c1dba1966dc60724129a703c9dd373abc564bab882eda8e9"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
-      },
-      "file": "src/consilient/cli.py",
-      "index": 87,
-      "line": 83,
-      "mut_snippet": "None",
-      "operator": "comparison_swap",
-      "orig_snippet": "f\"state at {db} is not a readable database: {exc}\"",
-      "pair_id": "0051",
-      "seed": 8,
-      "source_id": 272,
-      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
-      "unit_id": "E01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2117,7 +2157,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2129,7 +2169,7 @@
       "mut_snippet": "\"XXNo EXP-01 result is recorded.XX\"",
       "operator": "comparison_swap",
       "orig_snippet": "\"No EXP-01 result is recorded.\"",
-      "pair_id": "0052",
+      "pair_id": "0053",
       "seed": 8,
       "source_id": 425,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2139,7 +2179,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2149,7 +2189,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2161,7 +2201,7 @@
       "mut_snippet": "if a1_status is not None",
       "operator": "comparison_swap",
       "orig_snippet": "if a1_status is None",
-      "pair_id": "0053",
+      "pair_id": "0054",
       "seed": 8,
       "source_id": 428,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2171,7 +2211,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2181,7 +2221,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2193,7 +2233,7 @@
       "mut_snippet": "b1 = _condition(\"b1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
       "operator": "comparison_swap",
       "orig_snippet": "b1 = _condition(\"B1\", \"unknown\", \"Adapter-two outcome is not recorded.\", register)",
-      "pair_id": "0054",
+      "pair_id": "0055",
       "seed": 8,
       "source_id": 500,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2203,7 +2243,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2213,7 +2253,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2225,7 +2265,7 @@
       "mut_snippet": "b2 = _condition(\"B2\", \"unknown\", \"NO EXP-08 RESULT IS RECORDED.\")",
       "operator": "comparison_swap",
       "orig_snippet": "b2 = _condition(\"B2\", \"unknown\", \"No EXP-08 result is recorded.\")",
-      "pair_id": "0055",
+      "pair_id": "0056",
       "seed": 8,
       "source_id": 538,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2235,7 +2275,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2245,7 +2285,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2257,7 +2297,7 @@
       "mut_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is not False else \"unknown\"",
       "operator": "comparison_swap",
       "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
-      "pair_id": "0056",
+      "pair_id": "0057",
       "seed": 8,
       "source_id": 592,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2267,7 +2307,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2277,7 +2317,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2289,7 +2329,7 @@
       "mut_snippet": "reason = \"XXA scheduled workflow exists, but no machine-readable fallback result exists.XX\"",
       "operator": "expression_mutation",
       "orig_snippet": "reason = \"A scheduled workflow exists, but no machine-readable fallback result exists.\"",
-      "pair_id": "0057",
+      "pair_id": "0058",
       "seed": 8,
       "source_id": 773,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2299,7 +2339,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2309,7 +2349,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2321,7 +2361,7 @@
       "mut_snippet": "status = \"XXstructurally_unsatisfiableXX\"",
       "operator": "expression_mutation",
       "orig_snippet": "status = \"structurally_unsatisfiable\"",
-      "pair_id": "0058",
+      "pair_id": "0059",
       "seed": 8,
       "source_id": 836,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
@@ -2331,39 +2371,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "3c03b04d110ca419b2634ff2759ccb0d9f47f98fd262ce43a7db354d99753331"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
-      },
-      "file": "src/consilient/cli.py",
-      "index": 342,
-      "line": 336,
-      "mut_snippet": "status = \"PASS\"",
-      "operator": "expression_mutation",
-      "orig_snippet": "status = \"pass\"",
-      "pair_id": "0059",
-      "seed": 8,
-      "source_id": 855,
-      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
-      "unit_id": "E01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2373,7 +2381,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2395,7 +2403,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2405,7 +2413,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2427,7 +2435,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2437,7 +2445,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2459,31 +2467,31 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "841c7246fd7898c4546b319e470f99e5c4934e78eaa735565131b347dbad70bd"
+        "snapshot_digest": "d20252adf789eb020c5b6936b105057905c8ff93f464264866ada53af76ddfb9"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
         "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
       },
       "file": "src/consilient/projection.py",
-      "index": 110,
-      "line": 111,
-      "mut_snippet": "None, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "index": 244,
+      "line": 245,
+      "mut_snippet": "json.dumps(list(row), ensure_ascii=False, )",
       "operator": "boolean_logical_swap",
-      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "orig_snippet": "json.dumps(list(row), ensure_ascii=False, separators=(\",\", \":\"))",
       "pair_id": "0063",
       "seed": 8,
-      "source_id": 1736,
+      "source_id": 1925,
       "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
       "unit_id": "E01"
     },
@@ -2491,71 +2499,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "5b0540ba27902a5d46c067f6c6123b8b5d8ea14c3a626deccb21e503b5f4f31e"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
-      },
-      "file": "src/consilient/projection.py",
-      "index": 110,
-      "line": 111,
-      "mut_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\"XX,XX\", \":\")",
-      "operator": "boolean_logical_swap",
-      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
-      "pair_id": "0064",
-      "seed": 8,
-      "source_id": 1746,
-      "unit_commit": "90be64790145360141a4399ccb1bf4c160b8f8af",
-      "unit_id": "E01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "868f682154114006646f800aae5f3e109028a7428f24f40cdce7b97dda149865"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
-      },
-      "file": "src/consilient/events.py",
-      "index": 302,
-      "line": 298,
-      "mut_snippet": "f\"event ts {event['ts']} is {skew * 60:.0f} minutes from the current clock, \"",
-      "operator": "comparison_swap",
-      "orig_snippet": "f\"event ts {event['ts']} is {skew / 60:.0f} minutes from the current clock, \"",
-      "pair_id": "0065",
-      "seed": 8,
-      "source_id": 1556,
-      "unit_commit": "15d72ced02920a513b76adb0148caa92b4a71fa0",
-      "unit_id": "F02"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2565,7 +2509,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2577,7 +2521,7 @@
       "mut_snippet": "\"XXthat happened earlier, put the occurrence time in `data` and let `ts` record XX\"",
       "operator": "comparison_swap",
       "orig_snippet": "\"that happened earlier, put the occurrence time in `data` and let `ts` record \"",
-      "pair_id": "0066",
+      "pair_id": "0064",
       "seed": 8,
       "source_id": 1563,
       "unit_commit": "15d72ced02920a513b76adb0148caa92b4a71fa0",
@@ -2587,31 +2531,31 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "26a7c610bc9454c44eaa6ef4597aa1b112a3014ab1b44c1933cdeb14c22d49ff"
+        "snapshot_digest": "3f8bb8c142365df112701f0a34ce46183dfae8ba51e58202b13872c8c454e34a"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
         "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
       },
       "file": "src/consilient/events.py",
-      "index": 409,
-      "line": 405,
-      "mut_snippet": "return hashlib.sha256(\"XX\\nXX\".join(lines).encode(\"utf-8\")).hexdigest()",
-      "operator": "constant_literal_mutation",
-      "orig_snippet": "return hashlib.sha256(\"\\n\".join(lines).encode(\"utf-8\")).hexdigest()",
-      "pair_id": "0067",
+      "index": 300,
+      "line": 296,
+      "mut_snippet": "if skew >= MAX_CLOCK_SKEW_S:",
+      "operator": "comparison_swap",
+      "orig_snippet": "if skew > MAX_CLOCK_SKEW_S:",
+      "pair_id": "0065",
       "seed": 8,
-      "source_id": 1680,
+      "source_id": 1552,
       "unit_commit": "7764502d188fa1efc7eab6c20385aaca47c2255d",
       "unit_id": "F03"
     },
@@ -2619,7 +2563,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2629,7 +2573,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2641,7 +2585,7 @@
       "mut_snippet": "raise EventError(f\"missing required field(s): {'XX, XX'.join(missing)}\")",
       "operator": "control_flow_mutation",
       "orig_snippet": "raise EventError(f\"missing required field(s): {', '.join(missing)}\")",
-      "pair_id": "0068",
+      "pair_id": "0066",
       "seed": 8,
       "source_id": 1317,
       "unit_commit": "bfc7835764c0b966f62b38a86666b155d6174ac6",
@@ -2651,63 +2595,31 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "5402fc81ba5a57ecdaf6114eac6065c2d9b77fea3492303be3331b2e463f1197"
+        "snapshot_digest": "a56e23c8d0044bf59c41d03458fae2e2949ef200fbcc17c051ba8d5e230b0963"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
         "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
       },
-      "file": "src/consilient/projection.py",
-      "index": 110,
-      "line": 111,
-      "mut_snippet": "raw, ensure_ascii=False, separators=(\",\", \":\")",
-      "operator": "boolean_logical_swap",
-      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
-      "pair_id": "0069",
+      "file": "src/consilient/events.py",
+      "index": 344,
+      "line": 340,
+      "mut_snippet": "rejected.append(Rejection(str(None), number, str(exc)))",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "rejected.append(Rejection(str(path), number, str(exc)))",
+      "pair_id": "0067",
       "seed": 8,
-      "source_id": 1742,
-      "unit_commit": "bfc7835764c0b966f62b38a86666b155d6174ac6",
-      "unit_id": "G01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "6d6598857f1868b37b09c975191fde427c24231352cf4e46a0f43f44ac85e6b2"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
-      },
-      "file": "src/consilient/projection.py",
-      "index": 238,
-      "line": 239,
-      "mut_snippet": "hasher.update((\"XX|XX\".join(columns) + \"\\x00\").encode())",
-      "operator": "arithmetic_binary_op",
-      "orig_snippet": "hasher.update((\"|\".join(columns) + \"\\x00\").encode())",
-      "pair_id": "0070",
-      "seed": 8,
-      "source_id": 1912,
+      "source_id": 1623,
       "unit_commit": "57b86d76c26540d481c57fed6b9df40d165d65da",
       "unit_id": "M02"
     },
@@ -2715,39 +2627,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "9e4cfb9d072adc60d7faebf7fbc85b39051825f8f43742c569c98dcc4a4f00c5"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
-      },
-      "file": "src/consilient/events.py",
-      "index": 247,
-      "line": 243,
-      "mut_snippet": "elif decision != \"XXverdictXX\":",
-      "operator": "comparison_swap",
-      "orig_snippet": "elif decision != \"verdict\":",
-      "pair_id": "0071",
-      "seed": 8,
-      "source_id": 1495,
-      "unit_commit": "0895ddbc707d402090d561a70df49e64fda50f71",
-      "unit_id": "M03"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2757,7 +2637,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2769,7 +2649,7 @@
       "mut_snippet": "or \"CONTRIBUTOR\"",
       "operator": "expression_mutation",
       "orig_snippet": "or \"contributor\"",
-      "pair_id": "0072",
+      "pair_id": "0068",
       "seed": 8,
       "source_id": 1396,
       "unit_commit": "0d088db533767ad434834955b39d6237f0f8c3aa",
@@ -2779,31 +2659,63 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "b075dd99e83eb25023915f8df615b31652017a3944c2359a5eb0baf6cc7183c8"
+        "snapshot_digest": "becc0707cabc29899d2b9bcd5a2b1cf12f8ff1a6fcab00ba5ec0452ac5e1c462"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 107,
+      "line": 108,
+      "mut_snippet": "event.data.get(\"PRINCIPAL\"),",
+      "operator": "expression_mutation",
+      "orig_snippet": "event.data.get(\"principal\"),",
+      "pair_id": "0069",
+      "seed": 8,
+      "source_id": 1732,
+      "unit_commit": "0d088db533767ad434834955b39d6237f0f8c3aa",
+      "unit_id": "M04"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "2aac6acb9cf09f381b87055e3aa86af8fa37c485f1e5e1c9625346f907a33a43"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
         "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
       },
       "file": "src/consilient/events.py",
-      "index": 404,
-      "line": 400,
-      "mut_snippet": "lines.append(line.lstrip(\"\\n\"))",
-      "operator": "expression_mutation",
-      "orig_snippet": "lines.append(line.rstrip(\"\\n\"))",
-      "pair_id": "0073",
+      "index": 277,
+      "line": 273,
+      "mut_snippet": "return json.dumps(event, ensure_ascii=False, separators=(\",\", \":\"))",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "return json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\"))",
+      "pair_id": "0070",
       "seed": 8,
-      "source_id": 1673,
+      "source_id": 1534,
       "unit_commit": "f54bb9e380462d17145c74518f501072622ea81b",
       "unit_id": "M05"
     },
@@ -2811,7 +2723,71 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "9c12a7c75277b4da9708e9ea518e15494f53c50fdcdc4395a6b04126ee70a497"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 305,
+      "line": 301,
+      "mut_snippet": "\"THAT HAPPENED EARLIER, PUT THE OCCURRENCE TIME IN `DATA` AND LET `TS` RECORD \"",
+      "operator": "comparison_swap",
+      "orig_snippet": "\"that happened earlier, put the occurrence time in `data` and let `ts` record \"",
+      "pair_id": "0071",
+      "seed": 8,
+      "source_id": 1564,
+      "unit_commit": "f54bb9e380462d17145c74518f501072622ea81b",
+      "unit_id": "M05"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "deab9327254f37a4d52dfb6c5724a72ec82bece638157a741ff51d8bbf4d2c4a"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 29,
+      "line": 25,
+      "mut_snippet": "OUTCOME_KIND = \"ATTEMPT.OUTCOME\"",
+      "operator": "expression_mutation",
+      "orig_snippet": "OUTCOME_KIND = \"attempt.outcome\"",
+      "pair_id": "0072",
+      "seed": 8,
+      "source_id": 1288,
+      "unit_commit": "802c09800692b04fbfd47872e2f8775d9f5dff21",
+      "unit_id": "N06"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2821,7 +2797,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2833,7 +2809,7 @@
       "mut_snippet": "def wilson(successes: int, trials: int, z: float = 2.96) -> tuple[float, float]:",
       "operator": "comparison_swap",
       "orig_snippet": "def wilson(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:",
-      "pair_id": "0074",
+      "pair_id": "0073",
       "seed": 8,
       "source_id": 14,
       "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
@@ -2843,7 +2819,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -2853,7 +2829,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -2865,7 +2841,7 @@
       "mut_snippet": "return max(0.0, centre - spread), min(2.0, centre + spread)",
       "operator": "arithmetic_binary_op",
       "orig_snippet": "return max(0.0, centre - spread), min(1.0, centre + spread)",
-      "pair_id": "0075",
+      "pair_id": "0074",
       "seed": 8,
       "source_id": 58,
       "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
@@ -2875,149 +2851,21 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "5d358027e56ee487cc5b37a74b562b6f73d9e6efab7872ac78b347172b681dbf"
+        "snapshot_digest": "25b6229b54704fd5e06c7c4acc39ed7587028628b228ec681daa1beb25a2b987"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
-        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
-      },
-      "file": "src/consilient/beta.py",
-      "index": 196,
-      "line": 196,
-      "mut_snippet": "if (task_family is None or r.get(\"TASK_FAMILY\") == task_family)",
-      "operator": "comparison_swap",
-      "orig_snippet": "if (task_family is None or r.get(\"task_family\") == task_family)",
-      "pair_id": "0076",
-      "seed": 8,
-      "source_id": 69,
-      "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
-      "unit_id": "P01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "0b6b63db1c1260ebf6bdac1182f11718c6e6590fad4f7067603c26a89b53328e"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
-      },
-      "file": "src/consilient/projection.py",
-      "index": 240,
-      "line": 241,
-      "mut_snippet": "f\"SELECT {', '.join(columns)} FROM {table} ORDER BY {columns[1]}\"",
-      "operator": "constant_literal_mutation",
-      "orig_snippet": "f\"SELECT {', '.join(columns)} FROM {table} ORDER BY {columns[0]}\"",
-      "pair_id": "0077",
-      "seed": 8,
-      "source_id": 1917,
-      "unit_commit": "ec9ec13bba855c1ba6210f19c267684a8c9dab57",
-      "unit_id": "P01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "04e886d7fdf7e68ca6f0d32c2c9da0ebfce1d25be4bde11c84d8f760ddc58c46"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
-      },
-      "file": "src/consilient/events.py",
-      "index": 306,
-      "line": 302,
-      "mut_snippet": "\"XXwhen it was written.XX\"",
-      "operator": "expression_mutation",
-      "orig_snippet": "\"when it was written.\"",
-      "pair_id": "0078",
-      "seed": 8,
-      "source_id": 1565,
-      "unit_commit": "af8b5fcce959356cd0da26f9fecc994bd2488870",
-      "unit_id": "Q01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "8c580c81770f2f8b9276f661ad97bbf1908291bc6a1efe21ea34eedda8edc63d"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
-      },
-      "file": "src/consilient/events.py",
-      "index": 404,
-      "line": 400,
-      "mut_snippet": "lines.append(line.rstrip(None))",
-      "operator": "constant_literal_mutation",
-      "orig_snippet": "lines.append(line.rstrip(\"\\n\"))",
-      "pair_id": "0079",
-      "seed": 8,
-      "source_id": 1672,
-      "unit_commit": "af8b5fcce959356cd0da26f9fecc994bd2488870",
-      "unit_id": "Q01"
-    },
-    {
-      "bad": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": true,
-        "snapshot_digest": "8f68ed6b9f52a759c81bdc525d865c35111ed34abbe05099ed9f388281945c07"
-      },
-      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
-      "control": {
-        "checks": {
-          "mypy": "pass",
-          "pytest": "pass",
-          "ruff": "pass"
-        },
-        "mutated": false,
-        "snapshot_digest": "a5d786507162a356ff4e585edb32f183b2657212fa34ac1e88e2a4a962ecb9f2"
+        "snapshot_digest": "d5c8b7220947882e7eb7ca3afdfd56d9cf96047467a00c1f08296cc5b7db24a3"
       },
       "file": "src/consilient/projection.py",
       "index": 108,
@@ -3025,17 +2873,17 @@
       "mut_snippet": "event.data.get(\"XXtaskXX\"),",
       "operator": "expression_mutation",
       "orig_snippet": "event.data.get(\"task\"),",
-      "pair_id": "0080",
+      "pair_id": "0075",
       "seed": 8,
       "source_id": 1734,
-      "unit_commit": "af8b5fcce959356cd0da26f9fecc994bd2488870",
-      "unit_id": "Q01"
+      "unit_commit": "e1b009aed920199fdc26047b2ad144aa7f0243b0",
+      "unit_id": "Q02"
     },
     {
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3045,7 +2893,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3057,7 +2905,7 @@
       "mut_snippet": "raise ValueError(None)",
       "operator": "constant_literal_mutation",
       "orig_snippet": "raise ValueError(\"no trials\")",
-      "pair_id": "0081",
+      "pair_id": "0076",
       "seed": 8,
       "source_id": 17,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3067,7 +2915,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3077,7 +2925,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3089,7 +2937,7 @@
       "mut_snippet": "\"XXtsXX\": ts,",
       "operator": "expression_mutation",
       "orig_snippet": "\"ts\": ts,",
-      "pair_id": "0082",
+      "pair_id": "0077",
       "seed": 8,
       "source_id": 143,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3099,7 +2947,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3109,7 +2957,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3121,7 +2969,7 @@
       "mut_snippet": "\"TS\": ts,",
       "operator": "expression_mutation",
       "orig_snippet": "\"ts\": ts,",
-      "pair_id": "0083",
+      "pair_id": "0078",
       "seed": 8,
       "source_id": 144,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3131,7 +2979,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3141,7 +2989,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3153,7 +3001,7 @@
       "mut_snippet": "\"VERIFIER_VERSION\": ver,",
       "operator": "expression_mutation",
       "orig_snippet": "\"verifier_version\": ver,",
-      "pair_id": "0084",
+      "pair_id": "0079",
       "seed": 8,
       "source_id": 148,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3163,7 +3011,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3173,7 +3021,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3185,7 +3033,7 @@
       "mut_snippet": "path = Path(args.log) / f\"{event.get('ts', )[:10]}.jsonl\"",
       "operator": "arithmetic_binary_op",
       "orig_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:10]}.jsonl\"",
-      "pair_id": "0085",
+      "pair_id": "0080",
       "seed": 8,
       "source_id": 238,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3195,7 +3043,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3205,7 +3053,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3217,7 +3065,7 @@
       "mut_snippet": "path = Path(args.log) / f\"{event.get('TS', '')[:10]}.jsonl\"",
       "operator": "arithmetic_binary_op",
       "orig_snippet": "path = Path(args.log) / f\"{event.get('ts', '')[:10]}.jsonl\"",
-      "pair_id": "0086",
+      "pair_id": "0081",
       "seed": 8,
       "source_id": 240,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3227,7 +3075,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3237,7 +3085,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3249,7 +3097,7 @@
       "mut_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"EVENT\"]}",
       "operator": "boolean_logical_swap",
       "orig_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"event\"]}",
-      "pair_id": "0087",
+      "pair_id": "0082",
       "seed": 8,
       "source_id": 256,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3259,7 +3107,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3269,7 +3117,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3281,7 +3129,7 @@
       "mut_snippet": "preserved = \"\"",
       "operator": "expression_mutation",
       "orig_snippet": "preserved = None",
-      "pair_id": "0088",
+      "pair_id": "0083",
       "seed": 8,
       "source_id": 289,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3291,7 +3139,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3301,7 +3149,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3313,7 +3161,7 @@
       "mut_snippet": "b2 = _condition(\"B2\", \"XXunknownXX\", \"No EXP-08 result is recorded.\")",
       "operator": "comparison_swap",
       "orig_snippet": "b2 = _condition(\"B2\", \"unknown\", \"No EXP-08 result is recorded.\")",
-      "pair_id": "0089",
+      "pair_id": "0084",
       "seed": 8,
       "source_id": 534,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3323,7 +3171,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3333,7 +3181,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3345,7 +3193,7 @@
       "mut_snippet": "status = \"XXpassXX\" if identical is True else \"fail\" if identical is False else \"unknown\"",
       "operator": "comparison_swap",
       "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
-      "pair_id": "0090",
+      "pair_id": "0085",
       "seed": 8,
       "source_id": 586,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3355,7 +3203,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3365,7 +3213,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3377,7 +3225,7 @@
       "mut_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"XXunknownXX\"",
       "operator": "comparison_swap",
       "orig_snippet": "status = \"pass\" if identical is True else \"fail\" if identical is False else \"unknown\"",
-      "pair_id": "0091",
+      "pair_id": "0086",
       "seed": 8,
       "source_id": 594,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3387,7 +3235,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3397,7 +3245,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3409,7 +3257,7 @@
       "mut_snippet": "\"XXis identical.XX\" if identical else \"diverged.\"",
       "operator": "expression_mutation",
       "orig_snippet": "\"is identical.\" if identical else \"diverged.\"",
-      "pair_id": "0092",
+      "pair_id": "0087",
       "seed": 8,
       "source_id": 611,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3419,7 +3267,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3429,7 +3277,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3441,7 +3289,7 @@
       "mut_snippet": "\"FAIL\",",
       "operator": "expression_mutation",
       "orig_snippet": "\"fail\",",
-      "pair_id": "0093",
+      "pair_id": "0088",
       "seed": 8,
       "source_id": 665,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3451,7 +3299,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3461,7 +3309,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3473,7 +3321,7 @@
       "mut_snippet": "elif not any(re.search(r\"(?m)^\\s*schedule\\s*:\", text or \"XXXX\") for text in texts):",
       "operator": "comparison_swap",
       "orig_snippet": "elif not any(re.search(r\"(?m)^\\s*schedule\\s*:\", text or \"\") for text in texts):",
-      "pair_id": "0094",
+      "pair_id": "0089",
       "seed": 8,
       "source_id": 764,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3483,7 +3331,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3493,7 +3341,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3505,7 +3353,7 @@
       "mut_snippet": "status = \"STRUCTURALLY_UNSATISFIABLE\"",
       "operator": "expression_mutation",
       "orig_snippet": "status = \"structurally_unsatisfiable\"",
-      "pair_id": "0095",
+      "pair_id": "0090",
       "seed": 8,
       "source_id": 837,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3515,7 +3363,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3525,7 +3373,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3537,7 +3385,7 @@
       "mut_snippet": "elif \"unknown\" not in statuses:",
       "operator": "comparison_swap",
       "orig_snippet": "elif \"unknown\" in statuses:",
-      "pair_id": "0096",
+      "pair_id": "0091",
       "seed": 8,
       "source_id": 846,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3547,7 +3395,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3557,7 +3405,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3569,7 +3417,7 @@
       "mut_snippet": "return {\"STATUS\": status, \"passed\": status == \"pass\", \"conditions\": conditions}",
       "operator": "comparison_swap",
       "orig_snippet": "return {\"status\": status, \"passed\": status == \"pass\", \"conditions\": conditions}",
-      "pair_id": "0097",
+      "pair_id": "0092",
       "seed": 8,
       "source_id": 860,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3579,7 +3427,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3589,7 +3437,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3601,7 +3449,7 @@
       "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"b1\", \"B2\", \"B3\", \"B4\"}}",
       "operator": "expression_mutation",
       "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
-      "pair_id": "0098",
+      "pair_id": "0093",
       "seed": 8,
       "source_id": 908,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3611,7 +3459,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3621,7 +3469,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3633,7 +3481,7 @@
       "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"b4\"}}",
       "operator": "expression_mutation",
       "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
-      "pair_id": "0099",
+      "pair_id": "0094",
       "seed": 8,
       "source_id": 914,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3643,7 +3491,39 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "ff787e90976306a969e10dfcb235f9a8048ebf1a686aae339e677a04791bb441"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/cli.py",
+      "index": 378,
+      "line": 372,
+      "mut_snippet": "if command == \"REPLAY\":",
+      "operator": "comparison_swap",
+      "orig_snippet": "if command == \"replay\":",
+      "pair_id": "0095",
+      "seed": 8,
+      "source_id": 944,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3653,7 +3533,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3665,7 +3545,7 @@
       "mut_snippet": "\"EVENTS; REBUILT\"",
       "operator": "expression_mutation",
       "orig_snippet": "\"events; rebuilt\"",
-      "pair_id": "0100",
+      "pair_id": "0096",
       "seed": 8,
       "source_id": 953,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3675,7 +3555,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3685,7 +3565,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3697,7 +3577,7 @@
       "mut_snippet": "mark = \"identical\" if result[\"identical\"] else \"XXDIVERGEDXX\"",
       "operator": "expression_mutation",
       "orig_snippet": "mark = \"identical\" if result[\"identical\"] else \"DIVERGED\"",
-      "pair_id": "0101",
+      "pair_id": "0097",
       "seed": 8,
       "source_id": 966,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3707,7 +3587,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3717,7 +3597,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3729,7 +3609,7 @@
       "mut_snippet": "line += f\"\\n    {r['path']}:{r['XXlineXX']}  {r['reason']}\"",
       "operator": "expression_mutation",
       "orig_snippet": "line += f\"\\n    {r['path']}:{r['line']}  {r['reason']}\"",
-      "pair_id": "0102",
+      "pair_id": "0098",
       "seed": 8,
       "source_id": 984,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3739,7 +3619,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3749,7 +3629,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3761,7 +3641,7 @@
       "mut_snippet": "verifier_version=None,",
       "operator": "constant_literal_mutation",
       "orig_snippet": "verifier_version=result[\"verifier_version\"],",
-      "pair_id": "0103",
+      "pair_id": "0099",
       "seed": 8,
       "source_id": 1005,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3771,7 +3651,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3781,7 +3661,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3793,7 +3673,7 @@
       "mut_snippet": "mark = condition[\"STATUS\"].replace(\"_\", \"-\").upper()",
       "operator": "expression_mutation",
       "orig_snippet": "mark = condition[\"status\"].replace(\"_\", \"-\").upper()",
-      "pair_id": "0104",
+      "pair_id": "0100",
       "seed": 8,
       "source_id": 1066,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3803,7 +3683,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3813,7 +3693,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3825,7 +3705,7 @@
       "mut_snippet": "prog=None,",
       "operator": "constant_literal_mutation",
       "orig_snippet": "prog=\"consil\",",
-      "pair_id": "0105",
+      "pair_id": "0101",
       "seed": 8,
       "source_id": 1127,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3835,7 +3715,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3845,7 +3725,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3857,7 +3737,7 @@
       "mut_snippet": "json.dumps({\"XXerrorXX\": str(exc)}) if args.json else f\"error: {exc}\",",
       "operator": "expression_mutation",
       "orig_snippet": "json.dumps({\"error\": str(exc)}) if args.json else f\"error: {exc}\",",
-      "pair_id": "0106",
+      "pair_id": "0102",
       "seed": 8,
       "source_id": 1243,
       "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
@@ -3867,7 +3747,71 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "5b0540ba27902a5d46c067f6c6123b8b5d8ea14c3a626deccb21e503b5f4f31e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+      },
+      "file": "src/consilient/projection.py",
+      "index": 110,
+      "line": 111,
+      "mut_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\"XX,XX\", \":\")",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "pair_id": "0103",
+      "seed": 8,
+      "source_id": 1746,
+      "unit_commit": "b4babfcc268be781f7ee2038df8de5b24eb91d5e",
+      "unit_id": "R01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "376201ba5248d5411438fb81291c53f9f8e73e92c78ac2bd5d51db43e37e1457"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 262,
+      "line": 258,
+      "mut_snippet": "raise EventError(\"XXa human_decision event must name its principalXX\")",
+      "operator": "control_flow_mutation",
+      "orig_snippet": "raise EventError(\"a human_decision event must name its principal\")",
+      "pair_id": "0104",
+      "seed": 8,
+      "source_id": 1513,
+      "unit_commit": "16d49e4b3df1503bb95734ce8af72d9f797a57d9",
+      "unit_id": "S01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3877,7 +3821,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3889,7 +3833,7 @@
       "mut_snippet": "VERDICT_CORRECTION_KIND = \"ATTEMPT.VERDICT.CORRECTION\"",
       "operator": "expression_mutation",
       "orig_snippet": "VERDICT_CORRECTION_KIND = \"attempt.verdict.correction\"",
-      "pair_id": "0107",
+      "pair_id": "0105",
       "seed": 8,
       "source_id": 1294,
       "unit_commit": "106e77f43decf1596d9fd4833b2cef8ea74ebd1e",
@@ -3899,7 +3843,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3909,7 +3853,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3921,7 +3865,7 @@
       "mut_snippet": "raise EventError(None)",
       "operator": "constant_literal_mutation",
       "orig_snippet": "raise EventError(\"data must be an object\")",
-      "pair_id": "0108",
+      "pair_id": "0106",
       "seed": 8,
       "source_id": 1342,
       "unit_commit": "106e77f43decf1596d9fd4833b2cef8ea74ebd1e",
@@ -3931,7 +3875,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -3941,7 +3885,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -3953,7 +3897,7 @@
       "mut_snippet": "\"a human verdict is a verdict and may not be filed as anything else (v0-18)\"",
       "operator": "comparison_swap",
       "orig_snippet": "\"a human verdict is a verdict and may not be filed as anything else (V0-18)\"",
-      "pair_id": "0109",
+      "pair_id": "0107",
       "seed": 8,
       "source_id": 1499,
       "unit_commit": "106e77f43decf1596d9fd4833b2cef8ea74ebd1e",
@@ -3963,39 +3907,39 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
-        "snapshot_digest": "e0352c853cedc9fadb3c226f2a6775add09a64d8913e7635fa56136e9d9a4607"
+        "snapshot_digest": "7e8ba5cbfc1b1f804f777a1daecf649683a07ab4e8d624bed077de0d4e0370b7"
       },
       "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
-        "snapshot_digest": "0379566d34b13ac78b61abd0b0a5ba60b9c552e2dc15bc3e6e4ccc163935c54a"
+        "snapshot_digest": "d5c8b7220947882e7eb7ca3afdfd56d9cf96047467a00c1f08296cc5b7db24a3"
       },
-      "file": "src/consilient/cli.py",
-      "index": 35,
-      "line": 31,
-      "mut_snippet": "\"DOCS/DECISIONS/0037-REPLACE-GATE-B2-WITH-MEASURED-CRITIC-THROUGHPUT-GAIN.MD\"",
-      "operator": "constant_literal_mutation",
-      "orig_snippet": "\"docs/decisions/0037-replace-gate-b2-with-measured-critic-throughput-gain.md\"",
-      "pair_id": "0110",
+      "file": "src/consilient/projection.py",
+      "index": 110,
+      "line": 111,
+      "mut_snippet": "raw, ensure_ascii=True, sort_keys=True, separators=(\",\", \":\")",
+      "operator": "boolean_logical_swap",
+      "orig_snippet": "raw, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\")",
+      "pair_id": "0108",
       "seed": 8,
-      "source_id": 184,
-      "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
-      "unit_id": "V01"
+      "source_id": 1744,
+      "unit_commit": "5d88d9a59c39ea6d6f248458da2f2d3ccbcfda59",
+      "unit_id": "T01"
     },
     {
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4005,7 +3949,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4017,7 +3961,7 @@
       "mut_snippet": "\"B2\": \"exp-08 measured critic throughput gain is at least 20%\",",
       "operator": "comparison_swap",
       "orig_snippet": "\"B2\": \"EXP-08 measured critic throughput gain is at least 20%\",",
-      "pair_id": "0111",
+      "pair_id": "0109",
       "seed": 8,
       "source_id": 217,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4027,7 +3971,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4037,7 +3981,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4049,7 +3993,7 @@
       "mut_snippet": "return {\"recorded\": True, \"file\": str(None), \"event\": event[\"event\"]}",
       "operator": "boolean_logical_swap",
       "orig_snippet": "return {\"recorded\": True, \"file\": str(path), \"event\": event[\"event\"]}",
-      "pair_id": "0112",
+      "pair_id": "0110",
       "seed": 8,
       "source_id": 252,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4059,7 +4003,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4069,7 +4013,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4081,7 +4025,7 @@
       "mut_snippet": "return _condition(\"B3\", \"unknown\", \"no workflow evidence source exists.\")",
       "operator": "control_flow_mutation",
       "orig_snippet": "return _condition(\"B3\", \"unknown\", \"No workflow evidence source exists.\")",
-      "pair_id": "0113",
+      "pair_id": "0111",
       "seed": 8,
       "source_id": 734,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4091,7 +4035,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4101,7 +4045,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4113,7 +4057,7 @@
       "mut_snippet": "\"OWN CONDITION-FOUR EVIDENCE.\"",
       "operator": "expression_mutation",
       "orig_snippet": "\"own condition-four evidence.\"",
-      "pair_id": "0114",
+      "pair_id": "0112",
       "seed": 8,
       "source_id": 825,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4123,7 +4067,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4133,7 +4077,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4145,7 +4089,7 @@
       "mut_snippet": "elif \"FAIL\" in statuses:",
       "operator": "comparison_swap",
       "orig_snippet": "elif \"fail\" in statuses:",
-      "pair_id": "0115",
+      "pair_id": "0113",
       "seed": 8,
       "source_id": 839,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4155,7 +4099,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4165,7 +4109,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4177,7 +4121,7 @@
       "mut_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"b3\", \"B4\"}}",
       "operator": "expression_mutation",
       "orig_snippet": "expected = {\"A\": {\"A1\", \"A2\", \"A3\"}, \"B\": {\"B1\", \"B2\", \"B3\", \"B4\"}}",
-      "pair_id": "0116",
+      "pair_id": "0114",
       "seed": 8,
       "source_id": 912,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4187,7 +4131,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4197,7 +4141,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4209,7 +4153,7 @@
       "mut_snippet": "\"XXevents; rebuiltXX\"",
       "operator": "expression_mutation",
       "orig_snippet": "\"events; rebuilt\"",
-      "pair_id": "0117",
+      "pair_id": "0115",
       "seed": 8,
       "source_id": 952,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4219,7 +4163,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4229,7 +4173,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4241,7 +4185,7 @@
       "mut_snippet": "line = f\"replayed {result['events']} events; state {mark} ({result['digest'][:13]})\"",
       "operator": "constant_literal_mutation",
       "orig_snippet": "line = f\"replayed {result['events']} events; state {mark} ({result['digest'][:12]})\"",
-      "pair_id": "0118",
+      "pair_id": "0116",
       "seed": 8,
       "source_id": 973,
       "unit_commit": "a0ecbb15a70d458b84a39dbedfa80e258d8555c4",
@@ -4251,7 +4195,39 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "dfb8ddebb78ce048ca092770bb8327d1bfa588058ae5ec77e4505312eb37f4b9"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "80b074929f1f18560e4720e3f55778a41fe9eadd030551c70b3f457522bdb53d"
+      },
+      "file": "src/consilient/events.py",
+      "index": 315,
+      "line": 311,
+      "mut_snippet": "with path.open(\"a\", newline=\"\\n\") as fh:",
+      "operator": "constant_literal_mutation",
+      "orig_snippet": "with path.open(\"a\", encoding=\"utf-8\", newline=\"\\n\") as fh:",
+      "pair_id": "0117",
+      "seed": 8,
+      "source_id": 1579,
+      "unit_commit": "7ed96fa9bd5ef5c7cbefa709b677187a17b540cf",
+      "unit_id": "X01"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4261,7 +4237,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4273,7 +4249,7 @@
       "mut_snippet": "denom = 1 + z / z / trials",
       "operator": "arithmetic_binary_op",
       "orig_snippet": "denom = 1 + z * z / trials",
-      "pair_id": "0119",
+      "pair_id": "0118",
       "seed": 8,
       "source_id": 26,
       "unit_commit": "8cfffa7948c60f145994b549c81f6d7fc3c4ddc3",
@@ -4283,7 +4259,7 @@
       "bad": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": true,
@@ -4293,7 +4269,7 @@
       "control": {
         "checks": {
           "mypy": "pass",
-          "pytest": "pass",
+          "pytest": "not_verified",
           "ruff": "pass"
         },
         "mutated": false,
@@ -4305,9 +4281,41 @@
       "mut_snippet": "\"SPEND_AUTHORISATION\",",
       "operator": "expression_mutation",
       "orig_snippet": "\"spend_authorisation\",",
-      "pair_id": "0120",
+      "pair_id": "0119",
       "seed": 8,
       "source_id": 1306,
+      "unit_commit": "7eb86916f0e0d31e301a1e36122b53435e074533",
+      "unit_id": "Z05"
+    },
+    {
+      "bad": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": true,
+        "snapshot_digest": "69c8202619b55a2ad6d6440d15dc87581bd6debc4d68a122323c81d1f5d9aa0e"
+      },
+      "base_commit": "d579beedd0d88aeebee75666e0a4db89f2c3ac5d",
+      "control": {
+        "checks": {
+          "mypy": "pass",
+          "pytest": "not_verified",
+          "ruff": "pass"
+        },
+        "mutated": false,
+        "snapshot_digest": "1ea701857f4d71c40083c165c2e8dfe309aaf25ef788701f1296d3da5537fa06"
+      },
+      "file": "src/consilient/events.py",
+      "index": 304,
+      "line": 300,
+      "mut_snippet": "\"CLOCK RATHER THAN WRITING THE TIME YOU BELIEVE IT TO BE. TO RECORD SOMETHING \"",
+      "operator": "expression_mutation",
+      "orig_snippet": "\"clock rather than writing the time you believe it to be. To record something \"",
+      "pair_id": "0120",
+      "seed": 8,
+      "source_id": 1562,
       "unit_commit": "7eb86916f0e0d31e301a1e36122b53435e074533",
       "unit_id": "Z05"
     }

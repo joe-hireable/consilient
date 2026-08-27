@@ -29,7 +29,6 @@ from typing import Literal
 from .beta import HUMAN_VERDICT_BETA, admits_human_beta_row, admits_sizing_input
 from .harvest import HarvestError, assert_unpublishable
 
-
 ESTIMAND_KIND = "false_accept_among_accepted"
 QUANTITY_NAME = "false_accept_among_accepted"
 OUTCOMES_FILE = "upstream-outcomes.jsonl"
@@ -329,11 +328,17 @@ def as_meter_row(
         raise UpstreamError(
             "upstream outcomes are not beta and cannot be recorded as human_verdict_beta"
         )
+    if outcome.outcome_class in {"non_response", "closed_without_decision"}:
+        human_verdict = "undecided"
+    elif outcome.outcome_class == "rejected":
+        human_verdict = "reject"
+    else:
+        human_verdict = "accept"
     row: dict[str, object] = {
         "estimand_kind": kind,
         "auth_status": "unauthenticated",
         "verifier_accept": True,
-        "human_verdict": "reject" if outcome.outcome_class == "rejected" else "accept",
+        "human_verdict": human_verdict,
         "task_family": "upstream_contribution",
     }
     if admits_human_beta_row(row) or admits_sizing_input(row):

@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import build_corpus as B  # noqa: E402
+import build_corpus as B
 
 
 def _source_document() -> dict:
@@ -176,12 +176,21 @@ def test_at_least_120_verified_pairs():
     assert manifest["n_pairs"] == len(manifest["pairs"])
 
 
-def test_no_bad_item_fails_any_of_the_three_checks():
+def test_no_bad_item_fails_ruff_or_mypy():
+    """[measured 26 August 2026] Both are genuinely invoked (control-baselined so
+    pre-existing debt at SNAPSHOT_REV doesn't count) -- not a hardcoded label.
+    pytest is honestly reported as not_verified: no unit-to-test mapping exists
+    to scope a real per-pair run, and 240 full-suite runs is not a cost this
+    builder can pay. A composite survivor is expected to pass both cleanly; a
+    "fail" here means the mutation is not the kind EXP-08 wants and should be
+    investigated, not silently accepted.
+    """
     manifest = json.loads(B.CORPUS.read_text(encoding="utf-8"))
     for pair in manifest["pairs"]:
         checks = pair["bad"]["checks"]
-        for name in ("pytest", "mypy", "ruff"):
+        for name in ("mypy", "ruff"):
             assert checks[name] == "pass", (pair["pair_id"], name, checks[name])
+        assert checks["pytest"] == "not_verified", (pair["pair_id"], checks["pytest"])
 
 
 def test_no_control_carries_a_mutation():
@@ -218,3 +227,36 @@ def test_snapshot_is_the_exp47_20_aug_commit():
         assert pair["base_commit"] == manifest["snapshot_rev"]
         assert pair["seed"] == manifest["seed"]
         assert pair["orig_snippet"].strip() != pair["mut_snippet"].strip()
+
+
+def test_verify_arm_actually_invokes_ruff_and_mypy():
+    """[measured 26 August 2026] build_corpus.py previously wrote a hardcoded
+    {'pytest': 'pass', 'mypy': 'pass', 'ruff': 'pass'} without invoking any
+    tool -- swapping it for all-fail values still left every corpus test
+    green. verify_arm must genuinely run the tools: a real ruff violation and
+    a real mypy --strict violation, introduced fresh (not present in the
+    control baseline), must each report "fail".
+    """
+    scratch = B._scratch_worktree()
+    try:
+        rel_path = "src/consilient/__init__.py"
+        pristine = B.git_show(B.SNAPSHOT_REV, rel_path)
+        baseline = {
+            "ruff": B._ruff_codes(scratch, rel_path),
+            "mypy": B._mypy_codes(scratch, rel_path),
+        }
+
+        clean = B.verify_arm(scratch, rel_path, pristine, baseline)
+        assert clean == {"ruff": "pass", "mypy": "pass", "pytest": "not_verified"}
+
+        ruff_broken = pristine + "\nimport os\n"  # unused import: F401
+        broken_checks = B.verify_arm(scratch, rel_path, ruff_broken, baseline)
+        assert broken_checks["ruff"] == "fail"
+
+        mypy_broken = (
+            pristine + "\ndef _exp08_probe() -> int:\n    return 'not an int'\n"
+        )
+        broken_mypy = B.verify_arm(scratch, rel_path, mypy_broken, baseline)
+        assert broken_mypy["mypy"] == "fail"
+    finally:
+        B._remove_scratch_worktree(scratch)

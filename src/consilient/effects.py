@@ -151,7 +151,9 @@ def _broker_reference(value: object, field: str) -> None:
 
 def _keyed_commitment(value: object, field: str, domain: str) -> None:
     item = _mapping(value, field)
-    _exact_keys(item, field, {"kind", "algorithm", "domain", "key_version", "commitment"})
+    _exact_keys(
+        item, field, {"kind", "algorithm", "domain", "key_version", "commitment"}
+    )
     if item["kind"] != "keyed_commitment":
         raise EffectError(f"{field} must be a domain-separated keyed commitment")
     if item["algorithm"] != "hmac-sha256":
@@ -180,7 +182,9 @@ def _protected(
 
 def _freeze(value: object) -> object:
     if isinstance(value, Mapping):
-        return _FrozenMapping(tuple((str(key), _freeze(item)) for key, item in value.items()))
+        return _FrozenMapping(
+            tuple((str(key), _freeze(item)) for key, item in value.items())
+        )
     if isinstance(value, list | tuple):
         return tuple(_freeze(item) for item in value)
     return value
@@ -194,7 +198,9 @@ def _thaw(value: object) -> object:
     return value
 
 
-def _strings(value: object, field: str, *, allow_empty: bool = False) -> tuple[str, ...]:
+def _strings(
+    value: object, field: str, *, allow_empty: bool = False
+) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, str | bytes):
         raise EffectError(f"{field} must be a list")
     items = tuple(_text(item, field) for item in value)
@@ -294,10 +300,16 @@ class EffectManifest:
         outbound = bool(set(effects) & OUTBOUND_EFFECTS)
         if outbound:
             if self.disclosure is None:
-                raise EffectError("disclosure is required for outbound message.send effects")
-            object.__setattr__(self, "disclosure", _digest(self.disclosure, "disclosure"))
+                raise EffectError(
+                    "disclosure is required for outbound message.send effects"
+                )
+            object.__setattr__(
+                self, "disclosure", _digest(self.disclosure, "disclosure")
+            )
         elif self.disclosure is not None:
-            raise EffectError("disclosure is only permitted for outbound message.send effects")
+            raise EffectError(
+                "disclosure is only permitted for outbound message.send effects"
+            )
 
         for field, value in (
             ("inventory_snapshot", self.inventory_snapshot),
@@ -327,7 +339,11 @@ class EffectManifest:
         _text(reversal["kind"], "reversal.kind")
         _text(reversal["name"], "reversal.name")
         declared_residuals = tuple(
-            sorted(_strings(self.declared_residuals, "declared_residuals", allow_empty=True))
+            sorted(
+                _strings(
+                    self.declared_residuals, "declared_residuals", allow_empty=True
+                )
+            )
         )
         ceilings = _mapping(self.ceilings, "ceilings")
         if not ceilings:
@@ -340,7 +356,9 @@ class EffectManifest:
                 or (isinstance(ceiling, float) and not math.isfinite(ceiling))
                 or ceiling < 0
             ):
-                raise EffectError(f"ceilings.{name} must be a finite non-negative number")
+                raise EffectError(
+                    f"ceilings.{name} must be a finite non-negative number"
+                )
 
         object.__setattr__(self, "adapter", _freeze(self.adapter))
         object.__setattr__(self, "forward", _freeze(self.forward))
@@ -498,17 +516,39 @@ def _planning_predicate(manifest: EffectManifest) -> bool:
 
 def _proof_predicate(manifest: EffectManifest) -> bool:
     operations = _manifest_operations(manifest)
-    return bool(operations) and operations <= PROOF_OPERATIONS and not _has_protected_effects(manifest)
+    return (
+        bool(operations)
+        and operations <= PROOF_OPERATIONS
+        and not _has_protected_effects(manifest)
+    )
+
+
+def _privileged_admission_class(
+    manifest: EffectManifest,
+    facts: AdmissionFacts,
+) -> AdmissionClass | None:
+    """Grant a privileged class only when a caller flag and the manifest agree.
+
+    A flag alone is not authority. The 23 August verification measured
+    `is_material_choice=True` covering `money.commit` and `is_proof_operation=True`
+    executing an uncontained `process.run`. Conjunction with the manifest
+    predicates is the check that kills that bypass.
+    """
+
+    if facts.is_proof_operation and _proof_predicate(manifest) and facts.contained:
+        return "proof_operation"
+    if facts.is_material_choice and _planning_predicate(manifest):
+        return "material_choice"
+    return None
 
 
 def _classify_admission(
     manifest: EffectManifest,
     facts: AdmissionFacts,
 ) -> AdmissionClass:
-    if facts.is_proof_operation and _proof_predicate(manifest) and facts.contained:
-        return "proof_operation"
-    if facts.is_material_choice and _planning_predicate(manifest):
-        return "material_choice"
+    privileged = _privileged_admission_class(manifest, facts)
+    if privileged is not None:
+        return privileged
     if _observation_predicate(manifest) and facts.broker_confirms_observation:
         return "observation"
     effects = _manifest_effects(manifest)
@@ -623,7 +663,9 @@ class ProofObservation:
         ):
             status = _text(value, field)
             if status not in _PROOF_RUN_STATUSES:
-                raise EffectError(f"{field} must be one of {sorted(_PROOF_RUN_STATUSES)}")
+                raise EffectError(
+                    f"{field} must be one of {sorted(_PROOF_RUN_STATUSES)}"
+                )
             object.__setattr__(self, field, status)
         object.__setattr__(
             self,
@@ -692,9 +734,9 @@ def _proof_binding_digest(
         "verifier_policy_digest": observation.verifier_policy_digest,
     }
     return hashlib.sha256(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
-            "utf-8"
-        )
+        json.dumps(
+            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
     ).hexdigest()
 
 
@@ -709,7 +751,9 @@ def evaluate_recovery_proof(
 ) -> RecoveryProof:
     """Classify one executed scratch proof. Confidence and exit codes are not inputs."""
 
-    def finish(status: RecoveryStatus, reason: str, digest: str | None = None) -> RecoveryProof:
+    def finish(
+        status: RecoveryStatus, reason: str, digest: str | None = None
+    ) -> RecoveryProof:
         return RecoveryProof(
             proof_operation_id=proof_operation_id,
             proof_decision_id=proof_decision_id,
@@ -740,7 +784,10 @@ def evaluate_recovery_proof(
         if set(escaped) <= {"escaped_child"}:
             return finish("refused", "escaped_child")
         return finish("refused", "escaped_protected_effect")
-    if observation.observed_verifier_policy_digest != observation.verifier_policy_digest:
+    if (
+        observation.observed_verifier_policy_digest
+        != observation.verifier_policy_digest
+    ):
         return finish("refused", "verifier_policy_changed")
 
     start_commitment = _keyed_commitment_digest(manifest.start_state, "start_state")
@@ -749,26 +796,39 @@ def evaluate_recovery_proof(
     if start_commitment != observation.start_state_digest:
         return finish("refused", "start_state_mismatch")
 
-    if observation.forward_status == "not_run" or observation.inverse_status == "not_run":
+    if (
+        observation.forward_status == "not_run"
+        or observation.inverse_status == "not_run"
+    ):
         return finish("refused", "proof_not_executed")
     if observation.forward_status != "succeeded":
         return finish("refused", "forward_failed")
 
-    expected_commitment = _keyed_commitment_digest(manifest.expected_state, "expected_state")
+    expected_commitment = _keyed_commitment_digest(
+        manifest.expected_state, "expected_state"
+    )
     if expected_commitment is None:
         return finish("capability_gap", "expected_state_not_comparable")
     if expected_commitment != observation.expected_state_digest:
         return finish("refused", "expected_state_mismatch")
     if observation.forward_state_digest != observation.expected_state_digest:
         return finish("refused", "expected_state_mismatch")
-    if _has_mutation_effects(manifest) and observation.forward_state_digest == observation.start_state_digest:
+    if (
+        _has_mutation_effects(manifest)
+        and observation.forward_state_digest == observation.start_state_digest
+    ):
         return finish("refused", "forward_did_not_mutate")
-    if observation.inverse_status != "succeeded" or observation.end_state_digest != observation.start_state_digest:
+    if (
+        observation.inverse_status != "succeeded"
+        or observation.end_state_digest != observation.start_state_digest
+    ):
         return finish("refused", "inverse_failed")
     if observation.enclosing_after_digest != observation.enclosing_before_digest:
         return finish("refused", "enclosing_scope_mismatch")
 
-    declared = set(_strings(manifest.declared_residuals, "declared_residuals", allow_empty=True))
+    declared = set(
+        _strings(manifest.declared_residuals, "declared_residuals", allow_empty=True)
+    )
     observed = set(observation.observed_residuals)
     if not observed <= declared:
         return finish("refused", "undeclared_residual")
@@ -813,7 +873,11 @@ def _timestamp(value: object, field: str) -> datetime:
 
 
 def _intent(data: Mapping[str, object]) -> None:
-    _exact_keys(data, "effect.intent.data", {"intent_id", "manifest", "disposition", "decision_id", "admission"})
+    _exact_keys(
+        data,
+        "effect.intent.data",
+        {"intent_id", "manifest", "disposition", "decision_id", "admission"},
+    )
     _text(data["intent_id"], "effect.intent.intent_id")
     manifest = _binding(data["manifest"])
     disposition = _text(data["disposition"], "effect.intent.disposition")
@@ -829,17 +893,23 @@ def _intent(data: Mapping[str, object]) -> None:
         if data["decision_id"] is not None:
             raise EffectError("observation intent must carry decision_id: null")
         if manifest is None or not _observation_predicate(manifest):
-            raise EffectError("observation intent requires an inline read-only manifest")
+            raise EffectError(
+                "observation intent requires an inline read-only manifest"
+            )
         return
     if kind != "material":
-        raise EffectError("effect.intent.admission.kind must be observation or material")
+        raise EffectError(
+            "effect.intent.admission.kind must be observation or material"
+        )
     _exact_keys(admission, "effect.intent.admission", {"kind", "authority_chain"})
     decision_id = _text(data["decision_id"], "effect.intent.decision_id")
     chain = _mapping(admission["authority_chain"], "effect.intent.authority chain")
     if chain.get("kind") == "autonomous_decision":
         _exact_keys(chain, "effect.intent.authority chain", {"kind", "decision_id"})
         if chain["decision_id"] != decision_id:
-            raise EffectError("authority chain decision_id must match effect.intent.decision_id")
+            raise EffectError(
+                "authority chain decision_id must match effect.intent.decision_id"
+            )
         return
     if chain.get("kind") == "protected_authority":
         _exact_keys(
@@ -848,7 +918,9 @@ def _intent(data: Mapping[str, object]) -> None:
             {"kind", "decision_id", "proposal_id", "authority_id"},
         )
         if chain["decision_id"] != decision_id:
-            raise EffectError("authority chain decision_id must match effect.intent.decision_id")
+            raise EffectError(
+                "authority chain decision_id must match effect.intent.decision_id"
+            )
         _text(chain["proposal_id"], "effect.intent.authority chain.proposal_id")
         _text(chain["authority_id"], "effect.intent.authority chain.authority_id")
         return
@@ -857,10 +929,21 @@ def _intent(data: Mapping[str, object]) -> None:
 
 def _receipt(data: Mapping[str, object]) -> None:
     expected = {
-        "receipt_id", "intent_id", "manifest_digest", "status", "started_at", "ended_at",
-        "provider_request", "provider_receipt", "request_commitment",
-        "response_commitment", "content_commitment", "observed_consumption",
-        "post_state", "observed_residuals", "child_operation_ids",
+        "receipt_id",
+        "intent_id",
+        "manifest_digest",
+        "status",
+        "started_at",
+        "ended_at",
+        "provider_request",
+        "provider_receipt",
+        "request_commitment",
+        "response_commitment",
+        "content_commitment",
+        "observed_consumption",
+        "post_state",
+        "observed_residuals",
+        "child_operation_ids",
     }
     if "supersedes" in data:
         expected.add("supersedes")
@@ -869,25 +952,41 @@ def _receipt(data: Mapping[str, object]) -> None:
     _text(data["intent_id"], "effect.receipt.intent_id")
     _digest(data["manifest_digest"], "effect.receipt.manifest_digest")
     if data["status"] not in _RECEIPT_STATUSES:
-        raise EffectError(f"effect.receipt.status must be one of {sorted(_RECEIPT_STATUSES)}")
-    if _timestamp(data["ended_at"], "effect.receipt.ended_at") < _timestamp(data["started_at"], "effect.receipt.started_at"):
+        raise EffectError(
+            f"effect.receipt.status must be one of {sorted(_RECEIPT_STATUSES)}"
+        )
+    if _timestamp(data["ended_at"], "effect.receipt.ended_at") < _timestamp(
+        data["started_at"], "effect.receipt.started_at"
+    ):
         raise EffectError("effect.receipt.ended_at must not precede started_at")
     _protected(
-        data["provider_request"], "effect.receipt.provider_request", "effect.receipt.provider_request"
+        data["provider_request"],
+        "effect.receipt.provider_request",
+        "effect.receipt.provider_request",
     )
     _protected(
-        data["provider_receipt"], "effect.receipt.provider_receipt", "effect.receipt.provider_receipt"
+        data["provider_receipt"],
+        "effect.receipt.provider_receipt",
+        "effect.receipt.provider_receipt",
     )
     _keyed_commitment(
-        data["request_commitment"], "effect.receipt.request_commitment", "effect.receipt.request"
+        data["request_commitment"],
+        "effect.receipt.request_commitment",
+        "effect.receipt.request",
     )
     _keyed_commitment(
-        data["response_commitment"], "effect.receipt.response_commitment", "effect.receipt.response"
+        data["response_commitment"],
+        "effect.receipt.response_commitment",
+        "effect.receipt.response",
     )
     _keyed_commitment(
-        data["content_commitment"], "effect.receipt.content_commitment", "effect.receipt.content"
+        data["content_commitment"],
+        "effect.receipt.content_commitment",
+        "effect.receipt.content",
     )
-    consumption = _mapping(data["observed_consumption"], "effect.receipt.observed_consumption")
+    consumption = _mapping(
+        data["observed_consumption"], "effect.receipt.observed_consumption"
+    )
     for name, amount in consumption.items():
         _text(name, "effect.receipt.observed_consumption key")
         if (
@@ -899,9 +998,19 @@ def _receipt(data: Mapping[str, object]) -> None:
             raise EffectError(
                 f"effect.receipt.observed_consumption.{name} must be finite and non-negative"
             )
-    _protected(data["post_state"], "effect.receipt.post_state", "effect.receipt.post_state")
-    _strings(data["observed_residuals"], "effect.receipt.observed_residuals", allow_empty=True)
-    _strings(data["child_operation_ids"], "effect.receipt.child_operation_ids", allow_empty=True)
+    _protected(
+        data["post_state"], "effect.receipt.post_state", "effect.receipt.post_state"
+    )
+    _strings(
+        data["observed_residuals"],
+        "effect.receipt.observed_residuals",
+        allow_empty=True,
+    )
+    _strings(
+        data["child_operation_ids"],
+        "effect.receipt.child_operation_ids",
+        allow_empty=True,
+    )
     if "supersedes" in data:
         _text(data["supersedes"], "effect.receipt.supersedes")
 
@@ -919,11 +1028,27 @@ def validate_effect_event(event: Mapping[str, object]) -> None:
 
 
 def receipt_chain_validator(
-    prefix: tuple[Any, ...], rejections: tuple[Any, ...], candidates: tuple[dict[str, Any], ...]
+    prefix: tuple[Any, ...],
+    rejections: tuple[Any, ...],
+    candidates: tuple[dict[str, Any], ...],
 ) -> None:
-    """Purely refuse unreconstructable, unordered, duplicate, and forked effect chains."""
-    if rejections:
-        raise EffectError("receipt chain cannot be reconstructed with rejected history lines")
+    """Purely refuse unreconstructable, unordered, duplicate, and forked effect chains.
+
+    Only a rejection that was itself an effect-chain line (`event_kind` of
+    `EFFECT_INTENT` or `EFFECT_RECEIPT`) can make the chain unreconstructable. [measured]
+    A rejected `note.made` line -- or any other rejection with no `event_kind`, such as one
+    from a line that was not even valid JSON -- shares a log directory with the chain but is
+    not part of it, and previously blocked every write-ahead intent in that directory.
+    """
+    effect_rejections = [
+        rejection
+        for rejection in rejections
+        if rejection.event_kind in (EFFECT_INTENT, EFFECT_RECEIPT)
+    ]
+    if effect_rejections:
+        raise EffectError(
+            "receipt chain cannot be reconstructed with rejected history lines"
+        )
     intents: dict[str, str] = {}
     receipt_ids: set[str] = set()
     heads: dict[str, tuple[str, str]] = {}
@@ -932,7 +1057,9 @@ def receipt_chain_validator(
         if raw.get("event") == EFFECT_INTENT:
             intent_id = raw["data"]["intent_id"]
             if intent_id in intents:
-                raise EffectError(f"receipt chain has duplicate intent_id {intent_id!r}")
+                raise EffectError(
+                    f"receipt chain has duplicate intent_id {intent_id!r}"
+                )
             intents[intent_id] = raw["data"]["manifest"]["digest"]
             continue
         if raw.get("event") != EFFECT_RECEIPT:
@@ -944,7 +1071,9 @@ def receipt_chain_validator(
             raise EffectError(f"receipt chain has duplicate receipt_id {receipt_id!r}")
         receipt_ids.add(receipt_id)
         if intent_id not in intents:
-            raise EffectError(f"receipt chain receipt {receipt_id!r} precedes its intent")
+            raise EffectError(
+                f"receipt chain receipt {receipt_id!r} precedes its intent"
+            )
         if data["manifest_digest"] != intents[intent_id]:
             raise EffectError("receipt manifest digest does not match its intent")
         supersedes = data.get("supersedes")
@@ -957,5 +1086,293 @@ def receipt_chain_validator(
         if current is None or supersedes != current[0] or current[1] != "unknown":
             raise EffectError("receipt chain supersedes only its current unknown head")
         if data["status"] not in _FINAL_RECEIPT_STATUSES:
-            raise EffectError("receipt chain may resolve unknown only to a final status")
+            raise EffectError(
+                "receipt chain may resolve unknown only to a final status"
+            )
         heads[intent_id] = (receipt_id, data["status"])
+
+
+DECISION_EVENT = "decision.autonomous"
+PROPOSAL_EVENT = "action.proposal"
+AUTHORITY_EVENT = "authority.granted"
+OUTCOME_EVENT = "attempt.outcome"
+_ADMISSION_HANDLE_DOMAIN = "effect.admission.handle.v1"
+
+
+@dataclass(frozen=True)
+class EffectAdmissionRefusal:
+    reason: str
+
+
+@dataclass(frozen=True)
+class PreparedEffectAdmission:
+    """Pure admission plan: intent payload and opaque single-use handle metadata."""
+
+    intent_id: str
+    receipt_id: str
+    intent_data: dict[str, object]
+    handle_token: str
+    operation_id: str
+    manifest_digest: str
+
+
+def _raw_event(item: object) -> Mapping[str, object] | None:
+    if isinstance(item, Mapping):
+        return cast(Mapping[str, object], item)
+    raw = cast(Any, item).raw if hasattr(item, "raw") else None
+    return cast(Mapping[str, object], raw) if isinstance(raw, dict) else None
+
+
+def _planning_record(event: Mapping[str, object]) -> Mapping[str, object] | None:
+    kind = event.get("event")
+    data = event.get("data")
+    if not isinstance(data, Mapping):
+        return None
+    if kind == PROPOSAL_EVENT:
+        planning = data.get("planning")
+        return planning if isinstance(planning, Mapping) else None
+    if kind == DECISION_EVENT:
+        markers = {
+            "decision_id",
+            "operation_id",
+            "ticket",
+            "owner",
+            "actor",
+            "record_level",
+            "decision",
+            "reasoning",
+            "falsifier",
+            "reversal",
+            "alternatives",
+            "evidence_refs",
+            "acceptance_contract_digest",
+            "protocol",
+            "binding",
+        }
+        if markers & set(data):
+            return data
+    return None
+
+
+def _operation_intent_ids(prefix: Sequence[object]) -> set[str]:
+    operations: set[str] = set()
+    for item in prefix:
+        raw = _raw_event(item)
+        if raw is None or raw.get("event") != EFFECT_INTENT:
+            continue
+        data = raw.get("data")
+        if not isinstance(data, Mapping):
+            continue
+        manifest = data.get("manifest")
+        if not isinstance(manifest, Mapping):
+            continue
+        if manifest.get("kind") == "inline" and isinstance(
+            manifest.get("value"), Mapping
+        ):
+            operation_id = manifest["value"].get("operation_id")
+            if isinstance(operation_id, str) and operation_id.strip():
+                operations.add(operation_id)
+    return operations
+
+
+def _binding_manifest_digest(binding: Mapping[str, object]) -> str | None:
+    digest = binding.get("effect_manifest_digest")
+    if isinstance(digest, str) and len(digest) == 64:
+        return digest
+    return None
+
+
+def _admission_handle_token(intent_id: str, manifest_digest: str) -> str:
+    payload = json.dumps(
+        {
+            "domain": _ADMISSION_HANDLE_DOMAIN,
+            "intent_id": intent_id,
+            "manifest_digest": manifest_digest,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def build_effect_intent_event(
+    manifest: EffectManifest,
+    *,
+    disposition: str,
+    intent_id: str,
+    observation_id: str | None = None,
+    decision_id: str | None = None,
+    proposal_id: str | None = None,
+    authority_id: str | None = None,
+) -> dict[str, object]:
+    """Build one canonical effect.intent data object without performing reach."""
+
+    _text(intent_id, "intent_id")
+    disposition = _text(disposition, "disposition")
+    if disposition not in ADMISSION_DISPOSITIONS and disposition != "refused":
+        raise EffectError(
+            f"disposition must be one of {sorted(ADMISSION_DISPOSITIONS)} or refused"
+        )
+    if observation_id is not None:
+        if disposition not in {"execute", "refused"}:
+            raise EffectError(f"disposition_{disposition}")
+        if (
+            decision_id is not None
+            or proposal_id is not None
+            or authority_id is not None
+        ):
+            raise EffectError("observation intent cannot carry a decision chain")
+        if not _observation_predicate(manifest):
+            raise EffectError(
+                "observation intent requires an inline read-only manifest"
+            )
+        admission: dict[str, object] = {
+            "kind": "observation",
+            "observation_id": _text(observation_id, "observation_id"),
+        }
+        return {
+            "intent_id": intent_id,
+            "manifest": manifest.binding(),
+            "disposition": disposition,
+            "decision_id": None,
+            "admission": admission,
+        }
+
+    decision_id = _text(decision_id, "decision_id")
+    chain: dict[str, object]
+    if proposal_id is not None and authority_id is not None:
+        chain = {
+            "kind": "protected_authority",
+            "decision_id": decision_id,
+            "proposal_id": _text(proposal_id, "proposal_id"),
+            "authority_id": _text(authority_id, "authority_id"),
+        }
+    else:
+        chain = {"kind": "autonomous_decision", "decision_id": decision_id}
+    return {
+        "intent_id": intent_id,
+        "manifest": manifest.binding(),
+        "disposition": disposition,
+        "decision_id": decision_id,
+        "admission": {"kind": "material", "authority_chain": chain},
+    }
+
+
+def admit_effect(
+    manifest: EffectManifest,
+    *,
+    disposition: str,
+    prefix: Sequence[object] = (),
+    intent_id: str,
+    receipt_id: str,
+    observation_id: str | None = None,
+    decision_event: Mapping[str, object] | None = None,
+    proposal_event: Mapping[str, object] | None = None,
+    authority_event: Mapping[str, object] | None = None,
+) -> PreparedEffectAdmission | EffectAdmissionRefusal:
+    """Validate one pre-action chain and plan durable intent without raw reach."""
+
+    _text(intent_id, "intent_id")
+    _text(receipt_id, "receipt_id")
+    disposition = _text(disposition, "disposition")
+    if disposition not in ADMISSION_DISPOSITIONS and disposition != "refused":
+        return EffectAdmissionRefusal("invalid_disposition")
+    if manifest.operation_id in _operation_intent_ids(prefix):
+        return EffectAdmissionRefusal("operation_intent_exists")
+
+    if observation_id is not None:
+        if disposition not in {"execute", "refused"}:
+            return EffectAdmissionRefusal(f"disposition_{disposition}")
+        if not _observation_predicate(manifest):
+            return EffectAdmissionRefusal("observation_predicate_failed")
+        try:
+            intent_data = build_effect_intent_event(
+                manifest,
+                disposition="refused" if disposition == "refused" else disposition,
+                intent_id=intent_id,
+                observation_id=observation_id,
+            )
+        except EffectError as exc:
+            return EffectAdmissionRefusal(str(exc))
+        token = _admission_handle_token(intent_id, manifest.digest)
+        return PreparedEffectAdmission(
+            intent_id=intent_id,
+            receipt_id=receipt_id,
+            intent_data=intent_data,
+            handle_token=token,
+            operation_id=manifest.operation_id,
+            manifest_digest=manifest.digest,
+        )
+
+    if decision_event is None:
+        return EffectAdmissionRefusal("decision_missing")
+    planning = _planning_record(decision_event)
+    if planning is None:
+        return EffectAdmissionRefusal("decision_malformed")
+    if planning.get("operation_id") != manifest.operation_id:
+        return EffectAdmissionRefusal("operation_id_mismatch")
+    binding = planning.get("binding")
+    if not isinstance(binding, Mapping):
+        return EffectAdmissionRefusal("decision_binding_missing")
+    bound_digest = _binding_manifest_digest(binding)
+    if bound_digest is None:
+        return EffectAdmissionRefusal("decision_binding_missing")
+    if bound_digest != manifest.digest:
+        return EffectAdmissionRefusal("manifest_digest_mismatch")
+
+    decision_id = planning.get("decision_id")
+    if not isinstance(decision_id, str) or not decision_id.strip():
+        return EffectAdmissionRefusal("decision_id_missing")
+
+    proposal_id: str | None = None
+    authority_id: str | None = None
+    if proposal_event is not None:
+        proposal_data = proposal_event.get("data")
+        if not isinstance(proposal_data, Mapping):
+            return EffectAdmissionRefusal("proposal_malformed")
+        proposal_id = proposal_data.get("proposal_id")
+        if not isinstance(proposal_id, str) or not proposal_id.strip():
+            return EffectAdmissionRefusal("proposal_id_missing")
+        if authority_event is None:
+            return EffectAdmissionRefusal("authority_missing")
+        authority_data = authority_event.get("data")
+        if not isinstance(authority_data, Mapping):
+            return EffectAdmissionRefusal("authority_malformed")
+        if authority_data.get("human_decision") not in {"approval", "consent"}:
+            return EffectAdmissionRefusal("authority_not_first_party")
+        if authority_data.get("proposal_id") != proposal_id:
+            return EffectAdmissionRefusal("authority_proposal_mismatch")
+        if authority_data.get("decision_id") != decision_id:
+            return EffectAdmissionRefusal("authority_decision_mismatch")
+        authority_event_id = authority_event.get("event_id")
+        if not isinstance(authority_event_id, str) or not authority_event_id.strip():
+            return EffectAdmissionRefusal("authority_id_missing")
+        authority_id = authority_event_id
+
+    intent_disposition = disposition
+    if disposition in {"refuse", "refused"}:
+        intent_disposition = "refused"
+    elif disposition != "execute":
+        return EffectAdmissionRefusal(f"disposition_{disposition}")
+
+    try:
+        intent_data = build_effect_intent_event(
+            manifest,
+            disposition=intent_disposition,
+            intent_id=intent_id,
+            decision_id=decision_id,
+            proposal_id=proposal_id,
+            authority_id=authority_id,
+        )
+    except EffectError as exc:
+        return EffectAdmissionRefusal(str(exc))
+
+    token = _admission_handle_token(intent_id, manifest.digest)
+    return PreparedEffectAdmission(
+        intent_id=intent_id,
+        receipt_id=receipt_id,
+        intent_data=intent_data,
+        handle_token=token,
+        operation_id=manifest.operation_id,
+        manifest_digest=manifest.digest,
+    )

@@ -1,5 +1,11 @@
 # Dependency scheduling: derive the check, isolate the index, fence the lease
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-130 kills the derivation check if a dispatch's declared claim cannot be shown to cover the plan dependency graph.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** coordinating concurrent workers through declared inputs is not an unoccupied
 category. Bazel, Buck2 and Nix already enforce declared read/write sets by sandboxed execution;
 Airflow, Dagster and Prefect already schedule over explicit dependency DAGs; lease-based
@@ -148,7 +154,7 @@ language. The day's coordination failures lived elsewhere. [measured: A4, A5]
 
 A derived claim that passed its check could still clash on every one of these. That is why
 derivation is a *check on* declared claims — which can name docs, data files and schemas the
-graph cannot — and never a *source of* them.
+graph cannot — and never a *source of* them. [asserted]
 
 ## 5. The design
 

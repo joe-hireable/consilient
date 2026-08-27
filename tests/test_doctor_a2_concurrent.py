@@ -231,8 +231,15 @@ def test_a2_canonicalises_rejection_paths_across_log_locations(
         first.close()
         second.close()
 
-    assert _a2(_doctor(first_log, first_db, capsys))["status"] == "pass"
-    assert _a2(_doctor(second_log, second_db, capsys))["status"] == "pass"
+    first_a2 = _a2(_doctor(first_log, first_db, capsys))
+    second_a2 = _a2(_doctor(second_log, second_db, capsys))
+    assert first_a2["status"] == "pass", first_a2["reason"]
+    assert second_a2["status"] == "pass", second_a2["reason"]
+    for condition in (first_a2, second_a2):
+        reason = str(condition["reason"])
+        assert "identical" in reason
+        assert "diverged" not in reason
+        assert "Compared" in reason
 
 
 def test_a2_is_unknown_when_pragma_projection_version_changes(
@@ -253,6 +260,48 @@ def test_a2_is_unknown_when_pragma_projection_version_changes(
     condition = _a2(_doctor(log, db, capsys))
     assert condition["status"] == "unknown", condition["reason"]
     assert condition["reason"] == "Projection version 1 rebuilt as 2; not compared."
+
+
+def test_a2_does_not_prefix_digest_when_projection_version_differs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A version mismatch is unknown without comparing a prefix written by another projection."""
+    from consilient import cli as cli_mod
+
+    log, db, _path = _seeded(tmp_path)
+    existing = sqlite3.connect(db)
+    existing.execute("PRAGMA user_version = 1")
+    existing.commit()
+    existing.close()
+
+    def forbidden(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError(
+            "pinned-prefix rebuild must not run on a projection-version mismatch"
+        )
+
+    monkeypatch.setattr(cli_mod, "_digest_of_pinned_prefix", forbidden)
+    condition = _a2(_doctor(log, db, capsys))
+    assert condition["status"] == "unknown", condition["reason"]
+    assert condition["reason"] == "Projection version 1 rebuilt as 2; not compared."
+
+
+def test_a2_rejection_filename_still_changes_the_digest(tmp_path: Path) -> None:
+    """Normalising the path must not drop it from the digest: a moved file still changes state."""
+    first_log = tmp_path / "first" / "log"
+    second_log = tmp_path / "second" / "log"
+    first_log.mkdir(parents=True)
+    second_log.mkdir(parents=True)
+    (first_log / "one.jsonl").write_text("{not valid JSON}\n", encoding="utf-8")
+    (second_log / "two.jsonl").write_text("{not valid JSON}\n", encoding="utf-8")
+    first = projection.build(first_log, tmp_path / "first.db")
+    second = projection.build(second_log, tmp_path / "second.db")
+    try:
+        assert first.execute("SELECT path FROM rejections").fetchone()[0] == "one.jsonl"
+        assert second.execute("SELECT path FROM rejections").fetchone()[0] == "two.jsonl"
+        assert projection.state_digest(first) != projection.state_digest(second)
+    finally:
+        first.close()
+        second.close()
 
 
 def test_a2_stays_unknown_on_an_empty_prefix_while_the_log_grows(
@@ -334,3 +383,51 @@ def test_a2_verdict_is_stable_when_a_writer_thread_appends_during_the_check(
         second["reason"],
     )
     assert "identical" in str(first["reason"]) and "identical" in str(second["reason"])
+
+
+def test_a2_is_pass_when_a_refusal_lands_after_the_mark_unchanged(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """MEASURED 26 August 2026: `_copy_event_prefix` copied the WHOLE current file
+    whenever the accepted count was still within the mark, even if something had been
+    appended since. A refused line added after the mark, with the accepted count
+    unchanged, landed inside the reconstructed prefix anyway and read as divergence
+    against a log that had not actually diverged within the pinned window.
+    """
+    log, db, path = _seeded(tmp_path)
+
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("not valid json\n")
+
+    condition = _a2(_doctor(log, db, capsys))
+
+    assert condition["status"] == "pass", condition["reason"]
+    reason = str(condition["reason"])
+    assert "identical" in reason
+    assert "diverged" not in reason
+
+
+def test_a2_is_pass_when_a_refusal_predates_events_added_after_the_mark(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """MEASURED 26 August 2026: cutting the prefix at the Nth accepted event's own line
+    dropped a genuine refusal that predated the mark whenever later commits added MORE
+    accepted events to the same file. The log is append-only, so anything before the
+    FIRST accepted event beyond the mark is guaranteed to predate it, refusal or not.
+    """
+    log = tmp_path / "log"
+    db = tmp_path / "state.db"
+    path = log / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl"
+    _append_judged(path, "seed-0", "t0")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("not valid json\n")
+    projection.build(log, db).close()
+
+    _append_judged(path, "grown-after-mark", "t-grown")
+
+    condition = _a2(_doctor(log, db, capsys))
+
+    assert condition["status"] == "pass", condition["reason"]
+    reason = str(condition["reason"])
+    assert "identical" in reason
+    assert "diverged" not in reason

@@ -374,12 +374,15 @@ UNMAPPED_REASONING_PROVENANCE = (
 UNMAPPED_POOL_PROVENANCE = "unmapped model id; no verified pool-assignment source"
 CURSOR_MODELS_POOL_PROVENANCE = (
     "Cursor Models and Pricing, https://cursor.com/docs/models-and-pricing, "
-    "retrieved 2026-08-23; Composer 2.5 and Cursor Grok 4.5/4.6 are Cursor Models"
+    "retrieved 2026-08-24; Cursor Models includes Cursor Grok 4.6, Grok 4.5, "
+    "and Composer 2.5 (including Fast variants)"
 )
 CURSOR_UNVERIFIED_POOL_PROVENANCE = (
     "Cursor Models and Pricing, https://cursor.com/docs/models-and-pricing, "
-    "retrieved 2026-08-23; exact Kimi/GLM CLI ids are not individually classified"
+    "retrieved 2026-08-24; Other Models table lists Kimi K3, Kimi K2.7 Code, "
+    "and GLM 5.2 by family, not by exact CLI id"
 )
+AVOIDED_CURSOR_POOL = "cursor-other"
 
 # Default is bypass: the principal asked that dispatched harnesses run like this Grok
 # session, without per-tool prompts. `prompt` is the attended alternative. Flags were
@@ -581,13 +584,16 @@ def allows_reasoning_scaffold(model: ModelOption) -> bool:
     return model.reasoning_capability == "absent"
 
 
-# `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids. The
-# Cursor Models pool serves the non-vendor families below; claude-*/gpt-*/gemini-* bill
-# to the avoided Other Models pool (CURSOR_OTHER_PREFIXES). Only cursor-composer has a
-# measured multi-model surface today; the other harnesses expose no probed model list
-# here, so they register none rather than an invented one. `auto` is deliberately absent:
-# selection must name what it spends. Registry order is the preference order within a
-# family when pools tie — highest measured tier first [asserted].
+# `cursor-agent --list-models` on this machine, 21 August 2026 [measured]: 204 ids.
+# Vendor Cursor Models inclusion (retrieved 2026-08-24): Composer 2.5 and Cursor Grok
+# 4.5/4.6. claude-*/gpt-*/gemini-* bill to the avoided Other Models pool
+# (CURSOR_OTHER_PREFIXES). Kimi/GLM appear on the vendor Other Models table by family
+# name, not by exact CLI id, so those rows stay on cursor-models marked unverified and
+# automatic selection refuses them. Only cursor-composer has a measured multi-model
+# surface today; the other harnesses expose no probed model list here, so they register
+# none rather than an invented one. `auto` is deliberately absent: selection must name
+# what it spends. Registry order is the preference order within a family when pools
+# tie — highest measured tier first [asserted].
 CURSOR_MODEL_POOL_ASSIGNMENTS: tuple[tuple[str, str, bool, str], ...] = (
     ("composer-2.5", "composer", True, CURSOR_MODELS_POOL_PROVENANCE),
     ("composer-2.5-fast", "composer", True, CURSOR_MODELS_POOL_PROVENANCE),
@@ -670,9 +676,10 @@ def select_model(
 
     An explicit `requested` id is attended naming, like an explicit `--harness`: it is
     returned with its pool resolved, unblocked. Automatic selection is stricter: only
-    registered models on a pool with known, unexhausted headroom, most remaining
-    headroom first, registry order within a tie. It never falls to the avoided
-    cursor-other pool on its own — that is the silent-fallback shape at model level.
+    registered models on a *verified* pool with known, unexhausted headroom, most
+    remaining headroom first, registry order within a tie. It never falls to the
+    avoided cursor-other pool on its own — that is the silent-fallback shape at model
+    level, and it is enforced even when a row is verified as cursor-other.
     """
     harness = harness_by_id(harness_id, harnesses)
     if harness is None:
@@ -712,6 +719,11 @@ def select_model(
     for index, option in enumerate(registered):
         if not option.pool_verified:
             considered.append(f"{option.id}: pool assignment is unverified")
+            continue
+        if option.pool == AVOIDED_CURSOR_POOL:
+            considered.append(
+                f"{option.id}: pool {option.pool} is avoided unless named explicitly"
+            )
             continue
         pool = pool_by_name(option.pool, pool_tuple)
         if pool is None:

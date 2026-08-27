@@ -1,5 +1,11 @@
 # Living documentation: specs and plans that update themselves without drifting or lying
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 10 (EXP-99 and the maintained-prose cheaper kill).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 - **Date:** 2026-08-22
 - **Status:** Specification. Decided by ADR-0073 (PROVISIONAL — EXP-99 can kill it).
 - **Author:** Cursor dispatch `20260822T123007-cbcf603df9`. The requirement is the principal's,
@@ -11,10 +17,12 @@
 ## 1. The requirement
 
 The principal, 22 August 2026, verbatim (`docs/00-context/the-machine-2026-08-22.md`, "Living
-specs"):
+specs"): [cited]
 
 > "All of this needs to be baked into the SPECS. They need to be living specs and living plans that
 > are continuously and autonomously updated and executed by our orchestrators and swarms."
+
+Source: docs/00-context/the-machine-2026-08-22.md:65
 
 This is an architectural requirement, not a documentation preference. The question it poses is:
 what makes a document *living* without making it *false*? This repository has already measured both
@@ -50,7 +58,7 @@ Two lessons fall out:
 
 Every document in this repository is exactly one of three classes. There is no fourth class; the
 missing fourth class — *maintained* prose, hand-edited to stay current — is the class that drifts,
-and it is abolished.
+and it is abolished. [asserted]
 
 ### Class G: generated
 
@@ -91,12 +99,12 @@ regenerated on read. This is V0-01/V0-02 generalised from runtime state to plans
 projection of the JSONL log, and a plan document is a projection of work-item state. Orchestrators
 "update the plan" by **appending events**, never by editing the rendering — which is also the only
 update discipline that survives F9, because an appended event is durable the moment `append()`
-returns, while an edited file lives or dies with the session.
+returns, while an edited file lives or dies with the session. [asserted]
 
 ### The check that fails when a written document contradicts a generated one
 
 Working principle 3: a chokepoint without a lint rule banning bypass is not a chokepoint. Three
-checks, in increasing order of power and decreasing order of what they can honestly catch:
+checks, in increasing order of power and decreasing order of what they can honestly catch: [asserted]
 
 1. **The generator manifest.** A single machine-readable manifest
    (`docs/generated-manifest.json`) lists every class-G document, its producer, its source and its
@@ -162,12 +170,12 @@ Which classes an orchestrator may rewrite, and what enforces the difference:
 The trail of reversals is the most valuable thing in `docs/decisions/` and the first thing people
 delete; an autonomous updater with edit rights would delete it continuously, politely, and with a
 green check. Append-only is therefore not conservatism — it is the property that makes the audit
-(§ 3, check 3) possible, because an auditor can only re-derive what was never erased.
+(§ 3, check 3) possible, because an auditor can only re-derive what was never erased. [asserted]
 
 ## 6. Provenance: who wrote it
 
 F8 is the costliest failure in the inventory and V0-18 already reserves the principal's authorship
-of *decisions*. This specification extends the same rule to *text*:
+of *decisions*. This specification extends the same rule to *text*: [asserted]
 
 1. **The principal's words appear verbatim or not at all.** Quote blocks only, each carrying a
    retrievable locator (transcript and date). An obligation *derived* from his words is labelled
@@ -188,12 +196,12 @@ of *decisions*. This specification extends the same rule to *text*:
 This makes an agent's inference structurally unable to *become* his instruction: the channels are
 separate (event authorship versus human-decision events under V0-18), the text is labelled, and
 the record of who wrote what is append-only. It does not make fabrication impossible; nothing
-does. It makes fabrication *attributable and survivable*, which is what F8's repair actually cost.
+does. It makes fabrication *attributable and survivable*, which is what F8's repair actually cost. [asserted]
 
 ## 7. The organisation question, answered against the frozen bar
 
 `docs/00-context/agentic-organisation-bar-2026-08-22.md` was frozen before this design was written.
-Its tests bind as follows:
+Its tests bind as follows: [asserted]
 
 - **Existence and different class (tests 1–2).** This specification convenes **no agents**. Living
   documentation is a property of generators, append-only state and checks — not a squad. The two
@@ -221,7 +229,7 @@ generalised — not duplicated), `check_record_numbers.py` / `check_adr_trail.py
 extended in path set), the commit-attribution gate (authorship of autonomous writes). No new
 `consil` subcommand (the surface is pinned at six), no second orchestrator, no gate condition
 changes, `routing_orchestration_enabled` stays `false`, and `src/consilient/` stays inside its
-AST lock.
+AST lock. [asserted]
 
 ## 9. What this specification cannot do
 

@@ -1,5 +1,11 @@
 # Model lifecycle: discover automatically, qualify before routing, and train behind a sealed instrument
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** § 10 (EXP-111 and the named enforcement falsifiers).
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 [measured] The brief says there are three problems but specifies four; cost is independently governed,
 so this specification keeps **registry, selection, fine-tuning and cost** separate.
 

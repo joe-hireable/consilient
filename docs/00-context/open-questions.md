@@ -311,6 +311,50 @@ Three questions must be answered before any design, and the second is the danger
 
 Do not write a QA design document before these are answered. [asserted]
 
+## Addition — harness account rotation (added 26 August 2026)
+
+**Q33. Should Consilient rotate dispatch across several of a user's own accounts on the same
+harness to multiply available headroom, and can it do so within each vendor's actual terms?**
+
+Joe, 26 August 2026: *"I know many hardcore devs that have multiple accounts on the $200-300
+max plans"* — the premise is that individual power users already do this manually, and the
+question is whether Consilient should automate switching between a person's own several paid
+accounts on one harness (never sharing an account between different people). [asserted]
+
+§7.1 already keys resource records by "account, provider, plan, native bucket and native
+window" — an account dimension the schema anticipates but nothing yet populates with more than
+one value per provider. This is the natural extension that would use it. [measured]
+
+Per-harness findings, dispatched as parallel research and re-examined once against the
+specific scenario (own accounts only, local automation, no credential extraction) rather than
+the "reselling to other users" scenario the first pass evaluated: [cited]
+
+- **Codex and Grok** have a vendor-documented, vendor-sanctioned mechanism (`CODEX_HOME`,
+  `GROK_HOME`, both explicitly covering the credential file; xAI ships its own
+  `/dual-grok-account` helper for this exact case). [cited]
+- **Claude** has `CLAUDE_CONFIG_DIR`, and a real open-source ecosystem (cc-hotswap, clauth,
+  teamclaude, ccrotate, claude-swap) already does this successfully — but it is unconfirmed
+  whether the documented env var actually relocates the sign-in session (`~/.claude.json` may
+  sit outside it), and Anthropic's enforcement system has already produced false-positive bans
+  of legitimate multi-account users as collateral from an unrelated anti-spoofing sweep (Feb
+  2026). The written terms do not name this scenario; the clause aimed at it targets a
+  different actor (a third-party product intermediating *other people's* accounts), and an
+  Anthropic engineer publicly said mere multi-account ownership isn't a violation. Reasonably
+  supported, not certain. [cited]
+- **Cursor** has no config-directory override; the credential lives in the OS keychain as one
+  global account, with no documented headless/device-code login. Automating rotation cleanly
+  is not currently possible; only slow interactive logout/login or separate OS profiles are
+  available. [cited]
+- **xAI's own ToS position** on this specific scenario could not be verified — every primary-
+  source fetch was blocked. The technical picture is clean; the legal picture for this one
+  vendor is a genuine gap, not a confirmed silence. [cited]
+
+ADR-0108 (PROVISIONAL) records this. EXP-146 is the pre-registered check for the one open
+*technical* fact this all rests on for Claude specifically: whether `CLAUDE_CONFIG_DIR` alone
+isolates the sign-in session, or whether a real logged-in Claude account leaks across two
+directories set this way. Nothing routes dispatch through a second account until that returns
+a clean result. [asserted]
+
 ## Three gaps that must close before any metered call is made
 
 Raised 20 August 2026 by the agent that built the refuse-only budget primitive, in its own

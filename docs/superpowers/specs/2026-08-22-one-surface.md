@@ -1,5 +1,11 @@
 # One surface: one front door, with honest native hand-offs
 
+- **Document class: W**
+- **Review by:** 2026-09-22
+- **Falsifier:** EXP-129 (named here; register entry still unwritten) kills the front-door claim if it does not remove three direct surfaces.
+
+**Class-W contract adopted 22 August 2026.** Mechanical admission only; existing claim wording and evidence tags are unchanged. [asserted]
+
 **Correction:** the brief's example is false: Hermes documents a Figma MCP route, and current
 primary-source material shows several of the eight surfaces already reaching one another. The
 defensible negative is narrower: the bounded search below found no documented surface that preserves

@@ -1,0 +1,374 @@
+{
+  "A01": {
+    "claims": [
+      "src/consilient/effects.py",
+      "src/consilient/events.py",
+      "tests/test_effect_contract.py",
+      "src/consilient/capabilities.py",
+      "tests/test_effect_admission.py",
+      "tests/test_capabilities.py",
+      "src/consilient/work_items.py"
+    ],
+    "commit": "feat(effects): define canonical effect records"
+  },
+  "A02": {
+    "claims": [
+      "src/consilient/effects.py",
+      "src/consilient/events.py",
+      "src/consilient/capabilities.py",
+      "tests/test_effect_admission.py",
+      "tests/test_capabilities.py",
+      "src/consilient/work_items.py",
+      "tests/test_decision_protocol.py",
+      "tests/test_work_items.py",
+      "src/consilient/instructions.py"
+    ],
+    "commit": "feat(effects): derive gated effect admission"
+  },
+  "AB": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/harness.py"
+    ],
+    "commit": "fix(events): refuse a torn append rather than gluing it"
+  },
+  "AC": {
+    "claims": [
+      "src/consilient/projection.py",
+      "src/consilient/cli.py",
+      "src/consilient/dashboard.py"
+    ],
+    "commit": "fix(projection): quarantine duplicates and surface rejection reasons"
+  },
+  "AN": {
+    "claims": [
+      "src/consilient/cli.py",
+      "tests/test_doctor_a2_concurrent.py"
+    ],
+    "commit": "fix(doctor): decide A2 against a pinned prefix, not the live tail"
+  },
+  "AO": {
+    "claims": [
+      "docs/decisions/0105-baseline-the-22-august-capture-loss.md",
+      "src/consilient/cli.py",
+      "tests/test_doctor_a3_baseline.py"
+    ],
+    "commit": "docs(adr): baseline the 22 August capture loss, contingent on AB"
+  },
+  "B04": {
+    "claims": [
+      "src/consilient/work_items.py",
+      "src/consilient/projection.py",
+      "tests/test_work_items.py"
+    ],
+    "commit": "feat(work): group, block with a reason, and score soft edges"
+  },
+  "C01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/work_items.py",
+      "tests/test_conversation.py",
+      "tests/test_work_items.py",
+      "src/consilient/recall.py",
+      "src/consilient/instructions.py",
+      "tests/test_recall.py",
+      "tests/test_instructions.py"
+    ],
+    "commit": "feat(work): record immutable request commitments"
+  },
+  "C02": {
+    "claims": [
+      "src/consilient/recall.py",
+      "src/consilient/instructions.py",
+      "tests/test_recall.py",
+      "tests/test_instructions.py",
+      "src/consilient/events.py",
+      "src/consilient/work_items.py",
+      "tests/test_organisation_plan.py",
+      "src/consilient/projection.py"
+    ],
+    "commit": "feat(recall): protect active commitment context"
+  },
+  "D01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/projection.py",
+      "tests/test_delivery_estimates.py"
+    ],
+    "commit": "feat(delivery): freeze estimate before work"
+  },
+  "E01": {
+    "claims": [
+      "src/consilient/events.py",
+      "tests/test_v0_invariants.py",
+      "src/consilient/projection.py",
+      "src/consilient/beta.py",
+      "src/consilient/cli.py",
+      "tests/test_verdict_supply.py",
+      "src/consilient/effects.py",
+      "tests/test_effect_contract.py"
+    ],
+    "commit": "feat(evidence): complete verification outcome records"
+  },
+  "F01": {
+    "claims": [
+      "src/consilient/events.py",
+      "tests/test_event_durability.py",
+      "tests/test_budget.py",
+      "tests/test_event_transactions.py",
+      "tests/test_event_identity.py",
+      "src/consilient/work_items.py",
+      "tests/test_conversation.py"
+    ],
+    "commit": "feat(events): make ordinary append durable and process-serialised"
+  },
+  "F02": {
+    "claims": [
+      "src/consilient/events.py",
+      "tests/test_event_transactions.py",
+      "tests/test_event_identity.py",
+      "src/consilient/work_items.py",
+      "tests/test_conversation.py",
+      "tests/test_work_items.py",
+      "src/consilient/recall.py",
+      "src/consilient/instructions.py"
+    ],
+    "commit": "feat(events): add atomic transition append"
+  },
+  "F03": {
+    "claims": [
+      "src/consilient/events.py",
+      "tests/test_event_identity.py",
+      "src/consilient/work_items.py",
+      "tests/test_conversation.py",
+      "tests/test_work_items.py",
+      "src/consilient/recall.py",
+      "src/consilient/instructions.py",
+      "tests/test_recall.py",
+      "tests/test_instructions.py"
+    ],
+    "commit": "feat(events): bind stable event references"
+  },
+  "G01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/projection.py",
+      "tests/test_consilience_gate.py"
+    ],
+    "commit": "feat(evidence): project structural acquisition anchors"
+  },
+  "M01": {
+    "claims": [
+      ".gitignore",
+      "src/consilient/events.py",
+      "src/consilient/records.py",
+      "tests/test_records.py",
+      "src/consilient/projection.py",
+      "tests/test_memory_projection.py",
+      "src/consilient/recall.py",
+      "scripts/recall.py",
+      "tests/test_recall_receipts.py"
+    ],
+    "commit": "feat(memory): capture immutable linked records"
+  },
+  "M02": {
+    "claims": [
+      "src/consilient/projection.py",
+      "tests/test_memory_projection.py",
+      "src/consilient/recall.py",
+      "scripts/recall.py",
+      "tests/test_recall_receipts.py",
+      "src/consilient/events.py",
+      "src/consilient/capabilities.py",
+      "scripts/capability_context.py",
+      "tests/test_capability_manifests.py"
+    ],
+    "commit": "feat(memory): project temporal record heads"
+  },
+  "M03": {
+    "claims": [
+      "src/consilient/recall.py",
+      "scripts/recall.py",
+      "tests/test_recall_receipts.py",
+      "src/consilient/events.py",
+      "src/consilient/capabilities.py",
+      "src/consilient/projection.py",
+      "scripts/capability_context.py",
+      "tests/test_capability_manifests.py",
+      "src/consilient/instructions.py",
+      "scripts/dispatch.py"
+    ],
+    "commit": "feat(recall): emit bounded recall receipts"
+  },
+  "M04": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/capabilities.py",
+      "src/consilient/projection.py",
+      "scripts/capability_context.py",
+      "tests/test_capability_manifests.py",
+      "src/consilient/instructions.py",
+      "scripts/dispatch.py",
+      "tests/test_dispatch_memory.py",
+      "tests/test_model_change_records.py"
+    ],
+    "commit": "feat(capabilities): version explicit active manifests"
+  },
+  "M05": {
+    "claims": [
+      "src/consilient/instructions.py",
+      "scripts/dispatch.py",
+      "tests/test_dispatch_memory.py",
+      "src/consilient/events.py",
+      "tests/test_model_change_records.py",
+      "scripts/build_decision_index.py",
+      "docs/decisions/index.md",
+      "tests/test_decision_index.py",
+      "docs/generated-manifest.json",
+      ".github/scripts/check_generated_documents.py"
+    ],
+    "commit": "feat(dispatch): bind reconstructable memory envelope"
+  },
+  "M06": {
+    "claims": [
+      "src/consilient/events.py",
+      "tests/test_model_change_records.py",
+      "scripts/build_decision_index.py",
+      "docs/decisions/index.md",
+      "tests/test_decision_index.py",
+      "docs/generated-manifest.json",
+      ".github/scripts/check_generated_documents.py",
+      "scripts/build_requirements.py",
+      "docs/40-spec/requirements.md",
+      "tests/test_generated_documents.py"
+    ],
+    "commit": "feat(events): record model-state changes"
+  },
+  "N06": {
+    "claims": [
+      ".harness/build_driver.py",
+      "src/consilient/events.py",
+      "tests/test_intent.py"
+    ],
+    "commit": "feat(supervision): record intent and emit starvation"
+  },
+  "O01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/work_items.py",
+      "tests/test_organisation_plan.py"
+    ],
+    "commit": "feat(work): freeze minimum verifiable plan"
+  },
+  "P01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/work_items.py",
+      "tests/test_decision_protocol.py",
+      "tests/test_work_items.py",
+      "src/consilient/instructions.py",
+      "tests/test_instructions.py",
+      "src/consilient/projection.py",
+      "src/consilient/beta.py",
+      "src/consilient/verification.py"
+    ],
+    "commit": "feat(decisions): bind pre-action decision records"
+  },
+  "Q01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/projection.py",
+      "src/consilient/beta.py",
+      "src/consilient/verification.py",
+      "tests/test_review_queue.py",
+      "tests/test_v0_invariants.py"
+    ],
+    "commit": "feat(review): freeze candidate exposure queues"
+  },
+  "Q02": {
+    "claims": [
+      "tests/test_v0_invariants.py",
+      "tests/test_feedback.py",
+      "src/consilient/projection.py"
+    ],
+    "commit": "test(verdict): reconcile invariants to quarantine semantics"
+  },
+  "R01": {
+    "claims": [
+      "src/consilient/routing.py",
+      "tests/test_coordination.py",
+      "src/consilient/events.py",
+      "tests/test_v0_invariants.py",
+      "src/consilient/projection.py",
+      "src/consilient/beta.py",
+      "src/consilient/cli.py",
+      "tests/test_verdict_supply.py",
+      "src/consilient/effects.py"
+    ],
+    "commit": "fix(routing): finish the robust candidate ceiling"
+  },
+  "S01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/promote.py",
+      "tests/test_promote_contracts.py",
+      "scripts/promote_loop.py",
+      "tests/test_promote_instrument.py",
+      "src/consilient/dashboard.py",
+      "src/consilient/recall.py",
+      "src/consilient/instructions.py",
+      "tests/test_promote_card.py"
+    ],
+    "commit": "feat(promote): freeze impact contracts and safety floors"
+  },
+  "S03": {
+    "claims": [
+      "src/consilient/events.py"
+    ],
+    "commit": "feat(dashboard): render sealed promotion proposals"
+  },
+  "T01": {
+    "claims": [
+      "src/consilient/work_items.py",
+      "src/consilient/projection.py",
+      "tests/test_native_work_items.py"
+    ],
+    "commit": "feat(work): project evidence-bearing native items"
+  },
+  "V01": {
+    "claims": [
+      "src/consilient/projection.py",
+      "src/consilient/beta.py",
+      "src/consilient/cli.py",
+      "tests/test_verdict_supply.py",
+      "src/consilient/effects.py",
+      "src/consilient/events.py",
+      "tests/test_effect_contract.py",
+      "src/consilient/capabilities.py"
+    ],
+    "commit": "fix(beta): quarantine invalid verdict evidence"
+  },
+  "X01": {
+    "claims": [
+      "src/consilient/events.py",
+      "src/consilient/projection.py",
+      "tests/test_measurement.py"
+    ],
+    "commit": "feat(measurement): registration event and fail-closed join"
+  },
+  "Y04": {
+    "claims": [
+      "src/consilient/projection.py",
+      "src/consilient/beta.py",
+      "tests/test_verdict_supply.py"
+    ],
+    "commit": "fix(beta): count and render excluded verdicts rather than hiding them"
+  },
+  "Z05": {
+    "claims": [
+      "src/consilient/events.py",
+      "tests/test_retry_jitter.py"
+    ],
+    "commit": "fix(events): jitter every retry backoff, which was putting twenty readers on one instant"
+  }
+}

@@ -304,6 +304,12 @@ Reset-aware scheduling may rank only a user-authorised backlog and must maximise
 verified value per human review hour, never raw token use. [asserted] Live reset scheduling
 and plan-rightsizing advice remain behind EXP-23. [asserted]
 
+The account keying above is populated with exactly one value per provider today. Whether
+Consilient should rotate dispatch across a user's own several accounts on one harness, to
+raise available headroom, is PROVISIONAL under `../decisions/0108-rotate-dispatch-across-a-users-own-accounts-per-harness.md`
+— accepted in principle for Codex and Grok, gated on `EXP-146` for Claude, and out of scope for
+Cursor until it ships an isolation mechanism to build on. [asserted]
+
 ### 7.2 Metered providers
 
 Metered work is off by default and requires an explicitly authorised per-task cap and

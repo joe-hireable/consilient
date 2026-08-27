@@ -1,7 +1,10 @@
 """Portable verbatim recall projector for cross-harness memory.
 
 Projects append-only trajectory events into a bounded markdown pack. Quotes event
-fields literally — no condensation, no LLM summary (EXP-45: condensation drops ~59%).
+fields literally when they fit. When a single event exceeds the character bound, an
+extractive summary of named fields is selected instead of dropping it. That is not
+LLM condensation (EXP-45: condensation drops ~59%); the receipt records the form so
+replay can tell a summary from the full event.
 
 Every pack ends with one canonical JSON recall receipt describing selection, omission
 and completion state.
@@ -36,6 +39,15 @@ from .work_items import COMMITTED, TURN
 RECEIPT_MARKER = "consilient:recall-receipt:v1"
 RECEIPT_BEGIN = f"<!-- {RECEIPT_MARKER}\n"
 RECEIPT_END = "\n-->"
+FULL_FORM = "full"
+SUMMARY_FORM = "summary"
+PROJECTION_FORMS = frozenset({FULL_FORM, SUMMARY_FORM})
+OPTIONAL_RECEIPT_FIELDS = frozenset({"selected_forms"})
+_EMPTY_WHILE_AVAILABLE = "empty_while_available"
+# A summary that inlines an 8 KB field is not a summary. Live dispatch.outcome
+# events have no `unit`; `task` is the whole brief (median 5,079 characters,
+# 677 of 1,476 over the pack bound on 26 August 2026). [measured]
+_SUMMARY_FIELD_CHARS = 240
 
 OMISSION_REASONS = frozenset(
     {
@@ -119,6 +131,8 @@ class Selection:
     omissions: tuple[Omission, ...]
     context_complete: bool
     continuation_event_id: str | None
+    selected_forms: tuple[str, ...] = ()
+    empty_while_available: bool = False
 
 
 def _query_tokens(query: str) -> tuple[str, ...]:
@@ -324,6 +338,96 @@ def _format_event(event: Event) -> str:
     return "\n".join(lines)
 
 
+def _scalar_field(value: object, *, limit: int = _SUMMARY_FIELD_CHARS) -> str | None:
+    """Extractive one-line clip so a summary cannot refill the pack budget."""
+    if not isinstance(value, str):
+        return None
+    line = ""
+    for candidate in value.splitlines():
+        stripped = candidate.strip()
+        if stripped:
+            line = stripped
+            break
+    if not line:
+        return None
+    if len(line) <= limit:
+        return line
+    if limit < 4:
+        return line[:limit]
+    return line[: limit - 3].rstrip() + "..."
+
+
+def _summary_projection(event: Event) -> dict[str, str] | None:
+    """Named extractive fields, or None when this event cannot shrink.
+
+    A privileged field anywhere on the event refuses the projection. The guard
+    in instructions.py still inspects the full event; this keeps a summary from
+    being the path that admits one.
+    """
+    if _collect_keys(event.raw) & PRIVILEGED_FIELD_MARKERS:
+        return None
+    data = event.data
+    if event.kind == "dispatch.outcome":
+        unit = (
+            _scalar_field(data.get("unit"))
+            or _scalar_field(data.get("task"))
+            or _scalar_field(data.get("run_id"))
+        )
+        harness = _scalar_field(data.get("harness"))
+        status = _scalar_field(data.get("status"))
+        reason = _scalar_field(data.get("reason"))
+        if unit is None or harness is None or status is None or reason is None:
+            return None
+        return {
+            "unit": unit,
+            "harness": harness,
+            "status": status,
+            "reason": reason,
+        }
+    if event.kind == CAPABILITY_GAP_KIND:
+        capability = (
+            _scalar_field(data.get("capability"))
+            or _scalar_field(data.get("attempted"))
+            or _scalar_field(data.get("asked"))
+        )
+        gap = (
+            _scalar_field(data.get("gap"))
+            or _scalar_field(data.get("detail"))
+            or _scalar_field(data.get("failure"))
+        )
+        if capability is None or gap is None:
+            return None
+        return {"capability": capability, "gap": gap}
+    if event.kind == "dispatch.refused":
+        reason = _scalar_field(data.get("reason"))
+        status = _scalar_field(data.get("status")) or "refused"
+        if reason is None:
+            return None
+        return {"status": status, "reason": reason}
+    return None
+
+
+def _format_summary(event: Event, projection: dict[str, str]) -> str:
+    raw = event.raw
+    lines = [f"### `{raw['event']}` @ `{raw['ts']}` (summary)", ""]
+    event_id = raw.get("event_id")
+    if isinstance(event_id, str):
+        lines.append(f"- **event_id**: `{event_id}`")
+    lines.append("- **projection**: `summary`")
+    for key, value in projection.items():
+        lines.append(f"- **{key}**: `{value}`")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_event(event: Event, form: str) -> str:
+    if form == SUMMARY_FORM:
+        projection = _summary_projection(event)
+        if projection is not None:
+            return _format_summary(event, projection)
+    return _format_event(event)
+
+
 def _header(query: str) -> str:
     return f"# Recall pack\n\nquery: `{query}`\n"
 
@@ -348,9 +452,21 @@ def _compact_omitted_footer(
     )
 
 
-def _selected_digest(events: Sequence[Event]) -> str:
-    content = "\n".join(canonical(event.raw) for event in events)
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+def _selected_digest(
+    events: Sequence[Event], forms: Sequence[str] | None = None
+) -> str:
+    pieces: list[str] = []
+    for index, event in enumerate(events):
+        form = FULL_FORM
+        if forms is not None and index < len(forms):
+            form = forms[index]
+        if form == SUMMARY_FORM:
+            projection = _summary_projection(event)
+            if projection is not None:
+                pieces.append("summary\n" + canonical(projection))
+                continue
+        pieces.append(canonical(event.raw))
+    return hashlib.sha256("\n".join(pieces).encode("utf-8")).hexdigest()
 
 
 def lookup_event(events: Sequence[Event], stable_id: str) -> Event | None:
@@ -408,17 +524,22 @@ def _compact_select_events(
             None,
         )
 
-    kept = list(candidates)
+    kept: list[tuple[int, Event, int, str]] = [
+        (index, event, rank, FULL_FORM) for index, event, rank in candidates
+    ]
     removed: list[tuple[int, Event, int]] = []
     while kept:
-        selected_events = [event for _, event, _ in kept]
+        selected_events = [event for _, event, _, _ in kept]
+        selected_forms = tuple(form for _, _, _, form in kept)
         continuation = (
             _stable_id(max(removed, key=lambda item: (item[2], item[0]))[1])
             if removed
             else None
         )
         parts = [_header(query)]
-        parts.extend(_format_event(event) for event in selected_events)
+        parts.extend(
+            _render_event(event, form) for _, event, _, form in kept
+        )
         if removed:
             parts.append(
                 _compact_omitted_footer(
@@ -436,24 +557,55 @@ def _compact_select_events(
             return Selection(
                 text,
                 tuple(_stable_id(event) for event in selected_events),
-                _selected_digest(selected_events),
+                _selected_digest(selected_events, selected_forms),
                 omissions,
                 not removed,
                 continuation,
+                selected_forms,
+                False,
             )
+        victim = None
+        for position, (index, event, rank, form) in enumerate(kept):
+            if form != FULL_FORM or _summary_projection(event) is None:
+                continue
+            if victim is None:
+                victim = position
+                continue
+            current = kept[victim]
+            if (rank, index) < (current[2], current[0]):
+                victim = position
+        if victim is not None:
+            kept = [
+                (
+                    index,
+                    event,
+                    rank,
+                    SUMMARY_FORM
+                    if form == FULL_FORM and _summary_projection(event) is not None
+                    else form,
+                )
+                for index, event, rank, form in kept
+            ]
+            continue
         victim = min(
             range(len(kept)), key=lambda item: (kept[item][2], kept[item][0])
         )
-        removed.append(kept.pop(victim))
+        dropped = kept.pop(victim)
+        removed.append((dropped[0], dropped[1], dropped[2]))
 
     continuation = _stable_id(max(removed, key=lambda item: (item[2], item[0]))[1])
     omissions = tuple(privileged_omissions) + tuple(
         Omission(_stable_id(event), event.kind, "context_bound", rank > 0)
         for _, event, rank in sorted(removed, key=lambda item: item[0])
     )
-    text = "# Recall pack\n\n" + _compact_omitted_footer(
-        len(removed), limit_chars, continuation
-    ).lstrip("\n")
+    text = (
+        "# Recall pack\n\n"
+        f"{_EMPTY_WHILE_AVAILABLE}: candidates existed but none fitted, "
+        "even as summaries.\n"
+        + _compact_omitted_footer(
+            len(removed), limit_chars, continuation
+        ).lstrip("\n")
+    )
     if len(text) > limit_chars:
         text = f"INCOMPLETE event_id:{continuation}\n"
     return Selection(
@@ -463,6 +615,8 @@ def _compact_select_events(
         omissions,
         False,
         continuation,
+        (),
+        True,
     )
 
 
@@ -537,8 +691,10 @@ def _build_receipt(
     continuation_cursor: str | None,
     scan_complete: bool,
     context_complete: bool,
+    selected_forms: list[str] | None = None,
+    semantic_status: str = "unknown",
 ) -> dict[str, object]:
-    return {
+    receipt: dict[str, object] = {
         "bytes_used": bytes_used,
         "candidate_ids": candidate_ids,
         "context_complete": context_complete,
@@ -549,8 +705,11 @@ def _build_receipt(
         "scan_complete": scan_complete,
         "scanned_universe_count": scanned_universe_count,
         "selected_ids": selected_ids,
-        "semantic_status": "unknown",
+        "semantic_status": semantic_status,
     }
+    if selected_forms is not None:
+        receipt["selected_forms"] = selected_forms
+    return receipt
 
 
 def _assemble_pack_body(
@@ -560,11 +719,18 @@ def _assemble_pack_body(
     omitted_count: int,
     limit_chars: int,
     empty_text: str | None = None,
+    forms: Sequence[str] | None = None,
 ) -> str:
     if empty_text is not None:
         return empty_text
     parts = [_header(query)]
-    parts.extend(_format_event(event) for event in selected)
+    rendered = []
+    for index, event in enumerate(selected):
+        form = FULL_FORM
+        if forms is not None and index < len(forms):
+            form = forms[index]
+        rendered.append(_render_event(event, form))
+    parts.extend(rendered)
     if omitted_count:
         parts.append(_omitted_footer(omitted_count, limit_chars).lstrip("\n"))
     text = "\n".join(parts)
@@ -670,6 +836,9 @@ def _pack_with_receipt(
         page_candidates = list(all_candidates)
 
     selected = list(page_candidates)
+    forms: dict[str, str] = {
+        _stable_id(event): FULL_FORM for _, event, _ in selected
+    }
     context_bound: list[tuple[int, Event, int]] = []
 
     while True:
@@ -677,13 +846,21 @@ def _pack_with_receipt(
         selected_events = [
             event for _, event, _ in sorted(selected, key=lambda item: item[0])
         ]
+        selected_form_list = [forms[_stable_id(event)] for event in selected_events]
+        empty_while_available = not selected and bool(all_candidates)
         if not selected:
             footer = _omitted_footer(dropped_for_budget, limit_chars).strip()
-            minimal = f"# Recall pack\n\n{footer}\n"
+            marker = (
+                f"{_EMPTY_WHILE_AVAILABLE}: candidates existed but none fitted, "
+                "even as summaries.\n"
+            )
+            minimal = f"# Recall pack\n\n{marker}{footer}\n"
             body = (
                 minimal
                 if len(minimal) <= limit_chars
-                else _omitted_footer(dropped_for_budget, limit_chars).lstrip("\n") + "\n"
+                else marker
+                + _omitted_footer(dropped_for_budget, limit_chars).lstrip("\n")
+                + "\n"
             )
         else:
             body = _assemble_pack_body(
@@ -691,6 +868,7 @@ def _pack_with_receipt(
                 selected=selected_events,
                 omitted_count=dropped_for_budget,
                 limit_chars=limit_chars,
+                forms=selected_form_list,
             )
 
         provisional_omitted = list(omitted_entries)
@@ -727,13 +905,104 @@ def _pack_with_receipt(
             continuation_cursor=continuation,
             scan_complete=scan_complete,
             context_complete=not context_bound,
+            selected_forms=(
+                selected_form_list if SUMMARY_FORM in selected_form_list else None
+            ),
+            semantic_status=(
+                _EMPTY_WHILE_AVAILABLE if empty_while_available else "unknown"
+            ),
         )
-        if len(body) + len(_serialise_receipt(receipt)) + 1 <= limit_chars:
+        if (
+            len(body) + len(_serialise_receipt(receipt)) + 1 <= limit_chars
+            and selected
+        ):
+            return _fit_output(body, receipt, limit_chars)
+        if (
+            len(body) + len(_serialise_receipt(receipt)) + 1 <= limit_chars
+            and not selected
+        ):
+            reclaimed = False
+            reclaimable = [
+                item
+                for item in context_bound
+                if _summary_projection(item[1]) is not None
+            ]
+            reclaimable.sort(key=lambda item: (-item[2], -item[0]))
+            for item in reclaimable:
+                trial = selected + [item]
+                trial_bound = [entry for entry in context_bound if entry is not item]
+                trial_events = [
+                    event for _, event, _ in sorted(trial, key=lambda row: row[0])
+                ]
+                trial_forms = [SUMMARY_FORM for _event in trial_events]
+                trial_body = _assemble_pack_body(
+                    query=query,
+                    selected=trial_events,
+                    omitted_count=len(trial_bound),
+                    limit_chars=limit_chars,
+                    forms=trial_forms,
+                )
+                trial_omitted = list(omitted_entries)
+                trial_omitted.extend(
+                    _Omitted(_stable_id(event), "context_bound")
+                    for _, event, _ in trial_bound
+                )
+                trial_receipt = _build_receipt(
+                    query_digest=query_digest,
+                    prefix_digest=prefix,
+                    scanned_universe_count=scanned_universe_count,
+                    candidate_ids=full_candidate_ids,
+                    selected_ids=[_stable_id(event) for event in trial_events],
+                    omitted=trial_omitted,
+                    bytes_used=len(trial_body),
+                    continuation_cursor=_encode_cursor(
+                        query_digest=query_digest,
+                        prefix_digest=prefix,
+                        before_candidate_id=_stable_id(trial[0][1]),
+                        limit_chars=limit_chars,
+                    )
+                    if trial_bound
+                    else None,
+                    scan_complete=scan_complete,
+                    context_complete=not trial_bound,
+                    selected_forms=trial_forms,
+                    semantic_status="unknown",
+                )
+                if (
+                    len(trial_body) + len(_serialise_receipt(trial_receipt)) + 1
+                    > limit_chars
+                ):
+                    break
+                selected = trial
+                context_bound = trial_bound
+                forms[_stable_id(item[1])] = SUMMARY_FORM
+                reclaimed = True
+            if reclaimed:
+                continue
             return _fit_output(body, receipt, limit_chars)
 
         if not selected:
             return _fit_output(body, receipt, limit_chars)
-        context_bound.append(selected.pop(0))
+        demoted = None
+        for position, (index, event, rank) in enumerate(selected):
+            stable = _stable_id(event)
+            if forms[stable] != FULL_FORM or _summary_projection(event) is None:
+                continue
+            if demoted is None:
+                demoted = position
+                continue
+            current = selected[demoted]
+            if (rank, index) < (current[2], current[0]):
+                demoted = position
+        if demoted is not None:
+            for index, event, rank in selected:
+                stable = _stable_id(event)
+                if forms[stable] == FULL_FORM and _summary_projection(event) is not None:
+                    forms[stable] = SUMMARY_FORM
+            continue
+        dropped = selected.pop(0)
+        context_bound.append(dropped)
+        forms.pop(_stable_id(dropped[1]), None)
 
 
 def _fit_output(body: str, receipt: dict[str, object], limit_chars: int) -> str:
@@ -775,15 +1044,24 @@ def parse_receipt(text: str) -> dict[str, object]:
         "semantic_status",
     }
     actual = set(receipt)
-    if actual != expected:
-        missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
+    unexpected = actual - expected - OPTIONAL_RECEIPT_FIELDS
+    missing = expected - actual
+    if missing or unexpected:
         detail: list[str] = []
         if missing:
-            detail.append(f"missing {', '.join(missing)}")
-        if extra:
-            detail.append(f"unexpected {', '.join(extra)}")
+            detail.append(f"missing {', '.join(sorted(missing))}")
+        if unexpected:
+            detail.append(f"unexpected {', '.join(sorted(unexpected))}")
         raise ValueError(f"recall receipt fields are not canonical: {'; '.join(detail)}")
+    selected_forms = receipt.get("selected_forms")
+    if selected_forms is not None:
+        if not isinstance(selected_forms, list):
+            raise ValueError("recall receipt selected_forms must be a list")
+        if any(form not in PROJECTION_FORMS for form in selected_forms):
+            raise ValueError("recall receipt selected_forms carries an unknown form")
+        selected_ids = receipt.get("selected_ids")
+        if not isinstance(selected_ids, list) or len(selected_forms) != len(selected_ids):
+            raise ValueError("recall receipt selected_forms must align with selected_ids")
     omitted = receipt["omitted"]
     if not isinstance(omitted, list):
         raise ValueError("recall receipt omitted must be a list")
@@ -810,6 +1088,13 @@ def _selection_from_pack(events: Sequence[Event], text: str) -> Selection:
         if isinstance(value, str) and value in indexed
     ) if isinstance(raw_selected, list) else ()
     selected_events = [indexed[event_id][1] for event_id in selected_ids]
+    raw_forms = receipt.get("selected_forms")
+    if isinstance(raw_forms, list) and len(raw_forms) == len(selected_ids):
+        selected_forms = tuple(
+            form if form in PROJECTION_FORMS else FULL_FORM for form in raw_forms
+        )
+    else:
+        selected_forms = tuple(FULL_FORM for _ in selected_ids)
 
     omissions: list[Omission] = []
     continuation_candidates: list[tuple[int, Event, int]] = []
@@ -839,10 +1124,12 @@ def _selection_from_pack(events: Sequence[Event], text: str) -> Selection:
     return Selection(
         text,
         selected_ids,
-        _selected_digest(selected_events),
+        _selected_digest(selected_events, selected_forms),
         tuple(omissions),
         receipt.get("context_complete") is True,
         continuation,
+        selected_forms,
+        receipt.get("semantic_status") == _EMPTY_WHILE_AVAILABLE,
     )
 
 
@@ -856,10 +1143,12 @@ def select_events(
     scan_complete: bool = True,
     shrink_to_receipt: bool = False,
 ) -> Selection:
-    """Select whole events and expose the bounded pack's exact provenance.
+    """Select events and expose the bounded pack's exact provenance.
 
-    The canonical receipt is retained whenever it fits without displacing context
-    that the commitment contract protects. A smaller budget receives C02's compact,
+    Whole events are preferred. When a candidate cannot fit, a named extractive
+    summary is selected and the receipt records `selected_forms`. The canonical
+    receipt is retained whenever it fits without displacing context that the
+    commitment contract protects. A smaller budget receives C02's compact,
     explicit stable-ID continuation instead of a fabricated complete receipt.
     """
     compact = (
@@ -893,6 +1182,13 @@ def select_events(
         raise
 
     selection = _selection_from_pack(events, text)
+    if (
+        compact is not None
+        and not selection.selected_event_ids
+        and compact.selected_event_ids
+        and any(form == SUMMARY_FORM for form in compact.selected_forms)
+    ):
+        return compact
     if compact is not None:
         compact_protected = {
             omission.event_id for omission in compact.omissions if omission.protected

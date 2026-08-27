@@ -47,9 +47,13 @@ sys.path.insert(0, str(ROOT / "src"))
 from consilient import coordination, instructions  # noqa: E402
 from consilient.capabilities import CapabilityError, select_capabilities  # noqa: E402
 from consilient.effects import (  # noqa: E402
+    EFFECT_INTENT,
+    EFFECT_RECEIPT,
+    EffectAdmissionRefusal,
     EffectManifest,
     ProofObservation,
     RecoveryProof,
+    admit_effect,
     canonical_state_digest,
     evaluate_recovery_proof,
 )
@@ -58,7 +62,14 @@ from consilient.error_tracking import (  # noqa: E402
     append_record,
     build_record,
 )
-from consilient.events import SCHEMA_VERSION, EventError, append, read_all  # noqa: E402
+from consilient.events import (  # noqa: E402
+    OUTCOME_KIND,
+    SCHEMA_VERSION,
+    EventError,
+    append,
+    append_transaction,
+    read_all,
+)
 from consilient.records import RecordRef, capture_file  # noqa: E402
 from consilient.harness import (  # noqa: E402
     DEFAULT_PERMISSION_MODE,
@@ -162,7 +173,13 @@ class RunResult:
     output_records: dict[str, object] | None = None
 
 
-def heldout_contract_refusal(contract: str) -> str:
+def heldout_contract_refusal(
+    contract: str,
+    *,
+    brief: str = "",
+    worktree: str = "",
+    claims: tuple[str, ...] = (),
+) -> str | None:
     spec = importlib.util.spec_from_file_location(
         "check_heldout_isolation", HELDOUT_ISOLATION_CHECKER
     )
@@ -170,8 +187,49 @@ def heldout_contract_refusal(contract: str) -> str:
         return "held-out isolation checker is unavailable; refusing before child launch"
     checker = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(checker)
-    refusal_reason = cast(Callable[[str], str], checker.refusal_reason)
-    return refusal_reason(contract)
+    refusal_reason = cast(Callable[..., str | None], checker.refusal_reason)
+    return refusal_reason(contract, brief=brief, worktree=worktree, claims=claims)
+
+
+def heldout_contract_audit(
+    contract: str, *, run_dir: Path, run_id: str, cwd: Path, stdout: str, stderr: str
+) -> str | None:
+    """Return an audit refusal after writing the checker’s explicit local inputs."""
+    try:
+        audit_stdout = run_dir / f"{run_id}.out"
+        audit_stderr = run_dir / f"{run_id}.err"
+        audit_diff = run_dir / f"{run_id}.diff"
+        audit_stdout.write_text(stdout, encoding="utf-8", newline="\n")
+        audit_stderr.write_text(stderr, encoding="utf-8", newline="\n")
+        git = which_binary("git")
+        if git is None:
+            return "held-out audit input is invalid; measurement VOID"
+        completed = subprocess.run(
+            [git, "-C", str(cwd), "diff", "--no-ext-diff"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            env=GIT_ENV,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return "held-out audit input is invalid; measurement VOID"
+        audit_diff.write_text(completed.stdout, encoding="utf-8", newline="\n")
+        spec = importlib.util.spec_from_file_location(
+            "check_heldout_isolation", HELDOUT_ISOLATION_CHECKER
+        )
+        if spec is None or spec.loader is None:
+            return "held-out audit input is invalid; measurement VOID"
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+        audit_reason = cast(Callable[..., str | None], checker.audit_reason)
+        return audit_reason(
+            contract, runs_dir=str(run_dir), uid=run_id, diff=str(audit_diff)
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "held-out audit input is invalid; measurement VOID"
 
 
 def record_dispatch_error(log_dir: Path, result: RunResult) -> None:
@@ -1809,6 +1867,8 @@ def run_harness(
     unit: str = "",
     capability_selection: Mapping[str, object] | None = None,
     workspace_root: Path | None = None,
+    heldout_contract: str | None = None,
+    claims: tuple[str, ...] = (),
 ) -> RunResult:
     cwd = cwd.resolve()
     run_dir = run_dir.resolve()
@@ -1883,6 +1943,38 @@ def run_harness(
         claim_run_id=claim_run_id,
         assembly=assembly,
     )
+    if heldout_contract is not None:
+        refusal: str | None
+        try:
+            final_brief = brief.read_text(encoding="utf-8")
+        except OSError:
+            refusal = (
+                "held-out final brief is unavailable; refusing before child launch"
+            )
+        else:
+            refusal = heldout_contract_refusal(
+                heldout_contract,
+                brief=final_brief,
+                worktree=str(cwd),
+                claims=claims,
+            )
+        if refusal is not None:
+            return RunResult(
+                harness=harness,
+                status="refused",
+                reason=refusal,
+                exit_code=None,
+                stdout="",
+                stderr="",
+                artefact_bytes=0,
+                diff_bytes=0,
+                timed_out=False,
+                duration_s=0.0,
+                command=tuple(built),
+                run_id=run_id,
+                stdout_path=str(stdout_path),
+                stderr_path=str(stderr_path),
+            )
     if log_dir is not None and assembly is not None:
         instructions.record_assembly(
             log_dir, assembly, task=task, pre_run_records=pre_run_records
@@ -2003,6 +2095,20 @@ def run_harness(
         diff_bytes=diff_bytes,
         timed_out=timed_out,
     )
+    if heldout_contract is not None:
+        audit = heldout_contract_audit(
+            heldout_contract,
+            run_dir=run_dir,
+            run_id=run_id,
+            cwd=cwd,
+            stdout=stdout,
+            stderr=stderr,
+        )
+        if audit is not None:
+            status, reason = "refused", audit
+            stdout = ""
+            stderr = ""
+            artefact_bytes = 0
     request_timing = None
     if stream_timing is not None:
         usage = extract_usage_from_output(stdout, harness.id)
@@ -2631,6 +2737,7 @@ def dispatch_one(
     max_tokens: int = DEFAULT_MAX_TOKENS,
     native_claim: Mapping[str, object] | None = None,
     capability_selection: Mapping[str, object] | None = None,
+    heldout_contract: str | None = None,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "dispatch")
@@ -2670,6 +2777,23 @@ def dispatch_one(
             in_flight=in_flight,
             claim_run_id=run_id,
         )
+        if heldout_contract is not None:
+            refusal: str | None
+            try:
+                final_brief = brief.read_text(encoding="utf-8")
+            except OSError:
+                refusal = (
+                    "held-out final brief is unavailable; refusing before child launch"
+                )
+            else:
+                refusal = heldout_contract_refusal(
+                    heldout_contract,
+                    brief=final_brief,
+                    worktree=str(cwd),
+                    claims=claims,
+                )
+            if refusal is not None:
+                return {"status": "refused", "reason": refusal}, _exit_for("refused")
         built = build_command(
             harness,
             task=task,
@@ -2856,6 +2980,8 @@ def dispatch_one(
                 max_tokens=max_tokens,
                 capability_selection=capability_selection,
                 workspace_root=cwd,
+                heldout_contract=heldout_contract,
+                claims=claims,
             )
             if result.request_timing is not None:
                 record_request(
@@ -2938,6 +3064,7 @@ def dispatch_fanout(
     max_turns: int = DEFAULT_MAX_TURNS,
     max_tokens: int = DEFAULT_MAX_TOKENS,
     capability_selection: Mapping[str, object] | None = None,
+    heldout_contract: str | None = None,
 ) -> tuple[dict[str, object], int]:
     ts = now_ts()
     run_id = make_run_id(ts, task, "fanout")
@@ -3064,6 +3191,8 @@ def dispatch_fanout(
                 max_tokens=max_tokens,
                 capability_selection=capability_selection,
                 workspace_root=cwd,
+                heldout_contract=heldout_contract,
+                claims=claims,
             )
             if result.request_timing is not None:
                 record_request(
@@ -3253,6 +3382,219 @@ class _ProofObserver:
         return "failed" if denied else "succeeded"
 
 
+_ADMITTED_EFFECTS: dict[str, str] = {}
+_EFFECT_RECEIPT_STATUSES = frozenset({"succeeded", "failed", "refused", "unknown"})
+
+
+@dataclass
+class FakeEffectAdmissionResult:
+    status: str
+    receipt_id: str | None
+    intent_id: str
+    handle_token: str | None
+
+
+class FakeEffectSink:
+    """Inert fake adapter counting how many times reach was invoked."""
+
+    def __init__(self, *, status: str = "succeeded") -> None:
+        if status not in _EFFECT_RECEIPT_STATUSES:
+            raise ValueError(
+                f"status must be one of {sorted(_EFFECT_RECEIPT_STATUSES)}"
+            )
+        self.status = status
+        self.invocations = 0
+
+    def invoke(self, manifest: EffectManifest, handle_token: str) -> str:
+        if _ADMITTED_EFFECTS.get(handle_token) is not None:
+            raise RuntimeError("single-use admission handle already consumed")
+        _ADMITTED_EFFECTS[handle_token] = manifest.operation_id
+        self.invocations += 1
+        return self.status
+
+
+def _broker_reference(name: str) -> dict[str, str]:
+    return {
+        "kind": "broker_reference",
+        "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}",
+    }
+
+
+def _keyed_commitment(domain: str) -> dict[str, str]:
+    return {
+        "kind": "keyed_commitment",
+        "algorithm": "hmac-sha256",
+        "domain": domain,
+        "key_version": "v1",
+        "commitment": hashlib.sha256(domain.encode()).hexdigest(),
+    }
+
+
+def _effect_receipt_event(
+    *,
+    receipt_id: str,
+    intent_id: str,
+    manifest_digest: str,
+    status: str,
+    started_at: str,
+    ended_at: str,
+) -> dict[str, object]:
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": ended_at,
+        "event": EFFECT_RECEIPT,
+        "actor": DISPATCH_ACTOR,
+        "data": {
+            "receipt_id": receipt_id,
+            "intent_id": intent_id,
+            "manifest_digest": manifest_digest,
+            "status": status,
+            "started_at": started_at,
+            "ended_at": ended_at,
+            "provider_request": _broker_reference("provider-request"),
+            "provider_receipt": _broker_reference("provider-receipt"),
+            "request_commitment": _keyed_commitment("effect.receipt.request"),
+            "response_commitment": _keyed_commitment("effect.receipt.response"),
+            "content_commitment": _keyed_commitment("effect.receipt.content"),
+            "observed_consumption": {"cpu_seconds": 0},
+            "post_state": _keyed_commitment("effect.receipt.post_state"),
+            "observed_residuals": ("elapsed_time",),
+            "child_operation_ids": (),
+        },
+    }
+
+
+def _attempt_outcome_event(
+    manifest: EffectManifest,
+    *,
+    verifier_accept: bool,
+    ts: str,
+) -> dict[str, object]:
+    return {
+        "v": SCHEMA_VERSION,
+        "ts": ts,
+        "event": OUTCOME_KIND,
+        "actor": DISPATCH_ACTOR,
+        "data": {
+            "repository": "consilient",
+            "attempt_id": manifest.attempt_id,
+            "task": manifest.work_item_id,
+            "verifier_accept": verifier_accept,
+        },
+    }
+
+
+def _existing_effect_completion(
+    log_dir: Path,
+    intent_id: str,
+) -> FakeEffectAdmissionResult | None:
+    events, _rejections = read_all(log_dir)
+    for event in events:
+        raw = event.raw
+        if (
+            raw.get("event") == EFFECT_RECEIPT
+            and raw.get("data", {}).get("intent_id") == intent_id
+        ):
+            status = raw["data"]["status"]
+            return FakeEffectAdmissionResult(
+                status=status,
+                receipt_id=raw["data"]["receipt_id"],
+                intent_id=intent_id,
+                handle_token=None,
+            )
+    return None
+
+
+def run_admitted_fake_effect(
+    log_dir: Path,
+    *,
+    manifest: EffectManifest,
+    disposition: str,
+    sink: FakeEffectSink,
+    intent_id: str,
+    receipt_id: str,
+    observation_id: str | None = None,
+    decision_event: dict[str, object] | None = None,
+    proposal_event: dict[str, object] | None = None,
+    authority_event: dict[str, object] | None = None,
+) -> FakeEffectAdmissionResult:
+    """Atomically admit one fake effect: intent, one reach, receipt, outcome."""
+
+    existing = _existing_effect_completion(log_dir, intent_id)
+    if existing is not None:
+        return existing
+
+    prefix_events, _rejections = read_all(log_dir)
+    planned_disposition = "refused" if disposition == "refuse" else disposition
+    planned = admit_effect(
+        manifest,
+        disposition=planned_disposition,
+        prefix=prefix_events,
+        intent_id=intent_id,
+        receipt_id=receipt_id,
+        observation_id=observation_id,
+        decision_event=decision_event,
+        proposal_event=proposal_event,
+        authority_event=authority_event,
+    )
+    if isinstance(planned, EffectAdmissionRefusal):
+        return FakeEffectAdmissionResult(
+            status="refused",
+            receipt_id=None,
+            intent_id=intent_id,
+            handle_token=None,
+        )
+
+    if planned_disposition != "execute":
+        intent_payload = {
+            "v": SCHEMA_VERSION,
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "event": EFFECT_INTENT,
+            "actor": DISPATCH_ACTOR,
+            "data": planned.intent_data,
+        }
+        append_transaction(log_dir, [intent_payload], lambda p, r, c: None)
+        return FakeEffectAdmissionResult(
+            status="refused",
+            receipt_id=None,
+            intent_id=intent_id,
+            handle_token=None,
+        )
+
+    intent_payload = {
+        "v": SCHEMA_VERSION,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": EFFECT_INTENT,
+        "actor": DISPATCH_ACTOR,
+        "data": planned.intent_data,
+    }
+    append_transaction(log_dir, [intent_payload], lambda p, r, c: None)
+
+    started = datetime.now(timezone.utc).isoformat()
+    reach_status = sink.invoke(manifest, planned.handle_token)
+    ended = datetime.now(timezone.utc).isoformat()
+    receipt = _effect_receipt_event(
+        receipt_id=receipt_id,
+        intent_id=intent_id,
+        manifest_digest=planned.manifest_digest,
+        status=reach_status,
+        started_at=started,
+        ended_at=ended,
+    )
+    outcome = _attempt_outcome_event(
+        manifest,
+        verifier_accept=reach_status == "succeeded",
+        ts=ended,
+    )
+    append_transaction(log_dir, [receipt, outcome], lambda p, r, c: None)
+    return FakeEffectAdmissionResult(
+        status=reach_status,
+        receipt_id=receipt_id,
+        intent_id=intent_id,
+        handle_token=planned.handle_token,
+    )
+
+
 def run_isolated_recovery_proof(
     scratch_root: Path,
     verifier_log: Path,
@@ -3391,7 +3733,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--heldout-contract",
-        help="held-out contract path; refused until dispatch gains real isolation",
+        help="held-out contract path; refused when reachable from brief, worktree or claims",
     )
     parser.add_argument("--timeout", type=positive_int, default=DEFAULT_TIMEOUT_S)
     parser.add_argument("--max-turns", type=positive_int, default=DEFAULT_MAX_TURNS)
@@ -3432,15 +3774,6 @@ def main(argv: list[str] | None = None) -> int:
             runs_dir=Path(args.runs).resolve(),
             as_json=args.json,
         )
-    if args.heldout_contract is not None:
-        emit(
-            {
-                "status": "refused",
-                "reason": heldout_contract_refusal(args.heldout_contract),
-            },
-            args.json,
-        )
-        return 2
     try:
         cwd = resolve_cwd(args.cwd)
     except ValueError as exc:
@@ -3448,6 +3781,27 @@ def main(argv: list[str] | None = None) -> int:
         # another repository. A refused boundary must not leave a runnable artefact.
         emit({"status": "refused", "reason": str(exc)}, args.json)
         return 2
+    task: str | None = None
+    if args.heldout_contract is not None:
+        if not args.probe:
+            try:
+                task = load_task(args.task, args.task_file)
+                capability_selection = load_capability_selection(
+                    args.capability_inventory, args.capability_request
+                )
+                task = _task_with_selection(task, capability_selection)
+            except ValueError as exc:
+                emit({"status": "refused", "reason": str(exc)}, args.json)
+                return 2
+        refusal = heldout_contract_refusal(
+            args.heldout_contract,
+            brief=task or "",
+            worktree=str(cwd),
+            claims=tuple(args.claim or ()),
+        )
+        if refusal is not None:
+            emit({"status": "refused", "reason": refusal}, args.json)
+            return 2
     log_dir = Path(args.log).resolve()
     runs_dir = Path(args.runs).resolve()
     headroom_path = Path(args.headroom).resolve()
@@ -3488,15 +3842,16 @@ def main(argv: list[str] | None = None) -> int:
         emit(payload, args.json)
         return 0
 
-    try:
-        task = load_task(args.task, args.task_file)
-        capability_selection = load_capability_selection(
-            args.capability_inventory, args.capability_request
-        )
-        task = _task_with_selection(task, capability_selection)
-    except ValueError as exc:
-        emit({"status": "refused", "reason": str(exc)}, args.json)
-        return 2
+    if task is None:
+        try:
+            task = load_task(args.task, args.task_file)
+            capability_selection = load_capability_selection(
+                args.capability_inventory, args.capability_request
+            )
+            task = _task_with_selection(task, capability_selection)
+        except ValueError as exc:
+            emit({"status": "refused", "reason": str(exc)}, args.json)
+            return 2
 
     if args.fan_out and args.harness:
         emit(
@@ -3543,6 +3898,7 @@ def main(argv: list[str] | None = None) -> int:
             max_turns=args.max_turns,
             max_tokens=args.max_tokens,
             capability_selection=capability_selection,
+            heldout_contract=args.heldout_contract,
         )
         emit(payload, args.json)
         return code
@@ -3569,6 +3925,7 @@ def main(argv: list[str] | None = None) -> int:
         max_turns=args.max_turns,
         max_tokens=args.max_tokens,
         capability_selection=capability_selection,
+        heldout_contract=args.heldout_contract,
     )
     emit(payload, args.json)
     return code

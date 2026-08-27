@@ -48,6 +48,8 @@ from pathlib import Path
 # because a per-script exemption is how it erodes.
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
+_SELF_PATH = Path(__file__).resolve()
+
 # Windows and the CI runner both need an explicit timeout; a hung child must
 # be a failure, never a silent pass. This script's child is itself on a pair
 # of tiny files, so the cap is short.
@@ -84,14 +86,14 @@ SKIP_DIRS = {
 
 SPECIMEN = "\n".join(
     (
-        "KINDS = [\"CREATE\", \"READ\", \"UPDATE\", \"DELETE\", \"STATE\"]",
-        "KINDS = [\"CREATE\", \"READ\", \"UPDATE\", \"DELETE\"]",
+        'KINDS = ["CREATE", "READ", "UPDATE", "DELETE", "STATE"]',
+        'KINDS = ["CREATE", "READ", "UPDATE", "DELETE"]',
         "",
-        "SCHEMA = \"\"\"",
+        'SCHEMA = """',
         "CREATE TABLE items (",
         "    id INTEGER PRIMARY KEY,",
         "CREATE TABLE broken",
-        "\"\"\"",
+        '"""',
         "",
         "def leftover():",
         "    return True",
@@ -102,21 +104,21 @@ SPECIMEN = "\n".join(
 
 CONTROL = "\n".join(
     (
-        "KINDS = [\"CREATE\", \"READ\", \"UPDATE\", \"DELETE\", \"STATE\"]",
+        'KINDS = ["CREATE", "READ", "UPDATE", "DELETE", "STATE"]',
         "",
-        "SCHEMA = \"\"\"",
+        'SCHEMA = """',
         "CREATE TABLE items (",
         "    id INTEGER PRIMARY KEY",
         ");",
-        "\"\"\"",
+        '"""',
         "",
         "def inner():",
         "    x = 1",
         "    x = 2",
         "    return x",
         "",
-        "PATTERN = r\"CREATE TABLE IF NOT EXISTS\\s+(\\w+)\"",
-        "EXAMPLE = \"from x import y\\nCREATE TABLE z (id INTEGER);\"",
+        'PATTERN = r"CREATE TABLE IF NOT EXISTS\\s+(\\w+)"',
+        'EXAMPLE = "from x import y\\nCREATE TABLE z (id INTEGER);"',
         "",
     )
 )
@@ -166,13 +168,107 @@ def rebinding_findings(path: Path, tree: ast.AST) -> list[str]:
     return findings
 
 
+def _without_leading_sql_comments(value: str) -> str:
+    text = value.lstrip()
+    while text:
+        if text.startswith("--"):
+            _, separator, text = text.partition("\n")
+            if not separator:
+                return ""
+            text = text.lstrip()
+            continue
+        if text.startswith("/*"):
+            end = text.find("*/", 2)
+            if end < 0:
+                return ""
+            text = text[end + 2 :].lstrip()
+            continue
+        break
+    return text
+
+
+def _after_table_name(value: str) -> str | None:
+    if not value:
+        return ""
+    if value[0] in {'"', "`", "["}:
+        closing = "]" if value[0] == "[" else value[0]
+        end = value.find(closing, 1)
+        return "" if end < 0 else value[end + 1 :].lstrip()
+    end = 0
+    while end < len(value) and (value[end].isalnum() or value[end] in "_.$"):
+        end += 1
+    if end == 0:
+        return None
+    return value[end:].lstrip()
+
+
+def _create_table_shaped(tail: str) -> bool:
+    """Does `tail` (already past a "create table" match) look like real DDL?"""
+    if tail and not tail[0].isspace():
+        return False
+    tail = tail.lstrip()
+    conditional = "if not exists"
+    if tail.casefold().startswith(conditional):
+        remainder = tail[len(conditional) :]
+        if not remainder or remainder[0].isspace():
+            tail = remainder.lstrip()
+    after_name = _after_table_name(tail)
+    if after_name is None:
+        return False
+    if not after_name:
+        return True
+    folded = after_name.casefold()
+    return (
+        after_name.startswith(("(", ";")) or folded == "as" or folded.startswith("as ")
+    )
+
+
+def _ddl_start(value: str) -> int | None:
+    """Absolute index in `value` where a genuine CREATE TABLE statement begins.
+
+    MEASURED 26 August 2026: requiring the WHOLE string to start with "create table"
+    let a leading `PRAGMA foreign_keys = ON;` (or any other leading statement) hide a
+    genuinely broken schema from this check entirely -- the same cut-mid-statement SCHEMA
+    that was correctly refused on its own passed with "0 findings" once prefixed. A DDL
+    string is not only ever a single bare CREATE TABLE statement; check every statement
+    boundary (the start, and immediately after each top-level ';'), not just position 0.
+    """
+    script = _without_leading_sql_comments(value)
+    offset = len(value) - len(script)
+    prefix = "create table"
+    folded = script.casefold()
+    start = 0
+    while True:
+        index = folded.find(prefix, start)
+        if index < 0:
+            return None
+        at_statement_start = index == 0 or script[:index].rstrip().endswith(";")
+        if at_statement_start and _create_table_shaped(script[index + len(prefix) :]):
+            return offset + index
+        start = index + len(prefix)
+
+
 def sql_shaped(value: str) -> bool:
-    """True when `value` is DDL we should hand to sqlite3, not a mention of DDL."""
-    if "create table" not in value.lower():
-        return False
-    if "\\" in value:
-        return False
-    return value.lstrip().lower().startswith("create table")
+    """Distinguish DDL intent from prose, regexes and Python-source fixtures."""
+    return _ddl_start(value) is not None
+
+
+def _ddl_slice(value: str, start: int) -> str:
+    """The DDL statement(s) at `start`, trimmed of anything trailing the last ';'.
+
+    A CREATE TABLE match can sit embedded inside a larger non-SQL string (Python
+    source text being written out as a file, in `test_build_diagrams.py`'s own
+    fixtures) -- running the WHOLE original string through sqlite from `start`
+    onward would drag in whatever non-SQL text follows the real DDL (a closing
+    docstring quote, more Python) and raise a syntax error that has nothing to do
+    with whether the DDL itself is sound. Trim to the last statement boundary at
+    or after `start`; a script with no closing ';' (the truncated-mid-statement
+    case this check exists to catch) is used unchanged.
+    """
+    last_semicolon = value.rfind(";", start)
+    if last_semicolon < 0:
+        return value[start:]
+    return value[start : last_semicolon + 1]
 
 
 def _assigned_constant_names(tree: ast.AST) -> dict[int, str]:
@@ -204,9 +300,10 @@ def _ddl_error(script: str) -> sqlite3.Error | None:
 
 def ddl_findings(label: str, text: str) -> list[str]:
     """C3 against one string. Empty when the string is not SQL-shaped DDL."""
-    if not sql_shaped(text):
+    start = _ddl_start(text)
+    if start is None:
         return []
-    error = _ddl_error(text)
+    error = _ddl_error(_ddl_slice(text, start))
     if error is None:
         return []
     return [f"{label}:1:CREATE TABLE"]
@@ -220,9 +317,10 @@ def ddl_tree_findings(path: Path, tree: ast.AST) -> list[str]:
     for node in ast.walk(tree):
         if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
             continue
-        if not sql_shaped(node.value):
+        start = _ddl_start(node.value)
+        if start is None:
             continue
-        if _ddl_error(node.value) is None:
+        if _ddl_error(_ddl_slice(node.value, start)) is None:
             continue
         name = assigned.get(id(node), "CREATE TABLE")
         findings.append(f"{displayed}:{node.lineno}:{name}")
@@ -275,9 +373,7 @@ def _tracked_python() -> frozenset[Path]:
     if completed.returncode != 0:
         return frozenset()
     names = completed.stdout.decode("utf-8", "replace").split(chr(0))
-    return frozenset(
-        (REPO_ROOT / name).resolve() for name in names if name.strip()
-    )
+    return frozenset((REPO_ROOT / name).resolve() for name in names if name.strip())
 
 
 def iter_python(paths: list[Path]) -> list[Path]:
@@ -312,7 +408,17 @@ def report(paths: list[Path]) -> int:
             continue
         parsed += 1
         findings.extend(rebinding_findings(path, tree))
-        findings.extend(ddl_tree_findings(path, tree))
+        # C3 walks every string constant, including this file's own SPECIMEN/CONTROL
+        # self-test fixtures and the literal "create table" / "CREATE TABLE" strings
+        # sql_shaped() and ddl_tree_findings() use for matching -- all deliberately
+        # DDL-shaped-and-broken by design, not real application schema. A `--files`
+        # scan scoped to this checker's own file (exactly what the merge gate runs on
+        # a commit that touches it) refused itself on those self-matches before this
+        # exclusion existed. self_test() already proves detection works, via a
+        # subprocess over separate scratch files, so this file is exempt from its own
+        # C3 sweep without weakening the check for anything else.
+        if path.resolve() != _SELF_PATH:
+            findings.extend(ddl_tree_findings(path, tree))
     for line in findings:
         print(line)
     if findings:
@@ -323,7 +429,12 @@ def report(paths: list[Path]) -> int:
 
 def _run_files(paths: list[Path]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(Path(__file__).resolve()), "--files", *[str(p) for p in paths]],
+        [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--files",
+            *[str(p) for p in paths],
+        ],
         capture_output=True,
         text=True,
         encoding="utf-8",
