@@ -24,6 +24,18 @@ GRANT_KINDS: tuple[GrantKind, ...] = (
     "principal_authority",
     "controller_baseline.local_restorable.v1",
 )
+PROTECTED_EFFECT_CLASSES = frozenset(
+    {
+        "money.commit",
+        "message.send",
+        "content.publish",
+        "external.change",
+        "obligation.commit",
+        "authority.change",
+        "physical.actuate",
+    }
+)
+CONTROLLER_BASELINE_FORBIDDEN_EFFECTS = PROTECTED_EFFECT_CLASSES | {"network.call"}
 
 # Rewind classes from Claude Code's documented limits: 1 tool-mediated and
 # snapshotted; 2 shell; 3 subagent-delegated; 4 external. Shell that can reach
@@ -324,6 +336,8 @@ def _parse_gate(value: object, label: str) -> Gate:
     if state == "admitted":
         if grant_kind is None:
             raise CapabilityError(f"{label} admitted gate requires grant_kind")
+        if expires_at is None:
+            raise CapabilityError(f"{label} admitted gate requires expires_at")
         if grant_kind == "principal_authority" and authority_event is None:
             raise CapabilityError(
                 f"{label} principal_authority grant requires authority_event"
@@ -332,6 +346,13 @@ def _parse_gate(value: object, label: str) -> Gate:
             if decision_id is None or recovery_proof_ref is None:
                 raise CapabilityError(
                     f"{label} controller_baseline grant requires decision_id and recovery_proof_ref"
+                )
+            forbidden = sorted(
+                set(effect_classes) & CONTROLLER_BASELINE_FORBIDDEN_EFFECTS
+            )
+            if forbidden:
+                raise CapabilityError(
+                    f"{label} controller_baseline grant forbids protected reach: {forbidden}"
                 )
     if state == "gated" and grant_kind is not None:
         raise CapabilityError(f"{label} gated gate must not carry grant_kind")

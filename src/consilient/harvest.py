@@ -46,19 +46,38 @@ def assert_unpublishable(dest: Path, *, root: Path) -> Path:
 
 
 def _load_seen(path: Path) -> set[str]:
+    """Which run ids the harvest already holds, read WITHOUT loading the file.
+
+    MEASURED 28 August 2026. This was
+
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+
+    which materialises the entire file as one string AND then a list of every line in it.
+    `.harness/training/harvest.jsonl` had reached 1.65 GB, so a single call allocated
+    several gigabytes before the first run id was read, and the dispatch died with
+    MemoryError. Units A02, B01, B06, F01 and W11 all died here, A02 fifteen times.
+
+    The file is append-only and grows forever by design (ADR-0057 instance data), so the
+    slurp was guaranteed to fail eventually -- it was a question of which day, not whether.
+
+    Iterating the handle reads one line at a time and keeps only the id set, so peak memory
+    is a function of the ANSWER rather than of the file. Same ids, same order-independence,
+    same result.
+    """
     seen: set[str] = set()
     if not path.is_file():
         return seen
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        run_id = row.get("run_id")
-        if isinstance(run_id, str) and run_id.strip():
-            seen.add(run_id.strip())
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            run_id = row.get("run_id")
+            if isinstance(run_id, str) and run_id.strip():
+                seen.add(run_id.strip())
     return seen
 
 

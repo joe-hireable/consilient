@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -133,8 +135,9 @@ def test_a_second_dispatch_is_not_refused_after_a_confirmed_gone_release(
     assert len(_live(log)) == 1
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows process semantics")
 def test_worker_gone_from_pid_record_reports_gone_for_dead_pid(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     runs = tmp_path / "runs"
     run_dir = runs / "run-a"
@@ -142,25 +145,38 @@ def test_worker_gone_from_pid_record_reports_gone_for_dead_pid(
     (run_dir / "process.json").write_text(
         json.dumps({"pid": 999_999}), encoding="utf-8"
     )
-
-    def fake_kill(pid: int, _sig: int) -> None:
-        if pid == 999_999:
-            raise ProcessLookupError
-
-    monkeypatch.setattr(os, "kill", fake_kill)
     assert coordination.worker_gone_from_pid_record(runs, "run-a") is True
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows process semantics")
+def test_worker_gone_from_pid_record_reports_gone_after_child_exit(
+    tmp_path: Path,
+) -> None:
+    child = subprocess.Popen([sys.executable, "-c", "pass"])
+    pid = child.pid
+    assert child.wait() == 0
+    runs = tmp_path / "runs"
+    run_dir = runs / "run-exited"
+    run_dir.mkdir(parents=True)
+    (run_dir / "process.json").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    assert coordination.worker_gone_from_pid_record(runs, "run-exited") is True
+
+
 def test_worker_gone_from_pid_record_reports_running_for_live_pid(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     runs = tmp_path / "runs"
     run_dir = runs / "run-b"
     run_dir.mkdir(parents=True)
-    (run_dir / "process.json").write_text(json.dumps({"pid": 42}), encoding="utf-8")
-
-    monkeypatch.setattr(os, "kill", lambda _pid, _sig: None)
-    assert coordination.worker_gone_from_pid_record(runs, "run-b") is False
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        (run_dir / "process.json").write_text(
+            json.dumps({"pid": child.pid}), encoding="utf-8"
+        )
+        assert coordination.worker_gone_from_pid_record(runs, "run-b") is False
+    finally:
+        child.kill()
+        child.wait()
 
 
 def test_worker_gone_from_pid_record_is_unknown_without_a_record(
@@ -170,16 +186,17 @@ def test_worker_gone_from_pid_record_is_unknown_without_a_record(
     assert coordination.worker_gone_from_pid_record(runs, "missing") is None
 
 
-def test_worker_gone_from_pid_record_is_unknown_on_permission_error(
+def test_worker_gone_from_pid_record_is_unknown_when_process_check_is_unknown(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     runs = tmp_path / "runs"
     run_dir = runs / "run-c"
     run_dir.mkdir(parents=True)
-    (run_dir / "process.json").write_text(json.dumps({"pid": 7}), encoding="utf-8")
+    (run_dir / "process.json").write_text(
+        json.dumps({"pid": os.getpid()}), encoding="utf-8"
+    )
 
-    def deny(_pid: int, _sig: int) -> None:
-        raise PermissionError
-
-    monkeypatch.setattr(os, "kill", deny)
+    monkeypatch.setattr(
+        coordination, "_process_still_running", lambda _pid: None, raising=False
+    )
     assert coordination.worker_gone_from_pid_record(runs, "run-c") is None

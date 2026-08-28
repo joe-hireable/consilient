@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -21,12 +23,14 @@ from consilient.instructions import (
     ADAPTED_LIMIT_CHARS,
     ASSEMBLED,
     BETTER_THAN_BEST_NAME,
+    CORE_VERSION,
     INERT,
     INERT_NOTICE,
     INVARIANT_CORE,
     RECALL_LIMIT_CHARS,
     SKILL_CHARS,
     AdaptedLayer,
+    Assembly,
     CostCeiling,
     IndexAnswer,
     IndexLookup,
@@ -43,6 +47,7 @@ from consilient.instructions import (
     render,
     select_skills,
 )
+from consilient.recall import Omission, Selection
 
 
 def now() -> str:
@@ -300,7 +305,10 @@ def test_every_assembly_is_recorded_with_the_identity_of_every_layer(tmp_path: P
         == hashlib.sha256(canonical(selected).encode("utf-8")).hexdigest()
     )
     # The receipt records a digest and a count, not the omission list -- inlining the list is
-    # what took the trajectory to 40 MB (see tests/test_selection_receipt_size.py).
+    # what took the trajectory to 40 MB. Pin the LOGGED EVENT, not the helper: a mutant that
+    # re-spreads `omitted` next to the digest still passes tests that only inspect
+    # `_selection_receipt()`.
+    assert "omitted" not in data["recall"]
     assert data["recall"]["omitted_count"] == 0
     assert data["recall"]["omitted_digest"] == instructions._omitted_digest([])
     assert data["recall"]["context_complete"] is True
@@ -343,19 +351,17 @@ def test_overflow_metadata_points_to_omitted_protected_event_and_reconstructs(
     recall_data = event["data"]["recall"]
     assert recall_data["context_complete"] is False
     assert recall_data["continuation"] == {"event_id": protected["event_id"]}
-    # WHICH events were omitted is asserted against the selection, because the recorded
-    # receipt now carries only a digest of that set. The behaviour is unchanged and still
-    # checked; what moved is where it is read from. The digest is then pinned against the
-    # same omissions, so the log still discriminates a different omission set.
+    # The compounding loop wrote `data.recall.omitted` onto instructions.assembled.
+    # Pin that the logged event -- not the in-memory selection -- no longer carries it.
+    assert "omitted" not in recall_data
+    omitted_rows = instructions._omission_rows(assembly.recall_selection)
     assert {
         "event_id": protected["event_id"],
         "event_kind": "review.recorded",
         "reason": "context_bound",
         "protected": True,
-    } in instructions._omission_rows(assembly.recall_selection)
-    assert recall_data["omitted_digest"] == instructions._omitted_digest(
-        instructions._omission_rows(assembly.recall_selection)
-    )
+    } in omitted_rows
+    assert recall_data["omitted_digest"] == instructions._omitted_digest(omitted_rows)
     assert recall_data["omitted_count"] >= 1
     assert str(protected["event_id"]) in assembly.recall_pack
 
@@ -394,6 +400,149 @@ def test_overflow_metadata_points_to_omitted_protected_event_and_reconstructs(
     assert "selection receipt" in next(
         report.detail for report in drift.layers if report.layer == "recall"
     )
+
+
+def _selection_with_omissions(count: int) -> Selection:
+    return Selection(
+        text="# Recall pack\n\nNo events match query.\n",
+        selected_event_ids=(),
+        selected_digest="0" * 64,
+        omissions=tuple(
+            Omission(
+                event_id=f"evt-{index:04d}",
+                event_kind="conversation.turn",
+                reason="budget",
+                protected=False,
+            )
+            for index in range(count)
+        ),
+        context_complete=False,
+        continuation_event_id=None,
+    )
+
+
+def _stub_assembly(selection: Selection) -> Assembly:
+    pack = selection.text
+    return Assembly(
+        core_version=CORE_VERSION,
+        skills=(),
+        skills_omitted=0,
+        recall_pack=pack,
+        recall_selection=selection,
+        recall_limit_chars=300,
+        recall_source_events=0,
+        recall_source_digest=promote.digest(""),
+        adapted=AdaptedLayer(INERT, "", None),
+        text="stub",
+        sha256=promote.digest("stub"),
+        capability_manifests=(),
+        recall_receipt={"status": "ok", "digest": "0" * 64},
+    )
+
+
+def _logged_recall(tmp_path: Path, event: dict[str, object]) -> dict[str, object]:
+    """The recall object as written to the jsonl artefact, not the in-memory return."""
+    log_path = tmp_path / f"{str(event['ts'])[:10]}.jsonl"
+    line = log_path.read_bytes().splitlines()[-1]
+    recorded = json.loads(line.decode("utf-8"))
+    recall_data = recorded["data"]["recall"]
+    assert isinstance(recall_data, dict)
+    return recall_data
+
+
+def test_a_logged_assembled_event_does_not_inline_the_omission_list(
+    tmp_path: Path,
+) -> None:
+    """Z01 artefact pin. The helper `_selection_receipt` was already slim; the event was not."""
+    event = record_assembly(
+        tmp_path, _stub_assembly(_selection_with_omissions(454)), task="crowd"
+    )
+    assert event["event"] == ASSEMBLED
+    assert "omitted" not in event["data"]["recall"]
+    logged = _logged_recall(tmp_path, event)
+    assert "omitted" not in logged
+    assert logged["omitted_count"] == 454
+    assert isinstance(logged["omitted_digest"], str) and logged["omitted_digest"]
+
+
+def test_a_logged_assembled_event_that_used_to_be_110kb_is_under_8kb(
+    tmp_path: Path,
+) -> None:
+    """Measured 24 Aug 2026: 454 omissions inlined to ~110 KB. Hold the written line under 8 KB."""
+    event = record_assembly(
+        tmp_path, _stub_assembly(_selection_with_omissions(454)), task="crowd"
+    )
+    log_path = tmp_path / f"{str(event['ts'])[:10]}.jsonl"
+    line = log_path.read_bytes().splitlines()[-1]
+    assert len(line) < 8192, (
+        f"instructions.assembled jsonl line is {len(line)} B; inlining omitted "
+        "is the compounding loop that took the trajectory to 40 MB"
+    )
+    assert b'"omitted":' not in line
+
+
+def test_reconstruct_matches_an_event_recorded_after_the_digest_change(
+    tmp_path: Path,
+) -> None:
+    note(tmp_path, "beta work continued")
+    skills = skills_tree(tmp_path)
+    assembly = assemble(skills, tmp_path, task="measure the beta verifier outcome")
+    record_assembly(tmp_path, assembly, task="measure the beta verifier outcome")
+    result = reconstruct(tmp_path, skills, assembly.sha256)
+    assert result.ok, [report for report in result.layers if not report.ok]
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert recall_layer.ok
+
+
+def test_reconstruct_matches_an_event_recorded_with_the_old_fat_omitted_list(
+    tmp_path: Path,
+) -> None:
+    """Back-compatibility. Events already in the trajectory carry the full list."""
+    protected = record_event(
+        tmp_path,
+        "review.recorded",
+        {"dissent": "protected dissent", "padding": "x" * 2000},
+    )
+    for index in range(4):
+        note(tmp_path, f"crowd {index} " + "y" * 200)
+    skills = skills_tree(tmp_path)
+    assembly = assemble(skills, tmp_path, task="crowd", recall_limit_chars=300)
+    recorded = record_assembly(tmp_path, assembly, task="crowd")
+    legacy = copy.deepcopy(recorded)
+    legacy.pop("event_id")
+    legacy["ts"] = now()
+    recall = legacy["data"]["recall"]
+    recall.pop("omitted_digest")
+    recall.pop("omitted_count")
+    recall["omitted"] = instructions._omission_rows(assembly.recall_selection)
+    append(tmp_path / f"{legacy['ts'][:10]}.jsonl", legacy)
+    result = reconstruct(tmp_path, skills, assembly.sha256)
+    assert result.ok, [report for report in result.layers if not report.ok]
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert recall_layer.ok
+    assert str(protected["event_id"]) in assembly.recall_pack
+
+
+def test_reconstruct_rejects_a_digest_era_event_that_still_inlines_omitted(
+    tmp_path: Path,
+) -> None:
+    """A co-resident fat list is the mutant that previously still verified."""
+    note(tmp_path, "beta work continued")
+    skills = skills_tree(tmp_path)
+    assembly = assemble(skills, tmp_path, task="measure the beta verifier outcome")
+    recorded = record_assembly(tmp_path, assembly, task="measure the beta verifier outcome")
+    bloated = copy.deepcopy(recorded)
+    bloated.pop("event_id")
+    bloated["ts"] = now()
+    bloated["data"]["recall"]["omitted"] = instructions._omission_rows(
+        assembly.recall_selection
+    )
+    append(tmp_path / f"{bloated['ts'][:10]}.jsonl", bloated)
+    result = reconstruct(tmp_path, skills, assembly.sha256)
+    assert not result.ok
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert not recall_layer.ok
+    assert "inlines omitted" in recall_layer.detail
 
 
 def test_an_assembly_is_reconstructable_after_the_fact(tmp_path: Path):

@@ -400,23 +400,62 @@ def test_classifier_is_not_an_admission_chokepoint() -> None:
     assert "classify_reversibility" not in source
 
 
-def test_admission_residual_network_call_can_execute_as_observation() -> None:
-    """Honest residual, not flattened to 0%.
+def test_network_call_needs_standing_authority_not_the_local_baseline() -> None:
+    """The outbound-fetch residual is CLOSED, and closed narrowly.
 
-    ``network.call`` is class 4 on the tool table and irreversible on the
-    action-surface least-recoverable-atom rule, but ``READ_ONLY_EFFECTS``
-    still treats it as observation. Closing this costs the zero-click
-    public-fetch path: every webfetch would need class-4 confirm.
-    [measured] 2026-08-24
+    REPLACES test_admission_residual_network_call_can_execute_as_observation, which
+    asserted that network.call executes as plain observation under any admitted grant. That
+    was an honest residual when it was written [measured 2026-08-24]: network.call is class
+    4 on the tool table and irreversible under the least-recoverable-atom rule, but
+    READ_ONLY_EFFECTS treated it as observation, and the note recorded the cost of closing
+    it -- every webfetch would need a class-4 confirm.
+
+    Commit 5ac16cc closed it by adding a controller-baseline pre-check, so the code and that
+    recorded decision disagreed and this test went red. Joe chose the tightening on
+    28 August 2026 ("2. keep the tightening"), from two options put to him.
+
+    The cost turned out to be smaller than the original note feared, which is why the
+    boundary is worth asserting in all three directions rather than just the refusal:
+    the closure is SCOPED TO THE GRANT KIND, not to the effect. A local restorable
+    baseline may not reach outbound network; a principal-authority grant still may. The
+    zero-click path is not dead, it is reattached to standing authority -- which is what
+    an irreversible outbound effect should have required all along.
     """
-    result = derive_admission(
-        _manifest(effects=("network.call",), operations=("fetch",)),
+    manifest = _manifest(effects=("network.call",), operations=("fetch",))
+
+    # 1. The local baseline may NOT reach outbound network. This is the tightening.
+    baseline = derive_admission(
+        manifest,
         _admitted(effect_classes=("network.call",), operations=("fetch",)),
         AdmissionFacts(broker_confirms_observation=True),
     )
-    assert result.admission == "observation"
-    assert result.disposition == "execute"
+    assert baseline.admission == "capability_gap"
+    assert baseline.disposition == "refuse"
+    assert baseline.reason == "grant_kind_forbids_protected_reach"
 
+    # 2. Standing authority still may. Without this the test would pass for a blanket ban,
+    #    and the closure would be wider than anyone chose.
+    standing = derive_admission(
+        manifest,
+        _admitted(
+            effect_classes=("network.call",),
+            operations=("fetch",),
+            grant_kind="principal_authority",
+        ),
+        AdmissionFacts(broker_confirms_observation=True),
+    )
+    assert standing.admission == "observation"
+    assert standing.disposition == "execute"
+
+    # 3. Ordinary reads are untouched. The tightening is about REACH, not about
+    #    observation, and a check that cannot tell those apart would be the wrong one.
+    read_only = derive_admission(
+        _manifest(effects=("data.read",), operations=("read",)),
+        _admitted(effect_classes=("data.read",), operations=("read",)),
+        AdmissionFacts(broker_confirms_observation=True),
+    )
+    assert read_only.admission == "observation"
+    assert read_only.disposition == "execute"
 
 def test_protected_irreversible_effects_do_not_execute_without_standing_authority() -> (
     None

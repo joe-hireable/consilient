@@ -247,73 +247,81 @@ def _projection_workspace(log: Path) -> Path | None:
     return None
 
 
-def _copy_event_prefix(src: Path, dest: Path, count: int) -> None:
-    """Copy the log prefix that produced `count` projected events, including refusals.
+def _copy_event_prefix(
+    src: Path, dest: Path, count: int, rejection_count: int = 0
+) -> None:
+    """Copy the log prefix that produced `count` events and `rejection_count` refusals.
 
     Later lines are outside the high-water mark. Copying original file text, rather than
     re-serializing accepted events, keeps rejected lines in the prefix so the digest
     covers the same quarantine the projection had.
 
-    MEASURED 26 August 2026: the previous version copied the WHOLE current file whenever
-    `remaining >= len(file_events)` -- correct only if nothing had been appended since the
-    mark was taken. A refusal appended after the mark, with the accepted count unchanged,
-    landed inside the "pinned" prefix anyway and read as divergence against a log that had
-    not actually changed within the pinned window. Conversely, cutting only at the Nth
-    accepted event's own line (the other branch) dropped a genuine refusal that predated
-    the mark whenever later commits added MORE accepted events to the same file -- the log
-    is append-only, so anything strictly before the FIRST accepted event beyond the mark is
-    guaranteed to predate it, refusal or not, and belongs in the prefix regardless.
+    Pin on the persisted (event_count, rejection_count) pair, not accepted-event count
+    alone. MEASURED 26 August 2026: cutting at file_events[-1].line when remaining==0
+    dropped a trailing refusal that was already inside the projection, so doctor
+    reported divergence on a quiet log. The same accepted-event cut pulled a post-mark
+    refusal into the prefix whenever later accepted events existed beyond it. Walk
+    classified lines until both counts are met; anything after that is outside the
+    comparison.
     """
     dest.mkdir(parents=True, exist_ok=True)
-    remaining = count
+    remaining_events = count
+    remaining_rejections = rejection_count
     for path in sorted(src.glob("*.jsonl")):
-        if remaining <= 0:
+        if not path.is_file():
+            continue
+        if remaining_events <= 0 and remaining_rejections <= 0:
             break
-        file_events, _rejected = events_mod.read(path)
-        if remaining < len(file_events):
-            # The mark completes partway through this file. Cut strictly before the first
-            # accepted event beyond it; everything before that line -- including any
-            # interleaved refusal -- necessarily predates it in an append-only log.
-            cutoff = file_events[remaining].line
-            if cutoff is None:
-                shutil.copy2(path, dest / path.name)
+        file_events, file_rejected = events_mod.read(path)
+        items: list[tuple[int, int, int]] = []
+        missing_line = False
+        for event in file_events:
+            if event.line is None:
+                missing_line = True
                 break
-            text = path.read_text(encoding="utf-8")
-            lines = text.splitlines(keepends=True)
-            (dest / path.name).write_text(
-                "".join(lines[: cutoff - 1]), encoding="utf-8"
-            )
-            break
-        remaining -= len(file_events)
-        if remaining > 0 or not file_events:
-            # Either more accepted events are still needed from a later file, or this file
-            # held none at all -- either way its whole content is chronologically earlier
-            # than the mark's eventual completion, refusals included.
+            items.append((event.line, 1, 0))
+        if not missing_line:
+            for rejection in file_rejected:
+                items.append((rejection.line, 0, 1))
+            items.sort()
+        if missing_line or not items:
+            shutil.copy2(path, dest / path.name)
+            remaining_events -= len(file_events)
+            remaining_rejections -= len(file_rejected)
+            continue
+        last_included = 0
+        for line, events_delta, rejections_delta in items:
+            if remaining_events <= 0 and remaining_rejections <= 0:
+                break
+            remaining_events -= events_delta
+            remaining_rejections -= rejections_delta
+            last_included = line
+        if remaining_events > 0 or remaining_rejections > 0:
             shutil.copy2(path, dest / path.name)
             continue
-        # remaining == 0 and file_events is non-empty: this file's last accepted event is
-        # exactly where the mark completes. Cut at ITS line, not "whatever this file
-        # currently contains" -- see the docstring measurement above.
-        cutoff = file_events[-1].line
-        if cutoff is None:
-            shutil.copy2(path, dest / path.name)
-            break
-        text = path.read_text(encoding="utf-8")
-        lines = text.splitlines(keepends=True)
-        (dest / path.name).write_text("".join(lines[:cutoff]), encoding="utf-8")
+        file_text = path.read_text(encoding="utf-8")
+        lines = file_text.splitlines(keepends=True)
+        (dest / path.name).write_text(
+            "".join(lines[:last_included]), encoding="utf-8"
+        )
         break
 
 
 def _digest_of_pinned_prefix(
-    log: Path, count: int, workspace: Path | None, scratch: Path
+    log: Path,
+    count: int,
+    workspace: Path | None,
+    scratch: Path,
+    *,
+    rejection_count: int = 0,
 ) -> str:
-    """Rebuild a throwaway projection of the first `count` events and digest it."""
+    """Rebuild a throwaway projection of the pinned prefix and digest it."""
     if scratch.exists():
         shutil.rmtree(scratch)
     try:
         prefix_log = scratch / "log"
         prefix_db = scratch / "state.db"
-        _copy_event_prefix(log, prefix_log, count)
+        _copy_event_prefix(log, prefix_log, count, rejection_count)
         conn = projection.build(prefix_log, prefix_db, workspace=workspace)
         try:
             return projection.state_digest(conn)
@@ -321,7 +329,6 @@ def _digest_of_pinned_prefix(
             conn.close()
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
-
 
 def cmd_replay(args: argparse.Namespace) -> CommandResult:
     """Compare the state on disk against a rebuild from the log. Gate A condition 2.
@@ -337,15 +344,17 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
     none, `compared` is False and `identical` is None, because a check that did not run
     must not report a pass.
 
-    Gate A2 decides against a pinned prefix: the projection's own event count is the
-    high-water mark, and only those events are replayed for identity. Events appended
-    after the mark are not evidence of divergence. The `replay` command still reports
-    `stale` when the live log is longer, so a behind projection remains visible.
+    Gate A2 decides against a pinned prefix: the projection's own (event_count,
+    rejection_count) is the high-water mark, and only that prefix is replayed for
+    identity. Events and refusals appended after the mark are not evidence of
+    divergence. The `replay` command still reports `stale` when the live log is
+    longer, so a behind projection remains visible.
     """
     log, db = Path(args.log), Path(args.db)
 
     prior: str | None = None
     projected: int | None = None
+    projected_rejections = 0
     prior_version: int | None = None
     if db.exists():
         existing = sqlite3.connect(db)
@@ -354,6 +363,7 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
             projected = int(
                 existing.execute("SELECT COUNT(*) FROM events").fetchone()[0]
             )
+            projected_rejections = projection.rejection_count(existing)
             prior_version = projection.projection_version(existing)
         except sqlite3.DatabaseError as exc:
             raise EventError(
@@ -375,7 +385,11 @@ def cmd_replay(args: argparse.Namespace) -> CommandResult:
         else:
             scratch = db.parent / (db.stem + "-a2-prefix")
             prefix_digest = _digest_of_pinned_prefix(
-                log, projected, _projection_workspace(log), scratch
+                log,
+                projected,
+                _projection_workspace(log),
+                scratch,
+                rejection_count=projected_rejections,
             )
             prefix_identical = prefix_digest == prior
 

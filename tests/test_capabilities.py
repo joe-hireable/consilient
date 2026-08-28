@@ -19,6 +19,7 @@ from consilient.capabilities import (  # noqa: E402
     CAPABILITY_KINDS,
     CapabilityError,
     default_gate,
+    parse_inventory_entry,
     select_capabilities,
 )
 
@@ -35,7 +36,9 @@ def _authority_event() -> dict[str, object]:
     }
 
 
-def _admitted_gate(*, expires_at: str | None = "2099-01-01T00:00:00+00:00") -> dict[str, object]:
+def _admitted_gate(
+    *, expires_at: str | None = "2099-01-01T00:00:00+00:00"
+) -> dict[str, object]:
     return {
         "state": "admitted",
         "reason": "exact_grant",
@@ -101,7 +104,9 @@ def _request(*items: dict[str, object]) -> dict[str, object]:
     return {"capabilities": list(items)}
 
 
-def _wanted(kind: str, name: str, reason: str = "needed by this task") -> dict[str, object]:
+def _wanted(
+    kind: str, name: str, reason: str = "needed by this task"
+) -> dict[str, object]:
     return {"kind": kind, "name": name, "reason": reason}
 
 
@@ -174,7 +179,9 @@ def test_unknown_and_unavailable_capabilities_refuse() -> None:
 
     with pytest.raises(CapabilityError, match=r"unknown capability: mcp:missing"):
         select_capabilities(inventory, _request(_wanted("mcp", "missing")))
-    with pytest.raises(CapabilityError, match=r"unavailable capability: connection:github"):
+    with pytest.raises(
+        CapabilityError, match=r"unavailable capability: connection:github"
+    ):
         select_capabilities(inventory, _request(_wanted("connection", "github")))
 
 
@@ -300,6 +307,37 @@ def test_select_refuses_a_gated_inventory_entry() -> None:
         select_capabilities(inventory, _request(_wanted("tool", "pytest")))
 
 
+def test_select_rejects_admitted_gate_without_expiry() -> None:
+    inventory = _inventory(
+        {
+            "kind": "tool",
+            "name": "pytest",
+            "available": True,
+            "provenance": ["probe:tool:pytest"],
+            "gate": {
+                "state": "admitted",
+                "reason": "exact_grant",
+                "grant_kind": "controller_baseline.local_restorable.v1",
+                "authority_event": None,
+                "decision_id": "decision-1",
+                "recovery_proof_ref": {
+                    "event_id": "evt-proof-1",
+                    "event_kind": "effect.receipt",
+                    "event_sha256": "c" * 64,
+                },
+                "scope": ["workspace"],
+                "operations": ["read"],
+                "effect_classes": ["data.read"],
+                "expires_at": None,
+            },
+        }
+    )
+    with pytest.raises(CapabilityError, match="expires_at"):
+        parse_inventory_entry(inventory["allowlist"][0])
+    with pytest.raises(CapabilityError, match="expires_at"):
+        select_capabilities(inventory, _request(_wanted("tool", "pytest")))
+
+
 def test_select_refuses_an_entry_whose_gate_is_synthesised_as_gated() -> None:
     inventory = _inventory(
         {
@@ -422,9 +460,7 @@ def test_policy_module_is_pure_stdlib_policy() -> None:
         "write_text",
     }
     called = {
-        node.func.id
-        if isinstance(node.func, ast.Name)
-        else node.func.attr
+        node.func.id if isinstance(node.func, ast.Name) else node.func.attr
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, (ast.Name, ast.Attribute))

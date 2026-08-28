@@ -38,47 +38,8 @@ LOG = ROOT / ".harness" / "log"
 RUNS = ROOT / ".harness" / "dispatch"
 PUBLISH_STOP = ROOT / ".harness" / "STOP-PUBLISH"
 
-# The build plan's recommended order. Foundation first, then the task spine, then recall
-# and delivery; ingress and self-improvement last because they unlock nothing upstream.
-ORDER = [
-    "F01",
-    "F02",
-    "F03",
-    "L01",
-    "C01",
-    "O01",
-    "T01",
-    "T02",
-    "T03",
-    "T04",
-    "C03",
-    "M01",
-    "M02",
-    "M03",
-    "M04",
-    "M05",
-    "M06",
-    "D01",
-    "D02",
-    "D03",
-    "D04",
-    "C02",
-    "C04",
-    "L02",
-    "L03",
-    "L04",
-    "L05",
-    "L06",
-    "S01",
-    "S02",
-    "S03",
-    "S04",
-    "S05",
-    "S06",
-    "H01",
-    "H02",
-    "H03",
-]
+# Dispatch order is `.harness/plan-units.json` plus each unit's `deps`.
+# A hardcoded ORDER list lived here and was never read; unit AI deleted it.
 
 # Arms carry their own wall-clock leash, because a failure costs whatever the leash allows.
 #
@@ -209,6 +170,11 @@ ARM_EXHAUSTION_PHRASES = (
 # Conservative guess, not a measured reset cadence -- there is no live per-arm balance check to
 # confirm recovery, so this only bounds how long a stale cooldown can block a recovered arm.
 ARM_COOLDOWN_S = 1800
+
+# What to assume for a resolve entry recorded before start times were kept. Every arm in `ARMS`
+# leases 3600s and every resolve dispatch uses that leash, so this is the value they were
+# actually given -- not a guess, just the one that was never written down.
+RESOLVE_ADOPTED_LEASH_S = 3600
 
 
 def _tail_text(path: pathlib.Path, max_bytes: int = 8192) -> str:
@@ -369,6 +335,62 @@ def sh(args, **kw):
     )
 
 
+def spawn_logged(
+    args: list[str], stdout_path: pathlib.Path, stderr_path: pathlib.Path
+) -> None:
+    """Start a child, then close the parent's copies of the log handles.
+
+    `Popen` duplicates the fds into the child; the parent must drop its copies
+    or the file stays locked on Windows and a later attempt cannot rewrite the
+    same path. The 24 August audit named this leak. [cited: subprocess.Popen]
+    """
+    stdout_path.parent.mkdir(parents=True, exist_ok=True)
+    with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open(
+        "w", encoding="utf-8"
+    ) as err:
+        subprocess.Popen(args, cwd=str(ROOT), stdout=out, stderr=err)
+
+
+def preserve_review_artefacts(uid: str, attempt: int) -> None:
+    """Keep the previous attempt's receipts under per-attempt names.
+
+    Opening `{uid}-verify.out` with mode ``w`` destroyed the previous attempt, which is
+    why a `check_error` could not be diagnosed after the fact. [measured: Rank 6,
+    docs/10-research/failure-classes-and-resilience-2026-08-24.md, 24 August 2026]
+
+    The live names stay `{uid}-verify.out` and `{uid}-verdict.json` so the reviewer
+    contract and the identity-bound consumer do not move; history is renamed aside
+    before the next attempt truncates them.
+    """
+    previous = attempt - 1
+    if previous < 1:
+        return
+    BRIEFS.mkdir(parents=True, exist_ok=True)
+    pairs = (
+        (f"{uid}-verify.out", f"{uid}-verify-{previous}.out"),
+        (f"{uid}-verify.err", f"{uid}-verify-{previous}.err"),
+        (f"{uid}-verdict.json", f"{uid}-verdict-{previous}.json"),
+    )
+    for src_name, dst_name in pairs:
+        src = BRIEFS / src_name
+        dst = BRIEFS / dst_name
+        if src.exists() and not dst.exists():
+            try:
+                src.replace(dst)
+            except OSError as exc:
+                # MEASURED 27 August 2026: WinError 32 on N02-verify.out took down the whole
+                # tick. Windows refuses to rename a file another process still holds open, and a
+                # reviewer subprocess that has not yet closed its stdout is exactly that. Losing
+                # one previous attempt's receipt costs a diagnosis; letting the exception reach
+                # __main__ costs every unit in flight. The rename is history-keeping, so it is
+                # the half that yields -- and the loop keeps going.
+                print(
+                    f'driver: could not preserve {src_name} ({type(exc).__name__}); '
+                    f'the next attempt will overwrite it',
+                    flush=True,
+                )
+
+
 def save_state(state: dict) -> None:
     """Write driver state atomically. Never truncate the only record of what is in flight.
 
@@ -382,15 +404,28 @@ def save_state(state: dict) -> None:
 
     Temp-and-rename makes the swap atomic: a reader sees the old file or the new one, never a
     half. fsync before rename means the content is on disk before the name points at it.
+
+    The temp name is unique. A fixed `STATE.with_suffix(".json.tmp")` lets two writers
+    rename each other's partial file into place -- a crash vulnerability with no crash
+    required. `records._install_object` already does this with `os.urandom(16).hex()`.
+    [measured: Rank 8, same findings file]
     """
+    if _LAST_SUITE_SUMMARY:
+        state["last_green_summary"] = _LAST_SUITE_SUMMARY
     STATE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATE.with_suffix(".json.tmp")
     payload = json.dumps(state, indent=1)
-    with tmp.open("w", encoding="utf-8") as handle:
-        handle.write(payload)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, STATE)
+    tmp = STATE.parent / f".driver-state-{os.urandom(16).hex()}.tmp"
+    try:
+        with tmp.open("x", encoding="utf-8") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, STATE)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def load(path, default):
@@ -541,6 +576,18 @@ def live_dispatchers(state: dict) -> int:
 # A clean run of this suite is ~7 minutes. Twice that is generous for contention and still far
 # short of the loop's 3000 s tick abandonment, which is the outcome this exists to avoid.
 SUITE_TIMEOUT_S = 900
+_LAST_SUITE_SUMMARY: str | None = None
+
+
+def suite_baseline_line() -> str:
+    """The last green pytest summary, or an honest unmeasured marker.
+
+    Hardcoded '898 passed' / '914 passed' in the briefs drifted the moment the suite
+    moved. Unit AI interpolates from the last stored green summary instead.
+    """
+    if _LAST_SUITE_SUMMARY:
+        return _LAST_SUITE_SUMMARY
+    return "unmeasured (no green suite summary stored yet)"
 
 
 def suite_green() -> bool:
@@ -611,7 +658,11 @@ def suite_green() -> bool:
     last = summary[-1]
     if re.search(r"\b\d+ (failed|error|errors)\b", last):
         return False
-    return bool(re.search(r"\b\d+ passed\b", last))
+    green = bool(re.search(r"\b\d+ passed\b", last))
+    global _LAST_SUITE_SUMMARY
+    if green:
+        _LAST_SUITE_SUMMARY = last.strip()
+    return green
 
 
 def committed(uid: str, unit: dict) -> bool:
@@ -655,6 +706,26 @@ def artefact_identity(unit: dict[str, Any]) -> str | None:
     ).hexdigest()
 
 
+# WITHDRAWN 27 August 2026, hours after it landed. `resolver_can_change_nothing` skipped the
+# resolver for any conflicted unit whose every CLAIMED PATH resolved in HEAD, on the reasoning that
+# a conflict over work HEAD already carries needs a verdict rather than a merge.
+#
+# The predicate was wrong, and the driver already contained the right one. `artefact_identity`
+# answers "do these paths exist", not "did this work arrive" -- Z03 is the counterexample:
+# `.harness/build_loop.py` is present in HEAD, Z03's changes to it are not, and all six of its
+# tests fail against the tree. `_content_landed` is the real question, and `retest_conflicts`
+# already asks it EVERY TICK and pops the conflict when it is true.
+#
+# So by construction, a unit still sitting in `conflicts` after that retest has content that is
+# NOT in HEAD and genuinely needs resolving. The skip withheld a resolver from precisely the units
+# that needed one: 37 of 39, and zero commits merged in the 47 minutes it was live. [measured]
+#
+# What was right about the change is kept: resolvers now count against their own lane, and a
+# finished dispatch releases its slot. Those fixed a real leak of 34 slots. This part fixed
+# nothing and broke merging, and it is recorded here rather than deleted because a wrong turn
+# taken for a plausible reason is worth the next reader's five seconds.
+
+
 def append_review_outcome(outcome: dict[str, Any]) -> None:
     """Record consumed critic evidence through the one trajectory writer."""
     sys.path.insert(0, str(ROOT / "src"))
@@ -675,6 +746,77 @@ def append_review_outcome(outcome: dict[str, Any]) -> None:
     )
 
 
+def _unit_added_line_hashes(uid: str) -> dict[str, list[str]]:
+    """The lines this unit's own commits ADD, as short hashes, by path.
+
+    Line hashes rather than the lines themselves for two reasons. Size: a unit adding 500 lines
+    costs 8KB of driver state instead of tens of kilobytes of source. And provenance: the state
+    file is instance data that gets copied into dispatch workspaces, and storing verbatim source
+    there would put the same content in more places than it needs to be.
+
+    Whitespace-insensitive at the ends only. In Python, indentation IS the language, so leading
+    whitespace is kept -- `check_merge_acceptance` learned that the expensive way when a
+    whitespace-normalising patch-id declared a moved statement identical to itself.
+    """
+    path = WORKTREES / uid
+    if not path.exists():
+        return {}
+    head = sh(["git", "-C", str(path), "rev-parse", "HEAD"]).stdout.strip()
+    if not head:
+        return {}
+    own = [
+        ln.strip()
+        for ln in sh(["git", "rev-list", "--reverse", f"HEAD..{head}"]).stdout.splitlines()
+        if ln.strip()
+    ]
+    added: dict[str, list[str]] = {}
+    for sha in own:
+        show = sh(["git", "show", "--format=", "-U0", sha])
+        if show.returncode != 0:
+            continue
+        current: str | None = None
+        for line in show.stdout.splitlines():
+            if line.startswith("+++ b/"):
+                current = line[6:].strip()
+            elif line.startswith("+") and not line.startswith("+++") and current:
+                body = line[1:].rstrip()
+                if body.strip():
+                    added.setdefault(current, []).append(
+                        hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+                    )
+    return {p: sorted(set(v)) for p, v in added.items()}
+
+
+def deliverable_present(deliverable: dict[str, list[str]] | None) -> bool:
+    """Are this unit's own added lines still in HEAD?
+
+    The retirement question, asked of the unit's OWN WORK rather than of every byte of every file
+    it happens to touch. Another unit editing the same file elsewhere does not move this answer;
+    deleting or rewriting THIS unit's lines does.
+
+    The 99% floor and the twenty-line minimum are `_content_landed`'s, deliberately: two ways of
+    asking "did this work land" that disagreed about how much drift is drift would be worse than
+    either. Below twenty lines a diff cannot be told from a coincidence, so such a unit falls back
+    to blob identity rather than being waved through on a weak signal.
+    """
+    if not deliverable:
+        return False
+    total = sum(len(v) for v in deliverable.values())
+    if total < 20:
+        return False
+    absent = 0
+    for file_path, wanted in deliverable.items():
+        head = sh(["git", "show", f"HEAD:{file_path}"])
+        blob = head.stdout if head.returncode == 0 else ""
+        present = {
+            hashlib.sha256(ln.rstrip().encode("utf-8")).hexdigest()[:16]
+            for ln in blob.splitlines()
+            if ln.strip()
+        }
+        absent += sum(1 for h in wanted if h not in present)
+    return (total - absent) / total >= 0.99
+
+
 def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> set[str]:
     """Only a current, consumed SOUND review may retire a unit."""
     retired: set[str] = set()
@@ -686,6 +828,25 @@ def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> se
             continue
         if result.get("outcome") != "SOUND":
             continue
+        # BIND THE VERDICT TO THE UNIT'S OWN DIFF, NOT TO EVERY BYTE IT TOUCHES. ADR-0109.
+        #
+        # `artefact_identity` hashes every claimed blob, so a verdict died whenever ANY of those
+        # files changed for ANY reason. MEASURED 27 August 2026: `src/consilient/events.py` is
+        # claimed by 67 units, `projection.py` by 40, `dispatch.py` by 32. Every unit landing work
+        # in events.py killed the standing SOUND verdict of the other 66, whose own work was
+        # untouched. Ten verdicts were dead of this at once against six review slots, and the rate
+        # rises as more units land -- verdicts were being invalidated faster than they could be
+        # earned.
+        #
+        # A verdict now survives on the question the reviewer actually answered: is this unit's
+        # deliverable present and sound. Someone else's unrelated edit to a shared file does not
+        # move that. Deleting or rewriting THIS unit's lines does, and still invalidates it.
+        deliverable = result.get("deliverable")
+        if deliverable and deliverable_present(deliverable):
+            retired.add(uid)
+            continue
+        # No recorded deliverable -- a verdict from before this existed, or a diff too small to
+        # tell from coincidence. Fall back to the old binding rather than retiring on nothing.
         artefact = artefact_identity(units[uid])
         if artefact is not None and result.get("artefact") == artefact:
             retired.add(uid)
@@ -1049,6 +1210,12 @@ def consume_review_verdict(
     # written only for the two outcomes that cannot be improved on by waiting: SOUND, DEFECTIVE.
     if outcome in ("SOUND", "DEFECTIVE"):
         state["review_consumed"][uid] = expected
+    # Carry the deliverable fingerprint from the dispatch record onto the verdict. `retired_units`
+    # reads the RESULT, not the expectation, and the fingerprint cannot be re-derived once the
+    # unit has merged -- `HEAD..worktree_head` is empty by then. If it does not travel here it is
+    # lost exactly when it is needed. ADR-0109.
+    if isinstance(expected, dict) and expected.get("deliverable"):
+        record["deliverable"] = expected["deliverable"]
     state.setdefault("review_results", {})[uid] = record
     dispatched = state.setdefault("review_dispatched", [])
     if uid in dispatched:
@@ -1415,6 +1582,115 @@ def _unit_own_shas(
     return worktree_head, own, touched
 
 
+def _dispatch_output_age(stem: str, now: float) -> float | None:
+    """Seconds since this dispatch last wrote anything, or None if it never wrote at all.
+
+    The dispatcher streams into `<stem>.out` and `<stem>.err` while it runs, so the newest of
+    the two is the last moment the run is known to have existed. That is an artefact, which is
+    what this driver is required to judge by -- a process table says only whether something with
+    that name is running now, and every silent failure here has been a run that started, died,
+    and left the scheduler reporting success.
+    """
+    newest = None
+    for ext in (".out", ".err"):
+        try:
+            mtime = (BRIEFS / f"{stem}{ext}").stat().st_mtime
+        except OSError:
+            continue
+        newest = mtime if newest is None else max(newest, mtime)
+    return None if newest is None else now - newest
+
+
+def expire_finished_dispatches(
+    state: dict,
+    bucket_key: str = "resolve_dispatched",
+    started_key: str = "resolve_started",
+    stem_suffix: str = "-resolve",
+    now: float | None = None,
+) -> list[str]:
+    """Release a dispatch slot whose run is over, however it ended.
+
+    A `resolve_dispatched` entry was only ever removed on two paths: the unit's conflict
+    clearing, or `crashed_dispatches` finding the run dead. A resolver that ran, failed to fix
+    the conflict, and exited CLEANLY matched neither -- so its entry stayed for ever.
+
+    MEASURED 27 August 2026: 34 entries against roughly nine live dispatch processes in total,
+    builds and reviews included. Every one of those 34 units was therefore permanently barred
+    from re-dispatch by `uid in resolving`, and once resolvers began counting against their own
+    lane the stale entries alone exceeded MAX_BUILDS -- so the loop broke before examining
+    anything, and the two units that genuinely needed a resolver could not get one either.
+
+    This is the Y02 lesson in a second bucket, and this file already states it: stopping the
+    retries is right, leaking the capacity is not. Builds record `(started, leash)` in
+    `in_flight` and expire on it; resolves recorded a name and nothing else, so there was no
+    fact to expire against. Now they record the same pair.
+
+    Grace matches `crashed_dispatches`: a dispatch is not late until its leash plus 300s has
+    passed, so a slow-but-living dispatch is never reaped out from under itself.
+
+    REVIEWS HAD IT WORSE, and that is why this takes the bucket as a parameter. Measured the
+    same day: four entries in `review_dispatched` whose newest output was 36, 36, 45 and 50
+    HOURS old, against a lane capped at six. Two thirds of the review lane was held by runs
+    that ended two days earlier, while 76 units waited for a verdict -- and the review lane
+    is what decides a unit, so this was the single largest brake on the pipeline.
+
+    `crashed_dispatches` could not see them. It defines death as `<stem>.err` carrying a
+    traceback, which finds a dispatch that CRASHED and never one that simply stopped
+    existing -- killed, cut off with the machine, or exited quietly after doing nothing. An
+    empty `.err` reads exactly like a healthy run. Time is the signal that does not depend on
+    the dead process having written its own death certificate.
+    """
+    now = time.time() if now is None else now
+    started = state.setdefault(started_key, {})
+    resolving = state.setdefault(bucket_key, [])
+    expired = []
+    for uid in list(resolving):
+        when = started.get(uid)
+        if when is None:
+            # Recorded before this bookkeeping existed, so there is no start time to expire
+            # against. ASK THE ARTEFACT rather than guessing either way: the dispatch's own
+            # `.out`/`.err` are written as it runs, so an output file older than a full leash is
+            # positive evidence the run is over -- not merely an absence of evidence.
+            #
+            # This matters because the alternative was a blind adoption at `now`, which would
+            # have held 38 slots for a further hour on entries whose newest output was already
+            # 32 and 50 HOURS old. Where the artefact says nothing at all, adoption is still the
+            # safe answer: unknown is not known-dead, and cancelling a live run is worse than
+            # waiting one leash for certainty.
+            age = _dispatch_output_age(uid + stem_suffix, now)
+            if age is not None and age > RESOLVE_ADOPTED_LEASH_S + 300:
+                resolving.remove(uid)
+                expired.append(uid)
+            else:
+                started[uid] = [now, RESOLVE_ADOPTED_LEASH_S]
+            continue
+        try:
+            begun, leash = float(when[0]), float(when[1])
+        except (TypeError, ValueError, IndexError):
+            started[uid] = [now, RESOLVE_ADOPTED_LEASH_S]
+            continue
+        # A DISPATCH CANNOT HAVE LAST WRITTEN OUTPUT BEFORE IT STARTED. When the artefact is
+        # older than the recorded start, that start is not a dispatch time -- it is an adoption
+        # this function performed on an entry that had none, and adopting is a guess where the
+        # artefact is evidence.
+        #
+        # MEASURED 27 August 2026: the tick that first ran this reaper stamped 34 resolve entries
+        # at `now` before the artefact check existed, so they read as "started 47 minutes ago"
+        # while their own output was 32 HOURS old. Without this they would hold their slots for a
+        # further full leash on the strength of a timestamp the reaper itself invented.
+        age = _dispatch_output_age(uid + stem_suffix, now)
+        if age is not None and age > now - begun:
+            begun = now - age
+        if now - begun > leash + 300:
+            resolving.remove(uid)
+            started.pop(uid, None)
+            expired.append(uid)
+    for uid in list(started):
+        if uid not in resolving:
+            started.pop(uid, None)
+    return expired
+
+
 def clear_retired_conflicts(state: dict) -> None:
     """A conflict entry is re-earned each tick. Retirement clears it.
 
@@ -1442,9 +1718,29 @@ def retest_conflicts(state: dict) -> int:
     retired_without_review = 0
     for uid, why in sorted(list(conflicts.items())):
         match = re.search(r"cherry-picking ([0-9a-f]{7,40})", why or "")
-        if not match:
-            continue
-        sha = match.group(1)
+        if match:
+            sha = match.group(1)
+        else:
+            # A GATE-FAILURE conflict records no sha. Its reason reads
+            # "gate failed for X after cherry-pick", so the regex above misses it and the
+            # unit was skipped by `continue` -- never re-tested, and therefore unable to
+            # clear however clean it became.
+            #
+            # MEASURED 28 August 2026: six units -- A01, AC, AV, BC, W10, Y06 -- had ZERO
+            # conflicting commits and merged perfectly. Their cherry-pick had SUCCEEDED and
+            # the suite had failed afterwards, mostly on the six knowledge tests that fail
+            # in any worktree lacking the gitignored declaration. They sat unreachable
+            # while the whole pipeline reported 31/147 done for thirteen ticks.
+            #
+            # A gate failure is a statement about the SUITE at a moment in time, not about
+            # the merge, so it must be re-earned like every other conflict. The unit's own
+            # head is the right thing to re-test it against.
+            head = sh(
+                ["git", "-C", str(WORKTREES / uid), "rev-parse", "HEAD"]
+            ).stdout.strip()
+            if not head:
+                continue
+            sha = head
         if sh(["git", "merge-base", "--is-ancestor", sha, "HEAD"]).returncode == 0:
             conflicts.pop(uid, None)
             print(f"driver: {uid} conflict cleared -- already in the tree")
@@ -1465,24 +1761,87 @@ def retest_conflicts(state: dict) -> int:
             )
             retired_without_review += 1
             continue
-        tree = sh(
-            [
-                "git",
-                "merge-tree",
-                "--write-tree",
-                "--name-only",
-                f"--merge-base={sha}^",
-                "HEAD",
-                sha,
+        # BOTH the recorded sha AND the worktree's CURRENT head.
+        #
+        # MEASURED 28 August 2026, and this is why resolution never worked. The check used
+        # to test only `sha` -- the commit that conflicted when the conflict was RECORDED.
+        # A resolver's whole job is to add commits that make the unit merge, so its work is
+        # by definition not in that sha, and the check could never see it. 217 resolve
+        # dispatches ran and not one conflict ever cleared.
+        #
+        # Measured at the moment of the fix: AA, AF and Q02 all merged CLEANLY at their
+        # worktree head while the stale sha they were recorded against still showed 29
+        # conflicts. Three finished resolutions sat unnoticed while seven resolvers held
+        # the build lane and thirteen consecutive ticks reported an identical
+        # 31/147 done, 8 ready, 53 blocked.
+        #
+        # Clearing a conflict does not merge anything -- it lets the merge be ATTEMPTED,
+        # and that attempt is still gated on the suite and on mypy. So a resolver that only
+        # thinks it succeeded costs one gated attempt, not a bad merge.
+        # SCOPE, corrected the same night it was introduced. The first version of this
+        # loop tested the worktree head alone -- `--merge-base=head^ HEAD head` -- which is
+        # ONE commit, while `merge_unit_worktree` cherry-picks EVERY commit in
+        # `HEAD..head`. AA, AF and Q02 passed the one-commit test and then failed the real
+        # cherry-pick on ddbf0f556, an earlier commit in their own range that deletes 54
+        # files including .harness/build_driver.py and whole test files still present in
+        # HEAD. They cleared and re-conflicted on every tick, burning a merge attempt each
+        # time. The refusal was right; my check was measuring the wrong thing.
+        #
+        # So the head only counts as clear when EVERY commit the merge would replay is
+        # clear. Conservative in the safe direction: sequential cherry-picks can conflict
+        # even when each is individually clean against HEAD, so this can still be
+        # optimistic -- but it can no longer wave through a range containing a commit that
+        # visibly conflicts on its own.
+        candidates = [sha]
+        if worktree_head:
+            own_range = [
+                ln.strip()
+                for ln in sh(
+                    ["git", "rev-list", "--reverse", f"HEAD..{worktree_head}"]
+                ).stdout.splitlines()
+                if ln.strip()
             ]
-        )
-        if tree.returncode == 0 and tree.stdout.count("CONFLICT") == 0:
-            conflicts.pop(uid, None)
-            if uid in state.setdefault("resolve_dispatched", []):
-                state["resolve_dispatched"].remove(uid)
-            print(
-                f"driver: {uid} conflict was stale -- it merges cleanly against current HEAD"
+            if own_range and all(
+                sh(
+                    [
+                        "git",
+                        "merge-tree",
+                        "--write-tree",
+                        "--name-only",
+                        f"--merge-base={c}^",
+                        "HEAD",
+                        c,
+                    ]
+                ).stdout.count("CONFLICT")
+                == 0
+                for c in own_range
+            ):
+                candidates.append(worktree_head)
+        for candidate in candidates:
+            if not candidate:
+                continue
+            tree = sh(
+                [
+                    "git",
+                    "merge-tree",
+                    "--write-tree",
+                    "--name-only",
+                    f"--merge-base={candidate}^",
+                    "HEAD",
+                    candidate,
+                ]
             )
+            if tree.returncode == 0 and tree.stdout.count("CONFLICT") == 0:
+                conflicts.pop(uid, None)
+                if uid in state.setdefault("resolve_dispatched", []):
+                    state["resolve_dispatched"].remove(uid)
+                how = (
+                    "it merges cleanly against current HEAD"
+                    if candidate == sha
+                    else "the resolver's own commits merge cleanly against current HEAD"
+                )
+                print(f"driver: {uid} conflict cleared -- {how}")
+                break
     return retired_without_review
 
 
@@ -1642,6 +2001,7 @@ def reclaim_expired_slots(state: dict) -> list[str]:
 
         if expired or stale:
             inflight.pop(uid, None)
+            release_dead_claims({uid})
             if record_restart(state, uid, now=now):
                 print(
                     "driver: ESCALATION -- "
@@ -1705,7 +2065,7 @@ def publish_if_ready(state: dict, green: bool | None) -> str:
     gates = [
         (".github/scripts/check_foreign_identifiers.py", []),
         (".github/scripts/check_secrets.py", []),
-        (".github/scripts/check_private_corpus.py", []),
+        (".github/scripts/check_private_corpus.py", ["--require-corpora"]),
         (".github/scripts/check_private_repo_names.py", []),
         (".github/scripts/check_generated_documents.py", ["--check"]),
     ]
@@ -1715,12 +2075,75 @@ def publish_if_ready(state: dict, green: bool | None) -> str:
             return f"publish held: {script} is missing"
         if sh([sys.executable, str(path), *args]).returncode != 0:
             return f"publish REFUSED: {pathlib.Path(script).name} failed"
-    result = sh(["git", "push", "public", "HEAD:main"])
+    # PUBLISH A SQUASH, NEVER THE BRANCH.
+    #
+    # MEASURED 27 August 2026. This read `git push public HEAD:main`, and what that would have
+    # sent was 294 commits of which 275 carried a `Signed-off-by` naming
+    # `fixture@example.invalid` -- an RFC 2606 address that resolves to nobody -- and 240 had no
+    # sign-off matching their author at all. The cause was this worktree's LOCAL git config,
+    # which `tests/test_supervision.py` had written a fixture identity into. CONTRIBUTING.md
+    # requires a real name and email and the DCO workflow requires the sign-off to match the
+    # author, so that push would have filed 240 false certifications of origin in public.
+    #
+    # Correcting the commits in place was measured and rejected: 283 of this repository's 635
+    # refs are based inside the unpublished range and 455 worktrees are checked out against
+    # them, so rewriting orphans the build. The `pre-push` hook already records the alternative
+    # from the 21 August 2026 audit -- publish a squashed commit rather than the history -- and
+    # it costs nothing here, because what is being published is the tree, and the tree is
+    # identical either way.
+    #
+    # `commit-tree` takes the CONFIGURED identity, which is also what the sign-off names, so
+    # author, committer and certification agree by construction rather than by discipline. The
+    # `-s ours` merge afterwards keeps `public/main` an ancestor, so the next `ahead` count is
+    # honest; without it every later tick recomputes against a public/main it does not contain.
+    ident = sh(["git", "var", "GIT_AUTHOR_IDENT"]).stdout.strip()
+    signer = ident.rsplit(">", 1)[0] + ">" if ">" in ident else ""
+    if not signer:
+        return "publish held: no git identity configured to sign off with"
+    if "fixture" in signer.lower() or ".invalid" in signer.lower():
+        return f"publish REFUSED: identity {signer!r} cannot certify origin"
+    message = "\n".join(
+        [
+            f"publish: {ahead} commit(s) of harness work, squashed for an honest sign-off",
+            "",
+            "Squashed rather than fast-forwarded so that every published commit carries a",
+            "sign-off matching its author. The granular history is not lost, it stays in the",
+            "work repository; what travels is the tree, and one certification that is true.",
+            "",
+            f"Signed-off-by: {signer}",
+            "",
+        ]
+    )
+    squash = sh(
+        ["git", "commit-tree", "HEAD^{tree}", "-p", "public/main", "-m", message]
+    ).stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", squash):
+        return "publish FAILED: could not build the squash commit"
+    result = sh(["git", "push", "public", f"{squash}:main"])
     if result.returncode != 0:
         tail = (result.stderr or result.stdout or "").strip().splitlines()
         return f"publish FAILED: {tail[-1] if tail else 'unknown'}"
-    state["last_published_count"] = ahead
-    return f"published {ahead} commit(s) to public"
+    merged = sh(
+        [
+            "git",
+            "merge",
+            "-s",
+            "ours",
+            "--no-ff",
+            squash,
+            "-m",
+            "record the published squash as an ancestor",
+        ]
+    )
+    if merged.returncode != 0:
+        # Published, but the ancestry record failed. Say so plainly rather than reporting a
+        # clean publish: until that merge lands, every later tick computes `ahead` against a
+        # public/main this branch does not contain and tries to publish everything again.
+        return (
+            f"published {ahead} commit(s) to public as {squash[:9]}, but recording it as an "
+            "ancestor FAILED -- the next tick will over-count; merge it by hand"
+        )
+    return f"published {ahead} commit(s) to public as {squash[:9]}"
 
 
 def start_failed_dispatches() -> list[dict[str, object]]:
@@ -2070,7 +2493,7 @@ different class of evidence is that you RUN it.**
   as something that fails, say so and do not file it as a defect.
 - **If the unit is good, say so plainly and stop.** A review that manufactures findings to look
   thorough is worse than one that finds nothing, and this project has recorded the cost of both.
-- Baseline **914 passed, 1 skipped**. Report the exact line.
+- Baseline **{suite_baseline_line()}**. Report the exact line.
 
 ## Report
 
@@ -2262,7 +2685,7 @@ stopped clearing.
 
 ## Hard limits
 
-- **Baseline is 898 passed, 1 skipped.** None may fall. Report the exact suite line before and after.
+- **Baseline is {suite_baseline_line()}.** None may fall. Report the exact suite line before and after.
 - `src/consilient/` is AST-locked: no `subprocess`, network, credentials, third-party imports or
   `getattr`. Subprocess work belongs in `scripts/`.
 - **No new CLI subcommand** — the set is pinned at six. **Change no gate condition**; `consil doctor`
@@ -2445,6 +2868,33 @@ def shed_lane(outstanding: int, ceiling: int) -> bool:
 
 def admit_review(reviews_out: int) -> bool:
     return not shed_lane(reviews_out, MAX_REVIEWS)
+
+
+RESOLVE_RESERVE = 3
+
+
+def resolve_slots_reserved(conflicts, resolving) -> int:
+    """How many build-lane slots to hold back for conflict resolution.
+
+    MEASURED 28 August 2026. Resolvers were made to count against the build lane earlier the
+    same night, which was right -- 34 of them had been running at once on a lane capped at 12,
+    because the cap counted builds only. But the BUILD loop still admitted on `len(inflight)`
+    alone, so builds filled all twelve slots first and resolvers only ever got what builds left
+    over. With 116 units still to build there is always another build, so that remainder was
+    zero: `done` sat at 31 for two hours while conflicts climbed 8 -> 16 and exactly one
+    resolver ran.
+
+    A conflict cannot clear itself, and every failed merge adds one, so a starved resolve lane
+    is a pile that only grows. Reserving a few slots costs a little build throughput and is the
+    difference between the pile draining and the pile being permanent.
+
+    Nothing here raises a ceiling: MAX_BUILDS, MAX_REVIEWS and MAX_CONCURRENT are untouched.
+    This partitions the existing lane, which is what the two-lane design already does between
+    builds and reviews. Nothing is reserved when no conflict is waiting, so an unconflicted
+    queue still gets the whole lane.
+    """
+    waiting = [u for u in (conflicts or {}) if u not in (resolving or [])]
+    return min(RESOLVE_RESERVE, len(waiting))
 
 
 def admit_build(builds_out: int) -> bool:
@@ -2665,6 +3115,10 @@ def _handle_crashed_dispatches(state: dict) -> None:
 def main() -> int:
     units = load(UNITS, {})
     state = load(STATE, {"done": [], "attempts": {}})
+    stored = state.get("last_green_summary")
+    if isinstance(stored, str) and stored.strip():
+        global _LAST_SUITE_SUMMARY
+        _LAST_SUITE_SUMMARY = stored.strip()
     # `done` means retired. Old `done`, `verified`, and `force_done` values predate structured,
     # identity-bound review receipts, so none can substitute for current evidence.
     done = retired_units(state, units)
@@ -2709,6 +3163,37 @@ def main() -> int:
             "git operation restoring an older copy over an edit. Check the last merge or "
             "checkout before dispatching anything."
         )
+        # A TICK WITHOUT A PLAN DOES NOT DEGRADE GRACEFULLY, SO IT MUST NOT RUN.
+        #
+        # MEASURED 27 August 2026, twice within an hour. `plan-units.json` was DELETED -- it is
+        # untracked instance data, so git cannot restore it -- and this warning printed, and then
+        # the tick carried on into `units[uid]` and died on KeyError. Six separate call sites
+        # subscript `units` directly, so guarding one merely moved the crash to the next.
+        #
+        # Every one of those sites is downstream of a single question: is there a plan? When the
+        # answer is no, the honest tick does nothing at all. It cannot retire (no claims to hash),
+        # cannot dispatch (no briefs), and cannot merge safely. Continuing produced a driver that
+        # crashed every tick for 40 minutes while the loop dutifully restarted it.
+        #
+        # Half a plan is refused for the same reason: `retired_units` would silently drop every
+        # unit it can no longer see, and the driver would write a `done` set that reads as
+        # regression rather than as data loss. Losing more than a quarter is not a plan edit, it
+        # is a missing file, and the difference matters more than the tick does.
+        if not units or missing > seen_units * 0.25:
+            print(
+                f"driver: REFUSING THIS TICK -- {len(units)} of {seen_units} unit(s) present. "
+                "This is data loss, not a plan edit. Restore .harness/plan-units.json (the "
+                "newest complete copy is under .harness/plan-backups/) before the driver can "
+                "retire, dispatch or merge anything. Nothing has been changed."
+            )
+            # AND MEAN IT. This called save_state(), which wrote a `done` set computed from the
+            # missing plan -- so the tick that refused to act still recorded 0 of 147 retired,
+            # over a state file that had said 15. The message said nothing had changed while the
+            # code changed the one thing that matters. MEASURED 27 August 2026, twice.
+            #
+            # A refusal writes nothing. The previous state file is the last one computed from a
+            # real plan, and it stands until a real plan is back.
+            return 0
     state["unit_count"] = len(units)
 
     reclaimed = reclaim_expired_slots(state)
@@ -2791,7 +3276,31 @@ def main() -> int:
         expected_now = state.setdefault("review_expected", {}).get(uid) or {}
         if not review_receipt_is_finished(uid, expected_now):
             continue
-        outcome = consume_review_verdict(state, uid, units[uid])
+        # A UNIT MISSING FROM THE PLAN MUST NOT KILL THE DRIVER.
+        #
+        # MEASURED 27 August 2026: `.harness/plan-units.json` was deleted -- it is untracked
+        # instance data, so git could not restore it -- and `units` became empty while
+        # `review_dispatched` still named CB1. `units[uid]` raised KeyError at this line, the
+        # driver died on that exception, and it died again on every subsequent tick. The pipeline
+        # stalled completely, and the only reason it was noticed is that a watchdog was watching
+        # the log for tracebacks.
+        #
+        # The driver already prints a loud warning when the plan shrinks ("the plan lost 147
+        # unit(s)"), then walks straight into an unguarded subscript. Warning about a condition
+        # and then crashing on it is not handling it. Skip the orphan, say so once, and keep the
+        # other units moving -- a missing plan entry is a data problem, not a reason to stop
+        # reviewing everything else.
+        unit = units.get(uid)
+        if unit is None:
+            if uid not in state.setdefault("orphan_reviews_reported", []):
+                state["orphan_reviews_reported"].append(uid)
+                print(
+                    f"driver: {uid} is in review_dispatched but absent from the plan -- "
+                    "skipping its verdict. The plan has lost a unit that still has work in "
+                    "flight; restore plan-units.json before trusting the counts."
+                )
+            continue
+        outcome = consume_review_verdict(state, uid, unit)
         print(f"driver: review of {uid} consumed as {outcome}")
         consumed_any = True
     # PERSIST A VERDICT THE MOMENT IT IS CONSUMED, not at the end of the tick.
@@ -2817,6 +3326,12 @@ def main() -> int:
     built = set(state.setdefault("built", []))
     state["done"] = sorted(done)
     state["built"] = sorted(built)
+    for _expired in expire_finished_dispatches(state):
+        print(f"driver: resolve slot released for {_expired} -- its dispatch is over")
+    for _expired in expire_finished_dispatches(
+        state, "review_dispatched", "review_started", "-verify"
+    ):
+        print(f"driver: review slot released for {_expired} -- its dispatch is over")
     clear_retired_conflicts(state)
 
     import time as _time_m
@@ -2963,6 +3478,35 @@ def main() -> int:
             continue
         artefact = artefact_identity(units[uid])
         if artefact is None:
+            # A UNIT THAT CAN NEVER BE REVIEWED MUST NOT BE SKIPPED IN SILENCE.
+            #
+            # `artefact_identity` returns None when a claimed path is absent from HEAD, so no
+            # verdict can bind and this unit can never retire. The loop simply moved on, every
+            # tick, for as long as the condition lasted.
+            #
+            # MEASURED 27 August 2026: five units sat in exactly this state -- D01, O01, Q01, S03
+            # and T02, each missing one claimed test file -- and nothing named them. The driver
+            # prints an aggregate "N built unit(s) CANNOT retire" line elsewhere, which says the
+            # count but not which, and says it in a different part of the tick from the loop that
+            # is actually skipping them.
+            #
+            # This is the same defect as the resolve and review slot leaks repaired earlier the
+            # same day: a `continue` where a line of output belonged. Reported once per unit
+            # rather than per tick, because a message repeated every ninety seconds stops being
+            # read, which is how the aggregate line got ignored in the first place.
+            unreviewable = state.setdefault("unreviewable_reported", [])
+            if uid not in unreviewable:
+                unreviewable.append(uid)
+                missing = [
+                    p
+                    for p in (units[uid].get("claims") or [])
+                    if sh(["git", "rev-parse", "HEAD:" + p]).returncode != 0
+                ]
+                print(
+                    f"driver: {uid} CANNOT BE REVIEWED -- claimed path(s) absent from HEAD: "
+                    f"{', '.join(missing) or 'unknown'}. No verdict can bind to it, so it can "
+                    "never retire. It needs the missing work landed, not another review."
+                )
             continue
         review_escalated = uid in state.setdefault("review_escalated", [])
         if not review_dispatch_allowed(state, uid):
@@ -2975,9 +3519,14 @@ def main() -> int:
         rh, rm, rl = reviewers[0]
         attempt = state.setdefault("review_attempts", {}).get(uid, 0) + 1
         state["review_attempts"][uid] = attempt
+        # Captured HERE, not at retirement, and this is the load-bearing detail. A unit's own
+        # commits are `HEAD..worktree_head`, which is EMPTY once the unit has merged -- so the
+        # fingerprint cannot be re-derived later for exactly the units that reach retirement. It
+        # is taken while the answer still exists and carried forward with the verdict.
         state.setdefault("review_expected", {})[uid] = {
             "artefact": artefact,
             "attempt": attempt,
+            "deliverable": _unit_added_line_hashes(uid),
         }
         vb = write_verify_brief(uid, units[uid], artefact, attempt)
         vargs = [
@@ -2998,10 +3547,12 @@ def main() -> int:
         ]
         if rm:
             vargs += ["--model", rm]
-        vo = (BRIEFS / f"{uid}-verify.out").open("w", encoding="utf-8")
-        ve = (BRIEFS / f"{uid}-verify.err").open("w", encoding="utf-8")
-        subprocess.Popen(vargs, cwd=str(ROOT), stdout=vo, stderr=ve)
+        preserve_review_artefacts(uid, attempt)
+        spawn_logged(
+            vargs, BRIEFS / f"{uid}-verify.out", BRIEFS / f"{uid}-verify.err"
+        )
         state["review_dispatched"].append(uid)
+        state.setdefault("review_started", {})[uid] = [time.time(), rl]
         reviews_out += 1
         print(f"driver: review of {uid} dispatched to {rh} (built by {builder})")
 
@@ -3076,6 +3627,43 @@ def main() -> int:
             shown = ", ".join(absent[:3]) or "(claims unreadable)"
             print(f"driver:   {uid} -- missing {len(absent)}: {shown}")
 
+        # A UNIT THAT NEVER PRODUCED A FILE IT CLAIMS IS NOT BUILT.
+        #
+        # This block reported the condition and stopped there, so such a unit sat in `built` for
+        # ever: it cannot retire, because no identity binds; it cannot be reviewed, for the same
+        # reason; and it is not a build candidate, because `built` membership excludes it. Three
+        # doors, all shut, and the only sign was a line of log nobody acted on.
+        #
+        # MEASURED 27 August 2026: D01, O01, Q01, S03 and T02, five units between them missing six
+        # claimed test files. Every one of those files was absent from HEAD *and* from the unit's
+        # own worktree -- so this is not a merge that failed to land, it is a build that never
+        # wrote the file. AU looked identical and was NOT this case: its file existed in its
+        # worktree and merely needed landing, which is why the check is on BOTH locations rather
+        # than on HEAD alone. Getting that distinction wrong would re-dispatch finished work and
+        # throw away the merge repair.
+        #
+        # Returning it to the queue is the conservative move: it re-runs a build that demonstrably
+        # did not finish. It does not touch the attempt counter, so a unit that keeps failing this
+        # way still reaches its retry cap and escalates rather than looping for ever.
+        for uid, absent in unretirable:
+            unit = units.get(uid) or {}
+            worktree = WORKTREES / uid
+            never_written = [
+                p
+                for p in absent
+                if not (worktree / p).is_file()
+            ]
+            if not never_written or len(never_written) != len(absent):
+                continue
+            built_list = state.setdefault("built", [])
+            if uid in built_list:
+                built_list.remove(uid)
+                print(
+                    f"driver: {uid} returned to the build queue -- it claims "
+                    f"{len(never_written)} path(s) that exist in neither HEAD nor its worktree, "
+                    "so the build never wrote them. Reviewing it cannot help; building it can."
+                )
+
     candidates = [
         u
         for u in units
@@ -3143,10 +3731,17 @@ def main() -> int:
         return 0
 
     launched = 0
+    # Builds are dispatched before resolves in this tick, so whatever builds take, resolve
+    # never sees. Count the resolvers already out -- they occupy this same lane -- and hold
+    # back a few slots for the conflicts waiting behind them.
+    resolving_now = state.setdefault("resolve_dispatched", [])
+    reserved = resolve_slots_reserved(conflicts, resolving_now)
     for uid in startable:
-        if not admit_build(len(inflight)):
+        if not admit_build(len(inflight) + len(resolving_now) + reserved):
             print(
-                f"driver: build lane at ceiling ({len(inflight)}/{MAX_BUILDS}); shedding"
+                f"driver: build lane at ceiling ({len(inflight)} building + "
+                f"{len(resolving_now)} resolving + {reserved} reserved for resolve"
+                f"/{MAX_BUILDS}); shedding"
             )
             break
         unit = units[uid]
@@ -3187,9 +3782,7 @@ def main() -> int:
         wt = unit_worktree(uid)
         if wt is not None:
             args += ["--cwd", str(wt)]
-        out = (BRIEFS / f"{uid}.out").open("w", encoding="utf-8")
-        err = (BRIEFS / f"{uid}.err").open("w", encoding="utf-8")
-        subprocess.Popen(args, cwd=str(ROOT), stdout=out, stderr=err)
+        spawn_logged(args, BRIEFS / f"{uid}.out", BRIEFS / f"{uid}.err")
         attempts[uid] = n + 1
         inflight[uid] = (now, leash)
         # Record which arm actually took the work. This was read at retirement and never
@@ -3210,9 +3803,17 @@ def main() -> int:
     # its own dispatch, its own brief, and does not touch the build retry counter.
     resolving = state.setdefault("resolve_dispatched", [])
     for uid, why in sorted(conflicts.items()):
-        if not admit_build(len(inflight)):
+        # RESOLVERS COUNT AGAINST THE LANE THEY ARE GATED ON. This read
+        # `admit_build(len(inflight))`, where `inflight` holds BUILDS only -- so a resolver
+        # was admitted on the build lane's occupancy while adding nothing to it, and the next
+        # was admitted on the same unchanged number. MEASURED 27 August 2026: 34 resolvers
+        # live at once, each a full workspace clone and a harness run, on a lane whose cap is
+        # MAX_BUILDS. This is the MAX_REVIEWS defect in a second place: a cap that does not
+        # count what it is capping is not a cap.
+        if not admit_build(len(inflight) + len(resolving)):
             print(
-                f"driver: build lane at ceiling ({len(inflight)}/{MAX_BUILDS}); shedding"
+                f"driver: build lane at ceiling "
+                f"({len(inflight)} building + {len(resolving)} resolving/{MAX_BUILDS}); shedding"
             )
             break
         if (
@@ -3261,15 +3862,17 @@ def main() -> int:
         wt = unit_worktree(uid)
         if wt is not None:
             rargs += ["--cwd", str(wt)]
-        ro = (BRIEFS / f"{uid}-resolve.out").open("w", encoding="utf-8")
-        re_ = (BRIEFS / f"{uid}-resolve.err").open("w", encoding="utf-8")
-        subprocess.Popen(rargs, cwd=str(ROOT), stdout=ro, stderr=re_)
+        spawn_logged(
+            rargs, BRIEFS / f"{uid}-resolve.out", BRIEFS / f"{uid}-resolve.err"
+        )
         resolving.append(uid)
+        state.setdefault("resolve_started", {})[uid] = [time.time(), leash]
         inflight[uid] = (now, leash)
         launched += 1
         print(
             f"driver: RESOLVE dispatched for {uid} to {harness}/{model or 'default'} [{leash}s]"
         )
+
 
     if not launched:
         print(
@@ -3288,7 +3891,192 @@ def main() -> int:
     return 0
 
 
+def _self_test() -> None:
+    """Regression checks for unit AI. Invoked as: python .harness/build_driver.py --self-test."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = pathlib.Path(directory)
+        default: dict[str, object] = {"done": [], "attempts": {}}
+        assert load(root / "missing.json", default) == default
+
+        torn = root / "torn.json"
+        torn.write_text('{"done": ["F01"], "attempts":', encoding="utf-8")
+        try:
+            load(torn, default)
+        except SystemExit as exc:
+            assert "unreadable" in str(exc)
+        else:
+            raise AssertionError("truncated state was treated as absent")
+
+        target = root / "driver-state.json"
+        replacements: list[tuple[pathlib.Path, pathlib.Path]] = []
+        real_replace = os.replace
+
+        def wrapped(src: str, dst: str) -> None:
+            replacements.append((pathlib.Path(src), pathlib.Path(dst)))
+            real_replace(src, dst)
+
+        global STATE
+        old_state = STATE
+        STATE = target
+        os.replace = wrapped  # type: ignore[assignment]
+        try:
+            save_state({"done": ["A"]})
+        finally:
+            os.replace = real_replace
+            STATE = old_state
+        assert replacements, "save_state must go through os.replace"
+        src, dst = replacements[-1]
+        assert dst == target
+        assert src.parent == target.parent
+        assert src != dst
+        assert src != target.with_suffix(".json.tmp"), (
+            "a fixed temp name lets two writers rename each other's partial file"
+        )
+        assert load(target, {}) == {"done": ["A"]}
+
+        briefs = root / "briefs"
+        briefs.mkdir()
+        receipt = {
+            "v": 1,
+            "unit": "U01",
+            "artefact": "digest",
+            "attempt": 1,
+            "verdict": "DEFECTIVE",
+            "findings": ["fault"],
+        }
+        (briefs / "U01-verify.out").write_text(
+            json.dumps({"status": "ok", "stdout_tail": "reviewer finished"}),
+            encoding="utf-8",
+        )
+        (briefs / "U01-verdict.json").write_text(json.dumps(receipt), encoding="utf-8")
+        old_briefs = BRIEFS
+        real_append = append_review_outcome
+        real_identity = artefact_identity
+        globals()["BRIEFS"] = briefs
+        globals()["append_review_outcome"] = lambda _outcome: None
+        globals()["artefact_identity"] = lambda _unit: "digest"
+        try:
+            state = {
+                "built": ["U01"],
+                "done": ["U01"],
+                "verified": ["U01"],
+                "review_dispatched": ["U01"],
+                "review_expected": {"U01": {"artefact": "digest", "attempt": 1}},
+            }
+            assert consume_review_verdict(state, "U01", {}) == "DEFECTIVE"
+            assert "U01" not in state["verified"]
+            assert "U01" not in state["done"]
+            assert "U01" not in state["built"]
+        finally:
+            globals()["BRIEFS"] = old_briefs
+            globals()["append_review_outcome"] = real_append
+            globals()["artefact_identity"] = real_identity
+
+        (briefs / "U01-verify.out").write_text("attempt-1-out", encoding="utf-8")
+        (briefs / "U01-verdict.json").write_text("attempt-1-verdict", encoding="utf-8")
+        globals()["BRIEFS"] = briefs
+        try:
+            preserve_review_artefacts("U01", 2)
+            assert not (briefs / "U01-verify.out").exists()
+            assert (briefs / "U01-verify-1.out").read_text(encoding="utf-8") == (
+                "attempt-1-out"
+            )
+            assert (briefs / "U01-verdict-1.json").read_text(encoding="utf-8") == (
+                "attempt-1-verdict"
+            )
+        finally:
+            globals()["BRIEFS"] = old_briefs
+
+    ignore_lines = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert ".harness/driver-state.json" in ignore_lines
+    assert not hasattr(sys.modules[__name__], "ORDER")
+    source = pathlib.Path(__file__).read_text(encoding="utf-8")
+    assert ('state["last_published_' + 'count"]') not in source
+    assert ('state["skip' + 'ped"]') not in source
+    corpora_flag = "--require" + "-corpora"
+    assert f'["{corpora_flag}"]' in source
+
+    released: list[str] = []
+    real_release = release_dead_claims
+    real_progress = run_dir_progress
+    old_briefs = BRIEFS
+    briefs = pathlib.Path(tempfile.mkdtemp())
+    out = briefs / "S.out"
+    out.write_text("started\n", encoding="utf-8")
+    aged = time.time() - PROGRESS_SILENCE_S - 30
+    os.utime(out, (aged, aged))
+    globals()["BRIEFS"] = briefs
+    globals()["run_dir_progress"] = lambda _uid, _started: 0.0
+    globals()["release_dead_claims"] = (
+        lambda uids: released.extend(sorted(uids)) or len(uids)
+    )
+    try:
+        silent_state = {
+            "in_flight": {"S": (time.time() - 10, 3600.0)},
+            "attempts": {"S": 2},
+        }
+        assert reclaim_expired_slots(silent_state) == ["S (silent)"]
+        assert released == ["S"]
+        assert "S" not in silent_state["in_flight"]
+    finally:
+        globals()["BRIEFS"] = old_briefs
+        globals()["run_dir_progress"] = real_progress
+        globals()["release_dead_claims"] = real_release
+
+    handles: list[object] = []
+    real_popen = subprocess.Popen
+
+    def fake_popen(*_args: object, **kwargs: object) -> object:
+        handles.append(kwargs["stdout"])
+        handles.append(kwargs["stderr"])
+        return object()
+
+    subprocess.Popen = fake_popen  # type: ignore[assignment]
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            spawn_logged(
+                ["python", "-c", "pass"],
+                pathlib.Path(directory) / "unit.out",
+                pathlib.Path(directory) / "unit.err",
+            )
+    finally:
+        subprocess.Popen = real_popen
+    assert handles and all(getattr(handle, "closed") for handle in handles)
+
+    global _LAST_SUITE_SUMMARY
+    old_summary = _LAST_SUITE_SUMMARY
+    old_briefs = BRIEFS
+    with tempfile.TemporaryDirectory() as directory:
+        globals()["BRIEFS"] = pathlib.Path(directory)
+        _LAST_SUITE_SUMMARY = "1418 passed, 3 skipped"
+        unit = {
+            "title": "test",
+            "plan": "test.md",
+            "claims": ["a.py"],
+            "commit": "test",
+        }
+        try:
+            brief = write_brief("T", unit)
+            verify = write_verify_brief("T", unit, "d" * 64, 1)
+            brief_text = brief.read_text(encoding="utf-8")
+            verify_text = verify.read_text(encoding="utf-8")
+            assert "1418 passed, 3 skipped" in brief_text
+            assert "1418 passed, 3 skipped" in verify_text
+            assert "898 passed" not in brief_text
+            assert "914 passed" not in verify_text
+        finally:
+            _LAST_SUITE_SUMMARY = old_summary
+            globals()["BRIEFS"] = old_briefs
+
+    print("build_driver self-test: PASS")
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-test"]:
+        _self_test()
+        raise SystemExit(0)
     _lock = hold_tick_lock()
     if _lock is None:
         print(

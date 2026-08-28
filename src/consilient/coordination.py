@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -606,6 +607,40 @@ class ClaimRelease:
     reason: str
 
 
+def _process_still_running(pid: int) -> bool | None:
+    """Return whether the recorded process is running, or ``None`` if unknown."""
+    if os.name == "nt":
+        return _windows_process_still_running(pid)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except (PermissionError, OSError):
+        return None
+    return True
+
+
+def _windows_process_still_running(pid: int) -> bool | None:
+    """Query the Windows process status that ``os.kill(pid, 0)`` cannot report."""
+    winapi = sys.modules.get("_winapi")
+    if winapi is None:
+        return None
+    query_limited_information = 0x1000
+    still_active = 259
+    try:
+        handle = int(winapi.OpenProcess(query_limited_information, False, pid))
+    except OSError as exc:
+        return False if exc.winerror == 87 else None
+    if not handle:
+        return None
+    try:
+        return int(winapi.GetExitCodeProcess(handle)) == still_active
+    except OSError:
+        return None
+    finally:
+        winapi.CloseHandle(handle)
+
+
 def worker_gone_from_pid_record(runs_dir: Path, run_id: str) -> bool | None:
     """Map a run to its recorded pid and confirm the worker is not running.
 
@@ -622,14 +657,8 @@ def worker_gone_from_pid_record(runs_dir: Path, run_id: str) -> bool | None:
     pid = payload.get("pid") if isinstance(payload, dict) else None
     if not isinstance(pid, int) or pid < 1:
         return None
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return True
-    except PermissionError:
-        return None
-    else:
-        return False
+    running = _process_still_running(pid)
+    return None if running is None else not running
 
 
 def release_claims_when_worker_gone(

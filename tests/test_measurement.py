@@ -1,4 +1,22 @@
-"""X01 — measurement registration event and fail-closed projection join."""
+"""X01 — measurement registration event and fail-closed projection join.
+
+Acceptance command (the design table named no pytest invocation; this file is it):
+
+    python -m pytest tests/test_measurement.py -q
+
+The Done row said "replay of a result with no registration raises". That is
+wrong against this repository's projection contract: ``projection.build``
+quarantines relational defects and still returns, matching
+``verification.outcome`` without ``candidate.exposed`` and preserving V0-02
+replay of mixed logs. The fail-closed *join* is ``joined_measurement_results``,
+which raises ``ProjectionError`` on an unmatched result.
+
+Incumbent: MLPerf Logging ``compliance_checker``
+(https://github.com/mlcommons/logging, retrieved 2026-08-28). Invalid
+lifecycle fails the checker; the log remains readable. X01 matches that split.
+A CI-wired failing gate is BU2 (``check_measurement_recorded.py``) and is
+not this unit.
+"""
 
 from __future__ import annotations
 
@@ -92,6 +110,8 @@ def test_orphan_measurement_result_quarantined_on_replay(tmp_path: Path) -> None
         for row in relational
     )
     assert conn.execute("SELECT COUNT(*) FROM measurement_results").fetchone()[0] == 0
+    with pytest.raises(projection.ProjectionError, match="measurement.registered"):
+        projection.joined_measurement_results(conn)
     conn.close()
 
 
@@ -109,6 +129,12 @@ def test_registered_then_result_projects(tmp_path: Path) -> None:
     assert conn.execute("SELECT COUNT(*) FROM measurement_registrations").fetchone()[0] == 1
     assert conn.execute("SELECT COUNT(*) FROM measurement_results").fetchone()[0] == 1
     assert projection.relational_quarantines(conn) == []
+    joined = projection.joined_measurement_results(conn)
+    assert len(joined) == 1
+    assert joined[0]["run_id"] == run_id
+    assert joined[0]["fixture"] == "fanout-8-models"
+    assert joined[0]["config_hash"] == "a" * 64
+    assert joined[0]["hardware_id"] == "amd-9950x3d-win11"
     conn.close()
 
 
@@ -143,4 +169,50 @@ def test_result_before_registration_quarantines(tmp_path: Path) -> None:
     relational = projection.relational_quarantines(conn)
     assert any("measurement.registered" in str(row["reason"]) for row in relational)
     assert conn.execute("SELECT COUNT(*) FROM measurement_results").fetchone()[0] == 0
+    with pytest.raises(projection.ProjectionError, match="measurement.registered"):
+        projection.joined_measurement_results(conn)
     conn.close()
+
+
+def test_duplicate_registration_does_not_fail_the_join(tmp_path: Path) -> None:
+    run_id = "20260823T184318-edb77f1e88"
+    log_dir = tmp_path / "log"
+    db = tmp_path / "state.db"
+    _write_log(
+        log_dir / "2026-08-23.jsonl",
+        _registered(run_id),
+        _registered(run_id, hardware_id="other-hardware"),
+        _result(run_id),
+    )
+
+    conn = projection.build(log_dir, db)
+    relational = projection.relational_quarantines(conn)
+    assert any("duplicate run_id" in str(row["reason"]) for row in relational)
+    joined = projection.joined_measurement_results(conn)
+    assert len(joined) == 1
+    assert joined[0]["hardware_id"] == "amd-9950x3d-win11"
+    conn.close()
+
+
+def test_measurement_registered_rejects_wrong_actor_and_non_digest_hash() -> None:
+    with pytest.raises(EventError, match="consilient.measurement"):
+        validate(
+            _ev(
+                actor="consilient.cli",
+                data={
+                    "run_id": "run-1",
+                    "config_hash": "a" * 64,
+                    "hardware_id": "hw-1",
+                },
+            )
+        )
+    with pytest.raises(EventError, match="config_hash"):
+        validate(
+            _ev(
+                data={
+                    "run_id": "run-1",
+                    "config_hash": "A" * 64,
+                    "hardware_id": "hw-1",
+                }
+            )
+        )

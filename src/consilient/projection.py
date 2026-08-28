@@ -475,6 +475,43 @@ def relational_quarantines(conn: sqlite3.Connection) -> list[dict[str, object]]:
     ]
 
 
+def joined_measurement_results(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    """Fail-closed publication join of measurement.result onto a prior registration.
+
+    ``build`` quarantines unmatched results and still returns, so mixed-log
+    replay keeps V0-02. Publishing from that projection raises: an unmatched
+    result is not a published result.
+
+    Incumbent: MLPerf Logging ``compliance_checker`` (mlcommons/logging,
+    retrieved 2026-08-28) — invalid lifecycle fails the checker; the log
+    remains readable. A CI-wired failing gate is BU2, not this function.
+    """
+    failures = [
+        row
+        for row in relational_quarantines(conn)
+        if "measurement.result" in str(row["reason"])
+    ]
+    if failures:
+        reasons = "; ".join(str(row["reason"]) for row in failures)
+        raise ProjectionError(f"measurement join failed closed: {reasons}")
+    return [
+        {
+            "position": row[0],
+            "run_id": row[1],
+            "fixture": row[2],
+            "config_hash": row[3],
+            "hardware_id": row[4],
+        }
+        for row in conn.execute(
+            "SELECT r.position, r.run_id, r.fixture, g.config_hash, g.hardware_id"
+            " FROM measurement_results r"
+            " INNER JOIN measurement_registrations g ON g.run_id = r.run_id"
+            " WHERE r.position > g.position"
+            " ORDER BY r.position"
+        )
+    ]
+
+
 def sampling_unconditioned(conn: sqlite3.Connection) -> bool:
     row = conn.execute(
         "SELECT value FROM projection_meta WHERE key = 'sampling_unconditioned'"

@@ -5611,3 +5611,23 @@ def test_this_repository_does_not_commit_under_a_test_fixture_identity() -> None
         "global identity applies; every commit made meanwhile carries the wrong committer "
         "and cannot be corrected after a push."
     )
+
+
+def test_the_loop_prunes_every_workspace_form_not_just_worktrees() -> None:
+    """The mechanism behind the test above, asserted separately so a regression names itself.
+
+    Removing the call, or reverting to registration-pruning alone, silently reintroduces a 580GB
+    leak that takes days to become visible. The outcome test would eventually catch it; this one
+    catches it immediately.
+    """
+    loop = Path(".harness/build_loop.py")
+    if not loop.is_file():  # pragma: no cover - repository-only check
+        pytest.skip("build_loop.py not present in this checkout")
+    source = loop.read_text(encoding="utf-8")
+    assert "def prune_spent_workspace_dirs(" in source, (
+        "the clone-form workspace pruner is gone; only registered worktrees would be reclaimed"
+    )
+    assert source.count("prune_spent_workspace_dirs(") >= 2, (
+        "prune_spent_workspace_dirs is defined but never called from the tick"
+    )
+

@@ -120,3 +120,48 @@ def test_harvest_cli_refuses_docs_as_dest() -> None:
     spec.loader.exec_module(module)
     code = module.main(["--out", str(ROOT / "docs")])
     assert code == 2
+
+
+def test_load_seen_does_not_read_the_file_into_memory(tmp_path) -> None:
+    """Peak memory must scale with the ANSWER, not with the file.
+
+    MEASURED 28 August 2026. `_load_seen` was
+
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+
+    which builds the whole file as one string and then a list of every line. The live
+    harvest had reached 1.65 GB, so each call allocated several gigabytes before reading a
+    single run id, and the dispatch died with MemoryError -- A02 fifteen times, and B01,
+    B06, F01 and W11 besides. The file is append-only instance data that grows forever, so
+    the slurp could only ever fail later rather than never.
+
+    This asserts the property rather than the implementation: a caller may read the file
+    however it likes, provided it does not hold it. The threshold is deliberately loose --
+    a quarter of the file -- so it fails the slurp by a wide margin and cannot flake on the
+    streaming version, whose peak is a few hundred distinct ids.
+    """
+    import tracemalloc
+
+    from consilient.harvest import _load_seen
+
+    path = tmp_path / 'harvest.jsonl'
+    # Many rows, few distinct ids: the answer stays tiny while the file does not.
+    padding = 'x' * 600
+    with path.open('w', encoding='utf-8', newline=chr(10)) as handle:
+        for i in range(12000):
+            handle.write(
+                json.dumps({'run_id': 'run-' + str(i % 50), 'pad': padding}) + chr(10)
+            )
+    size = path.stat().st_size
+    assert size > 4_000_000, 'fixture too small to distinguish the two implementations'
+
+    tracemalloc.start()
+    seen = _load_seen(path)
+    _current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert seen == {'run-' + str(i) for i in range(50)}
+    assert peak < size / 4, (
+        'peak ' + str(peak) + ' bytes against a ' + str(size) + ' byte file: '
+        '_load_seen is holding the file rather than streaming it'
+    )

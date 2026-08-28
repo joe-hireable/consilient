@@ -409,6 +409,28 @@ def test_non_outbound_manifest_does_not_require_disclosure() -> None:
     assert "disclosure" not in value.to_record()
 
 
+def test_non_outbound_manifest_refuses_a_disclosure_field() -> None:
+    """Production break caught: a read-only manifest can carry a prompt-shaped disclosure."""
+    record = manifest().to_record()
+    record["disclosure"] = DISCLOSURE_DIGEST
+    with pytest.raises(EffectError, match="disclosure"):
+        EffectManifest.from_record(record)
+
+
+def test_composite_outbound_effect_still_requires_disclosure() -> None:
+    """Production break caught: mixing message.send with a read class drops the requirement."""
+    with pytest.raises(EffectError, match="disclosure"):
+        EffectManifest.from_record(outbound_record(effects=["message.send", "data.read"]))
+
+
+def test_outbound_disclosure_changes_the_canonical_digest() -> None:
+    """Production break caught: dropping disclosure from canonical() hides what was played."""
+    first = EffectManifest.from_record(outbound_record(disclosure=DISCLOSURE_DIGEST))
+    second = EffectManifest.from_record(outbound_record(disclosure="8" * 64))
+    assert first.digest != second.digest
+    assert "disclosure" in first.canonical()
+
+
 def test_mutation_effects_are_disjoint_from_read_only_effects() -> None:
     """A read-only class in MUTATION_EFFECTS makes the observation predicate lie."""
     assert MUTATION_EFFECTS & READ_ONLY_EFFECTS == frozenset()
@@ -588,24 +610,42 @@ def test_planning_operations_cannot_launder_protected_effects() -> None:
     assert result.disposition == "escalate"
 
 
-def test_classify_admission_conjoins_flags_with_manifest_predicates() -> None:
-    """A bare flag short-circuit can be deleted only if this call is required."""
-    source = Path(effects_mod.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    names = {
-        node.func.id
-        for node in ast.walk(_function_def(tree, "_classify_admission"))
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-    assert "_privileged_admission_class" in names
-    helper = _function_def(tree, "_privileged_admission_class")
-    helper_calls = {
-        node.func.id
-        for node in ast.walk(helper)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-    assert "_planning_predicate" in helper_calls
-    assert "_proof_predicate" in helper_calls
-    attrs = {node.attr for node in ast.walk(helper) if isinstance(node, ast.Attribute)}
-    assert "is_material_choice" in attrs
-    assert "is_proof_operation" in attrs
+def test_privileged_classes_need_the_caller_flag_and_the_manifest() -> None:
+    """Neither a caller flag nor a manifest shape alone may grant a privileged class.
+
+    REPLACES test_classify_admission_conjoins_flags_with_manifest_predicates, which walked
+    the AST asserting a helper named _privileged_admission_class was called. Commit 5ac16cc
+    inlined that helper, so the test was red on HEAD while the PROPERTY it cared about was
+    untouched -- it pinned an implementation detail rather than a behaviour. This asserts the
+    behaviour, so it survives the next inlining and fails if the conjunction is dropped.
+    """
+    proof = _manifest_with(effects=("file.change",), operations=("proof",))
+    proof_cap = _admitted_capability(effects=("file.change",), operations=("proof",))
+    plan = _manifest_with(effects=("data.read",), operations=("plan",))
+    plan_cap = _admitted_capability(effects=("data.read",), operations=("plan",))
+    write_m = _manifest_with(effects=("file.change",), operations=("write",))
+    write_cap = _admitted_capability(effects=("file.change",), operations=("write",))
+    # The manifest shape without the caller flag grants nothing.
+    assert (
+        derive_admission(
+            proof, proof_cap, AdmissionFacts(is_proof_operation=False, contained=True)
+        ).admission
+        != "proof_operation"
+    )
+    assert (
+        derive_admission(plan, plan_cap, AdmissionFacts(is_material_choice=False)).admission
+        != "material_choice"
+    )
+    # The caller flag without the manifest shape grants nothing.
+    assert (
+        derive_admission(
+            write_m, write_cap, AdmissionFacts(is_proof_operation=True, contained=True)
+        ).admission
+        != "proof_operation"
+    )
+    assert (
+        derive_admission(
+            write_m, write_cap, AdmissionFacts(is_material_choice=True, contained=True)
+        ).admission
+        != "material_choice"
+    )

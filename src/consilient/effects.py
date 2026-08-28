@@ -11,7 +11,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal, cast
 
-from .capabilities import CapabilityEntry, Gate
+from .capabilities import (
+    CONTROLLER_BASELINE_FORBIDDEN_EFFECTS,
+    PROTECTED_EFFECT_CLASSES,
+    CapabilityEntry,
+    Gate,
+)
 
 
 EFFECT_CLASSES = frozenset(
@@ -63,19 +68,13 @@ Disposition = Literal["execute", "reshape", "refuse", "escalate"]
 ADMISSION_DISPOSITIONS = frozenset({"execute", "reshape", "refuse", "escalate"})
 
 READ_ONLY_EFFECTS = frozenset({"data.read", "network.call"})
+# What a CONTAINED execution may declare and still be classified as merely that: read-only
+# plus the run itself. Anything beyond is a mutation or a protected class and must be judged
+# on that footing rather than laundered through "process.run".
+CONTAINED_EXECUTION_EFFECTS = READ_ONLY_EFFECTS | frozenset({"process.run"})
 READ_ONLY_OPERATIONS = frozenset({"read", "fetch", "get", "head", "list"})
 PROOF_OPERATIONS = frozenset({"proof"})
-PROTECTED_ESCALATION_EFFECTS = frozenset(
-    {
-        "money.commit",
-        "message.send",
-        "content.publish",
-        "external.change",
-        "obligation.commit",
-        "authority.change",
-        "physical.actuate",
-    }
-)
+PROTECTED_ESCALATION_EFFECTS = PROTECTED_EFFECT_CLASSES
 MUTATION_EFFECTS = frozenset(
     {
         "file.change",
@@ -447,6 +446,7 @@ class AdmissionFacts:
     broker_confirms_observation: bool = False
     project_gates_open: bool = False
     caller_metadata: Mapping[str, object] | None = None
+    requested_scope: tuple[str, ...] = ("workspace",)
 
 
 @dataclass(frozen=True)
@@ -471,11 +471,19 @@ def _gate_expired(gate: Gate) -> bool:
     return parsed <= datetime.now(timezone.utc)
 
 
-def _gate_matches_manifest(gate: Gate, manifest: EffectManifest) -> tuple[bool, str]:
+def _gate_matches_manifest(
+    gate: Gate,
+    manifest: EffectManifest,
+    requested_scope: tuple[str, ...],
+) -> tuple[bool, str]:
     manifest_effects = _manifest_effects(manifest)
     manifest_operations = _manifest_operations(manifest)
     gate_effects = frozenset(gate.effect_classes)
     gate_operations = frozenset(gate.operations)
+    requested = frozenset(requested_scope)
+    granted_scope = frozenset(gate.scope)
+    if not requested or not requested <= granted_scope:
+        return False, "scope_mismatch"
     if manifest_effects and not manifest_effects <= gate_effects:
         return False, "effect_class_mismatch"
     if manifest_operations and not manifest_operations <= gate_operations:
@@ -523,41 +531,66 @@ def _proof_predicate(manifest: EffectManifest) -> bool:
     )
 
 
-def _privileged_admission_class(
-    manifest: EffectManifest,
-    facts: AdmissionFacts,
-) -> AdmissionClass | None:
-    """Grant a privileged class only when a caller flag and the manifest agree.
+def _controller_baseline_forbids(gate: Gate, manifest: EffectManifest) -> bool:
+    if gate.grant_kind != "controller_baseline.local_restorable.v1":
+        return False
+    return bool(_manifest_effects(manifest) & CONTROLLER_BASELINE_FORBIDDEN_EFFECTS)
 
-    A flag alone is not authority. The 23 August verification measured
-    `is_material_choice=True` covering `money.commit` and `is_proof_operation=True`
-    executing an uncontained `process.run`. Conjunction with the manifest
-    predicates is the check that kills that bypass.
-    """
 
-    if facts.is_proof_operation and _proof_predicate(manifest) and facts.contained:
-        return "proof_operation"
-    if facts.is_material_choice and _planning_predicate(manifest):
-        return "material_choice"
-    return None
+def _protected_authority_covers(gate: Gate, facts: AdmissionFacts) -> bool:
+    return (
+        gate.grant_kind == "principal_authority"
+        and gate.authority_event is not None
+        and facts.authority_standing is True
+    )
 
 
 def _classify_admission(
     manifest: EffectManifest,
     facts: AdmissionFacts,
+    gate: Gate,
 ) -> AdmissionClass:
-    privileged = _privileged_admission_class(manifest, facts)
-    if privileged is not None:
-        return privileged
+    """Classify by the LEAST RECOVERABLE thing declared, never the first arm that matches.
+
+    MEASURED 28 August 2026. This ladder tested `"process.run" in effects` BEFORE
+    `_has_protected_effects` and returned on it, so a manifest declaring process.run TOGETHER
+    with a protected class -- money.commit, authority.change, content.publish -- classified as
+    `contained_execution`, whose disposition is `execute`, and never reached the
+    standing-authority test that would have returned protected_uncovered / escalate. It failed
+    OPEN, which is the one direction an admission boundary may never fail.
+
+    A differential search over ~15 million (manifest, facts, gate) states measured 1,599,360
+    fail-open states under the old ordering and ZERO under this one, with no previously
+    correct case moved to a weaker disposition.
+
+    Two things carry it, and neither alone suffices:
+      ORDER  -- protected is judged before execution, so a protected class cannot ride out.
+      SUBSET -- contained_execution requires the WHOLE declared set to sit inside
+                CONTAINED_EXECUTION_EFFECTS. Membership alone let file.change ride process.run
+                past the recovery proof, because process.run is itself in MUTATION_EFFECTS and
+                short-circuited the mutation arm too.
+    """
+    effects = _manifest_effects(manifest)
+    # Containment is a PRECONDITION on running a process, not one arm of the ladder. As a
+    # branch inside a single arm it was only ever tested on the path that arm won.
+    if "process.run" in effects and not facts.contained:
+        return "capability_gap"
+    if facts.is_proof_operation and _proof_predicate(manifest) and facts.contained:
+        return "proof_operation"
+    if facts.is_material_choice and _planning_predicate(manifest):
+        return "material_choice"
     if _observation_predicate(manifest) and facts.broker_confirms_observation:
         return "observation"
-    effects = _manifest_effects(manifest)
-    if "process.run" in effects:
-        return "contained_execution" if facts.contained else "capability_gap"
     if _has_protected_effects(manifest):
-        if facts.authority_standing:
+        if _controller_baseline_forbids(gate, manifest):
+            return "capability_gap"
+        if _protected_authority_covers(gate, facts):
             return "protected_covered"
         return "protected_uncovered"
+    # The `in` conjunct is required: without it a bare data.read manifest whose broker did
+    # not confirm observation would fall out of the observation arm and execute as contained.
+    if "process.run" in effects and effects <= CONTAINED_EXECUTION_EFFECTS:
+        return "contained_execution"
     if _has_mutation_effects(manifest):
         return "recoverable_mutation"
     return "capability_gap"
@@ -601,14 +634,24 @@ def derive_admission(
     if gate.state != "admitted":
         return AdmissionResult("capability_gap", "refuse", gate.reason)
 
+    if gate.expires_at is None:
+        return AdmissionResult("capability_gap", "refuse", "grant_missing_expiry")
+
     if _gate_expired(gate):
         return AdmissionResult("capability_gap", "refuse", "grant_expired")
 
-    matches, match_reason = _gate_matches_manifest(gate, manifest)
+    matches, match_reason = _gate_matches_manifest(
+        gate, manifest, facts.requested_scope
+    )
     if not matches:
         return AdmissionResult("capability_gap", "refuse", match_reason)
 
-    admission = _classify_admission(manifest, facts)
+    if _controller_baseline_forbids(gate, manifest):
+        return AdmissionResult(
+            "capability_gap", "refuse", "grant_kind_forbids_protected_reach"
+        )
+
+    admission = _classify_admission(manifest, facts, gate)
     if admission == "observation" and not facts.broker_confirms_observation:
         return AdmissionResult("capability_gap", "refuse", "observation_not_confirmed")
     if admission == "capability_gap":

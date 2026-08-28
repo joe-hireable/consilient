@@ -669,17 +669,27 @@ def _recorded_selection_receipt(recall_data: Mapping[str, object]) -> dict[str, 
     record is folded forward by digesting the list it stored. Both sides then route through
     `_omitted_digest`, which is what preserves the property: a different omission set still
     produces a different digest, whichever shape it was recorded in.
+
+    A digest-era record that also inlines `omitted` is not either of those shapes. The
+    extra key is kept so equality with `_selection_receipt` fails, and `reconstruct`
+    names the co-resident list rather than treating it as invisible extra.
     """
     data = {field: recall_data.get(field) for field in _RECEIPT_FIELDS}
-    if recall_data.get("omitted_digest") is None and "omitted" in recall_data:
-        legacy = recall_data.get("omitted")
-        rows = (
-            [row for row in legacy if isinstance(row, Mapping)]
-            if isinstance(legacy, list)
-            else []
-        )
-        data["omitted_count"] = len(rows)
-        data["omitted_digest"] = _omitted_digest(rows)
+    if "omitted" in recall_data:
+        if recall_data.get("omitted_digest") is not None:
+            # Digest-era record that still inlines the list. Reconstruct refuses
+            # this shape before comparing; keep the key so a caller that only
+            # compares receipts cannot treat the fat list as invisible extra.
+            data["omitted"] = recall_data.get("omitted")
+        else:
+            legacy = recall_data.get("omitted")
+            rows = (
+                [row for row in legacy if isinstance(row, Mapping)]
+                if isinstance(legacy, list)
+                else []
+            )
+            data["omitted_count"] = len(rows)
+            data["omitted_digest"] = _omitted_digest(rows)
     return data
 
 
@@ -944,6 +954,23 @@ def record_assembly(
 ) -> EventPayload:
     """Append the assembly through the single writer, naming every layer (V0-47)."""
     now = datetime.now(timezone.utc)
+    receipt = _selection_receipt(assembly.recall_selection)
+    recall_payload: dict[str, object] = {
+        "query": task,
+        "limit_chars": assembly.recall_limit_chars,
+        "sha256": promote.digest(assembly.recall_pack),
+        "source_events": assembly.recall_source_events,
+        "source_digest": assembly.recall_source_digest,
+    }
+    for field in _RECEIPT_FIELDS:
+        recall_payload[field] = receipt[field]
+    # The compounding loop was this list landing on instructions.assembled. Copying
+    # only `_RECEIPT_FIELDS` already drops it; the raise is the chokepoint so a
+    # later edit that re-adds the key cannot append.
+    if "omitted" in recall_payload:
+        raise InstructionError(
+            "instructions.assembled must not inline the omission list"
+        )
     return append(
         log_dir / f"{now.date().isoformat()}.jsonl",
         {
@@ -967,14 +994,7 @@ def record_assembly(
                     for skill in assembly.skills
                 ],
                 "skills_omitted": assembly.skills_omitted,
-                "recall": {
-                    "query": task,
-                    "limit_chars": assembly.recall_limit_chars,
-                    "sha256": promote.digest(assembly.recall_pack),
-                    "source_events": assembly.recall_source_events,
-                    "source_digest": assembly.recall_source_digest,
-                    **_selection_receipt(assembly.recall_selection),
-                },
+                "recall": recall_payload,
                 "adapted": {
                     "status": assembly.adapted.status,
                     "sha256": assembly.adapted.sha256,
@@ -1238,6 +1258,17 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
                 reports.append(
                     LayerReport(
                         "recall", False, "the replayed pack does not match the record"
+                    )
+                )
+            elif (
+                recall_data.get("omitted_digest") is not None
+                and "omitted" in recall_data
+            ):
+                reports.append(
+                    LayerReport(
+                        "recall",
+                        False,
+                        "the recorded receipt inlines omitted next to omitted_digest",
                     )
                 )
             elif any(

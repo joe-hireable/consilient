@@ -1955,3 +1955,218 @@ def test_an_originally_empty_unit_commit_lands_no_commit_at_all(
     # And it must be reported, not silently dropped -- the driver has to be able to say why a
     # unit with commits merged nothing.
     assert "already" in result or "no commits" in result, result
+
+
+class _Res:
+    def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.stderr = ""
+        self.returncode = returncode
+
+
+def _publish_harness(driver, monkeypatch, tmp_path, ident: str):
+    """Drive `publish_if_ready` over a fake git, recording every command."""
+    calls: list[list[str]] = []
+    squash_sha = "a" * 40
+
+    def fake_sh(args, **_kw):
+        calls.append(list(args))
+        if args[:3] == ["git", "rev-list", "--count"]:
+            return _Res("7\n")
+        if args[:3] == ["git", "var", "GIT_AUTHOR_IDENT"]:
+            return _Res(f"{ident} 1787841088 +0100\n")
+        if args[:2] == ["git", "commit-tree"]:
+            return _Res(squash_sha + "\n")
+        return _Res("")
+
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    monkeypatch.setattr(driver, "PUBLISH_STOP", tmp_path / "absent")
+    monkeypatch.setattr(driver, "ROOT", tmp_path)
+    for script, _args in [
+        (".github/scripts/check_foreign_identifiers.py", []),
+        (".github/scripts/check_secrets.py", []),
+        (".github/scripts/check_private_corpus.py", []),
+        (".github/scripts/check_private_repo_names.py", []),
+        (".github/scripts/check_generated_documents.py", ["--check"]),
+    ]:
+        path = tmp_path / script
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    return calls, squash_sha
+
+
+def test_publication_never_pushes_the_branch_itself(tmp_path, monkeypatch) -> None:
+    """MEASURED 27 August 2026, on a push that was about to happen.
+
+    This path read `git push public HEAD:main`. What that would have sent was 294 commits of
+    which 275 carried a `Signed-off-by` naming `fixture@example.invalid` -- an RFC 2606 address
+    reserved so it can never resolve to anyone -- and 240 had no sign-off matching their author
+    at all, because this worktree's local git config had been written by a test fixture.
+
+    CONTRIBUTING.md requires a real name and email; the DCO workflow requires a sign-off
+    matching the author. A sign-off is a certification of ORIGIN, so pushing the branch would
+    have filed 240 false certifications in a public repository whose declared subject is
+    provenance -- and publishing is one-way.
+
+    Rewriting the commits was measured and rejected: 283 of 635 refs are based inside the
+    unpublished range, with 455 worktrees checked out against them. So the tree is published
+    under one commit whose author, committer and sign-off are the same real identity.
+    """
+    driver = _load_driver()
+    calls, squash_sha = _publish_harness(
+        driver, monkeypatch, tmp_path, "Joe Brown <joe@example.com>"
+    )
+
+    result = driver.publish_if_ready({}, True)
+
+    pushes = [c for c in calls if c[:3] == ["git", "push", "public"]]
+    assert pushes, f"nothing was pushed: {result}"
+    assert ["git", "push", "public", "HEAD:main"] not in calls, (
+        "the branch itself was pushed; every fixture-signed commit in it travels"
+    )
+    assert pushes[0][3] == f"{squash_sha}:main", pushes[0]
+
+    tree = [c for c in calls if c[:2] == ["git", "commit-tree"]]
+    assert tree and "public/main" in tree[0], (
+        "the squash must be parented on public/main so the push fast-forwards"
+    )
+    assert "Signed-off-by: Joe Brown <joe@example.com>" in tree[0][-1], (
+        "the published commit must carry a sign-off naming its own author"
+    )
+    assert any(c[:4] == ["git", "merge", "-s", "ours"] for c in calls), (
+        "public/main must be recorded as an ancestor, or every later tick re-publishes"
+    )
+
+
+def test_publication_refuses_to_certify_origin_as_a_fixture(tmp_path, monkeypatch) -> None:
+    """The identity that signs is the identity that is configured, so the check belongs here
+    too -- a repository whose config has been poisoned must not publish at all, rather than
+    publish one commit that certifies origin as somebody who does not exist."""
+    driver = _load_driver()
+    calls, _ = _publish_harness(
+        driver, monkeypatch, tmp_path, "Fixture <fixture@example.invalid>"
+    )
+
+    result = driver.publish_if_ready({}, True)
+
+    assert "REFUSED" in result, result
+    assert not [c for c in calls if c[:3] == ["git", "push", "public"]], (
+        "it published anyway under an identity that cannot certify anything"
+    )
+
+
+def test_an_open_receipt_does_not_kill_the_tick(tmp_path: Path) -> None:
+    """A receipt another process still holds open must not reach __main__.
+
+    MEASURED 27 August 2026. `preserve_review_artefacts` renamed the previous attempt's
+    receipts aside with a bare `src.replace(dst)`. A reviewer subprocess that had not yet
+    closed its stdout still held `N02-verify.out`, Windows refused the rename with WinError
+    32, and the PermissionError travelled to `raise SystemExit(main())` -- killing a tick
+    that had already dispatched work and merged nothing.
+
+    The rename is history-keeping. It is allowed to fail; the tick is not.
+    """
+    driver = _load_driver()
+    briefs = tmp_path / 'briefs-driver'
+    briefs.mkdir()
+    driver.BRIEFS = briefs
+
+    held = briefs / 'N02-verify.out'
+    held.write_text('first attempt receipt', encoding='utf-8')
+    (briefs / 'N02-verdict.json').write_text('{}', encoding='utf-8')
+
+    handle = open(held, 'a', encoding='utf-8')  # noqa: SIM115 - it must stay open
+    try:
+        driver.preserve_review_artefacts('N02', 2)  # must not raise
+    finally:
+        handle.close()
+
+    # The receipt that COULD be renamed still was: one failure must not abandon the rest.
+    assert (briefs / 'N02-verdict-1.json').exists()
+
+
+def test_a_wsl_git_pointer_is_normalised_before_anything_prunes_it(tmp_path: Path) -> None:
+    """The guard that stops a WSL dispatch from getting a live worktree deleted.
+
+    MEASURED 27 August 2026: 37 of 41 built-and-unmerged units had lost their git metadata.
+    cursor-agent runs under WSL, so its git rewrote each worktree's pointer to /mnt/c/...,
+    Windows git could then not read the worktree, and the loop's disposal paths take an
+    unreadable worktree for an empty one -- `worktree remove --force` skips its has-work
+    guard and `worktree prune` drops the registration. The work becomes unmergeable forever.
+
+    Rewriting the path back is lossless. Not rewriting it costs the unit.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "build_loop_test", ROOT / ".harness" / "build_loop.py"
+    )
+    assert spec is not None and spec.loader is not None
+    loop = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = loop
+    spec.loader.exec_module(loop)
+
+    root = tmp_path / 'cto'
+    (root / '.harness' / 'unit-worktrees' / 'N02').mkdir(parents=True)
+    (root / '.git').write_text(
+        'gitdir: /mnt/c/Users/x/repo/.git/worktrees/cto' + chr(10), encoding='utf-8'
+    )
+    unit = root / '.harness' / 'unit-worktrees' / 'N02' / '.git'
+    unit.write_text('gitdir: /mnt/c/Users/x/repo/.git/worktrees/N02' + chr(10), encoding='utf-8')
+    healthy = root / '.harness' / 'unit-worktrees' / 'N03'
+    healthy.mkdir()
+    (healthy / '.git').write_text(
+        'gitdir: C:/Users/x/repo/.git/worktrees/N03' + chr(10), encoding='utf-8'
+    )
+
+    loop.ROOT = root
+    class _Log:
+        def __init__(self) -> None: self.text = ''
+        def write(self, s: str) -> None: self.text += s
+        def flush(self) -> None: pass
+    log = _Log()
+    fixed = loop.normalise_wsl_gitdirs(log)
+
+    assert fixed == 2, f'expected both WSL pointers rewritten, got {fixed}'
+    assert 'C:/Users/x/repo' in (root / '.git').read_text(encoding='utf-8')
+    assert '/mnt/' not in (root / '.git').read_text(encoding='utf-8')
+    assert '/mnt/' not in unit.read_text(encoding='utf-8')
+    # the already-correct one must be left exactly alone
+    assert (healthy / '.git').read_text(encoding='utf-8').startswith('gitdir: C:/')
+    assert 'normalised 2 WSL-form' in log.text
+
+
+def test_the_resolve_lane_is_not_starved_by_builds() -> None:
+    """Conflicts must be able to get a slot even when builds could fill the lane.
+
+    MEASURED 28 August 2026: `done` sat at 31 for two hours while conflicts climbed from 8 to
+    16 and exactly ONE resolver ran. Resolvers had just been made to count against the build
+    lane -- correct, they had been running 34 at a time on a lane of 12 -- but the build loop
+    still admitted on builds alone, so builds took all twelve slots first and resolve got the
+    remainder, which with 116 units left to build is always zero.
+
+    A conflict cannot clear itself and every failed merge adds one, so a starved resolve lane
+    is a pile that only ever grows.
+    """
+    driver = _load_driver()
+
+    # Nothing waiting: builds get the whole lane, which must not regress.
+    assert driver.resolve_slots_reserved({}, []) == 0
+    assert driver.resolve_slots_reserved(None, None) == 0
+
+    # Conflicts waiting: slots are held back, capped at the reserve.
+    assert driver.resolve_slots_reserved({'A': 'x'}, []) == 1
+    many = {chr(65 + i): 'x' for i in range(16)}
+    assert driver.resolve_slots_reserved(many, []) == driver.RESOLVE_RESERVE
+
+    # A conflict already being resolved is not also reserved for.
+    assert driver.resolve_slots_reserved({'A': 'x', 'B': 'x'}, ['A', 'B']) == 0
+
+    # The reserve must leave real room: builds admitted against a full-but-for-reserve lane
+    # have to shed, or the reservation is decorative.
+    reserved = driver.resolve_slots_reserved(many, [])
+    # builds occupying every non-reserved slot must be refused the next one
+    builds = driver.MAX_BUILDS - reserved
+    assert driver.admit_build(builds + reserved) is False, (
+        'a build was admitted into a slot reserved for resolve'
+    )
+    # and one fewer build still fits
+    assert driver.admit_build(builds - 1 + reserved) is True

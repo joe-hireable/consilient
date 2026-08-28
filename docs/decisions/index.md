@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `5be7b95fe9b7bad844f9c02316b4b5b76d780cc7e4629a6a00b1727926d8c249`
+> **Source SHA-256:** `1ec901aa71760773bbe48071d5b849570ae331935263a1bdec62f9f441d356de`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -113,3 +113,5 @@
 | [0106](0106-admit-third-party-maintainer-verdicts-as-human-beta.md) | Admit identified third-party maintainer verdicts as human-β authors | PROPOSED | — |
 | [0107](0107-a-unit-may-merge-into-a-red-tree-but-nothing-may-publish-from-one.md) | A unit may merge into a red tree; nothing may publish from one | ACCEPTED | — |
 | [0108](0108-rotate-dispatch-across-a-users-own-accounts-per-harness.md) | Rotate dispatch across a user's own accounts, per harness, where the vendor allows it | PROVISIONAL | — |
+| [0109](0109-bind-a-review-verdict-to-the-units-own-diff-not-to-every-blob-it-claims.md) | Bind a review verdict to the unit's own diff, not to every blob it claims | ACCEPTED | supersedes 0037 |
+| [0110](0110-record-the-in-place-rewrite-of-adr-0105.md) | Record the in-place rewrite of ADR-0105, and advance the history pin over it | ACCEPTED | supersedes 0105 |

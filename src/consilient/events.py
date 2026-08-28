@@ -2103,7 +2103,14 @@ def _check_dispatch_contract(event: EventPayload) -> None:
 
 
 def _check_measurement_contract(event: EventPayload) -> None:
-    """BU1: pre-run registration and result rows join on run_id at replay."""
+    """Per-event fields for measurement.registered / measurement.result.
+
+    Lifecycle join is not done here: a single event cannot see its partner.
+    Replay quarantines unmatched results; ``projection.joined_measurement_results``
+    raises. That split matches MLPerf Logging's compliance_checker
+    (mlcommons/logging, retrieved 2026-08-28): invalid lifecycle fails the
+    checker; the log remains readable.
+    """
     kind = event["event"]
     if kind not in (MEASUREMENT_REGISTERED_KIND, MEASUREMENT_RESULT_KIND):
         return
@@ -4059,8 +4066,58 @@ def _read_under_lock(path: Path, fd: int) -> tuple[list[Event], list[Rejection]]
     return _classify_lines(str(path), normalised.splitlines(keepends=True))
 
 
+_READ_ALL_CACHE: dict[str, tuple[object, list[Event], list[Rejection]]] = {}
+_READ_ALL_CACHE_MAX = 4
+
+
+def _trajectory_fingerprint(directory: Path) -> object:
+    """Identity of the whole trajectory, cheap enough to compute on every call.
+
+    Name, SIZE and mtime of each day file. An append always changes the size, so a stale
+    hit would need a write that left the byte count identical -- which an append-only log
+    cannot do. Costs ten stat() calls against a 1.8 second, 224 MB parse.
+    """
+    out: list[tuple[str, int, int]] = []
+    for path in sorted(directory.glob("*.jsonl")):
+        try:
+            st = path.stat()
+        except OSError:
+            return None  # unreadable: refuse to cache rather than cache a guess
+        out.append((path.name, st.st_size, st.st_mtime_ns))
+    return tuple(out)
+
+
 def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
-    """Every event across every daily file, ordered by filename then position."""
+    """Every event across every daily file, ordered by filename then position.
+
+    MEASURED 28 August 2026. This parses the WHOLE trajectory, and `coordination.py` calls
+    it at SIX sites on the claims path -- once per dispatch, with a dozen dispatches live.
+    One call: 1.8 seconds, 18,764 events, 224 MB retained, over 91 MB of JSONL in ten day
+    files. Six of those per dispatch is roughly eleven seconds of pure parsing and up to
+    six retained copies, and the driver was recording MemoryError crashes on this path.
+
+    So the repeats are memoised on a fingerprint of the files themselves. This changes NO
+    semantics: a hit returns exactly what a fresh parse would, because any append changes a
+    size and misses the cache.
+
+    WHAT THIS DELIBERATELY DOES NOT DO is narrow the horizon. `open_claim` derives the
+    fencing epoch from this function, and an epoch computed over less history can only be
+    LOWER -- which is the one direction that is unsafe, because a token that is too low
+    lets an expired holder write behind a live one. Reading the same events faster is safe;
+    reading fewer of them is not, and that distinction is the whole design of this cache.
+
+    The returned lists are fresh shallow copies. Callers append to them -- the claims
+    validator does exactly that -- and a shared list would let one caller corrupt the next
+    reader's history. The Event objects themselves are shared, which is why the copy is
+    cheap: 18,764 pointers rather than 18,764 re-parsed dicts.
+    """
+    key = str(directory)
+    fingerprint = _trajectory_fingerprint(directory)
+    if fingerprint is not None:
+        hit = _READ_ALL_CACHE.get(key)
+        if hit is not None and hit[0] == fingerprint:
+            return list(hit[1]), list(hit[2])
+
     events: list[Event] = []
     rejected: list[Rejection] = []
     for path in sorted(directory.glob("*.jsonl")):
@@ -4088,6 +4145,10 @@ def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
                 event.kind,
             )
         )
+    if fingerprint is not None:
+        if len(_READ_ALL_CACHE) >= _READ_ALL_CACHE_MAX:
+            _READ_ALL_CACHE.clear()
+        _READ_ALL_CACHE[key] = (fingerprint, list(events), list(rejected))
     return events, rejected
 
 

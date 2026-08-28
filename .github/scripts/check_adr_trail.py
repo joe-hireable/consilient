@@ -44,7 +44,13 @@ INDEX = DECISIONS / "index.md"
 # GIT_DIR overrides cwd. A git subprocess that inherits it from a hook reads the wrong repo.
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
-HISTORY_PIN = "1db009b"
+# Advanced from 1db009b to d1c7e9fd by ADR-0110, over exactly one commit.
+# d1c7e9fda rewrote ADR-0105 in place, withdrawing a 24 August acceptance claim that
+# named no trajectory event. The substance was right -- V0-18 requires the principal as
+# author of an event, and there was none -- but it declared nothing, so this checker
+# could not tell a correction from a quiet rewrite and refused, correctly.
+# The pin means "reviewed and acknowledged", and ADR-0110 is that review.
+HISTORY_PIN = "d1c7e9fd"
 SETTLED_RECORD_PIN = "27d67a2"
 
 # Commits imported from the public repository's own history on 23 Aug 2026. That repository

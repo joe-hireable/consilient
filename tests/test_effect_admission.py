@@ -20,6 +20,8 @@ from consilient import effects as effects_mod
 from consilient.effects import (
     ADMISSION_CLASSES,
     ADMISSION_DISPOSITIONS,
+    CONTAINED_EXECUTION_EFFECTS,
+    READ_ONLY_EFFECTS,
     AdmissionFacts,
     EffectManifest,
     derive_admission,
@@ -38,15 +40,26 @@ def commitment(domain: str) -> dict[str, str]:
 
 
 def broker_reference(name: str) -> dict[str, str]:
-    return {"kind": "broker_reference", "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}"}
+    return {
+        "kind": "broker_reference",
+        "reference": f"broker://effects/{hashlib.sha256(name.encode()).hexdigest()}",
+    }
 
 
 def authority_event(event_id: str = "evt-authority-1") -> dict[str, object]:
-    return {"event_id": event_id, "event_kind": "human.approval", "event_sha256": "b" * 64}
+    return {
+        "event_id": event_id,
+        "event_kind": "human.approval",
+        "event_sha256": "b" * 64,
+    }
 
 
 def recovery_proof_ref() -> dict[str, object]:
-    return {"event_id": "evt-proof-1", "event_kind": "effect.receipt", "event_sha256": "c" * 64}
+    return {
+        "event_id": "evt-proof-1",
+        "event_kind": "effect.receipt",
+        "event_sha256": "c" * 64,
+    }
 
 
 def manifest(
@@ -93,7 +106,7 @@ def admitted_gate(
     grant_kind: str = "controller_baseline.local_restorable.v1",
     effect_classes: tuple[str, ...] = ("data.read",),
     operations: tuple[str, ...] = ("read",),
-    scope: tuple[str, ...] = ("workspace"),
+    scope: tuple[str, ...] = ("workspace",),
     expires_at: str | None = None,
     decision_id: str | None = "decision-1",
     recovery_proof_ref_value: object | None = recovery_proof_ref(),
@@ -113,6 +126,30 @@ def admitted_gate(
         effect_classes=effect_classes,
         expires_at=expires_at,
     )
+
+
+def admitted_inventory_payload(**gate_overrides: object) -> dict[str, object]:
+    expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    gate: dict[str, object] = {
+        "state": "admitted",
+        "reason": "exact_grant",
+        "grant_kind": "controller_baseline.local_restorable.v1",
+        "authority_event": None,
+        "decision_id": "decision-1",
+        "recovery_proof_ref": recovery_proof_ref(),
+        "scope": ["workspace"],
+        "operations": ["read"],
+        "effect_classes": ["data.read"],
+        "expires_at": expires,
+    }
+    gate.update(gate_overrides)
+    return {
+        "kind": "tool",
+        "name": "pytest",
+        "available": True,
+        "provenance": ["probe:tool:pytest"],
+        "gate": gate,
+    }
 
 
 def capability_entry(
@@ -142,7 +179,9 @@ def test_admission_enums_are_closed() -> None:
             "capability_gap",
         }
     )
-    assert ADMISSION_DISPOSITIONS == frozenset({"execute", "reshape", "refuse", "escalate"})
+    assert ADMISSION_DISPOSITIONS == frozenset(
+        {"execute", "reshape", "refuse", "escalate"}
+    )
 
 
 def test_inventory_parser_rejects_malformed_gate_shape() -> None:
@@ -205,10 +244,12 @@ def test_present_but_gated_capability_refuses_without_handle() -> None:
 def test_unavailable_capability_is_capability_gap() -> None:
     result = derive_admission(
         manifest(),
-        capability_entry(available=False),
+        capability_entry(available=False, gate=admitted_gate()),
+        AdmissionFacts(broker_confirms_observation=True),
     )
     assert result.admission == "capability_gap"
     assert result.disposition == "refuse"
+    assert result.reason == "capability_unavailable"
 
 
 def test_expired_grant_refuses() -> None:
@@ -226,6 +267,38 @@ def test_expired_grant_refuses() -> None:
 
 
 def test_scope_mismatch_refuses() -> None:
+    result = derive_admission(
+        manifest(),
+        capability_entry(gate=admitted_gate(scope=("workspace",))),
+        AdmissionFacts(
+            broker_confirms_observation=True, requested_scope=("other-repo",)
+        ),
+    )
+    assert result.admission == "capability_gap"
+    assert result.disposition == "refuse"
+    assert result.reason == "scope_mismatch"
+
+
+def test_workspace_and_other_repo_scopes_differ() -> None:
+    facts = AdmissionFacts(
+        broker_confirms_observation=True, requested_scope=("workspace",)
+    )
+    workspace = derive_admission(
+        manifest(),
+        capability_entry(gate=admitted_gate(scope=("workspace",))),
+        facts,
+    )
+    other_repo = derive_admission(
+        manifest(),
+        capability_entry(gate=admitted_gate(scope=("other-repo",))),
+        facts,
+    )
+    assert workspace != other_repo
+    assert workspace.disposition == "execute"
+    assert other_repo.reason == "scope_mismatch"
+
+
+def test_operation_mismatch_refuses() -> None:
     gate = admitted_gate(operations=("write",))
     result = derive_admission(
         manifest(operations=("read",)),
@@ -486,7 +559,9 @@ def test_proof_operation_flag_cannot_cover_uncovered_money_commit() -> None:
     result = derive_admission(
         manifest(effects=("money.commit",), operations=("spend",)),
         capability_entry(gate=gate),
-        AdmissionFacts(is_proof_operation=True, contained=True, authority_standing=False),
+        AdmissionFacts(
+            is_proof_operation=True, contained=True, authority_standing=False
+        ),
     )
     assert result.admission == "protected_uncovered"
     assert result.disposition == "escalate"
@@ -522,7 +597,9 @@ def test_proof_operations_cannot_launder_protected_effects() -> None:
     result = derive_admission(
         manifest(effects=("money.commit",), operations=("proof",)),
         capability_entry(gate=gate),
-        AdmissionFacts(is_proof_operation=True, contained=True, authority_standing=False),
+        AdmissionFacts(
+            is_proof_operation=True, contained=True, authority_standing=False
+        ),
     )
     assert result.admission == "protected_uncovered"
     assert result.disposition == "escalate"
@@ -633,3 +710,159 @@ def test_derive_admission_has_no_production_caller() -> None:
                 continue
             callers.append(f"{path.name}:{node.lineno}")
     assert callers == []
+
+
+def test_controller_baseline_cannot_cover_protected_reach() -> None:
+    with pytest.raises(CapabilityError, match="protected"):
+        parse_inventory_entry(
+            admitted_inventory_payload(
+                effect_classes=["money.commit"],
+                operations=["spend"],
+            )
+        )
+    gate = admitted_gate(
+        grant_kind="controller_baseline.local_restorable.v1",
+        effect_classes=("money.commit",),
+        operations=("spend",),
+    )
+    result = derive_admission(
+        manifest(effects=("money.commit",), operations=("spend",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(authority_standing=True),
+    )
+    assert result.admission == "capability_gap"
+    assert result.disposition == "refuse"
+    assert result.reason == "grant_kind_forbids_protected_reach"
+
+
+def test_caller_authority_standing_cannot_cover_missing_authority_event() -> None:
+    gate = admitted_gate(
+        grant_kind="principal_authority",
+        effect_classes=("money.commit",),
+        operations=("spend",),
+        decision_id=None,
+        recovery_proof_ref_value=None,
+        authority_event_value=None,
+    )
+    result = derive_admission(
+        manifest(effects=("money.commit",), operations=("spend",)),
+        capability_entry(gate=gate),
+        AdmissionFacts(authority_standing=True),
+    )
+    assert result.admission == "protected_uncovered"
+    assert result.disposition == "escalate"
+    assert result.admission != "protected_covered"
+
+
+def test_admitted_gate_without_expiry_refuses() -> None:
+    with pytest.raises(CapabilityError, match="expires_at"):
+        parse_inventory_entry(admitted_inventory_payload(expires_at=None))
+    gate = Gate(
+        state="admitted",
+        reason="exact_grant",
+        grant_kind="controller_baseline.local_restorable.v1",
+        authority_event=None,
+        decision_id="decision-1",
+        recovery_proof_ref=recovery_proof_ref(),
+        scope=("workspace",),
+        operations=("read",),
+        effect_classes=("data.read",),
+        expires_at=None,
+    )
+    result = derive_admission(
+        manifest(),
+        capability_entry(gate=gate),
+        AdmissionFacts(broker_confirms_observation=True),
+    )
+    assert result.admission == "capability_gap"
+    assert result.disposition == "refuse"
+    assert result.reason == "grant_missing_expiry"
+
+
+def _run_gate(effects: tuple[str, ...]) -> Gate:
+    return admitted_gate(
+        grant_kind="principal_authority",
+        effect_classes=effects,
+        operations=("run",),
+        decision_id=None,
+        recovery_proof_ref_value=None,
+    )
+
+
+def test_contained_execution_effects_is_exactly_read_only_plus_process_run() -> None:
+    """The constant is PINNED, because widening it silently reopens the fail-open.
+
+    An adversarial pass found this hole in the FIRST version of these tests: the parametrised
+    ratchet below derived its case list from CONTAINED_EXECUTION_EFFECTS, so adding
+    file.change to the constant DELETED the case that would have caught it. The suite went
+    from 92 passing to 91 passing -- greener, and smaller -- while a file.change rode
+    process.run into execute with the recovery proof never demanded.
+
+    A test whose coverage shrinks when the thing it guards is widened is not a guard. This
+    equality cannot shrink.
+    """
+    assert CONTAINED_EXECUTION_EFFECTS == READ_ONLY_EFFECTS | frozenset({"process.run"})
+
+
+@pytest.mark.parametrize(
+    "carried,expected_admission,expected_disposition",
+    [
+        # LITERALS, deliberately not derived from any constant this test guards.
+        ("money.commit", "protected_uncovered", "escalate"),
+        ("authority.change", "protected_uncovered", "escalate"),
+        ("content.publish", "protected_uncovered", "escalate"),
+        ("external.change", "protected_uncovered", "escalate"),
+        ("obligation.commit", "protected_uncovered", "escalate"),
+        ("physical.actuate", "protected_uncovered", "escalate"),
+        # Not protected, but not read-only either: must still demand the recovery proof.
+        ("file.change", "recoverable_mutation", "refuse"),
+        ("system.change", "recoverable_mutation", "refuse"),
+    ],
+)
+def test_process_run_cannot_carry_another_effect_class(
+    carried: str, expected_admission: str, expected_disposition: str
+) -> None:
+    """A contained process.run must never launder a second effect class into execute.
+
+    The protected rows prove ORDER; the file.change / system.change rows prove SUBSET. They
+    fail differently, which is why both halves are here.
+    """
+    effects = ("process.run", carried)
+    result = derive_admission(
+        manifest(effects=effects, operations=("run",)),
+        capability_entry(gate=_run_gate(effects)),
+        AdmissionFacts(contained=True, authority_standing=False),
+    )
+    assert result.admission == expected_admission, (
+        f"process.run + {carried} classified as {result.admission}"
+    )
+    assert result.disposition == expected_disposition
+    assert result.disposition != "execute"
+
+
+def test_a_bare_contained_run_still_executes() -> None:
+    """The fix must not close the ordinary case it was never about.
+
+    If a plain contained run starts refusing, callers learn to silence it with
+    recovery_proof_passed=True, which is the bypass this whole file exists to prevent.
+    """
+    for effects in (("process.run",), ("process.run", "data.read")):
+        result = derive_admission(
+            manifest(effects=effects, operations=("run",)),
+            capability_entry(gate=_run_gate(effects)),
+            AdmissionFacts(contained=True),
+        )
+        assert result.admission == "contained_execution", effects
+        assert result.disposition == "execute", effects
+
+
+def test_an_uncontained_run_is_refused_whatever_else_it_declares() -> None:
+    """Containment is a precondition on running a process, not one arm of the ladder."""
+    for carried in ("data.read", "file.change", "money.commit"):
+        effects = ("process.run", carried)
+        result = derive_admission(
+            manifest(effects=effects, operations=("run",)),
+            capability_entry(gate=_run_gate(effects)),
+            AdmissionFacts(contained=False, authority_standing=False),
+        )
+        assert result.disposition != "execute", carried

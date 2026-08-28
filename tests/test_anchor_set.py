@@ -29,6 +29,7 @@ REQUIRED_REPORT_FIELDS = (
     "anchor_set_hash",
     "measured_at",
     "drift",
+    "drift_interval",
 )
 
 EMPTY_CONTENT_SHA256 = hashlib.sha256(b"").hexdigest()
@@ -234,6 +235,80 @@ def test_selection_is_stable_when_a_high_hash_task_is_added(anchors: Any) -> Non
     assert grown_ids == sitting
 
 
+def test_selection_is_not_the_first_n_in_bank_order(anchors: Any) -> None:
+    """Insertion-order of a 130-item family is ids 000-099. Hash ranking is not."""
+    built = anchors.select_anchor_set(_bank(n=130))
+    selected = {str(t["id"]) for t in built["tasks"]}
+    first_hundred = {
+        f"{family}-{i:03d}" for family in ("code", "docs") for i in range(100)
+    }
+    assert len(selected) == 200
+    assert selected != first_hundred
+
+
+def test_selection_is_stable_when_the_bank_is_reversed(anchors: Any) -> None:
+    bank = _bank(n=130)
+    forward = {t["id"] for t in anchors.select_anchor_set(bank)["tasks"]}
+    backward = {
+        t["id"] for t in anchors.select_anchor_set(list(reversed(bank)))["tasks"]
+    }
+    assert backward == forward
+
+
+def test_a_better_ranked_task_is_admitted_when_the_bank_grows(anchors: Any) -> None:
+    """A new id that outranks the sitting 100 must enter; insertion-order
+    of an append never would.
+    """
+    base = _bank(n=100)
+    built = anchors.select_anchor_set(base)
+    sitting = {(t["family"], t["id"]) for t in built["tasks"]}
+    sitting_keys = [
+        anchors.selection_key(t["family"], t["id"])
+        for t in built["tasks"]
+        if t["family"] == "code"
+    ]
+    cutoff = max(sitting_keys)
+    extra_id = None
+    for i in range(10_000):
+        candidate = f"code-better-{i}"
+        if anchors.selection_key("code", candidate) < cutoff:
+            extra_id = candidate
+            break
+    assert extra_id is not None
+    grown = anchors.select_anchor_set(
+        base + [{"family": "code", "id": extra_id, "cluster": "code-c0"}]
+    )
+    grown_ids = {(t["family"], t["id"]) for t in grown["tasks"]}
+    assert ("code", extra_id) in grown_ids
+    dropped = sitting - grown_ids
+    assert len(dropped) == 1
+    dropped_family, dropped_id = dropped.pop()
+    assert dropped_family == "code"
+    assert anchors.selection_key("code", extra_id) < anchors.selection_key(
+        dropped_family, dropped_id
+    )
+
+
+def test_one_bootstrap_draw_collapses_the_interval_not_the_parameter_space(
+    anchors: Any,
+) -> None:
+    """n_boot=1 has a single resample, so both percentiles are that mean.
+
+    Returning the parameter-space clip (0, 1) / (-1, 1) stays wide.
+    """
+    built = anchors.select_anchor_set(_bank())
+    earlier = _outcomes(built, all_pass=True)
+    later_fail = {str(task["id"]) for task in built["tasks"] if task["family"] == "code"}
+    later = _outcomes(built, passed=later_fail)
+    report = anchors.drift_report(built, [earlier, later], n_boot=1)
+    low, high = report["interval"]
+    dlow, dhigh = report["drift_interval"]
+    assert low == high
+    assert dlow == dhigh
+    assert (low, high) != (0.0, 1.0)
+    assert (dlow, dhigh) != (-1.0, 1.0)
+
+
 def test_empty_family_name_or_id_refuses(anchors: Any) -> None:
     with pytest.raises(anchors.AnchorSetError):
         anchors.select_anchor_set(
@@ -295,9 +370,17 @@ def test_two_runs_report_signed_drift_with_an_interval(anchors: Any) -> None:
     assert report["n_clusters"] >= 2
     assert report["drift"] == pytest.approx(-0.5)
     low, high = report["interval"]
-    assert 0.0 <= low <= report["point"] <= high <= 1.0
     dlow, dhigh = report["drift_interval"]
-    assert dlow <= report["drift"] <= dhigh
+    # Cluster-bootstrap percentiles on this 50/50, 10-cluster fixture,
+    # not the [0, 1] / [-1, 1] parameter space. n_boot=200 is part of the
+    # contract: a vacuous clip to the bounds still satisfies 0 <= low <=
+    # point <= high <= 1.
+    assert low == pytest.approx(0.2)
+    assert high == pytest.approx(0.8)
+    assert dlow == pytest.approx(-0.8)
+    assert dhigh == pytest.approx(-0.2)
+    assert 0.0 < low < report["point"] < high < 1.0
+    assert -1.0 < dlow < report["drift"] < dhigh < 1.0
     assert report["measured_at"] == "2026-08-24T00:00:00+00:00"
     assert report["anchor_set_hash"] == built["hash"]
 

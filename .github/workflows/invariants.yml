@@ -5,6 +5,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'
 
 # Every invariant step below carries `if: ${{ !cancelled() }}`. GitHub Actions skips a
 # step once an earlier one has failed, so a single red gate disabled the other nine:
@@ -64,7 +66,11 @@ jobs:
         run: python .github/scripts/check_measurement_recorded.py --self-test
       - name: Generated document drift check
         if: ${{ !cancelled() }}
-        run: python .github/scripts/check_generated_documents.py --check
+        run: |
+          python scripts/build_requirements.py --check
+          python .github/scripts/check_generated_documents.py --check
+          python .github/scripts/check_adr_trail.py
+          python .github/scripts/check_living_documents.py --check docs/superpowers/specs/2026-08-22-*.md
       - name: Relative link invariant check
         if: ${{ !cancelled() }}
         # C4 of docs/20-design/documentation-and-surfaces-plan-2026-08-23.md, and it ships

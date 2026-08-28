@@ -468,3 +468,324 @@ def test_clearing_escalations_does_not_hash_units_it_cannot_report_on(monkeypatc
     )
 
     assert len(hashed) == 2, f"hashed {len(hashed)} units; only BK and AL can report anything"
+
+
+def test_a_conflict_that_survived_the_retest_still_gets_a_resolver() -> None:
+    """WITHDRAWAL of the skip added earlier today, recorded as a test so it cannot come back.
+
+    That change skipped the resolver for any conflicted unit whose every CLAIMED PATH resolved in
+    HEAD. The predicate was wrong and the driver already held the right one: `artefact_identity`
+    answers "do these paths exist", not "did this work arrive", and Z03 is the counterexample --
+    `.harness/build_loop.py` is in HEAD, Z03's changes to it are not, and all six of its tests fail
+    against the tree.
+
+    `_content_landed` is the real question, and `retest_conflicts` asks it every tick and pops the
+    conflict when it is true. So a unit still in `conflicts` after the retest has content that is
+    NOT in HEAD, by construction, and needs resolving. The skip withheld a resolver from 37 of 39
+    such units and merging stopped dead for 47 minutes. [measured 27 August 2026]
+    """
+    import inspect
+
+    driver = _load_driver()
+    assert not hasattr(driver, "resolver_can_change_nothing"), (
+        "the withdrawn predicate is back; read the comment where it used to live"
+    )
+    source = inspect.getsource(driver.main)
+    assert "already_present" not in source, "the skip's accumulator survived the withdrawal"
+    # The two fixes that were right are kept.
+    assert "expire_finished_dispatches(" in inspect.getsource(driver), "the slot reaper was lost"
+
+
+def test_resolvers_count_against_the_lane_they_are_gated_on() -> None:
+    """The resolve loop admitted on `admit_build(len(inflight))`, where `inflight` holds BUILDS
+    only -- so a resolver was admitted on the build lane's occupancy while adding nothing to it,
+    and the next was admitted on the same unchanged number. 34 ran at once against a cap of
+    MAX_BUILDS.
+
+    This is the MAX_REVIEWS defect in a second place, and the fix is the same shape: count what
+    is being capped. Asserted on the source because the loop lives inside `main()`; the ceiling
+    itself is untouched and stays pinned by
+    `test_ceilings_are_not_raised_to_paper_over_contention`.
+    """
+    import inspect
+
+    driver = _load_driver()
+    source = inspect.getsource(driver.main)
+    sites = [
+        ln.strip()
+        for ln in source.splitlines()
+        if ln.strip().startswith("if not admit_build(")
+    ]
+    assert len(sites) == 2, f"expected two admission sites, found {sites}"
+    assert "len(resolving)" in " ".join(sites), "no admission counts live resolvers"
+
+
+def test_a_finished_resolver_releases_its_slot_however_it_ended() -> None:
+    """MEASURED 27 August 2026: 34 `resolve_dispatched` entries against roughly nine live
+    dispatch processes in total, builds and reviews included.
+
+    The bucket was only ever emptied on two paths -- the unit's conflict clearing, or
+    `crashed_dispatches` finding the run dead. A resolver that ran, failed to fix the conflict
+    and exited CLEANLY matched neither, so its entry stayed for ever. Every one of those units
+    was then permanently barred from re-dispatch by `uid in resolving`, and once resolvers began
+    counting against their own lane the stale entries alone exceeded MAX_BUILDS: the loop broke
+    before examining anything, so even the two units that genuinely needed a resolver got none.
+
+    This file already states the lesson, from Y02: stopping the retries is right, leaking the
+    capacity is not.
+    """
+    driver = _load_driver()
+    now = 1_000_000.0
+    state = {
+        "resolve_dispatched": ["OLD", "FRESH", "ADOPTED"],
+        "resolve_started": {
+            "OLD": [now - 3600 - 301, 3600],
+            "FRESH": [now - 10, 3600],
+        },
+    }
+
+    expired = driver.expire_finished_dispatches(state, now=now)
+
+    assert expired == ["OLD"], expired
+    assert state["resolve_dispatched"] == ["FRESH", "ADOPTED"]
+    # An entry with no start time is UNKNOWN, not known-dead. Reaping it immediately would
+    # cancel a resolver that may be doing real work, so it is adopted at `now` and expires on
+    # its own leash from here.
+    assert state["resolve_started"]["ADOPTED"][0] == now
+    assert state["resolve_started"]["ADOPTED"][1] == driver.RESOLVE_ADOPTED_LEASH_S
+    # A slow-but-living resolver is never reaped out from under itself.
+    assert "FRESH" in state["resolve_dispatched"]
+
+
+def test_expiry_grace_matches_the_crash_detector() -> None:
+    """A dispatch is not late until its leash plus 300s has passed -- the same grace
+    `crashed_dispatches` uses, so the two cannot disagree about whether a run is over."""
+    driver = _load_driver()
+    now = 1_000_000.0
+    just_inside = {
+        "resolve_dispatched": ["U"],
+        "resolve_started": {"U": [now - 3600 - 299, 3600]},
+    }
+    assert driver.expire_finished_dispatches(just_inside, now=now) == []
+    just_outside = {
+        "resolve_dispatched": ["U"],
+        "resolve_started": {"U": [now - 3600 - 301, 3600]},
+    }
+    assert driver.expire_finished_dispatches(just_outside, now=now) == ["U"]
+
+
+def test_a_review_slot_is_released_when_its_dispatch_is_over() -> None:
+    """MEASURED 27 August 2026, and this was the largest brake on the pipeline.
+
+    `review_dispatched` held four entries whose newest output was 36, 36, 45 and 50 HOURS old,
+    against a lane capped at six. Two thirds of the review lane was held by runs that had ended
+    two days earlier while 76 units waited for a verdict -- and the review lane is what decides a
+    unit, so nothing could move.
+
+    `crashed_dispatches` could not see them. It defines death as `<stem>.err` carrying a
+    traceback, which finds a dispatch that CRASHED and never one that simply stopped existing:
+    killed, cut off with the machine, or exited quietly. An empty `.err` reads exactly like a
+    healthy run. Time is the signal that does not depend on the dead process having written its
+    own death certificate.
+    """
+    driver = _load_driver()
+    now = 1_000_000.0
+    state = {
+        "review_dispatched": ["TWO_DAYS_DEAD", "RUNNING"],
+        "review_started": {
+            "TWO_DAYS_DEAD": [now - (50 * 3600), 3600],
+            "RUNNING": [now - 60, 3600],
+        },
+    }
+
+    expired = driver.expire_finished_dispatches(
+        state, "review_dispatched", "review_started", now=now
+    )
+
+    assert expired == ["TWO_DAYS_DEAD"], expired
+    assert state["review_dispatched"] == ["RUNNING"], (
+        "a live review was reaped out from under itself"
+    )
+
+
+def test_every_dispatch_bucket_has_an_expiry() -> None:
+    """Builds expired on `(started, leash)` in `in_flight`; resolves and reviews recorded a name
+    and nothing else, so there was no fact to expire against and both leaked -- resolves for up
+    to 32 hours, reviews for up to 50. Three buckets, one lesson, learned twice more than it
+    should have been. The driver must record a start time wherever it records a dispatch."""
+    import inspect
+
+    driver = _load_driver()
+    source = inspect.getsource(driver.main)
+    assert '"resolve_started"' in source or "resolve_started" in source, (
+        "resolves record no start time"
+    )
+    assert "review_started" in source, "reviews record no start time"
+    assert source.count("expire_finished_dispatches(") == 2, (
+        "both leaking buckets must be expired every tick"
+    )
+
+
+def test_adoption_asks_the_artefact_before_holding_a_slot(tmp_path, monkeypatch) -> None:
+    """An entry recorded before start times existed has no time to expire against. Asking the
+    dispatch's own output is better than guessing either way.
+
+    MEASURED 27 August 2026: 38 such entries, whose newest output was 32 hours old for resolves
+    and 50 for reviews. A blind adoption at `now` would have held every one of those slots for a
+    further full leash on runs that had been over for two days.
+
+    Where the artefact says nothing at all, adoption is still the safe answer: unknown is not
+    known-dead, and cancelling a live run is worse than waiting one leash for certainty.
+    """
+    driver = _load_driver()
+    monkeypatch.setattr(driver, "BRIEFS", tmp_path)
+    now = 1_000_000.0
+
+    long_dead = tmp_path / "DEAD-resolve.out"
+    long_dead.write_text("output from two days ago", encoding="utf-8")
+    import os
+
+    old = now - (50 * 3600)
+    os.utime(long_dead, (old, old))
+
+    recent = tmp_path / "BUSY-resolve.out"
+    recent.write_text("still writing", encoding="utf-8")
+    os.utime(recent, (now - 30, now - 30))
+
+    state = {"resolve_dispatched": ["DEAD", "BUSY", "SILENT"], "resolve_started": {}}
+    expired = driver.expire_finished_dispatches(state, now=now)
+
+    assert expired == ["DEAD"], expired
+    assert state["resolve_dispatched"] == ["BUSY", "SILENT"]
+    # BUSY wrote recently, so it is adopted rather than reaped.
+    assert "BUSY" in state["resolve_started"]
+    # SILENT never wrote at all: unknown, not known-dead, so it gets a leash to prove itself.
+    assert "SILENT" in state["resolve_started"]
+    assert state["resolve_started"]["SILENT"][0] == now
+
+
+def test_the_artefact_beats_an_adopted_start_time(tmp_path, monkeypatch) -> None:
+    """A dispatch cannot have last written output before it started.
+
+    MEASURED 27 August 2026: the first tick to run this reaper stamped 34 resolve entries at
+    `now`, before the artefact check existed. They then read as "started 47 minutes ago" while
+    their own output was 32 HOURS old -- and would have held their slots for a further full leash
+    on the strength of a timestamp the reaper itself had invented.
+
+    An adopted start is a guess. The artefact is evidence. Where they disagree in the only
+    direction that is physically impossible, the guess is what gives way.
+    """
+    driver = _load_driver()
+    monkeypatch.setattr(driver, "BRIEFS", tmp_path)
+    import os
+
+    now = 1_000_000.0
+    out = tmp_path / "ADOPTED-resolve.out"
+    out.write_text("last wrote 32 hours ago", encoding="utf-8")
+    old = now - (32 * 3600)
+    os.utime(out, (old, old))
+
+    state = {
+        "resolve_dispatched": ["ADOPTED"],
+        # exactly the shape a blind adoption leaves behind
+        "resolve_started": {"ADOPTED": [now - (47 * 60), 3600]},
+    }
+    assert driver.expire_finished_dispatches(state, now=now) == ["ADOPTED"]
+    assert state["resolve_dispatched"] == []
+
+
+def test_a_real_dispatch_is_still_judged_on_its_own_start(tmp_path, monkeypatch) -> None:
+    """The override must only fire in the impossible direction. A genuine dispatch that started
+    ten minutes ago and wrote output two minutes ago has an artefact NEWER than its start, so its
+    recorded start stands and it is not reaped."""
+    driver = _load_driver()
+    monkeypatch.setattr(driver, "BRIEFS", tmp_path)
+    import os
+
+    now = 1_000_000.0
+    out = tmp_path / "LIVE-resolve.out"
+    out.write_text("still going", encoding="utf-8")
+    os.utime(out, (now - 120, now - 120))
+
+    state = {
+        "resolve_dispatched": ["LIVE"],
+        "resolve_started": {"LIVE": [now - 600, 3600]},
+    }
+    assert driver.expire_finished_dispatches(state, now=now) == []
+    assert state["resolve_dispatched"] == ["LIVE"]
+
+
+def _hash_lines(driver, lines):
+    import hashlib
+
+    return sorted({hashlib.sha256(ln.encode("utf-8")).hexdigest()[:16] for ln in lines})
+
+
+def test_a_verdict_survives_an_unrelated_edit_to_a_shared_file(tmp_path, monkeypatch) -> None:
+    """ADR-0109. The claim, and it is falsifiable: binding a verdict to the unit's own added lines
+    rather than to every claimed blob does NOT admit a unit whose deliverable has been broken.
+
+    MEASURED 27 August 2026: `src/consilient/events.py` is claimed by 67 units, `projection.py` by
+    40, `dispatch.py` by 32. Under blob binding, any one of those 67 landing work in events.py
+    killed the standing SOUND verdict of the other 66 -- whose own work was untouched. Ten
+    verdicts were dead of this at once against six review slots, and the rate rises with every
+    merge, so verdicts were being invalidated faster than they could be earned.
+
+    This half of the claim: an unrelated edit must NOT invalidate. The other half is the next
+    test, and it is the one that matters for beta.
+    """
+    driver = _load_driver()
+    ours = [f"    unit_line_{i} = {i}" for i in range(30)]
+    theirs = [f"    someone_elses_line_{i} = {i}" for i in range(40)]
+
+    class _R:
+        def __init__(self, out):
+            self.stdout, self.stderr, self.returncode = out, "", 0
+
+    # HEAD holds our thirty lines PLUS forty someone else added afterwards.
+    monkeypatch.setattr(driver, "sh", lambda a, **k: _R(chr(10).join(ours + theirs)))
+    fingerprint = {"src/consilient/events.py": _hash_lines(driver, ours)}
+
+    assert driver.deliverable_present(fingerprint) is True, (
+        "an unrelated edit to a shared file invalidated a verdict about work it never touched"
+    )
+
+
+def test_a_verdict_dies_when_the_units_own_work_is_removed(tmp_path, monkeypatch) -> None:
+    """The half that protects beta. A looser binding is only defensible if it still catches the
+    case it exists to catch: the unit's own deliverable being deleted or rewritten.
+
+    If this ever passes wrongly, ADR-0109 is refuted and the binding must go back to blobs.
+    """
+    driver = _load_driver()
+    ours = [f"    unit_line_{i} = {i}" for i in range(30)]
+
+    class _R:
+        def __init__(self, out):
+            self.stdout, self.stderr, self.returncode = out, "", 0
+
+    fingerprint = {"src/consilient/events.py": _hash_lines(driver, ours)}
+
+    # Our work is gone from HEAD; someone reverted or rewrote it.
+    monkeypatch.setattr(driver, "sh", lambda a, **k: _R("    something_entirely_different = 1"))
+    assert driver.deliverable_present(fingerprint) is False, (
+        "a verdict survived the deletion of the very work it certified"
+    )
+
+    # And a partial gutting: 20% of the lines removed is well past the 1% tolerance.
+    monkeypatch.setattr(driver, "sh", lambda a, **k: _R(chr(10).join(ours[:24])))
+    assert driver.deliverable_present(fingerprint) is False, (
+        "a verdict survived a fifth of its deliverable being removed"
+    )
+
+
+def test_a_diff_too_small_to_identify_falls_back_to_blob_binding() -> None:
+    """Below twenty added lines a diff cannot be told from coincidence, so such a unit is NOT
+    waved through on a weak signal -- it falls back to the old, stricter blob binding. The
+    threshold is `_content_landed`'s, deliberately: two ways of asking "did this work land" that
+    disagreed about how much drift is drift would be worse than either alone."""
+    driver = _load_driver()
+    assert driver.deliverable_present({"a.py": ["deadbeefdeadbeef"] * 19}) is False
+    assert driver.deliverable_present(None) is False
+    assert driver.deliverable_present({}) is False
+
