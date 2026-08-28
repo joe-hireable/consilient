@@ -376,7 +376,19 @@ def preserve_review_artefacts(uid: str, attempt: int) -> None:
         dst = BRIEFS / dst_name
         if src.exists() and not dst.exists():
             try:
-                src.replace(dst)
+                # COPY, not rename. MEASURED 28 August 2026 on the held-open case:
+                #   rename : FAILED (PermissionError)   <- WinError 32
+                #   copy   : SUCCEEDED, archived 'attempt-1 receipt'
+                # A copy READS the source, and Windows permits that while another handle
+                # holds it; a rename needs exclusive access and cannot get it. The guard
+                # added on 27 August stopped the crash but let the archive silently fail,
+                # so attempt 1 was still lost to the next mode-'w' open -- which is the
+                # whole of Rank 6, and exactly what unit AI's reviewers measured and
+                # called DEFECTIVE three times running.
+                #
+                # Leaving the original in place is correct: the next dispatch truncates it,
+                # and if that dispatch never starts the live file still holds attempt 1.
+                shutil.copy2(src, dst)
             except OSError as exc:
                 # MEASURED 27 August 2026: WinError 32 on N02-verify.out took down the whole
                 # tick. Windows refuses to rename a file another process still holds open, and a

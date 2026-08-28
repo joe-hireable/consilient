@@ -2170,3 +2170,89 @@ def test_the_resolve_lane_is_not_starved_by_builds() -> None:
     )
     # and one fewer build still fits
     assert driver.admit_build(builds - 1 + reserved) is True
+
+
+def test_the_previous_attempts_receipt_survives_a_held_open_file(tmp_path: Path) -> None:
+    """Attempt 1's receipt must still be readable after attempt 2 starts.
+
+    This is unit AI's deliverable and it is Rank 6 of the failure-classes register: opening
+    the live receipt with mode 'w' destroyed the previous attempt, so a check_error could
+    not be diagnosed afterwards.
+
+    MEASURED 28 August 2026. The archive was a RENAME, and a rename needs exclusive access:
+    when a previous dispatch still held the file open it raised WinError 32. The guard
+    added on 27 August caught that and carried on -- so the crash stopped and the loss did
+    not. AI's reviewers measured exactly this and returned DEFECTIVE three times.
+
+    A copy reads the source, which Windows permits while another handle holds it.
+
+    The held-open handle is the whole point of the fixture: without it a rename passes and
+    the test proves nothing.
+    """
+    driver = _load_driver()
+    briefs = tmp_path / 'briefs-driver'
+    briefs.mkdir()
+    driver.BRIEFS = briefs
+
+    live = briefs / 'U01-verify.out'
+    live.write_text('attempt-1 receipt', encoding='utf-8')
+    (briefs / 'U01-verdict.json').write_text('{}', encoding='utf-8')
+
+    holder = open(live, 'a', encoding='utf-8')  # noqa: SIM115 - it must stay open
+    try:
+        driver.preserve_review_artefacts('U01', 2)
+    finally:
+        holder.close()
+
+    # the next dispatch opens the live path with mode 'w'
+    with live.open('w', encoding='utf-8') as handle:
+        handle.write('attempt-2 live')
+
+    archived = briefs / 'U01-verify-1.out'
+    assert archived.is_file(), (
+        'attempt 1 was not archived: a held-open receipt defeated the archive'
+    )
+    assert archived.read_text(encoding='utf-8') == 'attempt-1 receipt'
+    assert live.read_text(encoding='utf-8') == 'attempt-2 live'
+
+
+def test_the_review_dispatch_archives_before_it_truncates() -> None:
+    """The production CALL SITE is enforced, not merely the helper.
+
+    AI's second finding, measured by its reviewers: deleting
+    `preserve_review_artefacts(uid, attempt)` immediately before the verify `spawn_logged`
+    left the whole suite green -- 89 passed -- and the self-test still printed PASS,
+    because `_self_test` calls the helpers directly and never the dispatch site. They ran
+    positive controls on the same command to show the suite is not blind in general; it was
+    blind exactly there.
+
+    So this asserts the ORDER at the site: within the review dispatch, the archive must
+    happen before the spawn that truncates. It is a structural test because the property is
+    structural -- an ordering between two calls -- and a behavioural test of the helper
+    alone cannot see the site at all, which is precisely how this was missed.
+    """
+    source = DRIVER.read_text(encoding='utf-8')
+    tree = ast.parse(source)
+
+    spawn_lines = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == 'spawn_logged'
+        and 'verify' in ast.unparse(node)
+    ]
+    assert spawn_lines, 'no verify dispatch found -- has the site moved?'
+
+    preserve_lines = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == 'preserve_review_artefacts'
+    ]
+    for spawn_at in spawn_lines:
+        assert any(0 < spawn_at - at <= 6 for at in preserve_lines), (
+            f'the verify dispatch at line {spawn_at} is not preceded by '
+            'preserve_review_artefacts; attempt 1 will be truncated'
+        )

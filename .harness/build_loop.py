@@ -528,6 +528,72 @@ def self_heal(log) -> None:
     holds would corrupt that operation, so this only acts when no git is running at all, and
     only when the lock has been untouched for two minutes.
     """
+    # FOUR -- the worktree's OWN administrative directory is gone.
+    #
+    # MEASURED 28 August 2026, twice in one night. `.git/worktrees/consilience-cto/`
+    # disappeared and every git call from the driver failed with 'fatal: not a git
+    # repository'. That is the worst shape a fault can take here, because the driver does
+    # not stop: it keeps ticking and writes state computed from failed git calls -- a
+    # retired count derived from `rev-parse` returning nothing looks exactly like real
+    # regression. Both times it was repaired by hand.
+    #
+    # The cause is still unknown, and this deliberately does not wait to find out. A fault
+    # that blinds the orchestrator and recurs unattended has to be survivable before it is
+    # understood; the alternative is another night of hand-repair.
+    #
+    # Three files are the minimum git needs, and the index is the fourth thing: without it
+    # `git status` reports EVERY tracked file as deleted, so a commit taken in that state
+    # would record the deletion of the whole tree. `git reset` (MIXED, never --hard)
+    # rebuilds the index from HEAD and never touches the working tree.
+    try:
+        admin = ROOT.parent.parent.parent / ".git" / "worktrees" / ROOT.name
+        pointer = ROOT / ".git"
+        if pointer.is_file() and not admin.is_dir():
+            branch = "worktree-" + ROOT.name
+            ref = (
+                ROOT.parent.parent.parent / ".git" / "refs" / "heads" / branch
+            )
+            packed = ROOT.parent.parent.parent / ".git" / "packed-refs"
+            known = ref.is_file() or (
+                packed.is_file()
+                and ("refs/heads/" + branch)
+                in packed.read_text(encoding="utf-8", errors="replace")
+            )
+            if not known:
+                # Never guess which branch this worktree was on. A wrong HEAD is worse
+                # than a missing one, because it looks repaired.
+                log.write(
+                    "loop: the worktree admin dir is GONE and the branch could not be "
+                    "identified -- REFUSING to guess. git is blind until a person "
+                    "repairs it." + chr(10)
+                )
+                log.flush()
+            else:
+                admin.mkdir(parents=True, exist_ok=True)
+                (admin / "HEAD").write_text(
+                    "ref: refs/heads/" + branch + chr(10), encoding="utf-8"
+                )
+                (admin / "commondir").write_text("../.." + chr(10), encoding="utf-8")
+                (admin / "gitdir").write_text(
+                    str(pointer).replace(chr(92), "/") + chr(10), encoding="utf-8"
+                )
+                subprocess.run(
+                    ["git", "-C", str(ROOT), "reset"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=600,
+                )
+                log.write(
+                    "loop: REBUILT the worktree admin dir (" + branch + "); every git "
+                    "call had been failing and the driver was writing state computed "
+                    "from those failures" + chr(10)
+                )
+                log.flush()
+    except OSError:
+        pass
+
     main_config = ROOT.parent.parent.parent / ".git" / "config"
     try:
         text = main_config.read_text(encoding="utf-8")
