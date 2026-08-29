@@ -27,7 +27,7 @@ import subprocess
 import sys
 import time
 import uuid
-from typing import Any
+from typing import Any, cast
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 UNITS = ROOT / ".harness/plan-units.json"
@@ -479,18 +479,41 @@ def quarantine_unit(state: dict, uid: str) -> bool:
 def clear_quarantine_after_landed_check(state: dict, uid: str) -> None:
     """A SOUND, identity-bound review is the automatic quarantine recovery path."""
     quarantined = state.setdefault("quarantined", [])
-    if uid in quarantined:
-        quarantined.remove(uid)
+    for marker in (uid, "*"):
+        if marker in quarantined:
+            quarantined.remove(marker)
+
+
+def _restart_history(state: dict[str, Any]) -> list[float]:
+    """Return the append-only driver history, flattening legacy per-unit state once."""
+    history = state.get("total_restarts")
+    if isinstance(history, dict):
+        flattened: list[float] = [
+            float(timestamp) for values in history.values() for timestamp in values
+        ]
+        state["total_restarts"] = flattened
+        return flattened
+    if isinstance(history, list):
+        typed = cast(list[float], history)
+        state["total_restarts"] = typed
+        return typed
+    empty: list[float] = []
+    state["total_restarts"] = empty
+    return empty
 
 
 def record_restart(state: dict, uid: str, *, now: float) -> bool:
     """Record every repair attempt, including failures refundable to the unit budget."""
-    restarts = state.setdefault("total_restarts", {}).setdefault(uid, [])
-    restarts[:] = [
-        timestamp for timestamp in restarts if now - timestamp <= RESTART_WINDOW_S
-    ]
-    restarts.append(now)
-    return len(restarts) > MAX_RESTARTS and quarantine_unit(state, uid)
+    history = _restart_history(state)
+    history.append(now)
+    active = sum(now - timestamp <= RESTART_WINDOW_S for timestamp in history)
+    return active > MAX_RESTARTS and quarantine_unit(state, "*")
+
+
+def dispatch_allowed(state: dict[str, Any], lane: str, uid: str) -> bool:
+    """Keep a driver stop global while allowing a unit's review recovery."""
+    quarantined = state.setdefault("quarantined", [])
+    return "*" not in quarantined and (lane == "review" or uid not in quarantined)
 
 
 def reset_review_attempts_on_new_artefact(state: dict, uid: str, artefact: str) -> bool:
@@ -3306,6 +3329,7 @@ def _handle_crashed_dispatches(state: dict) -> None:
             if uid in bucket:
                 bucket.remove(uid)
         if len(seen) >= 3 and len(set(seen[-3:])) == 1:
+            unit_quarantined = quarantine_unit(state, uid)
             if restart_quarantined:
                 print(
                     "driver: ESCALATION -- "
@@ -3313,7 +3337,7 @@ def _handle_crashed_dispatches(state: dict) -> None:
                     + " exceeded the restart intensity limit. Auto-repair stopped; "
                     "it needs a person."
                 )
-            elif quarantine_unit(state, uid):
+            elif unit_quarantined:
                 print(
                     "driver: ESCALATION -- "
                     + uid
@@ -3703,6 +3727,8 @@ def main() -> int:
 
     reviews_out = len(state.setdefault("review_dispatched", []))
     for uid in pending_review:
+        if not dispatch_allowed(state, "review", uid):
+            continue
         if not admit_review(reviews_out):
             print(
                 f"driver: review lane at ceiling ({reviews_out}/{MAX_REVIEWS}); shedding"
@@ -3902,7 +3928,7 @@ def main() -> int:
         and u not in inflight
         and u not in built_unmerged
         and attempts.get(u, 0) < 3
-        and u not in state.setdefault("quarantined", [])
+        and dispatch_allowed(state, "build", u)
     ]
     # A dependency is satisfied when its code is IN THE TREE, not when it has been verified.
     # AV correctly made RETIREMENT require a consumed SOUND verdict, but the same set was also
@@ -4049,7 +4075,7 @@ def main() -> int:
         if (
             uid in resolving
             or uid in done
-            or uid in state.setdefault("quarantined", [])
+            or not dispatch_allowed(state, "resolve", uid)
             or (WORKTREES / uid).exists() is False
         ):
             continue

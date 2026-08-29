@@ -28,23 +28,146 @@ from build_driver_helpers import (
 )
 
 
-def test_restart_window_quarantines_once_without_refunding_history() -> None:
-    """A seventh restart in ten minutes is terminal, while old timestamps may age out."""
+def test_driver_wide_restart_window_quarantines_once_without_pruning_history() -> None:
+    """Replacing the global list with per-UID lists would miss seven distinct failures."""
     driver = _load_driver()
     state: dict[str, object] = {}
 
     for now in range(100, 107):
-        driver.record_restart(state, "U01", now=float(now))
+        driver.record_restart(state, f"U{now - 100:02d}", now=float(now))
 
-    assert state["total_restarts"] == {
-        "U01": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0]
+    assert state["total_restarts"] == [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0]
+    assert state["quarantined"] == ["*"]
+    assert state["quarantine_escalated"] == ["*"]
+
+    driver.record_restart(state, "U07", now=1000.0)
+    assert state["total_restarts"] == [
+        100.0,
+        101.0,
+        102.0,
+        103.0,
+        104.0,
+        105.0,
+        106.0,
+        1000.0,
+    ]
+    assert state["quarantined"] == ["*"]
+    assert state["quarantine_escalated"] == ["*"]
+
+
+def test_restart_history_migrates_legacy_per_unit_dict_on_first_write() -> None:
+    """Leaving old dict state in place would split the driver-wide intensity record."""
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "total_restarts": {"U01": [10.0, 11.0], "U02": [12.0]}
     }
-    assert state["quarantined"] == ["U01"]
-    assert state["quarantine_escalated"] == ["U01"]
 
-    driver.record_restart(state, "U01", now=1000.0)
-    assert state["total_restarts"] == {"U01": [1000.0]}
-    assert state["quarantine_escalated"] == ["U01"]
+    driver.record_restart(state, "U03", now=13.0)
+
+    assert state["total_restarts"] == [10.0, 11.0, 12.0, 13.0]
+
+
+def test_global_quarantine_blocks_all_dispatch_lanes_but_unit_quarantine_keeps_review_open() -> None:
+    """Omitting a lane guard would let the global breaker spend more work."""
+    driver = _load_driver()
+
+    global_stop = {"quarantined": ["*"]}
+    for lane in ("review", "build", "resolve"):
+        assert driver.dispatch_allowed(global_stop, lane, "U01") is False
+
+    assert driver.dispatch_allowed({"quarantined": ["U01"]}, "review", "U01") is True
+    assert driver.dispatch_allowed({"quarantined": ["U01"]}, "build", "U01") is False
+    assert driver.dispatch_allowed({"quarantined": ["U01"]}, "resolve", "U01") is False
+
+
+def test_global_quarantine_reaches_and_refuses_resolve_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Removing the resolver's admission guard would spawn despite the global stop."""
+    driver = _load_driver()
+    worktrees = tmp_path / "worktrees"
+    (worktrees / "U01").mkdir(parents=True)
+    state: dict[str, object] = {
+        "attempts": {},
+        "conflicts": {"U01": "CONFLICT held"},
+        "quarantined": ["*"],
+    }
+    units = {"U01": {"title": "held", "claims": [], "deps": []}}
+
+    class _Result:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_sh(args: list[str]) -> _Result:
+        result = _Result()
+        result.stdout = "0" if "rev-list" in args else "head"
+        return result
+
+    def held_open(_state: dict[str, object], lane: str, _uid: str) -> bool:
+        return lane == "build"
+
+    monkeypatch.setattr(driver, "WORKTREES", worktrees)
+    monkeypatch.setattr(
+        driver, "load", lambda path, _default: units if path == driver.UNITS else state
+    )
+    monkeypatch.setattr(driver, "committed", lambda _uid, _unit: False)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: None)
+    monkeypatch.setattr(driver, "dispatch_allowed", held_open)
+    monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
+    monkeypatch.setattr(driver, "save_state", lambda _state: None)
+    monkeypatch.setattr(driver, "record_tick_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(driver, "ready", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(driver, "retest_conflicts", lambda _state: 0)
+    monkeypatch.setattr(driver, "rebase_mergeable_worktrees", lambda *_args: None)
+    monkeypatch.setattr(driver, "merge_unit_worktree", lambda _uid: "CONFLICT held")
+    monkeypatch.setattr(driver, "write_resolve_brief", lambda *_args: tmp_path / "r.md")
+    monkeypatch.setattr(driver, "pick_arm", lambda *_args: ("codex", None, 60))
+    monkeypatch.setattr(driver, "unit_worktree", lambda _uid: None)
+    monkeypatch.setattr(driver, "publish_if_ready", lambda *_args: "")
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    monkeypatch.setattr(
+        driver.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("quarantined resolver was dispatched"),
+    )
+
+    assert driver.main() == 0
+
+
+def test_fourth_review_is_refused_before_the_dispatch_caller(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Removing the review-cap guard would spawn a fourth review for unchanged work."""
+    driver = _load_driver()
+    state: dict[str, object] = {
+        "attempts": {},
+        "built": ["U01"],
+        "review_attempts": {"U01": 3},
+    }
+    units = {"U01": {"title": "held", "claims": [], "deps": []}}
+
+    monkeypatch.setattr(driver, "WORKTREES", tmp_path / "worktrees")
+    monkeypatch.setattr(
+        driver, "load", lambda path, _default: units if path == driver.UNITS else state
+    )
+    monkeypatch.setattr(driver, "committed", lambda _uid, _unit: False)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: "digest")
+    monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
+    monkeypatch.setattr(driver, "save_state", lambda _state: None)
+    monkeypatch.setattr(driver, "record_tick_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(driver, "write_verify_brief", lambda *_args: tmp_path / "v.md")
+    monkeypatch.setattr(driver, "publish_if_ready", lambda *_args: "")
+    monkeypatch.setattr(
+        driver.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("fourth review was dispatched"),
+    )
+
+    assert driver.main() == 0
+    assert state["review_escalated"] == ["U01"]
 
 
 def test_live_dispatchers_ignores_unrelated_processes(monkeypatch) -> None:
@@ -66,6 +189,7 @@ def test_reclamation_does_not_clear_quarantine_but_landed_check_does(
     state: dict[str, object] = {
         "in_flight": {"U01": (0.0, 1.0)},
         "quarantined": ["U01"],
+        "total_restarts": [7.0],
     }
     monkeypatch.setattr(driver, "run_dir_progress", lambda _uid, _started: 0.0)
     monkeypatch.setattr(driver, "BRIEFS", Path("missing-briefs"))
@@ -73,8 +197,12 @@ def test_reclamation_does_not_clear_quarantine_but_landed_check_does(
     driver.reclaim_expired_slots(state)
 
     assert state["quarantined"] == ["U01"]
+    history = state["total_restarts"]
+    assert isinstance(history, list)
+    assert history[0] == 7.0
     driver.clear_quarantine_after_landed_check(state, "U01")
     assert state["quarantined"] == []
+    assert state["total_restarts"] == history
 
 
 def test_main_escalates_when_reclamation_crosses_restart_limit(
@@ -86,7 +214,7 @@ def test_main_escalates_when_reclamation_crosses_restart_limit(
     state: dict[str, object] = {
         "in_flight": {"U01": (0.0, 1.0)},
         "attempts": {"U01": 3},
-        "total_restarts": {"U01": [now - offset for offset in range(6)]},
+        "total_restarts": [now - offset for offset in range(6)],
     }
     monkeypatch.setattr(
         driver, "load", lambda path, _default: {} if path == driver.UNITS else state
@@ -103,7 +231,7 @@ def test_main_escalates_when_reclamation_crosses_restart_limit(
         in capsys.readouterr().out
     )
     assert state["attempts"] == {"U01": 2}
-    assert state["quarantined"] == ["U01"]
+    assert state["quarantined"] == ["*"]
 
 
 def test_main_refunds_crash_that_crosses_restart_limit_once(
@@ -116,7 +244,7 @@ def test_main_refunds_crash_that_crosses_restart_limit_once(
         "in_flight": {"U01": (now, 3600.0)},
         "attempts": {"U01": 3},
         "crash_history": {"U01": ["first", "second"]},
-        "total_restarts": {"U01": [now - offset for offset in range(6)]},
+        "total_restarts": [now - offset for offset in range(6)],
     }
     monkeypatch.setattr(
         driver, "load", lambda path, _default: {} if path == driver.UNITS else state
@@ -134,7 +262,7 @@ def test_main_refunds_crash_that_crosses_restart_limit_once(
     output = capsys.readouterr().out
     assert output.count("ESCALATION -- U01 exceeded the restart intensity limit") == 1
     assert state["attempts"] == {"U01": 2}
-    assert state["quarantined"] == ["U01"]
+    assert state["quarantined"] == ["*"]
 
 
 def test_main_does_not_refund_identical_crash_at_restart_limit(
@@ -147,7 +275,7 @@ def test_main_does_not_refund_identical_crash_at_restart_limit(
         "in_flight": {"U01": (now, 3600.0)},
         "attempts": {"U01": 3},
         "crash_history": {"U01": ["same", "same"]},
-        "total_restarts": {"U01": [now - offset for offset in range(6)]},
+        "total_restarts": [now - offset for offset in range(6)],
     }
     monkeypatch.setattr(
         driver, "load", lambda path, _default: {} if path == driver.UNITS else state
@@ -165,7 +293,7 @@ def test_main_does_not_refund_identical_crash_at_restart_limit(
     output = capsys.readouterr().out
     assert output.count("ESCALATION -- U01 exceeded the restart intensity limit") == 1
     assert state["attempts"] == {"U01": 3}
-    assert state["quarantined"] == ["U01"]
+    assert state["quarantined"] == ["*", "U01"]
 
 
 def test_main_does_not_dispatch_a_quarantined_unit(monkeypatch) -> None:
@@ -210,7 +338,7 @@ def test_main_quarantines_malformed_review_before_same_tick_redispatch(
         "built": ["U01"],
         "review_dispatched": ["U01"],
         "review_expected": {"U01": {"artefact": "digest", "attempt": 1}},
-        "total_restarts": {"U01": [now - offset for offset in range(6)]},
+        "total_restarts": [now - offset for offset in range(6)],
     }
     monkeypatch.setattr(
         driver, "load", lambda path, _default: units if path == driver.UNITS else state
@@ -231,9 +359,13 @@ def test_main_quarantines_malformed_review_before_same_tick_redispatch(
 
     output = capsys.readouterr().out
     assert output.count("ESCALATION -- U01 exceeded the restart intensity limit") == 1
-    assert len(state["total_restarts"]["U01"]) == 7
-    assert state["review_results"]["U01"]["outcome"] == "dispatch_failed"
-    assert state["quarantined"] == ["U01"]
+    restarts = state["total_restarts"]
+    assert isinstance(restarts, list)
+    assert len(restarts) == 7
+    results = state["review_results"]
+    assert isinstance(results, dict)
+    assert results["U01"]["outcome"] == "dispatch_failed"
+    assert state["quarantined"] == ["*"]
 
 
 def test_defective_review_records_restart_before_rejection(
@@ -267,9 +399,44 @@ def test_defective_review_records_restart_before_rejection(
 
     assert driver.consume_review_verdict(state, "U01", {}) == "DEFECTIVE"
 
-    assert len(state["total_restarts"]["U01"]) == 1
+    restarts = state["total_restarts"]
+    assert isinstance(restarts, list)
+    assert len(restarts) == 1
     assert state["built"] == []
     assert state["rejected_artefacts"] == {"U01": "digest"}
+
+
+def test_identity_bound_sound_receipt_clears_unit_and_global_quarantine_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Clearing history with quarantine would refund the restart-intensity evidence."""
+    driver = _load_driver()
+    briefs = tmp_path / "briefs"
+    briefs.mkdir()
+    receipt = {
+        "v": 1,
+        "unit": "U01",
+        "artefact": "digest",
+        "attempt": 1,
+        "verdict": "SOUND",
+        "findings": [],
+    }
+    (briefs / "U01-verdict.json").write_text(json.dumps(receipt), encoding="utf-8")
+    state: dict[str, object] = {
+        "built": ["U01"],
+        "review_dispatched": ["U01"],
+        "review_expected": {"U01": {"artefact": "digest", "attempt": 1}},
+        "quarantined": ["*", "U01"],
+        "total_restarts": [10.0, 11.0, 12.0],
+    }
+    monkeypatch.setattr(driver, "BRIEFS", briefs)
+    monkeypatch.setattr(driver, "append_review_outcome", lambda _outcome: None)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: "digest")
+
+    assert driver.consume_review_verdict(state, "U01", {}) == "SOUND"
+
+    assert state["quarantined"] == []
+    assert state["total_restarts"] == [10.0, 11.0, 12.0]
 
 
 # --- a crash is evidence once, not once per tick, 25 August 2026 ---------------
