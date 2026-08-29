@@ -151,7 +151,9 @@ DEFAULT_CURSOR_LOCK = dispatch_vocabulary.ROOT / ".harness" / "cursor-agent.lock
 
 DEFAULT_SKILLS = dispatch_vocabulary.ROOT / ".agents" / "skills"
 
-HELDOUT_ISOLATION_CHECKER = dispatch_vocabulary.ROOT / ".github" / "scripts" / "check_heldout_isolation.py"
+HELDOUT_ISOLATION_CHECKER = (
+    dispatch_vocabulary.ROOT / ".github" / "scripts" / "check_heldout_isolation.py"
+)
 
 
 def find_claude() -> str | None:
@@ -330,7 +332,14 @@ def start_failures(
                     signal="no started line within the start window",
                     threshold_s=window,
                     observed_s=round(age_s, 2),
-                    observed_bytes=0,
+                    # MEASURED, not 0. This was the literal `0`, and build_driver prints the
+                    # field as "(N bytes after Ns)" -- so eleven dispatches on 29 August 2026
+                    # were reported as "0 bytes after 1160s" while their run directories held
+                    # 1.6 MB of stderr and a finished report. The signal is that no STARTED
+                    # LINE was found, which is a different and much narrower claim than "the
+                    # run produced nothing", and reporting a constant as an observation sent
+                    # the investigation looking for a dead harness that was not dead.
+                    observed_bytes=artefact_bytes_in(runs_dir / claim.run_id),
                     action="diagnose",
                     consumes_attempt=False,
                 )
@@ -343,7 +352,8 @@ def start_failures(
             continue
         tree = Path(claim.cwd) if claim.cwd else None
         if tree is not None and (
-            dispatch_evidence.git_diff_bytes(tree) > 0 or committed_since(tree, claim.opened_at)
+            dispatch_evidence.git_diff_bytes(tree) > 0
+            or committed_since(tree, claim.opened_at)
         ):
             continue
         found.append(

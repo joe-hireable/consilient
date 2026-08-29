@@ -700,6 +700,33 @@ def committed(uid: str, unit: dict) -> bool:
     )
 
 
+def replays_over_instance_state(sha: str) -> list[str]:
+    """Paths in `sha` that this tree keeps as untracked, gitignored instance state.
+
+    Replaying such a commit is never safe. The path is tracked in the commit and absent from
+    HEAD, so git stages it -- overwriting whatever the running system has there -- and any
+    abort or reset then deletes it, because HEAD holds no version to restore.
+
+    The rule is deliberately about the TREE's current opinion rather than a list of filenames.
+    A path that is tracked today replays normally; a path git neither tracks nor would clean is
+    live state belonging to this instance, whatever it is called, and history has no business
+    writing over it.
+    """
+    listing = sh(["git", "show", "--name-only", "--format=", sha])
+    if listing.returncode != 0:
+        return []
+    hits: list[str] = []
+    for path in listing.stdout.split("\n"):
+        path = path.strip()
+        if not path:
+            continue
+        if sh(["git", "ls-files", "--error-unmatch", "--", path]).returncode == 0:
+            continue  # tracked here: an ordinary replay
+        if sh(["git", "check-ignore", "-q", "--", path]).returncode == 0:
+            hits.append(path)
+    return sorted(set(hits))
+
+
 def family_claims(claims: list[str]) -> list[str]:
     """Expand a claimed module to its split family, because that is where its behaviour went.
 
@@ -1524,6 +1551,21 @@ def downstream_count(uid: str, units: dict) -> int:
     return len(seen)
 
 
+def _family_lines_at_head(file_path: str) -> set[str]:
+    """Every line HEAD holds for a path AND its split siblings.
+
+    Extracted from `_content_landed` rather than inlined, because inlining it took that
+    function to C901 12 and the per-function ratchet added under ADR-0111 refused the commit --
+    working as intended on its author the same day it shipped.
+    """
+    present: set[str] = set()
+    for candidate in family_claims([file_path]):
+        head = sh(["git", "show", f"HEAD:{candidate}"])
+        if head.returncode == 0:
+            present |= {line.rstrip() for line in head.stdout.splitlines()}
+    return present
+
+
 def _content_landed(shas: str | list[str]) -> bool:
     """Are these commits' added lines already present in HEAD, line for line?
 
@@ -1565,9 +1607,17 @@ def _content_landed(shas: str | list[str]) -> bool:
         return False
     absent = 0
     for file_path, lines in added.items():
-        head = sh(["git", "show", f"HEAD:{file_path}"])
-        blob = head.stdout if head.returncode == 0 else ""
-        present = {ln.rstrip() for ln in blob.splitlines()}
+        # The FAMILY, not the single path. MEASURED 29 August 2026: after the splits a commit's
+        # lines can be wholly present in the tree and wholly absent from the file it named,
+        # because that file is now a re-export facade. S02's work reads as 8.5% present at its
+        # own paths and 70.0% present across their families -- and the gap does not close when
+        # a resolver finishes the job, so a unit could be fully repaired and still never retire.
+        #
+        # This is not a widening. Before the split these siblings WERE the file, so searching
+        # the family asks exactly the question this check asked before the paths moved. The
+        # twenty-line floor and the 0.99 threshold above are unchanged and still do the work of
+        # telling "landed" from "coincidentally similar".
+        present = _family_lines_at_head(file_path)
         absent += sum(1 for ln in lines if ln not in present)
     return (total - absent) / total >= 0.99
 
@@ -2452,6 +2502,7 @@ def merge_unit_worktree(uid: str) -> str:
     post_pick_sha = pre_sha
     applied = 0
     already = 0
+    skipped: list[str] = []
     for sha in own:
         # DCO requires a `Signed-off-by:` trailer on every commit that reaches `main`, and a
         # dispatched worker's own commit is not guaranteed to carry one -- the workers run
@@ -2473,6 +2524,41 @@ def merge_unit_worktree(uid: str) -> str:
         # did exactly this; 189 of one 200-commit window were two zero-diff messages
         # repeating. Without the flag an empty source commit takes the already-applied path
         # and nothing lands, which is the honest outcome for a commit that changes nothing.
+        # REFUSE BEFORE STARTING if the commit carries instance state this tree keeps
+        # untracked. REPRODUCED 29 August 2026 in a throwaway clone, and it is the answer to a
+        # five-occurrence mystery that two investigations failed to solve by reading code:
+        #
+        #   plan after cherry-pick : present, but its content REPLACED by the old version
+        #   plan after --abort     : GONE
+        #   plan after reset --hard: GONE
+        #
+        # `.harness/plan-units.json` is untracked and gitignored today and was TRACKED at
+        # ddbf0f5, which the driver kept replaying for Z05. Cherry-picking a commit that
+        # touches a path HEAD does not carry stages that path; aborting then removes it,
+        # because there is no HEAD version to restore. No Python unlink is involved, `git
+        # clean -nd` lists nothing while the ignore rule stands, and git's abort is atomic --
+        # which is exactly why a 2 Hz watcher caught the context and never the culprit.
+        #
+        # The overwrite is the worse half. A deleted plan is loud and ensure_plan restores it;
+        # a plan silently replaced by an older, smaller one looks entirely valid.
+        # SKIP the commit, do not refuse the unit. The first version of this guard returned here,
+        # which stopped the damage and replaced it with deadlock: 12 branches carry this commit in
+        # their replay range, and every one of them was blocked entirely because ONE commit out of
+        # several was poison. A unit's real work has done nothing wrong.
+        #
+        # Skipping is safe for this class specifically. A commit that only git could apply here --
+        # over a path the tree deliberately keeps as live, untracked state -- has nothing the merge
+        # wants. If a later commit genuinely depends on it, that lands as an ordinary conflict and
+        # takes the resolver path, which is the honest outcome rather than a silent one.
+        clobbers = replays_over_instance_state(sha)
+        if clobbers:
+            skipped.append(sha[:9])
+            print(
+                f"driver: SKIPPING {sha[:9]} for {uid} -- it carries instance state this tree "
+                f"keeps untracked ({', '.join(clobbers[:3])}). Replaying it overwrites the live "
+                "file and aborting deletes it; the unit's other commits continue."
+            )
+            continue
         r = sh(["git", "cherry-pick", "--signoff", "-x", sha])
         if r.returncode != 0:
             # ALREADY APPLIED is not a conflict. A unit's work often lands under a different sha —
@@ -2532,11 +2618,24 @@ def merge_unit_worktree(uid: str) -> str:
     # Distinguish landed from already-there. "applied 1" over a commit that was merely
     # already present reads as progress that did not happen, which is the ambiguity this
     # repository exists to refuse.
+    # A unit whose ONLY commits were instance-state replays has nothing to land, and saying
+    # "applied 0" would read as a failure when the correct thing happened: the poison was
+    # dropped and there was no other work behind it. Name it so the difference is visible.
+    poisoned = (
+        f" ({len(skipped)} instance-state commit(s) dropped: {', '.join(skipped[:3])})"
+    )
+    if not applied and not already and skipped:
+        return (
+            f"{uid} carried nothing but instance-state commits; none replayed{poisoned}"
+        )
+    tail = poisoned if skipped else ""
     if applied and already:
-        return f"applied {applied} and skipped {already} already-present commit(s) from {uid}"
+        return f"applied {applied} and skipped {already} already-present commit(s) from {uid}{tail}"
     if already:
-        return f"{uid} was already in the tree ({already} commit(s) already present)"
-    return f"applied {applied} commit(s) from {uid}"
+        return (
+            f"{uid} was already in the tree ({already} commit(s) already present){tail}"
+        )
+    return f"applied {applied} commit(s) from {uid}{tail}"
 
 
 def write_verify_brief(

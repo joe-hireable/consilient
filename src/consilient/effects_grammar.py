@@ -287,6 +287,42 @@ def _timestamp(value: object, field: str) -> datetime:
     return parsed
 
 
+def _admitted_manifest_digest(
+    manifest: Any,
+    operation_ids: set[str],
+    manifest_digests: set[str],
+) -> Any:
+    """Admit one intent's manifest, or refuse it, and return the digest to bind to the intent.
+
+    A fresh `intent_id` is not enough to make an intent new. Three ways the chain can still be a
+    replay or an unprovable claim, all refused here (unit A01):
+
+      * a manifest digest already seen -- the same authorisation presented twice;
+      * a REFERENCE manifest, which names an operation held elsewhere, so the chain cannot prove
+        which operation it authorises. Accepting one would let two distinct effects share an
+        identity this log never saw;
+      * an inline operation_id already seen -- one operation admitted under two intents.
+
+    Extracted from `receipt_chain_validator` rather than inlined: inlining took that function to
+    51 statements against the per-function ratchet ADR-0111 added, which refused the commit.
+    """
+    manifest_digest = manifest["digest"]
+    if manifest_digest in manifest_digests:
+        raise EffectError(
+            f"receipt chain has duplicate manifest digest {manifest_digest!r}"
+        )
+    manifest_digests.add(manifest_digest)
+    if manifest["kind"] == "reference":
+        raise EffectError(
+            "receipt chain operation identity cannot be proved from reference manifest"
+        )
+    operation_id = manifest["value"]["operation_id"]
+    if operation_id in operation_ids:
+        raise EffectError(f"receipt chain has duplicate operation_id {operation_id!r}")
+    operation_ids.add(operation_id)
+    return manifest_digest
+
+
 def receipt_chain_validator(
     prefix: tuple[Any, ...],
     rejections: tuple[Any, ...],
@@ -322,29 +358,9 @@ def receipt_chain_validator(
                 raise EffectError(
                     f"receipt chain has duplicate intent_id {intent_id!r}"
                 )
-            # A fresh intent_id is not enough to make an intent new. Three ways the chain can
-            # still be a replay or an unprovable claim, all refused here (unit A01):
-            manifest = raw["data"]["manifest"]
-            manifest_digest = manifest["digest"]
-            if manifest_digest in manifest_digests:
-                raise EffectError(
-                    f"receipt chain has duplicate manifest digest {manifest_digest!r}"
-                )
-            manifest_digests.add(manifest_digest)
-            # A reference manifest names an operation held elsewhere, so the chain cannot prove
-            # which operation it authorises. Accepting one would let two distinct effects share
-            # an identity that this log never saw.
-            if manifest["kind"] == "reference":
-                raise EffectError(
-                    "receipt chain operation identity cannot be proved from reference manifest"
-                )
-            operation_id = manifest["value"]["operation_id"]
-            if operation_id in operation_ids:
-                raise EffectError(
-                    f"receipt chain has duplicate operation_id {operation_id!r}"
-                )
-            operation_ids.add(operation_id)
-            intents[intent_id] = manifest_digest
+            intents[intent_id] = _admitted_manifest_digest(
+                raw["data"]["manifest"], operation_ids, manifest_digests
+            )
             continue
         if raw.get("event") != EFFECT_RECEIPT:
             continue

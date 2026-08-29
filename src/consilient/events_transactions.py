@@ -60,6 +60,8 @@ from .events_kinds import (
     EventError,
     EventPayload,
     MAX_CLOCK_SKEW_S,
+    MEASUREMENT_REGISTERED_KIND,
+    MEASUREMENT_RESULT_KIND,
     SPEND_RESERVED_KIND,
     _READ_ALL_CACHE_MAX,
     _READ_RETRIES,
@@ -123,6 +125,36 @@ __all__ = [
 ]
 
 
+# Kinds whose REPLAY ORDER decides a security property, and which therefore may only be written
+# to the daily file their own `ts` names.
+#
+# `read_all` orders by FILENAME first. So for any kind where "which came first" is the question
+# being answered, letting an author choose the file lets them choose the answer. Budget and spend
+# were bound for that reason. The measurement kinds were not, and unit X01's review found the hole
+# and reproduced it three times:
+#
+#     append measurement.result      to 2999-01-02.jsonl   ACCEPTED
+#     append measurement.registered  to 2999-01-01.jsonl   ACCEPTED
+#     read_all -> [measurement.registered, measurement.result], 0 rejected
+#
+# The result was written FIRST in wall-clock time and replays SECOND, so a post-hoc measurement
+# reads as pre-registered. Pre-registration is the discipline the whole evidence base rests on --
+# a stopping rule that can be written after the result is not a stopping rule -- and `_check_clock`
+# does not stop this, because both lines carry an honest `ts`; only the FILE was chosen.
+#
+# Not applied to every kind. Measured 29 August 2026: binding all kinds fails 110 tests, because
+# writing an arbitrarily-named log is ordinary elsewhere and ordering across days is not
+# load-bearing there. A rule that broad would be paid for in churn and would obscure this one.
+_DATE_BOUND_KINDS = frozenset(
+    {
+        BUDGET_STATE_KIND,
+        SPEND_RESERVED_KIND,
+        MEASUREMENT_REGISTERED_KIND,
+        MEASUREMENT_RESULT_KIND,
+    }
+)
+
+
 def _check_clock(event: EventPayload) -> None:
     """An appended event must be stamped from a clock, not from an author's belief.
 
@@ -151,7 +183,7 @@ def _check_clock(event: EventPayload) -> None:
 
 
 def _write_validated(path: Path, event: EventPayload) -> EventPayload:
-    if event["event"] in (BUDGET_STATE_KIND, SPEND_RESERVED_KIND):
+    if event["event"] in _DATE_BOUND_KINDS:
         expected = f"{event['ts'][:10]}.jsonl"
         if path.name != expected:
             raise EventError(
@@ -380,6 +412,47 @@ def _read_under_lock(path: Path, fd: int) -> tuple[list[Event], list[Rejection]]
     return _classify_lines(str(path), normalised.splitlines(keepends=True))
 
 
+def _replay_in_file_order(
+    file_events: list[Event],
+    file_rejected: list[Rejection],
+    events: list[Event],
+    rejected: list[Rejection],
+) -> None:
+    """Replay one file's lines in the order they were written, appending to the running lists.
+
+    The effect receipt chain is ORDER-DEPENDENT: whether a receipt is valid depends on the
+    intents accepted before it. Extending the accepted and rejected lists separately validated
+    every line against a prefix that already contained lines occurring after it, so a chain
+    broken part-way through a file was accepted whole (unit A01). A line that breaks the chain
+    is demoted to a Rejection here and does not enter the prefix the next line is judged against.
+
+    Extracted from `read_all` rather than inlined: inlining took that function past the
+    complexity ceiling of the per-function ratchet ADR-0111 added, which refused the commit.
+    """
+    replay: list[Event | Rejection] = [*file_events, *file_rejected]
+    for item in sorted(replay, key=lambda row: row.line or 0):
+        if isinstance(item, Rejection):
+            rejected.append(item)
+            continue
+        if item.kind in (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT):
+            try:
+                _validate_effect_receipt_chain(
+                    tuple(events), tuple(rejected), (item.raw,)
+                )
+            except EventError as exc:
+                rejected.append(
+                    Rejection(
+                        item.path or "",
+                        item.line or 0,
+                        str(exc),
+                        item.content_digest,
+                        item.kind,
+                    )
+                )
+                continue
+        events.append(item)
+
+
 def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
     """Every event across every daily file, ordered by filename then position.
 
@@ -423,28 +496,7 @@ def read_all(directory: Path) -> tuple[list[Event], list[Rejection]]:
         # against a prefix that already contained lines occurring after it, so a chain broken
         # part-way through the file was accepted whole. A line that breaks the chain is demoted
         # to a Rejection here and does not enter the prefix the next line is judged against.
-        replay_items: list[Event | Rejection] = [*file_events, *file_rejected]
-        for item in sorted(replay_items, key=lambda item: item.line or 0):
-            if isinstance(item, Rejection):
-                rejected.append(item)
-                continue
-            if item.kind in (effects.EFFECT_INTENT, effects.EFFECT_RECEIPT):
-                try:
-                    _validate_effect_receipt_chain(
-                        tuple(events), tuple(rejected), (item.raw,)
-                    )
-                except EventError as exc:
-                    rejected.append(
-                        Rejection(
-                            item.path or "",
-                            item.line or 0,
-                            str(exc),
-                            item.content_digest,
-                            item.kind,
-                        )
-                    )
-                    continue
-            events.append(item)
+        _replay_in_file_order(file_events, file_rejected, events, rejected)
     seen_ids: dict[str, Event] = {}
     for event in events:
         event_id = event.raw.get("event_id")

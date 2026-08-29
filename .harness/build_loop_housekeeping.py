@@ -25,6 +25,7 @@ it appends to, the `STOP-LOOP` marker that is the only thing that ends it, and t
 file that makes it safe for the scheduler to fire as often as it likes -- a second loop
 exits immediately, and a dead one is replaced within a single scheduling interval."""
 
+import json
 import os
 import re
 import shutil
@@ -106,6 +107,57 @@ def hold_loop_lock():
     return handle
 
 
+# A shrink smaller than this is left alone: an operator pruning a unit or two is doing their job,
+# and a guard that fights a legitimate edit is worse than no guard. The measured failure was a
+# rollback of 147 units to 117 -- 20% -- so the threshold sits well below it and well above
+# ordinary editing.
+PLAN_ROLLBACK_FRACTION = 0.05
+
+
+def _plan_units(path: Path) -> int | None:
+    """How many units a plan file declares, or None if it cannot be read as one."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    units = data if isinstance(data, list) else data.get("units", data)
+    return len(units) if isinstance(units, (list, dict)) else None
+
+
+def _plan_rolled_back(plan: Path, backups: Path) -> tuple[int, int, Path] | None:
+    """Has the live plan been silently replaced by an OLDER, smaller one?
+
+    MEASURED 29 August 2026, and this is the half of the failure that `ensure_plan` could not
+    see. The plan was tracked until d01394a on 25 August, and 262 of 838 local branches still
+    carry it at their tip. Replaying any of those commits into the main worktree stages the path
+    into an index whose HEAD has no version of it: the live file is OVERWRITTEN with the commit's
+    copy, and only the abort that follows deletes it.
+
+    A deleted plan is loud and the branch above restores it. A plan quietly rolled back four days
+    -- 147 units to 117 -- looks entirely valid, and the driver then builds from it. The driver's
+    own plan-shrink refusal needs a 25% loss to fire, so a 20% rollback passes it silently.
+
+    Compares against the newest backup rather than a remembered number, because the backup is at
+    most PLAN_BACKUP_EVERY_S old and is the only record of what the plan looked like before.
+    """
+    live = _plan_units(plan)
+    if live is None:
+        return None
+    newest = max(
+        backups.glob("plan-units-*.json"),
+        key=lambda p: p.stat().st_mtime,
+        default=None,
+    )
+    if newest is None:
+        return None
+    known = _plan_units(newest)
+    if known is None or known == 0:
+        return None
+    if live >= known - max(1, int(known * PLAN_ROLLBACK_FRACTION)):
+        return None
+    return live, known, newest
+
+
 def ensure_plan(log) -> str:
     """Keep `.harness/plan-units.json` alive. Returns what happened, for the log.
 
@@ -113,13 +165,26 @@ def ensure_plan(log) -> str:
     untracked and gitignored, so git cannot restore it, and it is the one file the driver cannot
     work without -- every tick that ran without it either crashed on `units[uid]` or refused.
 
-    What deletes it is still unknown, and that is precisely why this exists. The obvious suspects
-    were read and cleared: neither the loop nor the driver removes it, `self_heal` only repairs
-    git config, and `git clean` cannot be it because `git clean -nd` lists nothing. A watcher
-    polling twice a second caught the context but not the culprit -- an unlink completes far
-    faster than any poll, and two Claude Code sessions were live on this machine at the time.
+    SOLVED 29 August 2026, by reproduction after two investigations failed by reading code.
+    NOTHING deletes it. GIT does, and the paragraph that used to stand here said "what deletes it
+    is still unknown ... neither the loop nor the driver removes it ... `git clean -nd` lists
+    nothing ... a watcher polling twice a second caught the context but not the culprit."
 
-    So this does not diagnose. It makes the question stop mattering: if the plan is gone, restore
+    Every one of those observations was true and none of them pointed at the cause. The file was
+    TRACKED until d01394a on 25 August, and 262 of 838 local branches still carry it at their tip.
+    `build_driver` replays unit commits with `git cherry-pick` in the MAIN worktree; picking a
+    commit from before that boundary stages the path into an index whose HEAD has no version of
+    it, so the live file is overwritten with the commit's copy, and the `--abort`, `--skip` or
+    `reset --hard` that follows a conflict then removes it. Git does that to ignored files without
+    complaint. There is no unlink to find, `git clean` really is innocent, and the abort is one
+    atomic index rewrite, so no poller could ever win the race. Measured: 776 such aborts in the
+    log, across ten units, all replaying one commit.
+
+    `build_driver.replays_over_instance_state` now refuses those replays. This stays, because a
+    hand-run `git checkout` or `rebase` across the same boundary does the same thing and no guard
+    in the driver can cover an operator's shell.
+
+    So this still does not diagnose. It makes the question stop mattering: if the plan is gone, restore
     the newest backup and say so loudly; if it is present, keep a backup fresh enough to be worth
     restoring. The first restore of the day had to fall back to a copy from 25 August because
     nothing had refreshed it in two days, and six units lost their retirement because their
@@ -161,6 +226,24 @@ def ensure_plan(log) -> str:
         )
         log.flush()
         return "restored"
+
+    rolled_back = _plan_rolled_back(plan, backups)
+    if rolled_back is not None:
+        live_units, backup_units, source = rolled_back
+        try:
+            shutil.copy2(source, plan)
+        except OSError as exc:
+            log.write(f"loop: plan-units.json rollback repair FAILED: {exc}" + chr(10))
+            log.flush()
+            return "rollback-repair-failed"
+        log.write(
+            f"loop: plan-units.json had SHRUNK from {backup_units} units to {live_units} and "
+            f"has been restored from {source.name}. A cherry-pick of a commit predating "
+            "d01394a -- when this file was still tracked -- silently overwrites it with that "
+            "commit's older copy. Deletion is loud; this is not." + chr(10)
+        )
+        log.flush()
+        return "rolled-back"
 
     # Present. Keep a backup fresh enough that restoring it costs nothing.
     try:

@@ -24,9 +24,12 @@ review on 29 August 2026.
     the check that bans bypassing it, in the same commit.
 """
 
+import json
 import sys
 import pytest
 from consilient import events as events_mod
+from consilient import projection
+from consilient.cli import main
 from consilient.events import (
     SCHEMA_VERSION,
     EventError,
@@ -41,6 +44,7 @@ from v0_invariants_helpers import (
     _spend_scripts,
     ev,
     now_ts,
+    outcome,
     verdict,
 )
 
@@ -388,6 +392,41 @@ def test_reading_a_historical_log_does_not_depend_on_when_it_is_read():
     aged - the same failure the explicit-offset rule exists to prevent.
     """
     validate(ev(ts="2026-08-19T01:00:00+01:00"))
+
+
+# ------------------------------------------------- V01 quarantine reconciliation (Q02)
+def test_relational_quarantine_count_helper_is_gone() -> None:
+    """V01: the count-only helper pooled forged approvals into a bare integer."""
+    assert not hasattr(projection, "relational_quarantine_count")
+
+
+def test_relational_quarantine_and_parser_rejection_use_separate_ledgers(
+    tmp_path, capsys
+):
+    """Parser/schema refusals and relational join failures are different quarantine classes."""
+    log_dir, db = tmp_path / "log", tmp_path / "state.db"
+    path = log_dir / "2026-08-20.jsonl"
+    append(path, outcome("attempt-001", "valid-before", True))
+    append(path, verdict("missing-attempt", "reject"))
+    append(path, ev())
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write("{not json}\n")
+
+    conn = projection.build(log_dir, db)
+    parser_rows = list(conn.execute("SELECT line, reason FROM rejections ORDER BY line"))
+    relational = projection.relational_quarantines(conn)
+    conn.close()
+
+    assert len(parser_rows) == 1
+    assert "not valid JSON" in parser_rows[0][1]
+    assert len(relational) == 1
+    assert "unknown attempt" in relational[0]["reason"]
+
+    main(["--json", "--log", str(log_dir), "--db", str(db), "beta"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["quarantined"] == 1
+    assert payload["relational_quarantine_count"] == 1
+    assert payload["relational_quarantine"][0]["reason"] == relational[0]["reason"]
 
 
 if _spend_scripts not in sys.path:

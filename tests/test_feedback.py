@@ -164,6 +164,21 @@ def _project_feedback_variant(
     return derived, measured, feedback_kinds
 
 
+def test_feedback_events_do_not_create_relational_quarantines(tmp_path: Path) -> None:
+    """R23 feedback kinds are auditable ledger rows, not beta inputs or join failures."""
+    stamp = datetime.now(timezone.utc).isoformat()
+    answered = feedback.record_answer("task-1", "fully", principal="joe-brown")
+    log_dir = tmp_path / "answered" / "log"
+    db_path = tmp_path / "answered" / "state.sqlite"
+    _project_feedback_variant(tmp_path / "answered", answered, stamp)
+
+    conn = projection.build(log_dir, db_path)
+    try:
+        assert projection.relational_quarantines(conn) == []
+    finally:
+        conn.close()
+
+
 def test_answering_or_declining_has_no_projection_or_beta_consequence(
     tmp_path: Path,
 ) -> None:
