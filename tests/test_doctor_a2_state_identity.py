@@ -10,7 +10,9 @@ filenames.
 
 The projection-version pair belongs with them for the same reason. Compatibility is
 decided by the SQLite header version, not by the ``projection_meta`` row, and a mismatch
-is UNKNOWN with the exact reason "Projection version 1 rebuilt as 2; not compared." The
+is UNKNOWN with a reason naming both versions, e.g. "Projection version 1 rebuilt as 3;
+not compared." The figures are derived from PROJECTION_VERSION rather than written down,
+because a literal broke these tests when the version legitimately moved. The
 second of the pair pins the *absence* of work: on a version mismatch the pinned-prefix
 rebuild must not run at all, because a prefix digest written by another projection
 version is not evidence about this one."""
@@ -74,8 +76,14 @@ def test_a2_is_unknown_when_pragma_projection_version_changes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The SQLite header version, not projection_meta, decides compatibility."""
-    old, new = 1, 2
-    assert projection.PROJECTION_VERSION == new
+    # Derived, not pinned. These tests are about the BEHAVIOUR of a version mismatch -- it
+    # reports unknown and compares nothing -- and a literal broke both of them on 29 August
+    # 2026 when PROJECTION_VERSION legitimately moved 2 -> 3 to carry event_kind. A test that
+    # fails because the thing it does not test changed is a test that has to be edited for the
+    # wrong reason, and the edit is indistinguishable from silencing it.
+    new = projection.PROJECTION_VERSION
+    old = new - 1
+    assert old != new
     log, db, _path = _seeded(tmp_path)
     existing = sqlite3.connect(db)
     existing.execute(f"PRAGMA user_version = {old}")
@@ -87,7 +95,9 @@ def test_a2_is_unknown_when_pragma_projection_version_changes(
 
     condition = _a2(_doctor(log, db, capsys))
     assert condition["status"] == "unknown", condition["reason"]
-    assert condition["reason"] == "Projection version 1 rebuilt as 2; not compared."
+    assert condition["reason"] == (
+        f"Projection version {old} rebuilt as {new}; not compared."
+    )
 
 
 def test_a2_does_not_prefix_digest_when_projection_version_differs(
@@ -109,7 +119,9 @@ def test_a2_does_not_prefix_digest_when_projection_version_differs(
     monkeypatch.setattr(cli_replay, "_digest_of_pinned_prefix", forbidden)
     condition = _a2(_doctor(log, db, capsys))
     assert condition["status"] == "unknown", condition["reason"]
-    assert condition["reason"] == "Projection version 1 rebuilt as 2; not compared."
+    assert condition["reason"] == (
+        f"Projection version 1 rebuilt as {projection.PROJECTION_VERSION}; not compared."
+    )
 
 
 def test_a2_rejection_filename_still_changes_the_digest(tmp_path: Path) -> None:

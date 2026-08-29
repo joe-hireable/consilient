@@ -50,7 +50,7 @@ from .work_items import state_group
 # The SQLite header version makes a legitimate handler/schema change a third replay
 # state, not Gate A2 "DIVERGED". Bump when a rebuild of the same log is expected to
 # change state_digest.
-PROJECTION_VERSION = 2
+PROJECTION_VERSION = 3
 
 VERSION_KEY = "version"
 
@@ -94,8 +94,15 @@ def _apply_rejections(conn: sqlite3.Connection, rejected: list[Rejection]) -> No
     """
     for index, rejection in enumerate(rejected):
         conn.execute(
-            "INSERT INTO rejections (id, path, line, reason) VALUES (?, ?, ?, ?)",
-            (index, Path(rejection.path).name, rejection.line, rejection.reason),
+            "INSERT INTO rejections (id, path, line, reason, event_kind)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (
+                index,
+                Path(rejection.path).name,
+                rejection.line,
+                rejection.reason,
+                rejection.event_kind or "",
+            ),
         )
 
 
@@ -105,8 +112,10 @@ def rejection_count(conn: sqlite3.Connection) -> int:
 
 def rejections(conn: sqlite3.Connection) -> list[dict[str, object]]:
     return [
-        {"path": row[0], "line": row[1], "reason": row[2]}
-        for row in conn.execute("SELECT path, line, reason FROM rejections ORDER BY id")
+        {"path": row[0], "line": row[1], "reason": row[2], "event_kind": row[3]}
+        for row in conn.execute(
+            "SELECT path, line, reason, event_kind FROM rejections ORDER BY id"
+        )
     ]
 
 
@@ -118,9 +127,10 @@ def relational_quarantines(conn: sqlite3.Connection) -> list[dict[str, object]]:
             "line": row[2],
             "digest": row[3],
             "reason": row[4],
+            "event_kind": row[5],
         }
         for row in conn.execute(
-            "SELECT position, path, line, digest, reason"
+            "SELECT position, path, line, digest, reason, event_kind"
             " FROM relational_quarantines ORDER BY id"
         )
     ]
@@ -156,14 +166,16 @@ def _quarantine_relational(
     reason: str,
 ) -> None:
     conn.execute(
-        "INSERT INTO relational_quarantines (position, path, line, digest, reason)"
-        " VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO relational_quarantines"
+        " (position, path, line, digest, reason, event_kind)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
         (
             position,
             event.path or "",
             event.line or 0,
             event_sha256(event.raw),
             reason,
+            event.kind,
         ),
     )
 

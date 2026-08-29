@@ -177,6 +177,20 @@ def cmd_beta(args: argparse.Namespace) -> CommandResult:
         rejection_reasons = projection.rejections(conn)
         relational = projection.relational_quarantines(conn)
         sampling = projection.sampling_unconditioned(conn)
+        # The fail-closed measurement join, called here because this is where a measurement
+        # actually reaches a reader. Unit X01's review found it had NO non-test caller: a
+        # guard nothing invokes protects nothing, and its Done criterion was false.
+        #
+        # β is the reason it belongs here rather than anywhere else. β is a rate over a
+        # denominator, and a result that could not be joined to its registration is a
+        # measurement this log cannot vouch for. Reporting β over it is precisely the false
+        # confidence this project exists to measure -- the same argument the comment below
+        # makes for surfacing quarantines, carried to its conclusion.
+        #
+        # It RAISES ProjectionError, and that is the intended behaviour: cli.main already
+        # catches it and exits 2 with the reason, so `consil beta` refuses rather than
+        # publishing a number it cannot stand behind.
+        joined = projection.joined_measurement_results(conn)
     finally:
         conn.close()
     # β is a rate over a denominator, so anything the log refused has to be visible
@@ -190,6 +204,7 @@ def cmd_beta(args: argparse.Namespace) -> CommandResult:
         "relational_quarantine_count": len(relational),
         "relational_quarantine": relational,
         "sampling_unconditioned": sampling,
+        "joined_measurements": joined,
     }
 
 

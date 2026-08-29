@@ -37,6 +37,10 @@ from .projection_records import (
     _classify_reading,
 )
 
+from .events_kinds import (
+    MEASUREMENT_RESULT_KIND,
+)
+
 from .projection_rows import (
     HANDLERS,
     ProjectionError,
@@ -51,6 +55,7 @@ from .projection_rows import (
     capability_conflicts,
     capability_heads,
     capability_versions,
+    rejections,
     relational_quarantines,
     review_queue_row,
 )
@@ -122,14 +127,47 @@ def joined_measurement_results(conn: sqlite3.Connection) -> list[dict[str, objec
     replay keeps V0-02. Publishing from that projection raises: an unmatched
     result is not a published result.
 
-    Incumbent: MLPerf Logging ``compliance_checker`` (mlcommons/logging,
-    retrieved 2026-08-28) — invalid lifecycle fails the checker; the log
-    remains readable. A CI-wired failing gate is BU2, not this function.
+    THE BAR, restated honestly on 29 August 2026 after unit X01's review found the previous
+    version unmet under working principle 9.
+
+    Incumbent: MLPerf Logging ``compliance_checker`` (github.com/mlcommons/logging, retrieved
+    2026-08-28). An invalid lifecycle fails the checker and the log stays readable.
+
+    This used to claim X01 "matches that split". That was a COMPARISON with no measurement
+    behind it, which is the exact failure principle 9 was written about after an unsupported
+    superlative shipped in this project's own README. It is withdrawn. `mlperf_logging` is not
+    installed on this machine [measured 29 Aug 2026], so no comparison has been run and none
+    can be from here.
+
+    What IS measured is one structural difference, and it is stated without any claim about
+    what the incumbent does or cannot do: the lifecycle rule here runs inside the WRITER's own
+    append path, so an invalid ordering cannot be written rather than being detected afterwards.
+    Measured the same day — a `measurement.result` back-dated into another day's file to forge
+    pre-registration is refused at append (`_DATE_BOUND_KINDS` in events_transactions), where
+    before it was accepted and replayed as if registered first.
+
+    WHAT WOULD SETTLE IT: install mlperf_logging at a pinned version, construct the same three
+    logs against both — a valid lifecycle, an orphan result, and a back-dated result — and
+    record which of the three each system refuses, and at what point. Until that runs, "better"
+    is unclaimed rather than assumed.
     """
+    # Match the KIND, never the reason text. Unit X01's review measured both errors that
+    # `"measurement.result" in str(row["reason"])` produced, and they point opposite ways:
+    #
+    #   FALSE POSITIVE  a duplicate-registration quarantine whose prose merely mentions
+    #                   measurement.result raised ProjectionError, though every result present
+    #                   had joined correctly;
+    #   FALSE NEGATIVE  a measurement.result refused by the SCHEMA never reaches
+    #                   relational_quarantines at all -- it is a read-level rejection -- so this
+    #                   returned normally while a result had in fact been thrown away.
+    #
+    # Both tables now carry event_kind, which was known at write time and was being discarded.
+    # Reading BOTH is what closes the second half: a fail-closed join has to see every way a
+    # result can fail to arrive, not only the relational one.
     failures = [
         row
-        for row in relational_quarantines(conn)
-        if "measurement.result" in str(row["reason"])
+        for row in (*relational_quarantines(conn), *rejections(conn))
+        if row.get("event_kind") == MEASUREMENT_RESULT_KIND
     ]
     if failures:
         reasons = "; ".join(str(row["reason"]) for row in failures)

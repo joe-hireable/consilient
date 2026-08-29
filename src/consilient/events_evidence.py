@@ -185,9 +185,14 @@ def _check_measurement_contract(event: EventPayload) -> None:
 
     Lifecycle join is not done here: a single event cannot see its partner.
     Replay quarantines unmatched results; ``projection.joined_measurement_results``
-    raises. That split matches MLPerf Logging's compliance_checker
-    (mlcommons/logging, retrieved 2026-08-28): invalid lifecycle fails the
-    checker; the log remains readable.
+    raises.
+
+    Incumbent: MLPerf Logging's compliance_checker (mlcommons/logging, retrieved
+    2026-08-28) -- invalid lifecycle fails the checker, the log stays readable.
+    This used to add "that split matches" it. Withdrawn 29 August 2026: that was a
+    comparison with no measurement behind it, and mlperf_logging is not installed
+    here, so none has been run. See joined_measurement_results for the one
+    difference that IS measured and the experiment that would settle the rest.
     """
     kind = event["event"]
     if kind not in (MEASUREMENT_REGISTERED_KIND, MEASUREMENT_RESULT_KIND):

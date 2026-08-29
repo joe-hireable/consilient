@@ -67,10 +67,15 @@ CREATE TABLE IF NOT EXISTS usage (
     provenance    TEXT
 );
 CREATE TABLE IF NOT EXISTS rejections (
-    id     INTEGER PRIMARY KEY,
-    path   TEXT NOT NULL,
-    line   INTEGER NOT NULL,
-    reason TEXT NOT NULL
+    id         INTEGER PRIMARY KEY,
+    path       TEXT NOT NULL,
+    line       INTEGER NOT NULL,
+    reason     TEXT NOT NULL,
+    -- The kind is KNOWN when the line is refused and was being thrown away. Callers then
+    -- recovered it by searching `reason`, which is free-form prose: unit X01's review measured
+    -- both errors that follows from -- a quarantine whose text merely mentions a kind read as
+    -- that kind, and a kind whose refusal text does not name it read as absent.
+    event_kind TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS record_facts (
     position             INTEGER NOT NULL,
@@ -132,12 +137,15 @@ CREATE TABLE IF NOT EXISTS delivery_estimates (
 CREATE INDEX IF NOT EXISTS delivery_estimates_delivery
     ON delivery_estimates (delivery_id, revision);
 CREATE TABLE IF NOT EXISTS relational_quarantines (
-    id       INTEGER PRIMARY KEY,
-    position INTEGER NOT NULL,
-    path     TEXT NOT NULL,
-    line     INTEGER NOT NULL,
-    digest   TEXT NOT NULL,
-    reason   TEXT NOT NULL
+    id         INTEGER PRIMARY KEY,
+    position   INTEGER NOT NULL,
+    path       TEXT NOT NULL,
+    line       INTEGER NOT NULL,
+    digest     TEXT NOT NULL,
+    reason     TEXT NOT NULL,
+    -- Same repair as `rejections` above: `_quarantine_relational` already receives the Event,
+    -- so the kind is in hand at write time and only needed storing.
+    event_kind TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS projection_meta (
     key   TEXT PRIMARY KEY,
