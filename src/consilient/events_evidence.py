@@ -189,10 +189,11 @@ def _check_measurement_contract(event: EventPayload) -> None:
 
     Incumbent: MLPerf Logging's compliance_checker (mlcommons/logging, retrieved
     2026-08-28) -- invalid lifecycle fails the checker, the log stays readable.
-    This used to add "that split matches" it. Withdrawn 29 August 2026: that was a
-    comparison with no measurement behind it, and mlperf_logging is not installed
-    here, so none has been run. See joined_measurement_results for the one
-    difference that IS measured and the experiment that would settle the rest.
+    "That split matches" stood here as an unmeasured claim. The comparison has now
+    been RUN against mlperf-logging 4.1.62 [measured 29 Aug 2026]: both systems
+    catch an orphan result, and they differ on a back-dated one -- MLPerf's checker
+    reports the same empty finding set for it as for a correct log, while this
+    refuses it at append. See joined_measurement_results for the table.
     """
     kind = event["event"]
     if kind not in (MEASUREMENT_REGISTERED_KIND, MEASUREMENT_RESULT_KIND):

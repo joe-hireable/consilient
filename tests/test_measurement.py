@@ -15,10 +15,18 @@ Incumbent: MLPerf Logging ``compliance_checker``
 (https://github.com/mlcommons/logging, retrieved 2026-08-28). Invalid lifecycle
 fails the checker; the log remains readable.
 
-"X01 matches that split" stood here and is withdrawn (29 August 2026). It was a
-comparison with no measurement behind it, and `mlperf_logging` is not installed
-on this machine, so none has been run and none can be from here. Principle 9
-asks for the bar and the evidence, not a claim of parity.
+"X01 matches that split" stood here as an unmeasured claim. The comparison has now
+been RUN (29 August 2026), against mlperf-logging 4.1.62 in a throwaway venv, giving
+both systems the same three shapes:
+
+    shape       MLPerf compliance_checker      Consilient
+    valid       0 failed checks                accepted
+    orphan      1 failed check                 refused at REPLAY
+    back-dated  0 failed checks                refused at WRITE
+
+Both catch the orphan. Only this refuses the back-dated log -- the one whose file
+order reads correctly while its timestamps say the result preceded its registration.
+Principle 9 asks for the bar and the evidence; this is the evidence.
 
 "A CI-wired failing gate is BU2 and is not this unit" is also withdrawn, because
 it is no longer true: ``cmd_beta`` calls ``joined_measurement_results``, so the

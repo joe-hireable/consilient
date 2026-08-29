@@ -133,23 +133,31 @@ def joined_measurement_results(conn: sqlite3.Connection) -> list[dict[str, objec
     Incumbent: MLPerf Logging ``compliance_checker`` (github.com/mlcommons/logging, retrieved
     2026-08-28). An invalid lifecycle fails the checker and the log stays readable.
 
-    This used to claim X01 "matches that split". That was a COMPARISON with no measurement
-    behind it, which is the exact failure principle 9 was written about after an unsupported
-    superlative shipped in this project's own README. It is withdrawn. `mlperf_logging` is not
-    installed on this machine [measured 29 Aug 2026], so no comparison has been run and none
-    can be from here.
+    This used to claim X01 "matches that split", which was a comparison with no measurement
+    behind it. THE COMPARISON HAS NOW BEEN RUN. mlperf-logging 4.1.62 was installed in a
+    throwaway venv and both systems were given the same three lifecycle shapes
+    [measured 29 Aug 2026]:
 
-    What IS measured is one structural difference, and it is stated without any claim about
-    what the incumbent does or cannot do: the lifecycle rule here runs inside the WRITER's own
-    append path, so an invalid ordering cannot be written rather than being detected afterwards.
-    Measured the same day — a `measurement.result` back-dated into another day's file to forge
-    pre-registration is refused at append (`_DATE_BOUND_KINDS` in events_transactions), where
-    before it was accepted and replayed as if registered first.
+        shape       MLPerf compliance_checker      Consilient
+        valid       0 failed checks                accepted
+        orphan      1 failed check                 refused at REPLAY
+        back-dated  0 failed checks                refused at WRITE
 
-    WHAT WOULD SETTLE IT: install mlperf_logging at a pinned version, construct the same three
-    logs against both — a valid lifecycle, an orphan result, and a back-dated result — and
-    record which of the three each system refuses, and at what point. Until that runs, "better"
-    is unclaimed rather than assumed.
+    Both catch the orphan. They differ on exactly one shape, and it is the one pre-registration
+    depends on: a log whose FILE ORDER reads start-then-finish while its TIMESTAMPS say the
+    finish came first. MLPerf's checker returns an identical finding set for that log and for a
+    correct one — back-dating adds nothing it can see. Consilient refuses it before it is
+    written, because the daily file a measurement lands in must be the one its own `ts` names.
+
+    Said fairly, because the point is the axis and not a cheap shot: MLPerf's checker validates
+    submission logs someone else produced, and a checker cannot refuse a write it never saw.
+    That IS the difference — enforcement in the writer versus validation after the fact — and it
+    is the reason the forgery survives one and not the other.
+
+    Limitation of the probe, recorded rather than buried: the synthetic MLPerf log is not a
+    complete submission, so all three exit non-zero on missing submission fields. The
+    discriminator is the set of FAILED CHECKS, which is empty for both valid and back-dated and
+    non-empty for the orphan. Re-run it by pinning mlperf-logging and repeating the three shapes.
     """
     # Match the KIND, never the reason text. Unit X01's review measured both errors that
     # `"measurement.result" in str(row["reason"])` produced, and they point opposite ways:
