@@ -3698,10 +3698,23 @@ def main() -> int:
     # Dispatch stays blocked (the build and resolve paths still exclude quarantined units), so
     # nothing starts burning retries again. Only the verdict path reopens, which is precisely
     # the door the recovery was written to come through.
+    # A RETIRED UNIT IS NOT PENDING REVIEW. `mergeable` above already excludes `done` and
+    # `force_done` for the same reason; this list did not, so a unit that had been retired while
+    # sitting in `built` was dispatched for review for ever.
+    #
+    # MEASURED 30 August 2026: X01 was force-retired after its review found four real defects,
+    # all since fixed. The driver then dispatched a fresh review of it, held a review slot on a
+    # 3600s leash, drove it to the 3-attempt ceiling and printed
+    # "ESCALATION -- review of X01 reached 3 attempts" for work that was finished. A slot out of
+    # six, and an escalation line that means nothing, both spent on a closed unit -- and it
+    # recurs every time a built unit is retired by hand.
+    settled_units = set(state.setdefault("done", [])) | set(
+        state.setdefault("force_done", [])
+    )
     pending_review = [
         u
         for u in sorted(state.setdefault("built", []))
-        if u not in state.setdefault("review_dispatched", [])
+        if u not in state.setdefault("review_dispatched", []) and u not in settled_units
     ]
 
     live = live_dispatchers(state)
