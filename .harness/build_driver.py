@@ -2195,6 +2195,32 @@ def publish_if_ready(state: dict, green: bool | None) -> str:
     ahead = sh(["git", "rev-list", "--count", "public/main..HEAD"]).stdout.strip()
     if not ahead or ahead == "0":
         return ""
+    # WHAT TRAVELS IS THE TREE, so "is there anything to publish" is a question about the tree and
+    # never about the commit count. MEASURED 29 August 2026: the count can never reach zero, so
+    # this published on every green tick for ever.
+    #
+    # The `-s ours` merge below records each published squash as an ancestor, which is what keeps
+    # public/main reachable -- but that merge is itself a commit inside `public/main..HEAD` on the
+    # NEXT tick. The count went 380, 389, 390, 391 with no work at all between the last three, and
+    # six "record the published squash" merges were sitting in the range, every one of them a
+    # commit this function had created. A counter incremented by its own side effect does not
+    # measure outstanding work.
+    #
+    # Comparing trees stops it dead and is the honest test: two commits with the same tree publish
+    # identical bytes, so the second publication carries nothing.
+    published_tree = sh(["git", "rev-parse", "public/main^{tree}"]).stdout.strip()
+    if (
+        published_tree
+        and published_tree == sh(["git", "rev-parse", "HEAD^{tree}"]).stdout.strip()
+    ):
+        return ""
+    # Report the work, not the bookkeeping. `ahead` counts this function's own ancestry merges
+    # beside the units' commits, so "390 commit(s) of harness work" overstated it by once per
+    # publication that had already happened.
+    work = sh(
+        ["git", "rev-list", "--count", "--no-merges", "public/main..HEAD"]
+    ).stdout.strip()
+    ahead = work or ahead
     # Reuse the tick's existing suite result. Running it again here doubled the tick to past ten
     # minutes and starved the scheduler of the thing it exists to do.
     #
