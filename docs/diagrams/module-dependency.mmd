@@ -1,57 +1,334 @@
 %% **Producer:** `scripts/build_diagrams.py`
 %% **Source:** `src/**/*.py`
-%% **Source SHA-256:** `25509ce33d9b122b4ca419dbcf3ad324e18b950b3dc98feb27dfde846a9640cd`
+%% **Source SHA-256:** `f99425207e497f2b9ab47264d7a1ee7302e508e55646bf7860337a30703d500f`
 %% **Do not hand-edit:** regenerate with `python scripts/build_diagrams.py`.
 
 flowchart LR
+  consilient_beta --> consilient_beta_admission
   consilient_beta --> consilient_projection
   consilient_budget --> consilient_events
-  consilient_cli --> consilient_beta
+  consilient_capabilities --> consilient_capabilities_parse
+  consilient_capabilities --> consilient_capabilities_manifests
+  consilient_capabilities --> consilient_capabilities_reversibility
+  consilient_capabilities_manifests --> consilient_capabilities_parse
   consilient_cli --> consilient_dashboard
   consilient_cli --> consilient_events
-  consilient_cli --> consilient_budget
   consilient_cli --> consilient_projection
   consilient_cli --> consilient_usage
+  consilient_cli --> consilient_cli_replay
+  consilient_cli --> consilient_cli_conditions
+  consilient_cli --> consilient_cli_measurements
+  consilient_cli --> consilient_cli_readout
+  consilient_cli_conditions --> consilient_events
+  consilient_cli_conditions --> consilient_cli_replay
+  consilient_cli_conditions --> consilient_cli_measurements
+  consilient_cli_measurements --> consilient_beta
+  consilient_cli_measurements --> consilient_budget
+  consilient_cli_measurements --> consilient_projection
+  consilient_cli_measurements --> consilient_usage
+  consilient_cli_measurements --> consilient_events
+  consilient_cli_measurements --> consilient_cli_replay
+  consilient_cli_readout --> consilient_beta
+  consilient_cli_readout --> consilient_cli_replay
+  consilient_cli_readout --> consilient_cli_measurements
+  consilient_cli_replay --> consilient_events
+  consilient_cli_replay --> consilient_projection
   consilient_commit_gate --> consilient_coordination
-  consilient_coordination --> consilient_beta
-  consilient_coordination --> consilient_routing
-  consilient_coordination --> consilient_work_items
   consilient_coordination --> consilient_events
+  consilient_coordination --> consilient_coordination_records
+  consilient_coordination --> consilient_coordination_admission
+  consilient_coordination --> consilient_coordination_leases
+  consilient_coordination --> consilient_coordination_projection
+  consilient_coordination_admission --> consilient_beta
+  consilient_coordination_admission --> consilient_work_items
+  consilient_coordination_admission --> consilient_events
+  consilient_coordination_admission --> consilient_coordination_records
+  consilient_coordination_admission --> consilient_coordination_leases
+  consilient_coordination_admission --> consilient_coordination_projection
+  consilient_coordination_leases --> consilient_work_items
+  consilient_coordination_leases --> consilient_events
+  consilient_coordination_leases --> consilient_coordination_records
+  consilient_coordination_leases --> consilient_coordination_projection
+  consilient_coordination_projection --> consilient_beta
+  consilient_coordination_projection --> consilient_routing
+  consilient_coordination_projection --> consilient_events
+  consilient_coordination_projection --> consilient_coordination_records
+  consilient_coordination_records --> consilient_work_items
+  consilient_coordination_records --> consilient_events
   consilient_dashboard --> consilient_events
-  consilient_dashboard --> consilient_promote
+  consilient_dashboard --> consilient_dashboard_types
+  consilient_dashboard --> consilient_dashboard_cards
+  consilient_dashboard --> consilient_dashboard_css
+  consilient_dashboard --> consilient_dashboard_facts
+  consilient_dashboard --> consilient_dashboard_render
+  consilient_dashboard --> consilient_dashboard_usage
+  consilient_dashboard_cards --> consilient_events
+  consilient_dashboard_cards --> consilient_promote
+  consilient_dashboard_cards --> consilient_dashboard_types
+  consilient_dashboard_cards --> consilient_dashboard_css
+  consilient_dashboard_facts --> consilient_events
+  consilient_dashboard_facts --> consilient_dashboard_types
+  consilient_dashboard_facts --> consilient_dashboard_css
+  consilient_dashboard_html --> consilient_dashboard_types
+  consilient_dashboard_html --> consilient_dashboard_css
+  consilient_dashboard_render --> consilient_dashboard_types
+  consilient_dashboard_render --> consilient_dashboard_css
+  consilient_dashboard_render --> consilient_dashboard_html
+  consilient_dashboard_usage --> consilient_events
+  consilient_dashboard_usage --> consilient_dashboard_types
+  consilient_dashboard_usage --> consilient_dashboard_css
   consilient_effects --> consilient_capabilities
+  consilient_effects --> consilient_effects_grammar
+  consilient_effects --> consilient_effects_manifest
+  consilient_effects --> consilient_effects_proof
+  consilient_effects_grammar --> consilient_capabilities
+  consilient_effects_manifest --> consilient_effects_grammar
+  consilient_effects_proof --> consilient_capabilities
+  consilient_effects_proof --> consilient_effects_grammar
+  consilient_effects_proof --> consilient_effects_manifest
   consilient_events --> consilient_effects
-  consilient_events --> consilient_work_items
-  consilient_events --> consilient_verification
+  consilient_events --> consilient_events_authority
+  consilient_events --> consilient_events_digests
+  consilient_events --> consilient_events_durability
+  consilient_events --> consilient_events_evidence
+  consilient_events --> consilient_events_fields
+  consilient_events --> consilient_events_kinds
+  consilient_events --> consilient_events_protocol
+  consilient_events --> consilient_events_records
+  consilient_events --> consilient_events_references
+  consilient_events --> consilient_events_relations
+  consilient_events --> consilient_events_supervision
+  consilient_events --> consilient_events_transactions
+  consilient_events --> consilient_events_validation
+  consilient_events --> consilient_events_versioning
+  consilient_events --> consilient_events_vocabulary
+  consilient_events_authority --> consilient_events_vocabulary
+  consilient_events_authority --> consilient_events_durability
+  consilient_events_authority --> consilient_events_fields
+  consilient_events_authority --> consilient_events_kinds
+  consilient_events_digests --> consilient_events_vocabulary
+  consilient_events_digests --> consilient_events_durability
+  consilient_events_digests --> consilient_events_fields
+  consilient_events_digests --> consilient_events_kinds
+  consilient_events_durability --> consilient_events_vocabulary
+  consilient_events_durability --> consilient_events_kinds
+  consilient_events_evidence --> consilient_events_vocabulary
+  consilient_events_evidence --> consilient_events_kinds
+  consilient_events_fields --> consilient_events_vocabulary
+  consilient_events_fields --> consilient_events_durability
+  consilient_events_fields --> consilient_events_kinds
+  consilient_events_kinds --> consilient_verification
+  consilient_events_protocol --> consilient_effects
+  consilient_events_protocol --> consilient_events_vocabulary
+  consilient_events_protocol --> consilient_events_digests
+  consilient_events_protocol --> consilient_events_durability
+  consilient_events_protocol --> consilient_events_fields
+  consilient_events_protocol --> consilient_events_kinds
+  consilient_events_protocol --> consilient_events_references
+  consilient_events_records --> consilient_effects
+  consilient_events_records --> consilient_events_vocabulary
+  consilient_events_records --> consilient_events_digests
+  consilient_events_records --> consilient_events_durability
+  consilient_events_records --> consilient_events_fields
+  consilient_events_records --> consilient_events_kinds
+  consilient_events_records --> consilient_events_protocol
+  consilient_events_records --> consilient_events_references
+  consilient_events_records --> consilient_events_versioning
+  consilient_events_references --> consilient_events_vocabulary
+  consilient_events_references --> consilient_events_digests
+  consilient_events_references --> consilient_events_durability
+  consilient_events_references --> consilient_events_fields
+  consilient_events_references --> consilient_events_kinds
+  consilient_events_relations --> consilient_events_vocabulary
+  consilient_events_relations --> consilient_events_digests
+  consilient_events_relations --> consilient_events_durability
+  consilient_events_relations --> consilient_events_fields
+  consilient_events_relations --> consilient_events_kinds
+  consilient_events_relations --> consilient_events_references
+  consilient_events_supervision --> consilient_events_vocabulary
+  consilient_events_supervision --> consilient_events_durability
+  consilient_events_supervision --> consilient_events_evidence
+  consilient_events_supervision --> consilient_events_fields
+  consilient_events_supervision --> consilient_events_kinds
+  consilient_events_transactions --> consilient_effects
+  consilient_events_transactions --> consilient_events_vocabulary
+  consilient_events_transactions --> consilient_events_digests
+  consilient_events_transactions --> consilient_events_durability
+  consilient_events_transactions --> consilient_events_evidence
+  consilient_events_transactions --> consilient_events_fields
+  consilient_events_transactions --> consilient_events_kinds
+  consilient_events_transactions --> consilient_events_records
+  consilient_events_transactions --> consilient_events_references
+  consilient_events_transactions --> consilient_events_validation
+  consilient_events_validation --> consilient_effects
+  consilient_events_validation --> consilient_events_vocabulary
+  consilient_events_validation --> consilient_events_authority
+  consilient_events_validation --> consilient_events_digests
+  consilient_events_validation --> consilient_events_durability
+  consilient_events_validation --> consilient_events_evidence
+  consilient_events_validation --> consilient_events_fields
+  consilient_events_validation --> consilient_events_kinds
+  consilient_events_validation --> consilient_events_protocol
+  consilient_events_validation --> consilient_events_records
+  consilient_events_validation --> consilient_events_references
+  consilient_events_validation --> consilient_events_relations
+  consilient_events_validation --> consilient_events_supervision
+  consilient_events_validation --> consilient_events_versioning
+  consilient_events_validation --> consilient_work_items
+  consilient_events_versioning --> consilient_events_vocabulary
+  consilient_events_versioning --> consilient_events_digests
+  consilient_events_versioning --> consilient_events_durability
+  consilient_events_versioning --> consilient_events_fields
+  consilient_events_versioning --> consilient_events_kinds
+  consilient_events_versioning --> consilient_events_references
   consilient_feedback --> consilient_events
-  consilient_harness --> consilient_events
+  consilient_harness --> consilient_harness_registry
+  consilient_harness --> consilient_harness_grammar
+  consilient_harness --> consilient_harness_headroom
+  consilient_harness --> consilient_harness_models
+  consilient_harness --> consilient_harness_recording
+  consilient_harness --> consilient_harness_requests
+  consilient_harness --> consilient_harness_selection
+  consilient_harness_grammar --> consilient_harness_registry
+  consilient_harness_headroom --> consilient_harness_registry
+  consilient_harness_models --> consilient_harness_registry
+  consilient_harness_recording --> consilient_events
+  consilient_harness_recording --> consilient_harness_registry
+  consilient_harness_requests --> consilient_events
+  consilient_harness_requests --> consilient_harness_registry
+  consilient_harness_selection --> consilient_harness_registry
+  consilient_harness_selection --> consilient_harness_headroom
+  consilient_harness_selection --> consilient_harness_models
   consilient_harvest --> consilient_events
   consilient_instructions --> consilient_beta
   consilient_instructions --> consilient_promote
-  consilient_instructions --> consilient_recall
   consilient_instructions --> consilient_events
+  consilient_instructions --> consilient_instructions_vocabulary
+  consilient_instructions --> consilient_instructions_admission
+  consilient_instructions --> consilient_instructions_audit
+  consilient_instructions --> consilient_instructions_composition
+  consilient_instructions_admission --> consilient_promote
+  consilient_instructions_admission --> consilient_recall
+  consilient_instructions_admission --> consilient_events
+  consilient_instructions_admission --> consilient_instructions_vocabulary
+  consilient_instructions_audit --> consilient_promote
+  consilient_instructions_audit --> consilient_recall
+  consilient_instructions_audit --> consilient_events
+  consilient_instructions_audit --> consilient_instructions_vocabulary
+  consilient_instructions_audit --> consilient_instructions_admission
+  consilient_instructions_audit --> consilient_instructions_composition
+  consilient_instructions_composition --> consilient_promote
+  consilient_instructions_composition --> consilient_recall
+  consilient_instructions_composition --> consilient_events
+  consilient_instructions_composition --> consilient_instructions_vocabulary
+  consilient_instructions_composition --> consilient_instructions_admission
+  consilient_instructions_vocabulary --> consilient_beta
+  consilient_instructions_vocabulary --> consilient_promote
+  consilient_instructions_vocabulary --> consilient_recall
+  consilient_instructions_vocabulary --> consilient_events
   consilient_local_fit --> consilient_events
   consilient_loop --> consilient_budget
   consilient_loop --> consilient_events
   consilient_projection --> consilient_events
   consilient_projection --> consilient_work_items
+  consilient_projection --> consilient_projection_schema
+  consilient_projection --> consilient_projection_consilience
+  consilient_projection --> consilient_projection_records
+  consilient_projection --> consilient_projection_rows
+  consilient_projection --> consilient_projection_verdicts
   consilient_projection --> consilient_verification
+  consilient_projection_consilience --> consilient_events
+  consilient_projection_consilience --> consilient_work_items
+  consilient_projection_consilience --> consilient_projection_records
+  consilient_projection_consilience --> consilient_projection_rows
+  consilient_projection_consilience --> consilient_projection_verdicts
+  consilient_projection_records --> consilient_events
+  consilient_projection_records --> consilient_projection_rows
+  consilient_projection_rows --> consilient_events
+  consilient_projection_rows --> consilient_work_items
+  consilient_projection_schema --> consilient_events
+  consilient_projection_verdicts --> consilient_events
+  consilient_projection_verdicts --> consilient_projection_rows
   consilient_promote --> consilient_beta
   consilient_promote --> consilient_events
+  consilient_promote --> consilient_promote_vocabulary
+  consilient_promote --> consilient_promote_checks
+  consilient_promote --> consilient_promote_evidence
+  consilient_promote --> consilient_promote_policy
+  consilient_promote_checks --> consilient_events
+  consilient_promote_checks --> consilient_promote_vocabulary
+  consilient_promote_evidence --> consilient_beta
+  consilient_promote_evidence --> consilient_promote_vocabulary
+  consilient_promote_evidence --> consilient_promote_checks
+  consilient_promote_policy --> consilient_beta
+  consilient_promote_policy --> consilient_events
+  consilient_promote_policy --> consilient_promote_vocabulary
+  consilient_promote_policy --> consilient_promote_checks
+  consilient_promote_policy --> consilient_promote_evidence
   consilient_recall --> consilient_events
-  consilient_recall --> consilient_promote
-  consilient_recall --> consilient_work_items
+  consilient_recall --> consilient_recall_vocabulary
+  consilient_recall --> consilient_recall_body
+  consilient_recall --> consilient_recall_budget
+  consilient_recall --> consilient_recall_receipt
+  consilient_recall_body --> consilient_events
+  consilient_recall_body --> consilient_recall_vocabulary
+  consilient_recall_body --> consilient_recall_receipt
+  consilient_recall_budget --> consilient_events
+  consilient_recall_budget --> consilient_recall_vocabulary
+  consilient_recall_budget --> consilient_recall_body
+  consilient_recall_budget --> consilient_recall_receipt
+  consilient_recall_receipt --> consilient_events
+  consilient_recall_receipt --> consilient_work_items
+  consilient_recall_receipt --> consilient_recall_vocabulary
+  consilient_recall_vocabulary --> consilient_events
+  consilient_recall_vocabulary --> consilient_promote
+  consilient_recall_vocabulary --> consilient_work_items
   consilient_records --> consilient_events
   consilient_routing --> consilient_beta
   consilient_routing --> consilient_projection
+  consilient_surfaces --> consilient_events
   consilient_transport --> consilient_events
-  consilient_usage --> consilient_budget
+  consilient_upstream --> consilient_beta
+  consilient_upstream --> consilient_harvest
   consilient_usage --> consilient_events
+  consilient_usage --> consilient_usage_model
+  consilient_usage --> consilient_usage_limits
+  consilient_usage_collectors --> consilient_usage_model
+  consilient_usage_limits --> consilient_budget
+  consilient_usage_limits --> consilient_usage_model
+  consilient_usage_model --> consilient_budget
+  consilient_usage_model --> consilient_events
   consilient_verification --> consilient_events
   consilient_work_items --> consilient_events
+  consilient_work_items --> consilient_work_items_vocabulary
+  consilient_work_items --> consilient_work_items_contracts
+  consilient_work_items --> consilient_work_items_integrity
+  consilient_work_items --> consilient_work_items_transition
+  consilient_work_items --> consilient_work_items_writer
+  consilient_work_items_contracts --> consilient_events
+  consilient_work_items_contracts --> consilient_work_items_vocabulary
+  consilient_work_items_integrity --> consilient_events
+  consilient_work_items_integrity --> consilient_work_items_vocabulary
+  consilient_work_items_integrity --> consilient_work_items_contracts
+  consilient_work_items_schemas --> consilient_events
+  consilient_work_items_schemas --> consilient_work_items_vocabulary
+  consilient_work_items_schemas --> consilient_work_items_contracts
+  consilient_work_items_schemas --> consilient_work_items_integrity
+  consilient_work_items_transition --> consilient_events
+  consilient_work_items_transition --> consilient_work_items_vocabulary
+  consilient_work_items_transition --> consilient_work_items_contracts
+  consilient_work_items_transition --> consilient_work_items_integrity
+  consilient_work_items_transition --> consilient_work_items_schemas
+  consilient_work_items_vocabulary --> consilient_events
+  consilient_work_items_writer --> consilient_events
+  consilient_work_items_writer --> consilient_work_items_vocabulary
+  consilient_work_items_writer --> consilient_work_items_contracts
+  consilient_work_items_writer --> consilient_work_items_integrity
+  consilient_work_items_writer --> consilient_work_items_schemas
+  consilient_work_items_writer --> consilient_work_items_transition
   consilient_connectors_computer_use --> consilient_events
   consilient_connectors_computer_use --> consilient_transport
   consilient_connectors_outbound --> consilient_events
   consilient_connectors_outbound --> consilient_transport
-  %% in-degree: consilient_events=20, consilient_beta=5, consilient_work_items=4, consilient_budget=3, consilient_projection=3, consilient_promote=3, consilient_transport=2, consilient_verification=2
+  %% in-degree: consilient_events=54, consilient_events_kinds=14, consilient_events_vocabulary=14, consilient_events_durability=12, consilient_beta=11, consilient_events_fields=11, consilient_work_items=9, consilient_events_digests=8
 

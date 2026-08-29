@@ -27,44 +27,93 @@ family and check membership is unchanged; ``git check-ignore`` on the dest.
 Where it is not: this does not download or run a live eval. ADR-0013 keeps
 public benchmarks out of β, and the claim list is the builder plus its tests.
 The operator supplies the bank. [asserted]
+
+This file keeps the build and the command line. `anchor_set_tasks.py` holds the task row both
+halves read and its digest, and `anchor_set_drift.py` the paired comparison of two runs of the
+frozen set. Every name importable from here before the split still is; `__all__` says which.
 """
 
-from __future__ import annotations
-
 import argparse
-import hashlib
 import json
-import math
 import os
-import random
 import subprocess
 import sys
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+# This directory is not a package, so a sibling module is importable only when it is on
+# sys.path. Running this file as a script puts it there; loading it through importlib by
+# path does not. A no-op in the script case.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from anchor_set_tasks import (
+    AnchorSetError,
+    _canonical_task,
+    canonical_dumps,
+    sha256_hex,
+)
+
+from anchor_set_drift import (
+    _index_outcomes,
+    _insufficient,
+    _nearest_rank,
+    _unpack_run,
+    cluster_bootstrap_mean,
+    drift_report,
+)
+
+from anchor_set_tasks import (
+    EMPTY_CONTENT_SHA256,
+    _content_sha256,
+    _hex64,
+    _optional_text,
+    _text_field,
+)
+
+__all__ = [
+    "AnchorSetError",
+    "DEFAULT_DEST",
+    "EMPTY_CONTENT_SHA256",
+    "ROOT",
+    "SCHEMA_VERSION",
+    "SEED",
+    "TASKS_PER_FAMILY",
+    "_canonical_task",
+    "_content_sha256",
+    "_hex64",
+    "_index_outcomes",
+    "_insufficient",
+    "_nearest_rank",
+    "_optional_text",
+    "_text_field",
+    "_unpack_run",
+    "assert_uncommitted_readable",
+    "canonical_dumps",
+    "cluster_bootstrap_mean",
+    "drift_report",
+    "hash_anchor_set",
+    "load_anchor_set",
+    "main",
+    "select_anchor_set",
+    "selection_key",
+    "sha256_hex",
+    "write_anchor_set",
+]
+
 ROOT = Path(__file__).resolve().parent.parent
+
 TASKS_PER_FAMILY = 100
+
 SEED = "consilient-anchor-set-v1"
+
 DEFAULT_DEST = ROOT / ".harness" / "objects" / "anchor-set" / "set.json"
+
 SCHEMA_VERSION = 1
-EMPTY_CONTENT_SHA256 = hashlib.sha256(b"").hexdigest()
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-
-class AnchorSetError(ValueError):
-    """The set cannot be built, written or compared."""
-
-
-def canonical_dumps(obj: object) -> str:
-    return json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def sha256_hex(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def selection_key(family: str, task_id: str, seed: str = SEED) -> str:
@@ -119,64 +168,6 @@ def assert_uncommitted_readable(dest: Path, *, root: Path = ROOT) -> Path:
     return dest
 
 
-def _text_field(row: Mapping[str, Any], key: str) -> str:
-    value = row.get(key)
-    if not isinstance(value, str) or not value.strip():
-        raise AnchorSetError(f"task {key} must be a non-empty string")
-    return value.strip()
-
-
-def _optional_text(row: Mapping[str, Any], key: str) -> str | None:
-    if key not in row or row[key] is None:
-        return None
-    value = row[key]
-    if not isinstance(value, str):
-        raise AnchorSetError(f"task {key} must be a string")
-    return value
-
-
-def _hex64(value: str, *, label: str) -> str:
-    text = value.strip().lower()
-    if len(text) != 64:
-        raise AnchorSetError(f"{label} must be 64 lowercase hex characters")
-    int(text, 16)
-    return text
-
-
-def _content_sha256(row: Mapping[str, Any]) -> str:
-    content = _optional_text(row, "content")
-    declared = _optional_text(row, "content_sha256")
-    digest = (
-        hashlib.sha256(content.encode("utf-8")).hexdigest()
-        if content is not None
-        else None
-    )
-    if digest is not None and declared is not None:
-        declared = _hex64(declared, label="content_sha256")
-        if digest != declared:
-            raise AnchorSetError(
-                "content_sha256 does not match the supplied content"
-            )
-        return digest
-    if digest is not None:
-        return digest
-    if declared is not None:
-        return _hex64(declared, label="content_sha256")
-    return EMPTY_CONTENT_SHA256
-
-
-def _canonical_task(row: Mapping[str, Any]) -> dict[str, str]:
-    family = _text_field(row, "family")
-    task_id = _text_field(row, "id")
-    cluster = _optional_text(row, "cluster")
-    return {
-        "cluster": cluster.strip() if cluster else task_id,
-        "content_sha256": _content_sha256(row),
-        "family": family,
-        "id": task_id,
-    }
-
-
 def _load_tasks(bank: object) -> list[Mapping[str, Any]]:
     if isinstance(bank, Mapping) and "tasks" in bank:
         bank = bank["tasks"]
@@ -217,7 +208,10 @@ def select_anchor_set(
             )
         ranked = sorted(
             rows,
-            key=lambda task: (selection_key(task["family"], task["id"], seed), task["id"]),
+            key=lambda task: (
+                selection_key(task["family"], task["id"], seed),
+                task["id"],
+            ),
         )
         selected.extend(ranked[:tasks_per_family])
     selected.sort(key=lambda task: (task["family"], task["id"]))
@@ -253,7 +247,9 @@ def hash_anchor_set(anchor: Mapping[str, Any]) -> str:
     return sha256_hex(canonical_dumps(payload))
 
 
-def write_anchor_set(anchor: Mapping[str, Any], dest: Path, *, root: Path = ROOT) -> Path:
+def write_anchor_set(
+    anchor: Mapping[str, Any], dest: Path, *, root: Path = ROOT
+) -> Path:
     dest = assert_uncommitted_readable(dest, root=root)
     payload = {
         "v": int(anchor.get("v") or SCHEMA_VERSION),
@@ -281,188 +277,6 @@ def load_anchor_set(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _unpack_run(run: object) -> tuple[str | None, list[Mapping[str, Any]]]:
-    if isinstance(run, Mapping) and "outcomes" in run:
-        outcomes = run["outcomes"]
-        digest = run.get("anchor_set_hash")
-        if not isinstance(outcomes, list):
-            raise AnchorSetError("run outcomes must be a list")
-        if digest is not None and not isinstance(digest, str):
-            raise AnchorSetError("anchor_set_hash must be a string")
-        return digest, outcomes
-    if isinstance(run, list):
-        return None, run
-    raise AnchorSetError("a run must be a list of outcomes or an object with outcomes")
-
-
-def _index_outcomes(
-    outcomes: Sequence[Mapping[str, Any]],
-    *,
-    expected: Sequence[Mapping[str, Any]],
-) -> dict[tuple[str, str], bool]:
-    indexed: dict[tuple[str, str], bool] = {}
-    for raw in outcomes:
-        if not isinstance(raw, Mapping):
-            raise AnchorSetError("each outcome must be an object")
-        family = _text_field(raw, "family")
-        task_id = _text_field(raw, "id")
-        passed = raw.get("passed")
-        if not isinstance(passed, bool):
-            raise AnchorSetError("outcome passed must be a boolean")
-        key = (family, task_id)
-        if key in indexed:
-            raise AnchorSetError(f"duplicate outcome for {family}/{task_id}")
-        indexed[key] = passed
-    expected_keys = {(str(t["family"]), str(t["id"])) for t in expected}
-    missing = expected_keys - set(indexed)
-    extra = set(indexed) - expected_keys
-    if missing or extra:
-        raise AnchorSetError(
-            "run is incomplete or names a task outside the set "
-            f"(missing={len(missing)} extra={len(extra)})"
-        )
-    return indexed
-
-
-def _nearest_rank(values: Sequence[float], p: float) -> float:
-    if not values:
-        raise AnchorSetError("percentile requires at least one value")
-    if not 0.0 <= p <= 100.0:
-        raise AnchorSetError(f"percentile p must lie in [0, 100]; got {p!r}")
-    ordered = sorted(float(v) for v in values)
-    index = max(0, min(len(ordered) - 1, math.ceil(p / 100.0 * len(ordered)) - 1))
-    return ordered[index]
-
-
-def cluster_bootstrap_mean(
-    values: Sequence[float],
-    clusters: Sequence[str],
-    *,
-    n_boot: int,
-    seed: int,
-    lo_bound: float,
-    hi_bound: float,
-) -> tuple[float, tuple[float, float]]:
-    if len(values) != len(clusters):
-        raise AnchorSetError("values and clusters must be paired")
-    if len(values) == 0:
-        raise AnchorSetError("bootstrap requires at least one value")
-    if n_boot < 1:
-        raise AnchorSetError("n_boot must be at least 1")
-    groups: dict[str, list[int]] = defaultdict(list)
-    for i, cluster in enumerate(clusters):
-        groups[cluster].append(i)
-    cluster_ids = sorted(groups)
-    if len(cluster_ids) < 2:
-        raise AnchorSetError(
-            "a cluster-robust interval needs at least 2 clusters; "
-            "leave cluster unset to treat each task as its own cluster"
-        )
-    rng = random.Random(seed)
-    n_c = len(cluster_ids)
-    means: list[float] = []
-    for _ in range(n_boot):
-        drawn = [cluster_ids[rng.randrange(n_c)] for _ in range(n_c)]
-        sample: list[float] = []
-        for cluster in drawn:
-            sample.extend(values[i] for i in groups[cluster])
-        means.append(sum(sample) / len(sample))
-    point = sum(values) / len(values)
-    low = max(lo_bound, _nearest_rank(means, 2.5))
-    high = min(hi_bound, _nearest_rank(means, 97.5))
-    if high < low:
-        low, high = high, low
-    return point, (low, high)
-
-
-def _insufficient(
-    *,
-    n: int,
-    n_clusters: int,
-    anchor_set_hash: str,
-    measured_at: str | None,
-) -> dict[str, Any]:
-    return {
-        "verdict": "insufficient_data",
-        "point": None,
-        "interval": None,
-        "n": n,
-        "n_clusters": n_clusters,
-        "anchor_set_hash": anchor_set_hash,
-        "measured_at": measured_at,
-        "drift": None,
-        "drift_interval": None,
-    }
-
-
-def drift_report(
-    anchor: Mapping[str, Any],
-    runs: Sequence[object],
-    *,
-    measured_at: str | None = None,
-    n_boot: int = 2000,
-) -> dict[str, Any]:
-    tasks = list(anchor["tasks"])
-    digest = str(anchor["hash"])
-    n_clusters = len({str(task["cluster"]) for task in tasks})
-    n = len(tasks)
-    if len(runs) < 2:
-        return _insufficient(
-            n=n,
-            n_clusters=n_clusters,
-            anchor_set_hash=digest,
-            measured_at=measured_at,
-        )
-    earlier_hash, earlier_rows = _unpack_run(runs[0])
-    later_hash, later_rows = _unpack_run(runs[1] if len(runs) == 2 else runs[-1])
-    for named in (earlier_hash, later_hash):
-        if named is not None and named != digest:
-            raise AnchorSetError(
-                "run hash does not match the frozen anchor set; "
-                "the set changed, so this is not drift"
-            )
-    earlier = _index_outcomes(earlier_rows, expected=tasks)
-    later = _index_outcomes(later_rows, expected=tasks)
-    later_bits: list[float] = []
-    diffs: list[float] = []
-    clusters: list[str] = []
-    for task in tasks:
-        key = (str(task["family"]), str(task["id"]))
-        later_val = 1.0 if later[key] else 0.0
-        earlier_val = 1.0 if earlier[key] else 0.0
-        later_bits.append(later_val)
-        diffs.append(later_val - earlier_val)
-        clusters.append(str(task["cluster"]))
-    boot_seed = int(digest[:8], 16)
-    point, interval = cluster_bootstrap_mean(
-        later_bits,
-        clusters,
-        n_boot=n_boot,
-        seed=boot_seed,
-        lo_bound=0.0,
-        hi_bound=1.0,
-    )
-    drift, drift_interval = cluster_bootstrap_mean(
-        diffs,
-        clusters,
-        n_boot=n_boot,
-        seed=boot_seed + 1,
-        lo_bound=-1.0,
-        hi_bound=1.0,
-    )
-    return {
-        "verdict": "measured",
-        "point": point,
-        "interval": [interval[0], interval[1]],
-        "n": n,
-        "n_clusters": n_clusters,
-        "anchor_set_hash": digest,
-        "measured_at": measured_at,
-        "drift": drift,
-        "drift_interval": [drift_interval[0], drift_interval[1]],
-    }
-
-
 def _read_json(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -483,7 +297,11 @@ def main(argv: list[str] | None = None) -> int:
         write_anchor_set(built, dest)
         print(built["hash"])
         return 0
-    if args.set_path is not None and args.earlier is not None and args.later is not None:
+    if (
+        args.set_path is not None
+        and args.earlier is not None
+        and args.later is not None
+    ):
         anchor = load_anchor_set(args.set_path)
         report = drift_report(
             anchor,

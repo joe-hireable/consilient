@@ -1,142 +1,39 @@
-"""Canonical effect records stay inert while their schema is enforced."""
+"""The canonical form of an effect manifest, and what it refuses before anything is
+appended.
 
-from __future__ import annotations
+Nothing in this module touches a log. Each case builds a record, hands it to
+`EffectManifest.from_record`, and asserts either the digest that comes out or the
+refusal that should have. Two rules share the file because they are two rules about the
+same function: the effect classes are an exact, order-independent set whose digest must
+move when a class is truncated, and an outbound `message.send` manifest must carry a
+disclosure digest that survives into `canonical()`. The disclosure cases insist on a
+hash of pre-rendered bytes rather than prompt-shaped text, because a prompt can be
+stripped by injection and a digest cannot; the operation label is not what triggers the
+requirement, so `send_push` is refused alongside `send_email` and `send_sms`.
 
-import ast
-from datetime import datetime, timezone
+Two findings recorded in the original prose are kept here because they are the evidence.
+A01's review found the composite-manifest check passing regardless of truncation: the
+only existing composite check compared digests of reversed class order, and those stay
+equal after both sides are truncated or after both drop the field the same way, so
+`test_a_composite_manifest_retains_every_applicable_effect_class` is the replacement
+that fails. And NaN and both infinities survive canonical JSON while changing its
+digest, which is why they are refused while an arbitrarily large integer is not."""
+
 from math import inf, nan
-from pathlib import Path
-
 import pytest
-
-from consilient import effects as effects_mod
-from consilient import events as events_mod
-from consilient.capabilities import CapabilityEntry, Gate
 from consilient.effects import (
     EFFECT_CLASSES,
-    EFFECT_INTENT,
-    EFFECT_RECEIPT,
-    MUTATION_EFFECTS,
     OUTBOUND_EFFECTS,
-    READ_ONLY_EFFECTS,
-    AdmissionFacts,
     EffectError,
     EffectManifest,
-    derive_admission,
-    receipt_chain_validator,
 )
-from consilient.events import (
-    EventError,
-    Rejection,
-    SCHEMA_VERSION,
-    append,
-    append_transaction,
-    validate,
+from effect_contract_helpers import (
+    commitment,
+    manifest,
 )
-
-
-def event(
-    kind: str, data: dict[str, object], *, ts: str | None = None
-) -> dict[str, object]:
-    return {
-        "v": SCHEMA_VERSION,
-        "ts": ts or datetime.now(timezone.utc).isoformat(),
-        "event": kind,
-        "actor": "effect-contract-test",
-        "data": data,
-    }
-
-
-def commitment(domain: str) -> dict[str, str]:
-    return {
-        "kind": "keyed_commitment",
-        "algorithm": "hmac-sha256",
-        "domain": domain,
-        "key_version": "v1",
-        "commitment": "a" * 64,
-    }
-
-
-def broker_reference(name: str) -> dict[str, str]:
-    del name
-    return {"kind": "broker_reference", "reference": f"broker://effects/{'a' * 64}"}
-
-
-def manifest() -> EffectManifest:
-    return EffectManifest(
-        operation_id="operation-1",
-        work_item_id="work-1",
-        attempt_id="attempt-1",
-        adapter={
-            "id": "test.adapter",
-            "version": "v1",
-            "implementation_digest": "b" * 64,
-        },
-        forward=commitment("effect.manifest.forward"),
-        scope=broker_reference("scope"),
-        operations=("read",),
-        effects=("data.read",),
-        inventory_snapshot={"digest": "c" * 64},
-        gate_snapshot={"digest": "d" * 64},
-        authority_snapshot=broker_reference("authority"),
-        law_snapshot={"digest": "e" * 64},
-        start_state=commitment("effect.manifest.start_state"),
-        observer={"id": "observer-1", "policy_digest": "f" * 64},
-        expected_state=commitment("effect.manifest.expected_state"),
-        reversal={"kind": "named_inverse", "name": "restore"},
-        declared_residuals=("elapsed_time",),
-        ceilings={"wall_time_s": 1, "writes": 0},
-    )
-
-
-def intent_data(
-    manifest_value: EffectManifest, *, observation: bool = False
-) -> dict[str, object]:
-    return {
-        "intent_id": "intent-1",
-        "manifest": manifest_value.binding(),
-        "disposition": "refused",
-        "decision_id": None if observation else "decision-1",
-        "admission": (
-            {"kind": "observation", "observation_id": "observation-1"}
-            if observation
-            else {
-                "kind": "material",
-                "authority_chain": {
-                    "kind": "autonomous_decision",
-                    "decision_id": "decision-1",
-                },
-            }
-        ),
-    }
-
-
-def receipt_data(
-    *, receipt_id: str, status: str, supersedes: str | None = None
-) -> dict[str, object]:
-    data: dict[str, object] = {
-        "receipt_id": receipt_id,
-        "intent_id": "intent-1",
-        "manifest_digest": manifest().digest,
-        "status": status,
-        "started_at": "2026-08-23T10:00:00+00:00",
-        "ended_at": "2026-08-23T10:00:01+00:00",
-        "provider_request": broker_reference("provider-request"),
-        "provider_receipt": broker_reference("provider-receipt"),
-        "request_commitment": commitment("effect.receipt.request"),
-        "response_commitment": commitment("effect.receipt.response"),
-        "content_commitment": commitment("effect.receipt.content"),
-        "observed_consumption": {"cpu_seconds": 1},
-        "post_state": commitment("effect.receipt.post_state"),
-        "observed_residuals": ("elapsed_time",),
-        "child_operation_ids": (),
-    }
-    if supersedes is not None:
-        data["supersedes"] = supersedes
-    return data
-
 
 _MISSING = object()
+
 DISCLOSURE_DIGEST = "9" * 64
 
 
@@ -254,107 +151,18 @@ def test_manifest_rejects_raw_private_values_and_credentials() -> None:
     with pytest.raises(EffectError, match="opaque"):
         EffectManifest.from_record(opaque)
     unkeyed = manifest().to_record()
-    unkeyed["forward"] = commitment("effect.manifest.forward")
-    unkeyed["forward"]["algorithm"] = "sha256"
+    # Built before it is stored, because `to_record()` returns dict[str, object] and indexing
+    # back into a slot of it is `object[...]`, which mypy --strict refuses. This was A01's
+    # remaining conflict on 29 August 2026; the assertion is unchanged.
+    unkeyed_forward = commitment("effect.manifest.forward")
+    unkeyed_forward["algorithm"] = "sha256"
+    unkeyed["forward"] = unkeyed_forward
     with pytest.raises(EffectError, match="hmac-sha256"):
         EffectManifest.from_record(unkeyed)
     shared_domain = manifest().to_record()
     shared_domain["start_state"] = commitment("effect.manifest.forward")
     with pytest.raises(EffectError, match="domain"):
         EffectManifest.from_record(shared_domain)
-
-
-def test_effect_events_validate_the_observation_and_material_discriminants() -> None:
-    """Production break caught: material reach can omit a decision/authority chain."""
-    value = manifest()
-    validate(event("effect.intent", intent_data(value, observation=True)))
-    validate(event("effect.intent", intent_data(value)))
-
-    invalid = intent_data(value, observation=True)
-    invalid["decision_id"] = "decision-1"
-    with pytest.raises(EventError, match="observation"):
-        validate(event("effect.intent", invalid))
-
-    invalid = intent_data(value)
-    invalid["admission"] = {"kind": "material", "authority_chain": []}
-    with pytest.raises(EventError, match="authority chain"):
-        validate(event("effect.intent", invalid))
-
-    reference = intent_data(value)
-    reference["manifest"] = {
-        "kind": "reference",
-        "reference": broker_reference("manifest"),
-        "digest": value.digest,
-    }
-    validate(event("effect.intent", reference))
-
-
-def test_receipt_fields_reject_raw_provider_payloads() -> None:
-    """Production break caught: a provider response/content payload is persisted verbatim."""
-    payload = receipt_data(receipt_id="receipt-unknown", status="unknown")
-    payload["provider_receipt"] = {"response": "private reply"}
-    with pytest.raises(EventError, match="broker reference|commitment"):
-        validate(event("effect.receipt", payload))
-    for amount in (nan, inf, -inf):
-        payload = receipt_data(receipt_id="receipt-unknown", status="unknown")
-        payload["observed_consumption"] = {"cpu_seconds": amount}
-        with pytest.raises(EventError, match="finite"):
-            validate(event("effect.receipt", payload))
-    payload = receipt_data(receipt_id="receipt-unknown", status="unknown")
-    payload["observed_consumption"] = {"cpu_seconds": 10**1000}
-    validate(event("effect.receipt", payload))
-
-
-def test_receipt_binds_the_manifest_digest_of_its_intent(tmp_path) -> None:
-    """Production break caught: a receipt can be filed against a different manifest."""
-    value = manifest()
-    path = tmp_path / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl"
-    append_transaction(
-        tmp_path,
-        [event("effect.intent", intent_data(value))],
-        lambda prefix, rejections, candidates: None,
-    )
-    mismatch = receipt_data(receipt_id="receipt-mismatch", status="failed")
-    mismatch["manifest_digest"] = "0" * 64
-    with pytest.raises(EventError, match="manifest digest"):
-        append(path, event("effect.receipt", mismatch))
-
-
-def test_receipt_chain_allows_one_unknown_resolution_and_refuses_a_fork(
-    tmp_path,
-) -> None:
-    """Production break caught: two receipt heads can claim incompatible outcomes."""
-    value = manifest()
-    append_transaction(
-        tmp_path,
-        [
-            event("effect.intent", intent_data(value)),
-            event(
-                "effect.receipt",
-                receipt_data(receipt_id="receipt-unknown", status="unknown"),
-            ),
-        ],
-        lambda prefix, rejections, candidates: None,
-    )
-    append(
-        tmp_path / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl",
-        event(
-            "effect.receipt",
-            receipt_data(
-                receipt_id="receipt-final",
-                status="failed",
-                supersedes="receipt-unknown",
-            ),
-        ),
-    )
-    with pytest.raises(EventError, match="receipt chain"):
-        append(
-            tmp_path / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl",
-            event(
-                "effect.receipt",
-                receipt_data(receipt_id="receipt-fork", status="succeeded"),
-            ),
-        )
 
 
 def test_outbound_effects_are_exactly_message_send() -> None:
@@ -420,7 +228,9 @@ def test_non_outbound_manifest_refuses_a_disclosure_field() -> None:
 def test_composite_outbound_effect_still_requires_disclosure() -> None:
     """Production break caught: mixing message.send with a read class drops the requirement."""
     with pytest.raises(EffectError, match="disclosure"):
-        EffectManifest.from_record(outbound_record(effects=["message.send", "data.read"]))
+        EffectManifest.from_record(
+            outbound_record(effects=["message.send", "data.read"])
+        )
 
 
 def test_outbound_disclosure_changes_the_canonical_digest() -> None:
@@ -429,223 +239,3 @@ def test_outbound_disclosure_changes_the_canonical_digest() -> None:
     second = EffectManifest.from_record(outbound_record(disclosure="8" * 64))
     assert first.digest != second.digest
     assert "disclosure" in first.canonical()
-
-
-def test_mutation_effects_are_disjoint_from_read_only_effects() -> None:
-    """A read-only class in MUTATION_EFFECTS makes the observation predicate lie."""
-    assert MUTATION_EFFECTS & READ_ONLY_EFFECTS == frozenset()
-    assert "data.read" not in MUTATION_EFFECTS
-    assert "network.call" not in MUTATION_EFFECTS
-
-
-@pytest.mark.parametrize("operation", ["write", "plan"])
-def test_observation_intent_refuses_a_mutating_operation(operation: str) -> None:
-    """Decision-free observation cannot record a mutating provider operation."""
-    record = manifest().to_record()
-    record["operations"] = [operation]
-    value = EffectManifest.from_record(record)
-    with pytest.raises(EventError, match="read-only"):
-        validate(event("effect.intent", intent_data(value, observation=True)))
-
-
-def _function_def(tree: ast.AST, name: str) -> ast.FunctionDef:
-    for node in tree.body if isinstance(tree, ast.Module) else ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return node
-    raise AssertionError(f"{name} is missing")
-
-
-def test_intent_calls_observation_predicate() -> None:
-    """An inline effects-only check misses a mutating operation on a read class."""
-    source = Path(effects_mod.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    names = {
-        node.func.id
-        for node in ast.walk(_function_def(tree, "_intent"))
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-    assert "_observation_predicate" in names
-
-
-def test_receipt_chain_resolves_an_unknown_across_daily_logs(
-    tmp_path, monkeypatch
-) -> None:
-    """Production break caught: midnight turns one operation into two receipt chains."""
-    monkeypatch.setattr(events_mod, "_check_clock", lambda event: None)
-    value = manifest()
-    first_day = "2026-08-23T10:00:00+00:00"
-    second_day = "2026-08-24T10:00:00+00:00"
-    append_transaction(
-        tmp_path,
-        [
-            event("effect.intent", intent_data(value), ts=first_day),
-            event(
-                "effect.receipt",
-                receipt_data(receipt_id="receipt-unknown", status="unknown"),
-                ts=first_day,
-            ),
-        ],
-        lambda prefix, rejections, candidates: None,
-    )
-    append(
-        tmp_path / "2026-08-24.jsonl",
-        event(
-            "effect.receipt",
-            receipt_data(
-                receipt_id="receipt-final",
-                status="failed",
-                supersedes="receipt-unknown",
-            ),
-            ts=second_day,
-        ),
-    )
-
-
-def test_receipt_chain_refuses_a_rejected_effect_history_line() -> None:
-    """Production break caught: a corrupt earlier record is ignored while a new chain is admitted."""
-    with pytest.raises(EffectError, match="rejected"):
-        receipt_chain_validator(
-            (),
-            (Rejection("effect.jsonl", 1, "malformed", event_kind=EFFECT_INTENT),),
-            (),
-        )
-    with pytest.raises(EffectError, match="rejected"):
-        receipt_chain_validator(
-            (),
-            (Rejection("effect.jsonl", 1, "malformed", event_kind=EFFECT_RECEIPT),),
-            (),
-        )
-
-
-def test_receipt_chain_ignores_a_rejection_unrelated_to_the_effect_chain() -> None:
-    """A01's review found this failing: a rejected line of *any* kind sharing the log
-    directory blocked every write-ahead effect intent, including one with no relation to
-    the effect chain at all."""
-    receipt_chain_validator((), (Rejection("log.jsonl", 1, "malformed"),), ())
-    receipt_chain_validator(
-        (), (Rejection("log.jsonl", 1, "malformed", event_kind="note.made"),), ()
-    )
-
-
-def test_effect_records_require_a_jsonl_authority_path(tmp_path) -> None:
-    """Production break caught: a non-JSONL append escapes the replayed chain history."""
-    path = tmp_path / "effects.log"
-    with pytest.raises(EventError, match="JSONL"):
-        append(path, event("effect.intent", intent_data(manifest())))
-    assert not path.exists()
-
-
-def _admitted_capability(*, effects: tuple[str, ...], operations: tuple[str, ...]) -> CapabilityEntry:
-    return CapabilityEntry(
-        kind="tool",
-        name="pytest",
-        available=True,
-        provenance=("probe:tool:pytest",),
-        gate=Gate(
-            state="admitted",
-            reason="exact_grant",
-            grant_kind="principal_authority",
-            authority_event=None,
-            decision_id=None,
-            recovery_proof_ref=None,
-            scope=("workspace",),
-            operations=operations,
-            effect_classes=effects,
-            expires_at="2099-01-01T00:00:00+00:00",
-        ),
-    )
-
-
-def _manifest_with(*, effects: tuple[str, ...], operations: tuple[str, ...]) -> EffectManifest:
-    record = manifest().to_record()
-    record["effects"] = list(effects)
-    record["operations"] = list(operations)
-    if set(effects) & OUTBOUND_EFFECTS:
-        record["disclosure"] = "9" * 64
-    return EffectManifest.from_record(record)
-
-
-def test_material_choice_flag_cannot_cover_uncovered_money_commit() -> None:
-    """Caller-supplied is_material_choice must not execute unprotected spend."""
-    result = derive_admission(
-        _manifest_with(effects=("money.commit",), operations=("spend",)),
-        _admitted_capability(effects=("money.commit",), operations=("spend",)),
-        AdmissionFacts(is_material_choice=True, authority_standing=False),
-    )
-    assert result.admission == "protected_uncovered"
-    assert result.disposition == "escalate"
-
-
-def test_proof_operation_flag_cannot_cover_uncovered_money_commit() -> None:
-    """Caller-supplied is_proof_operation must not execute unprotected spend."""
-    result = derive_admission(
-        _manifest_with(effects=("money.commit",), operations=("spend",)),
-        _admitted_capability(effects=("money.commit",), operations=("spend",)),
-        AdmissionFacts(is_proof_operation=True, contained=True, authority_standing=False),
-    )
-    assert result.admission == "protected_uncovered"
-    assert result.disposition == "escalate"
-
-
-def test_proof_operation_flag_cannot_uncontain_process_run() -> None:
-    """Caller-supplied is_proof_operation must not execute an uncontained process."""
-    result = derive_admission(
-        _manifest_with(effects=("process.run",), operations=("run",)),
-        _admitted_capability(effects=("process.run",), operations=("run",)),
-        AdmissionFacts(is_proof_operation=True, contained=False),
-    )
-    assert result.admission == "capability_gap"
-    assert result.disposition == "refuse"
-    assert result.reason == "process_not_contained"
-
-
-def test_planning_operations_cannot_launder_protected_effects() -> None:
-    """A plan operation on money.commit is still a protected class."""
-    result = derive_admission(
-        _manifest_with(effects=("money.commit",), operations=("plan",)),
-        _admitted_capability(effects=("money.commit",), operations=("plan",)),
-        AdmissionFacts(is_material_choice=True, authority_standing=False),
-    )
-    assert result.admission == "protected_uncovered"
-    assert result.disposition == "escalate"
-
-
-def test_privileged_classes_need_the_caller_flag_and_the_manifest() -> None:
-    """Neither a caller flag nor a manifest shape alone may grant a privileged class.
-
-    REPLACES test_classify_admission_conjoins_flags_with_manifest_predicates, which walked
-    the AST asserting a helper named _privileged_admission_class was called. Commit 5ac16cc
-    inlined that helper, so the test was red on HEAD while the PROPERTY it cared about was
-    untouched -- it pinned an implementation detail rather than a behaviour. This asserts the
-    behaviour, so it survives the next inlining and fails if the conjunction is dropped.
-    """
-    proof = _manifest_with(effects=("file.change",), operations=("proof",))
-    proof_cap = _admitted_capability(effects=("file.change",), operations=("proof",))
-    plan = _manifest_with(effects=("data.read",), operations=("plan",))
-    plan_cap = _admitted_capability(effects=("data.read",), operations=("plan",))
-    write_m = _manifest_with(effects=("file.change",), operations=("write",))
-    write_cap = _admitted_capability(effects=("file.change",), operations=("write",))
-    # The manifest shape without the caller flag grants nothing.
-    assert (
-        derive_admission(
-            proof, proof_cap, AdmissionFacts(is_proof_operation=False, contained=True)
-        ).admission
-        != "proof_operation"
-    )
-    assert (
-        derive_admission(plan, plan_cap, AdmissionFacts(is_material_choice=False)).admission
-        != "material_choice"
-    )
-    # The caller flag without the manifest shape grants nothing.
-    assert (
-        derive_admission(
-            write_m, write_cap, AdmissionFacts(is_proof_operation=True, contained=True)
-        ).admission
-        != "proof_operation"
-    )
-    assert (
-        derive_admission(
-            write_m, write_cap, AdmissionFacts(is_material_choice=True, contained=True)
-        ).admission
-        != "material_choice"
-    )

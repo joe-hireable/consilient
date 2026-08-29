@@ -1,0 +1,24 @@
+Publication held, 29 August 2026, by the CTO session while preparing the loop restart.
+
+WHY. `.harness/STOP-PUBLISH.lifted-20260824-joe-authorised` lifted the hold on 24 August, so
+`PUBLISH_STOP.exists()` was False and `publish_if_ready` was live on every tick. HEAD is 371
+commits ahead of `public/main` (github.com/joe-hireable/consilient), and the only thing standing
+between those commits and an unattended push was one suite run -- whose last recorded result is
+`timeout:900s`. Publishing is the single irreversible act the driver performs, and it was being
+decided by whether a 900-second test run happened to pass.
+
+This file does not stop the build. It stops only publication. The loop can be restarted with
+this in place, and the 371-commit backlog then becomes a deliberate decision rather than a
+side effect of the first green tick.
+
+TO LIFT IT: delete this file. That is Joe's call, not an orchestrator's -- the same authority
+that lifted it on 24 August.
+
+LIFTED 29 August 2026 by Joe, in his own words: "lift the publication hold and make
+sure all work current is on main and published to the public repo."
+
+Lifted only after a pre-publication audit of the range found: 0 secrets across 19
+credential classes over all 1,198 blobs (19/19 self-test), 0 private-corpus paths, 0
+content shingles, no harvest, no instance config. Two README lines naming a private
+commercial repository as referential prose were repaired first, and the name gate's
+breach pin tightened 64 -> 63 so they cannot return.

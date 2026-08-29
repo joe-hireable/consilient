@@ -245,7 +245,9 @@ def _check_locked(
 
 def _state_order(item: tuple[int, Event]) -> tuple[datetime, datetime, int]:
     index, event = item
-    observed = datetime.fromisoformat(event.data["observed_at"]).astimezone(timezone.utc)
+    observed = datetime.fromisoformat(event.data["observed_at"]).astimezone(
+        timezone.utc
+    )
     stamped = datetime.fromisoformat(event.raw["ts"]).astimezone(timezone.utc)
     return observed, stamped, index
 
@@ -301,9 +303,7 @@ def _permission_is_current(
         observed = parsed.astimezone(timezone.utc)
     except (OverflowError, ValueError):
         return False
-    return not _state_is_stale(
-        observed, now.astimezone(timezone.utc), ceilings
-    )
+    return not _state_is_stale(observed, now.astimezone(timezone.utc), ceilings)
 
 
 def _decide(

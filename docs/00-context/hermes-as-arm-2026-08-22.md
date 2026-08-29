@@ -37,7 +37,7 @@ The candidate non-interactive surface is `hermes chat --query-file BRIEF -Q --in
 
 `--max-turns` and `--run-budget` are not hard bounds on the Codex app-server path: Hermes enters that path before its normal iteration loop and the app-server session receives neither value. In the normal loop, `--run-budget` gives an 80% wrap-up notice and caps implicit stale-call timeouts; it does not itself terminate the run at 100%. [measured] ([budget behaviour](https://github.com/NousResearch/hermes-agent/blob/261a4efb90d7/agent/conversation_loop.py#L121-L165), [app-server branch](https://github.com/NousResearch/hermes-agent/blob/261a4efb90d7/agent/conversation_loop.py#L1950-L1957), [session construction](https://github.com/NousResearch/hermes-agent/blob/261a4efb90d7/agent/codex_runtime.py#L742-L750))
 
-The enforceable wall-clock contract would therefore come from Consilient's existing parent timeout and process-tree kill, not from those Hermes flags. [measured] ([dispatch enforcement](../../scripts/dispatch.py#L550-L614))
+The enforceable wall-clock contract would therefore come from Consilient's existing parent timeout and process-tree kill, not from those Hermes flags. [measured] ([dispatch enforcement](../../scripts/dispatch_workspace.py#L133-L163))
 
 Provider, model and toolset flags are available on the same `chat` subcommand. They are invocation inputs, not proof of the provider, model or bill that actually handled every main and auxiliary call. [measured] ([revision-pinned source](https://github.com/NousResearch/hermes-agent/blob/261a4efb90d7/hermes_cli/_parser.py#L320-L370))
 
@@ -49,7 +49,7 @@ Therefore Hermes passes only the mechanical non-interactive-entry test. `dispatc
 
 ## What a fifth arm would add: no independent induction
 
-Consilient's arm identity is static: each `Harness` has one `family` and one subscription `pool`, while fan-out treats `family:<family>` as the evidence class. [measured] ([registry](../../src/consilient/harness.py#L68-L76), [fan-out](../../src/consilient/harness.py#L662-L740), [recorded evidence class](../../src/consilient/harness.py#L1068-L1082))
+Consilient's arm identity is static: each `Harness` has one `family` and one subscription `pool`, while fan-out treats `family:<family>` as the evidence class. [measured] ([registry](../../src/consilient/harness.py#L68-L76), [fan-out](../../src/consilient/harness_models.py#L196-L210), [recorded evidence class](../../src/consilient/harness_selection.py#L297-L375))
 
 Hermes selects its effective provider and model dynamically. Registering it as `family="hermes"` would therefore turn a wrapper name into a false independence claim. Binding it to Codex, Claude or xAI authentication would consume an existing family and pool; it would add neither exogenous evidence nor separately measured headroom. [measured] [asserted] ([provider resolution](https://github.com/NousResearch/hermes-agent/blob/261a4efb90d7/hermes_cli/runtime_provider.py#L618-L634))
 
@@ -77,7 +77,7 @@ Hermes does not supply a V0-18-equivalent default. Its board auto-dispatches rev
 
 V0-18 states that a human approval, consent, gate lift, spend authorisation or verdict is valid only when the principal authored it. [asserted] ([V0-18](../40-spec/v0-draft.md#L419-L419))
 
-Current Consilient enforcement validates only caller-declared actor, principal and channel fields and expressly records the absence of a signature verifier. The intended rule and present enforcement are not equivalent. [measured] ([event ingress](../../src/consilient/events.py#L890-L978))
+Current Consilient enforcement validates only caller-declared actor, principal and channel fields and expressly records the absence of a signature verifier. The intended rule and present enforcement are not equivalent. [measured] ([event ingress](../../src/consilient/events_durability.py#L122-L133))
 
 A future Hermes arm would be forbidden to publish, push, send, approve, lift a gate, author a verdict, incur metered spend, access any unclaimed or non-allowlisted root, read host credentials, accept another agent's work, or persist a learned skill or memory as trusted policy. Agents could only propose those effects for separately authenticated principal action. [asserted]
 
@@ -97,7 +97,7 @@ Implementing those controls would reduce Hermes to a more complicated wrapper ar
 
 Hermes' supported Kanban claim path is stronger than the unlocked read-modify-write defect found in Ruflo: it enables SQLite WAL mode, enters `BEGIN IMMEDIATE`, and uses a conditional `UPDATE` with `rowcount == 1` so only one claimant wins; the run and event are created in the same write transaction. No unlocked claim read-modify-write was found in that path. [measured] ([transaction](https://github.com/NousResearch/hermes-agent/blob/261a4efb90d7/hermes_cli/kanban_db.py#L61-L68), [claim protocol](https://github.com/NousResearch/hermes-agent/blob/261a4efb90d7/hermes_cli/kanban_db.py#L4617-L4727))
 
-Consilient's current claim opening is weaker: `dispatch.py` checks for a conflict and later appends the claim as separate operations, while the append writer has no cross-process lock. [measured] ([check](../../scripts/dispatch.py#L1423-L1445), [later open](../../scripts/dispatch.py#L1579-L1601), [append](../../src/consilient/events.py#L1031-L1058))
+Consilient's current claim opening is weaker: `dispatch.py` checks for a conflict and later appends the claim as separate operations, while the append writer has no cross-process lock. [measured] ([check](../../scripts/dispatch_launch.py#L274-L361), [later open](../../scripts/dispatch_preflight.py#L219-L298), [append](../../src/consilient/events_fields.py#L148-L158))
 
 Two dispatchers can therefore both observe no conflict and open overlapping claims. This race follows from the static interleaving; it was not reproduced in this review. [asserted]
 

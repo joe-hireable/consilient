@@ -27,9 +27,7 @@ def should_ask(task_id: str, events: Iterable[Event]) -> bool:
     )
 
 
-def _build(
-    kind: str, actor: str, data: dict[str, object]
-) -> event_schema.EventPayload:
+def _build(kind: str, actor: str, data: dict[str, object]) -> event_schema.EventPayload:
     payload: event_schema.EventPayload = {
         "v": event_schema.SCHEMA_VERSION,
         "ts": datetime.now(timezone.utc).isoformat(),

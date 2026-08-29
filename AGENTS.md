@@ -121,7 +121,7 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
    That claim was in the public shop window of a project whose entire subject is measurement honesty.
 
    **Enforcement:** a capability claim in public-facing prose names its incumbent and the evidence,
-   or it does not ship. `tests/test_v0_invariants.py` fails a superlative — "nothing", "no one",
+   or it does not ship. `tests/test_v0_enforcement_ratchets.py` fails a superlative — "nothing", "no one",
    "first", "only" — appearing in public-facing prose without a citation beside it. Beating a bar you
    never located is indistinguishable from not knowing where it was.
 
@@ -185,7 +185,7 @@ These are load-bearing. They were derived, not asserted — see `docs/10-researc
     something is run. **Deciding under uncertainty and pretending to certainty are opposites, not
     neighbours.**
 
-    **Enforcement:** `tests/test_v0_invariants.py::test_provisional_adrs_name_a_live_experiment` fails
+    **Enforcement:** `tests/test_v0_enforcement_ratchets.py::test_provisional_adrs_name_a_live_experiment` fails
     when a `PROVISIONAL` ADR names no experiment, or names one absent from the register. A decision
     that admits it is provisional and offers no way out is the failure this principle exists to stop.
 

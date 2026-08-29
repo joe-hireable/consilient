@@ -299,7 +299,7 @@ binary items has $1 + 2k$ parameters against $2^k - 1$ degrees of freedom in the
 that is 7 against 7, leaving **zero** degrees of freedom for a goodness-of-fit test. At $k = 4$ it
 is 9 against 15, leaving 6. `[algebra]` So *"model it"* is not available at present and becomes
 available on adding a fourth check — a concrete, cheap prerequisite rather than a preference, and
-the reason EXP-58 is registered with $k \ge 4$.
+the reason EXP-150 is registered with $k \ge 4$.
 
 ---
 
@@ -390,7 +390,7 @@ they are only partially identified: `[algebra]`
 This is the provenance rule in `brief-common.md` costing something real: a conclusion's evidence was
 computed and thrown away, and recovering it costs a 104-second re-run rather than a new experiment.
 The fix is one dictionary per mutant instead of four counters — record the full outcome vector, not
-per-check totals. It is registered as EXP-58 rather than applied, because applying it means editing
+per-check totals. It is registered as EXP-150 rather than applied, because applying it means editing
 `run_exp47.py` and its result file, which this brief does not authorise.
 
 ---
@@ -502,12 +502,12 @@ rest on the read-depths in this table and nowhere else.
 
 **Reversal path.** This commit adds one research document and one register entry, and changes no
 code, no ADR and no gate. To undo it entirely: `git revert <commit-sha>`. To undo only the register
-entry, delete the `### EXP-58` block. Nothing else in the tree references either.
+entry, delete the `### EXP-150` block. Nothing else in the tree references either.
 
 **The option not taken.** I considered re-running EXP-47 with full outcome capture, which would have
 replaced § 9b's ranges with measured numbers and made the near-comonotone claim testable at $k \ge 4$.
 I did not, because it writes `results-exp47.json` and `run_exp47.py`, and the brief names the two
-files I may write. Registering EXP-58 preserves the work at the cost of a delay; the alternative
+files I may write. Registering EXP-150 preserves the work at the cost of a delay; the alternative
 was to exceed the brief.
 
 ---
@@ -520,7 +520,7 @@ Stated as observations that would show this document wrong, not as caveats.
    at least four checks, at least one of which kills more than 20% of mutants. If the composite's
    position within the sharp bound falls below 50% of the width, *"verifiers sit near the upper
    bound"* is refuted and the § 8 recommendation to gate at the conservative end becomes needlessly
-   pessimistic rather than merely safe. **This is the cheap test and EXP-58 pre-registers it.**
+   pessimistic rather than merely safe. **This is the cheap test and EXP-150 pre-registers it.**
 2. **On the infeasibility guard's usefulness.** If, across repositories, the independence product
    almost always falls *inside* the bound implied by marginals plus one pairwise table, then the
    guard fires rarely and is not worth shipping. It fired here with a margin of 0.040018; one

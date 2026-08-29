@@ -71,6 +71,9 @@ jobs:
           python .github/scripts/check_generated_documents.py --check
           python .github/scripts/check_adr_trail.py
           python .github/scripts/check_living_documents.py --check docs/superpowers/specs/2026-08-22-*.md
+          python .github/scripts/check_file_length.py
+          python .github/scripts/check_function_size.py --self-test
+          python .github/scripts/check_function_size.py
       - name: Relative link invariant check
         if: ${{ !cancelled() }}
         # C4 of docs/20-design/documentation-and-surfaces-plan-2026-08-23.md, and it ships
@@ -107,6 +110,23 @@ jobs:
         # docstring says it cannot run on a runner, and a gate that silently no-ops is worse
         # than no gate. That omission is pinned by a test.
         run: python .github/scripts/check_foreign_identifiers.py --self-test
+      - name: Boundary and inventory invariant checks
+        if: ${{ !cancelled() }}
+        # MEASURED 28 August 2026: ten of the twenty-three scripts in .github/scripts/ were
+        # invoked by no workflow at all. Among them was check_private_repo_names.py -- the
+        # boundary check -- which on that day was RED against the tracked tree: the publication
+        # policy still carried the private-corpus carve-out the principal rescinded on 23
+        # August, exempted by the checker's own EXISTING_BREACHES list. A check that runs
+        # nowhere cannot report anything, which is working principle 3 exactly.
+        #
+        # check_private_corpus.py is still deliberately absent and that omission stays pinned by
+        # its own test: it cannot run on a runner, and a gate that silently no-ops is worse than
+        # no gate.
+        run: |
+          python .github/scripts/check_private_repo_names.py
+          python .github/scripts/check_adopted_deps.py
+          python .github/scripts/check_adr_experiments.py
+          python .github/scripts/check_merge_acceptance.py --self-test
       - name: Adopted component licence invariant check
         if: ${{ !cancelled() }}
         # The curated markdown table is not an adoption gate. This self-test proves each

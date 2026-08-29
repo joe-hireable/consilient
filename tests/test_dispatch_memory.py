@@ -6,6 +6,8 @@ from the trajectory and the private object store in a fresh process.
 
 from __future__ import annotations
 
+from family_source import seam
+
 import hashlib
 import importlib.util
 import json
@@ -235,10 +237,10 @@ def _dispatch_with_fake(
 ) -> tuple[Any, dict[str, object], int]:
     script = _load_script()
     skills = _skills(workspace)
-    monkeypatch.setattr(script, "DEFAULT_SKILLS", skills)
-    monkeypatch.setattr(script, "git_diff_bytes", lambda _cwd: 0)
+    monkeypatch.setattr(seam("dispatch_launch"), "DEFAULT_SKILLS", skills)
+    monkeypatch.setattr(seam("dispatch_evidence"), "git_diff_bytes", lambda _cwd: 0)
     monkeypatch.setattr(
-        script,
+        seam("dispatch_invocation"),
         "build_command",
         lambda _harness, **kwargs: ["agent", str(kwargs["brief"])],
     )
@@ -263,7 +265,7 @@ def _dispatch_with_fake(
                 extra_artefact.write_text("outside-bytes\n", encoding="utf-8")
         return exit_code, False, 0.1, None
 
-    monkeypatch.setattr(script, "run_process", fake_run_process)
+    monkeypatch.setattr(seam("dispatch_launch"), "run_process", fake_run_process)
     grok = harness_by_id("grok")
     assert grok is not None
     payload, code = script.dispatch_one(

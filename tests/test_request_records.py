@@ -7,6 +7,8 @@ completes without a request.record in the trajectory is a silent regression.
 
 from __future__ import annotations
 
+from family_source import seam
+
 import importlib.util
 import json
 import sys
@@ -183,11 +185,11 @@ def test_dispatch_once_emits_request_record_in_production_path(
     runs_dir = tmp_path / "runs"
     cwd = tmp_path / "repo"
     cwd.mkdir()
-    monkeypatch.setattr(script, "find_grok", lambda: "grok")
-    monkeypatch.setattr(script, "metered_grok_reason", lambda: None)
-    monkeypatch.setattr(script, "help_text", lambda _argv: "  --max-turns <N>\n")
+    monkeypatch.setattr(seam("dispatch_evidence"), "find_grok", lambda: "grok")
+    monkeypatch.setattr(seam("dispatch_evidence"), "metered_grok_reason", lambda: None)
+    monkeypatch.setattr(seam("dispatch_launch"), "help_text", lambda _argv: "  --max-turns <N>\n")
     monkeypatch.setattr(
-        script,
+        seam("dispatch_harness"),
         "run_harness",
         lambda *args, **kwargs: script.RunResult(
             harness=HARNESSES[2],

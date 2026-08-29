@@ -10,6 +10,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FACTS = Path("docs/project-facts.md")
+
+# A generated region is exempt only when its marker names a REGISTERED generator. An arbitrary
+# marker must not buy an exemption. Widened 28 August 2026: the set named only the facts spine,
+# so the two inline blocks that scripts/build_counts.py maintains in CLAUDE.md and README.md were
+# unrecognised, and the generator's own output was reported as a hand-written restatement of
+# itself -- "CLAUDE.md:14 restates a generated fact '108 ADRs'", on a line no human wrote.
+REGISTERED_REGIONS = frozenset(
+    {
+        FACTS.as_posix(),
+        "scripts/build_counts.py#inventory",
+        "scripts/build_counts.py#experiments",
+    }
+)
 TOP_LEVEL_WRITTEN = ("README.md", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md")
 FACT_HEADING = re.compile(r"^##\s+(\w+)\s*$", re.MULTILINE)
 DOCUMENT_CLASS = re.compile(r"(?:Document\s+)?class:\s*\**\s*W(?:/g)?\b", re.IGNORECASE)
@@ -56,24 +69,45 @@ def written_documents(root: Path) -> list[Path]:
 
 
 def written_lines(path: Path) -> list[tuple[int, str]]:
+    """The HAND-WRITTEN lines of a document: everything outside a generated region.
+
+    MEASURED 28 August 2026. REGISTERED_REGIONS held only `docs/project-facts.md`, so
+    `docs/project-facts.md`, so the two live generated blocks in CLAUDE.md and README.md --
+    both emitted by `scripts/build_counts.py` -- were invisible to it. Their BEGIN markers were
+    treated as ordinary prose, the region never opened, and the generator's own output was then
+    reported as a hand-written restatement of itself: "CLAUDE.md:14 restates a generated fact
+    '108 ADRs'", on a line no human wrote and that `build_counts.py --check` keeps current.
+
+    The registration requirement itself is deliberate and stays: an arbitrary hand-written
+    BEGIN GENERATED marker must NOT buy an exemption, or the check could be silenced by wrapping
+    prose in a fake marker. tests/test_restatement.py pins that, and it caught the first attempt
+    at this fix, which had dropped the requirement entirely. The defect was only that the
+    registered set named one generator when the tree has two.
+
+    Regions are also now tracked per source, because two generators may interleave in one file
+    and a single boolean cannot tell whose END it has just read.
+    """
     visible: list[tuple[int, str]] = []
-    in_generated = False
+    open_sources: set[str] = set()
     for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         marker = GENERATED_MARKER.search(line)
-        if marker is None or marker.group(2) != FACTS.as_posix():
-            if not in_generated:
+        if marker is None or marker.group(2) not in REGISTERED_REGIONS:
+            if not open_sources:
                 visible.append((line_no, line))
             continue
+        source = marker.group(2)
         if marker.group(1).upper() == "BEGIN":
-            if in_generated:
-                raise ValueError("nested generated region")
-            in_generated = True
+            if source in open_sources:
+                raise ValueError(f"nested generated region for {source}")
+            open_sources.add(source)
         else:
-            if not in_generated:
-                raise ValueError("generated region ends without a beginning")
-            in_generated = False
-    if in_generated:
-        raise ValueError("unclosed generated region")
+            if source not in open_sources:
+                raise ValueError(
+                    f"generated region for {source} ends without a beginning"
+                )
+            open_sources.discard(source)
+    if open_sources:
+        raise ValueError(f"unclosed generated region: {sorted(open_sources)}")
     return visible
 
 

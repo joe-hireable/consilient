@@ -27,6 +27,8 @@ import sys
 
 import pytest
 
+from family_source import family_trees
+
 from consilient import events
 
 SRC = (
@@ -134,9 +136,12 @@ def test_lock_and_unlock_seek_to_the_sentinel_and_never_to_zero() -> None:
     survived months of review because it looks like the obvious thing to write. Reading the
     offset out of the AST means a regression fails here rather than in production, where it
     cost 3,895 deaths before anyone attributed them to a seek."""
-    tree = ast.parse(SRC.read_text(encoding="utf-8"))
+    # Parse the whole events family. `_lock_file` and `_unlock_file` moved into a sibling in
+    # the 28 August 2026 split, and reading only events.py inspected neither -- the count came
+    # back zero and the test said so, which is the right failure for the wrong reason.
+    trees = family_trees("events")
     checked = 0
-    for node in ast.walk(tree):
+    for node in [n for tree in trees for n in ast.walk(tree)]:
         if not isinstance(node, ast.FunctionDef) or node.name not in {
             "_lock_file",
             "_unlock_file",

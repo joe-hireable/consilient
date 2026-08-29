@@ -1,86 +1,61 @@
-"""Dispatch policy and runner. Invariants ship with the check that can fail.
+"""Selection: which pool and which harness a task is sent to, automatically and when the
+operator names one.
 
-The load-bearing ones:
-  - an exhausted pool is never selected while any other pool has headroom
-  - automatic selection never spends unknown headroom
-  - a silent exit-0 is recorded silent, not retried on another pool
-  - fan-out requires two different families
-  - the consil CLI surface is unchanged
+Two invariants are load-bearing and each ships with the check that can fail it — an
+exhausted pool is never selected while another has headroom, and automatic selection
+never spends unknown headroom. Both are mutation targets: ranking on `used_percent`
+alone would pick claude at 0%, and treating unknown as free would spend a plan nobody
+has measured. The Cursor Other pool is avoided automatically, so `claude-4-sonnet` and
+`gpt-5` route there only when the operator names the model, and a model whose reasoning
+capability is unregistered is refused before a brief is written or a process launched.
+
+Naming a harness explicitly is attended operation, not a fallback: an unknown pool may
+be spent that way, an exhausted one only with `--allow-exhausted`. Fan-out selection is
+here too because it is a selection rule — two arms of the same family are echo, not
+consilience, so it refuses rather than pick twice from one family. The headroom file
+tests belong with these because the pool states the selector reasons over come from it:
+a written file overrides the defaults, the exhaustion threshold is a boundary not a
+strict inequality, and a recent probe is reused rather than re-run.
+
+Preserved from before the 28 August 2026 split, which rewrote this docstring and carried
+the paragraph below into no sibling. It is reproduced WHOLE. An earlier restoration took
+only the individual lines a checker had reported missing, which spliced halves of two
+different sentences together beneath a claim of being verbatim -- found by an outside
+review on 29 August 2026.
+
+    The load-bearing ones:
+      - an exhausted pool is never selected while any other pool has headroom
+      - automatic selection never spends unknown headroom
+      - a silent exit-0 is recorded silent, not retried on another pool
+      - fan-out requires two different families
+      - the consil CLI surface is unchanged
 """
 
-from __future__ import annotations
+from family_source import seam
 
-import argparse
-import hashlib
-import importlib.util
 import json
-import os
-import subprocess
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
-
 import pytest
-
-from consilient.cli import build_parser
-from consilient.events import read, read_all, validate
 from consilient.harness import (
     DEFAULT_POOLS,
     HARNESSES,
-    Decision,
-    FanoutDecision,
-    permission_flags,
     EXHAUSTED_USED_PERCENT,
-    Harness,
     PoolState,
     Probe,
-    classify_artefact,
     cursor_pool_for_model,
     harness_by_id,
-    judge_fanout,
     load_pools,
-    make_run_id,
-    parse_status,
     pools_from_mapping,
-    record_fanout,
-    record_outcome,
-    record_refusal,
     remaining_percent,
     select,
     select_fanout,
 )
-
-DISPATCH_PATH = Path(__file__).resolve().parent.parent / "scripts" / "dispatch.py"
-
-INSTALLED = tuple(
-    Probe(item.id, True, "1.0", f"{item.binary} (fixture)") for item in HARNESSES
+from dispatch_helpers import (
+    CAP_HELP,
+    INSTALLED,
+    _load_script,
 )
-CAP_HELP = (
-    "  --max-turns <N>\n  --max-tokens <N>\n"
-    "  --always-approve --force --trust --skip-git-repo-check"
-)
-
-
-def _load_script():
-    name = "consilient_dispatch_script"
-    existing = sys.modules.get(name)
-    if existing is not None:
-        return existing
-    spec = importlib.util.spec_from_file_location(name, DISPATCH_PATH)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def _stub_harness_commands(monkeypatch, script) -> None:
-    monkeypatch.setattr(script, "find_claude", lambda: "claude")
-    monkeypatch.setattr(script, "find_grok", lambda: "grok")
-    monkeypatch.setattr(script, "find_codex", lambda: "codex")
-    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
-    monkeypatch.setattr(script, "metered_grok_reason", lambda: None)
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
 
 
 def _pool(
@@ -103,7 +78,12 @@ def _pool(
 def _probes(*missing: str) -> tuple[Probe, ...]:
     skip = set(missing)
     return tuple(
-        Probe(item.id, item.id not in skip, "1.0" if item.id not in skip else None, "fixture")
+        Probe(
+            item.id,
+            item.id not in skip,
+            "1.0" if item.id not in skip else None,
+            "fixture",
+        )
         for item in HARNESSES
     )
 
@@ -220,151 +200,11 @@ def test_fanout_refuses_when_only_one_family_is_eligible():
     assert "different model families" in decision.reason
 
 
-def test_workspace_trust_message_is_silent_even_when_exit_is_zero():
-    status, reason = classify_artefact(
-        exit_code=0,
-        stdout="Workspace Trust Required\n",
-        stderr="",
-        output_bytes=24,
-        diff_bytes=0,
-        timed_out=False,
-    )
-    assert status == "silent"
-    assert "workspace trust required" in reason
-
-
-def test_trust_marker_in_a_large_transcript_is_not_silent():
-    """Codex twice wrote the artefact and was recorded silent because the marker
-    appeared in a dumped agents.md. A banner with no work is silent; a 5 kB
-    transcript is not."""
-    status, reason = classify_artefact(
-        exit_code=0,
-        stdout="Completed naming-repo.md\n",
-        stderr="workspace trust required appears inside a dump\n" + ("x" * 3000),
-        output_bytes=5000,
-        diff_bytes=0,
-        timed_out=False,
-    )
-    assert status == "ok"
-    assert "artefact" in reason
-
-
-def test_empty_exit_zero_is_silent():
-    status, reason = classify_artefact(
-        exit_code=0,
-        stdout="",
-        stderr="",
-        output_bytes=0,
-        diff_bytes=0,
-        timed_out=False,
-    )
-    assert status == "silent"
-    assert "empty" in reason
-
-
-def test_nonempty_transcript_is_ok():
-    status, reason = classify_artefact(
-        exit_code=0,
-        stdout="pong\n",
-        stderr="",
-        output_bytes=5,
-        diff_bytes=0,
-        timed_out=False,
-    )
-    assert status == "ok"
-    assert reason == "produced an artefact"
-
-
-def test_timeout_is_not_called_ok():
-    status, _reason = classify_artefact(
-        exit_code=None,
-        stdout="",
-        stderr="",
-        output_bytes=0,
-        diff_bytes=0,
-        timed_out=True,
-    )
-    assert status == "timeout"
-
-
-def test_fanout_agreement_and_disagreement():
-    assert judge_fanout("pong", "pong", True, True) == "agree"
-    assert judge_fanout("pong", "ping", True, True) == "disagree"
-    assert judge_fanout("pong", "pong", True, False) == "incomparable"
-
-
 def test_cursor_vendor_aliases_draw_on_the_avoided_pool():
     assert cursor_pool_for_model("composer-2.5") == "cursor-models"
     assert cursor_pool_for_model("claude-4-sonnet") == "cursor-other"
     assert cursor_pool_for_model("gpt-5") == "cursor-other"
     assert cursor_pool_for_model("gemini-3.7-flash") == "cursor-other"
-
-
-def test_refusal_and_outcome_go_through_append(tmp_path):
-    ts = datetime.now(timezone.utc).isoformat()
-    recorded = record_refusal(
-        tmp_path,
-        ts=ts,
-        run_id="run-1",
-        task="pong",
-        cwd=str(tmp_path),
-        reason="no eligible harness",
-        considered=("claude: exhausted",),
-    )
-    assert recorded["event"] == "dispatch.refused"
-    events, rejected = read(tmp_path / f"{ts[:10]}.jsonl")
-    assert not rejected
-    # The refusal and the capability gap it constitutes are recorded together (V0-41):
-    # the gap is the same event seen from the user's side, not a side note.
-    assert [event.kind for event in events] == ["dispatch.refused", "capability.gap"]
-    assert events[0].raw == recorded
-    assert events[1].data["run_id"] == "run-1"
-
-    grok = harness_by_id("grok")
-    assert grok is not None
-    outcome = record_outcome(
-        tmp_path,
-        ts=datetime.now(timezone.utc).isoformat(),
-        run_id="run-2",
-        task="pong",
-        cwd=str(tmp_path),
-        harness=grok,
-        status="silent",
-        reason="Workspace Trust Required",
-        exit_code=0,
-        artefact_bytes=24,
-        diff_bytes=0,
-        timed_out=False,
-        duration_s=1.2,
-        command=("cursor-agent", "-p"),
-    )
-    assert outcome["event"] == "dispatch.outcome"
-    assert outcome["data"]["status"] == "silent"
-
-
-def test_fanout_event_names_distinct_evidence_classes(tmp_path):
-    first = harness_by_id("cursor-composer")
-    second = harness_by_id("grok")
-    assert first is not None and second is not None
-    ts = datetime.now(timezone.utc).isoformat()
-    recorded = record_fanout(
-        tmp_path,
-        ts=ts,
-        run_id="fan-1",
-        task="pong",
-        cwd=str(tmp_path),
-        first=first,
-        second=second,
-        first_status="ok",
-        second_status="ok",
-        verdict="disagree",
-        first_run_id="a",
-        second_run_id="b",
-    )
-    validate(recorded)
-    classes = [row["evidence_class"] for row in recorded["data"]["contributors"]]
-    assert classes[0] != classes[1]
-    assert classes[0].startswith("family:")
 
 
 def test_pools_from_file_override_defaults(tmp_path):
@@ -399,191 +239,13 @@ def test_used_percent_at_threshold_is_exhausted():
     assert remaining_percent(grok) == 100.0 - EXHAUSTED_USED_PERCENT
 
 
-def test_dispatch_is_a_script_not_a_consil_subcommand():
-    parser = build_parser()
-    subparsers = next(
-        action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
-    )
-    assert set(subparsers.choices) == {
-        "record",
-        "replay",
-        "beta",
-        "doctor",
-        "dashboard",
-        "usage",
-    }
-    assert DISPATCH_PATH.is_file()
-    source = DISPATCH_PATH.read_text(encoding="utf-8")
-    assert "silently" in source.lower() or "NOT retried" in source
-
-
-def test_wsl_path_translation_is_absolute():
-    script = _load_script()
-    converted = script.to_wsl_path(Path("C:/Users/jpbpr/Repositories/consilient-w-orch-b"))
-    assert converted.startswith("/mnt/c/")
-    assert "C:" not in converted
-    assert "\\" not in converted
-
-
-def test_run_process_writes_an_artefact_file(tmp_path):
-    script = _load_script()
-    stdout_path = tmp_path / "stdout.txt"
-    stderr_path = tmp_path / "stderr.txt"
-    code, timed_out, _duration, _timing = script.run_process(
-        [sys.executable, "-c", "print('pong')"],
-        cwd=tmp_path,
-        stdout_path=stdout_path,
-        stderr_path=stderr_path,
-        timeout_s=20,
-    )
-    assert timed_out is False
-    assert code == 0
-    assert "pong" in stdout_path.read_text(encoding="utf-8")
-
-
-def test_run_process_kills_a_sleeping_child(tmp_path):
-    script = _load_script()
-    stdout_path = tmp_path / "stdout.txt"
-    stderr_path = tmp_path / "stderr.txt"
-    code, timed_out, duration, _timing = script.run_process(
-        [sys.executable, "-c", "import time; time.sleep(30)"],
-        cwd=tmp_path,
-        stdout_path=stdout_path,
-        stderr_path=stderr_path,
-        timeout_s=2,
-    )
-    assert timed_out is True
-    assert duration < 15
-    assert code != 0 or timed_out
-
-
-def test_cap_defaults_are_finite_and_cli_overrides_are_honoured():
-    script = _load_script()
-    parser = script.build_parser()
-
-    defaults = parser.parse_args(["noop"])
-    assert defaults.max_turns == script.DEFAULT_MAX_TURNS > 0
-    assert defaults.max_tokens == script.DEFAULT_MAX_TOKENS > 0
-    assert defaults.timeout == script.DEFAULT_TIMEOUT_S > 0
-
-    overridden = parser.parse_args(
-        ["noop", "--max-turns", "7", "--max-tokens", "1234", "--timeout", "9"]
-    )
-    assert (overridden.max_turns, overridden.max_tokens, overridden.timeout) == (7, 1234, 9)
-
-
-@pytest.mark.parametrize("flag", ("--max-turns", "--max-tokens", "--timeout"))
-@pytest.mark.parametrize("value", ("0", "-1", "malformed"))
-def test_finite_limit_cli_rejects_non_positive_or_malformed_values(flag, value):
-    script = _load_script()
-    with pytest.raises(SystemExit):
-        script.build_parser().parse_args(["noop", flag, value])
-
-
-@pytest.mark.parametrize("harness_id", tuple(item.id for item in HARNESSES))
-def test_every_harness_command_carries_both_native_caps(
-    monkeypatch, tmp_path, harness_id
-):
-    """Mutation target: deleting either cap from any harness command fails this test."""
-    script = _load_script()
-    _stub_harness_commands(monkeypatch, script)
-    harness = harness_by_id(harness_id)
-    assert harness is not None
-
-    built = script.build_command(
-        harness,
-        task="noop",
-        cwd=tmp_path,
-        brief=tmp_path / "brief.md",
-        model="composer-2.5" if harness_id == "cursor-composer" else None,
-        max_turns=7,
-        max_tokens=1234,
-    )
-
-    assert isinstance(built, list)
-    command = " ".join(str(part) for part in built)
-    assert "--max-turns 7" in command
-    assert "--max-tokens 1234" in command
-
-
-@pytest.mark.parametrize("harness_id", tuple(item.id for item in HARNESSES))
-def test_every_harness_applies_the_native_caps_its_cli_actually_exposes(
-    monkeypatch, tmp_path, harness_id
-):
-    """R11 obliges that no arm runs UNBOUNDED. It does not oblige a flag spelling.
-
-    R11's attribution was withdrawn on 21 August 2026; the bounded-arm obligation remains
-    on engineering merit.
-
-    Until that evening this suite pinned the stricter reading -- refuse the launch unless the
-    CLI exposed BOTH `--max-turns` and `--max-tokens` natively. Measured against the installed
-    CLIs: grok exposes `--max-turns` only, codex exposes neither. So the condition could never
-    pass for two of the three subscription harnesses, and the harness had locked itself out of
-    two of the plans it exists to spend -- a wall, not a gate, and in direct conflict with the
-    principal's standing instruction to use every subscription.
-
-    The obligation is still enforced. Where a native cap exists it is applied, asserted here.
-    Where it does not, the arm is bounded by the wall-clock timeout and the process-tree kill
-    in `run_process`, asserted by `test_an_arm_without_a_native_cap_is_still_bounded`.
-
-    Not achieved, and stated rather than implied: no installed CLI exposes a real per-run token
-    cap, so token bounding lives in the pool ceiling rather than per arm; and a wall-clock bound
-    is strictly weaker than a turn cap, since an arm can burn many turns quickly inside it.
-    """
-    script = _load_script()
-    _stub_harness_commands(monkeypatch, script)
-    monkeypatch.setattr(script, "help_text", lambda _argv: "--max-turns <N>")
-    harness = harness_by_id(harness_id)
-    assert harness is not None
-
-    built = script.build_command(
-        harness,
-        task="noop",
-        cwd=tmp_path,
-        brief=tmp_path / "brief.md",
-        model="composer-2.5" if harness_id == "cursor-composer" else None,
-    )
-
-    assert not isinstance(built, str), f"{harness_id} refused a launch it can bound: {built}"
-    command = " ".join(built)
-    assert "--max-turns" in command, "the native cap on offer was not applied"
-    assert "--max-tokens" not in command, "a cap the CLI does not expose must not be passed"
-
-
-def test_an_arm_without_a_native_cap_is_still_bounded(monkeypatch, tmp_path):
-    """The fallback bound is what makes the change above honest rather than a loosening.
-
-    A CLI exposing no cap flag at all must still be launched under a finite wall-clock, and
-    `run_process` must kill the process tree when it expires -- `taskkill /T /F` on Windows,
-    `os.killpg(SIGKILL)` on POSIX. Without this, dropping the native-flag requirement would
-    genuinely leave arms unbounded and R11 would be unmet.
-    """
-    script = _load_script()
-    _stub_harness_commands(monkeypatch, script)
-    monkeypatch.setattr(script, "help_text", lambda _argv: "no cap flags here")
-    harness = harness_by_id("codex")
-    assert harness is not None
-
-    built = script.build_command(
-        harness, task="noop", cwd=tmp_path, brief=tmp_path / "brief.md", model=None
-    )
-    assert not isinstance(built, str), f"a bounded launch was refused: {built}"
-    command = " ".join(built)
-    assert "--max-turns" not in command and "--max-tokens" not in command
-
-    source = Path(script.__file__).read_text(encoding="utf-8")
-    assert "subprocess.TimeoutExpired" in source, "no wall-clock bound in run_process"
-    assert "taskkill" in source, "no Windows process-tree kill"
-    assert "killpg" in source, "no POSIX process-group kill"
-
-
 def test_unknown_explicit_model_refuses_before_brief_or_launch(monkeypatch, tmp_path):
     script = _load_script()
-    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", tmp_path / "cursor.lock")
-    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
+    monkeypatch.setattr(seam("dispatch_launch"), "DEFAULT_CURSOR_LOCK", tmp_path / "cursor.lock")
+    monkeypatch.setattr(seam("dispatch_launch"), "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(seam("dispatch_launch"), "help_text", lambda _argv: CAP_HELP)
     monkeypatch.setattr(
-        script,
+        seam("dispatch_launch"),
         "run_process",
         lambda *_args, **_kwargs: pytest.fail("unknown model must not launch"),
     )
@@ -611,7 +273,7 @@ def test_default_headroom_refresh_is_bounded_and_uses_the_local_probe(
 ):
     script = _load_script()
     output = (tmp_path / "headroom.json").resolve()
-    monkeypatch.setattr(script, "DEFAULT_HEADROOM", output)
+    monkeypatch.setattr(seam("dispatch_launch"), "DEFAULT_HEADROOM", output)
     captured = {}
 
     def fake_run(argv, **kwargs):
@@ -619,7 +281,7 @@ def test_default_headroom_refresh_is_bounded_and_uses_the_local_probe(
         captured["kwargs"] = kwargs
         return 0, False, 0.1, None
 
-    monkeypatch.setattr(script, "run_process", fake_run)
+    monkeypatch.setattr(seam("dispatch_launch"), "run_process", fake_run)
 
     assert script.refresh_default_headroom(output) is None
     assert captured["argv"][0] == sys.executable
@@ -628,12 +290,10 @@ def test_default_headroom_refresh_is_bounded_and_uses_the_local_probe(
     assert captured["kwargs"]["timeout_s"] == 45
 
 
-def test_recent_default_headroom_is_reused_without_another_probe(
-    monkeypatch, tmp_path
-):
+def test_recent_default_headroom_is_reused_without_another_probe(monkeypatch, tmp_path):
     script = _load_script()
     output = (tmp_path / "headroom.json").resolve()
-    monkeypatch.setattr(script, "DEFAULT_HEADROOM", output)
+    monkeypatch.setattr(seam("dispatch_launch"), "DEFAULT_HEADROOM", output)
     observed_at = datetime.now(timezone.utc).isoformat()
     output.write_text(
         json.dumps(
@@ -653,7 +313,7 @@ def test_recent_default_headroom_is_reused_without_another_probe(
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        script,
+        seam("dispatch_launch"),
         "run_process",
         lambda *_args, **_kwargs: pytest.fail("fresh headroom must be reused"),
     )
@@ -661,214 +321,11 @@ def test_recent_default_headroom_is_reused_without_another_probe(
     assert script.refresh_default_headroom(output) is None
 
 
-def test_non_ok_dispatch_emits_only_a_privacy_bounded_error_identity(tmp_path):
-    from consilient.error_tracking import read_records
-
-    script = _load_script()
-    harness = harness_by_id("grok")
-    assert harness is not None
-    result = script.RunResult(
-        harness=harness,
-        status="timeout",
-        reason=r"C:\\private\\repo token=must-not-appear",
-        exit_code=None,
-        stdout="private output",
-        stderr="private error",
-        artefact_bytes=1,
-        diff_bytes=0,
-        timed_out=True,
-        duration_s=1.0,
-        command=("secret-command",),
-        run_id="run-error",
-        stdout_path="private-stdout",
-        stderr_path="private-stderr",
-    )
-
-    script.record_dispatch_error(tmp_path, result)
-
-    records = read_records(tmp_path / "errors" / "errors.jsonl")
-    assert len(records) == 1
-    assert records[0]["component"] == "dispatch.grok"
-    assert records[0]["error_type"] == "DispatchOutcome"
-    assert records[0]["error_code"] == "timeout"
-    assert "private" not in json.dumps(records[0]).casefold()
-
-
-@pytest.mark.parametrize("harness_id", ("claude", "grok", "codex"))
-def test_brief_is_delivered_by_reference(monkeypatch, tmp_path, harness_id):
-    script = _load_script()
-    monkeypatch.setattr(script, "find_claude", lambda: "claude")
-    monkeypatch.setattr(script, "find_grok", lambda: "grok")
-    monkeypatch.setattr(script, "find_codex", lambda: "codex")
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
-    monkeypatch.setattr(script, "metered_grok_reason", lambda: None)
-    harness = harness_by_id(harness_id)
-    assert harness is not None
-    brief = (tmp_path / "brief.md").resolve()
-    task = "INLINE_TASK_SENTINEL $(touch escaped) `also escaped`"
-
-    built = script.build_command(
-        harness,
-        task=task,
-        cwd=tmp_path,
-        brief=brief,
-        model=None,
-    )
-
-    assert isinstance(built, list)
-    command = " ".join(str(part) for part in built)
-    assert "INLINE_TASK_SENTINEL" not in command
-    assert brief.as_posix() in command
-
-
-def test_run_harness_scrubs_git_environment(monkeypatch, tmp_path):
-    script = _load_script()
-    monkeypatch.setenv("GIT_DIR", "C:/wrong/repository/.git")
-    monkeypatch.setenv("GIT_WORK_TREE", "C:/wrong/repository")
-    monkeypatch.setenv("GIT_INDEX_FILE", "C:/wrong/repository/index")
-    monkeypatch.setattr(script, "build_command", lambda *_args, **_kwargs: ["agent"])
-    captured: dict[str, str] = {}
-
-    def fake_run_process(_argv, *, env, **_kwargs):
-        captured.update(env)
-        return 0, False, 0.1, None
-
-    monkeypatch.setattr(script, "run_process", fake_run_process)
-    harness = harness_by_id("codex")
-    assert harness is not None
-
-    script.run_harness(
-        harness,
-        task="pong",
-        cwd=tmp_path,
-        run_dir=tmp_path / "run",
-        timeout_s=5,
-        model=None,
-        run_id="run-1",
-    )
-
-    assert not any(key.startswith("GIT_") for key in captured)
-    assert captured["PYTHONDONTWRITEBYTECODE"] == "1"
-
-
-def test_live_dispatches_consume_recorded_instruction_assemblies(monkeypatch, tmp_path):
-    """Cutting either live caller, delivery, or recording breaks this test."""
-    script = _load_script()
-    active_log = tmp_path / "single-log"
-    observed = []
-
-    def fake_build_command(_harness, **kwargs):
-        return ["agent", str(kwargs["brief"])]
-
-    def fake_run_process(argv, *, stdout_path, **_kwargs):
-        brief_path = Path(argv[-1])
-        brief = brief_path.read_text(encoding="utf-8")
-        events, rejected = script.read_all(active_log)
-        assemblies = [
-            event for event in events if event.kind == "instructions.assembled"
-        ]
-        observed.append(
-            {
-                "brief": brief,
-                "recall": brief_path.with_name("recall.md").read_text(encoding="utf-8"),
-                "assemblies": assemblies,
-                "rejected": rejected,
-            }
-        )
-        stdout_path.parent.mkdir(parents=True, exist_ok=True)
-        stdout_path.write_text("pong\n", encoding="utf-8")
-        return 0, False, 0.1, None
-
-    monkeypatch.setattr(script, "build_command", fake_build_command)
-    monkeypatch.setattr(script, "run_process", fake_run_process)
-    grok = harness_by_id("grok")
-    codex = harness_by_id("codex")
-    assert grok is not None and codex is not None
-
-    single, single_code = script.dispatch_one(
-        decision=Decision("run", grok, "selected grok", ("codex",)),
-        task="pong",
-        cwd=tmp_path,
-        log_dir=active_log,
-        runs_dir=tmp_path / "single-runs",
-        timeout_s=5,
-        model=None,
-        dry_run=False,
-    )
-    assert single_code == 0 and single["status"] == "ok"
-
-    active_log = tmp_path / "fanout-log"
-    fanout, fanout_code = script.dispatch_fanout(
-        decision=FanoutDecision("run", grok, codex, "two families", ()),
-        task="pong",
-        cwd=tmp_path,
-        log_dir=active_log,
-        runs_dir=tmp_path / "fanout-runs",
-        timeout_s=5,
-        model=None,
-        dry_run=False,
-    )
-    assert fanout_code == 0 and fanout["status"] == "agree"
-
-    assert [len(item["assemblies"]) for item in observed] == [1, 1, 2]
-    for item in observed:
-        brief = item["brief"]
-        assert brief.startswith("pong\n")
-        assert "# Invariant core" in brief
-        assert "# Skills selected for this task" in brief
-        assert "# Recall pack" in brief
-        assert "# Adapted layer" in brief
-        assert "`recall.md` beside this brief" in brief
-        assert "work_item.opened" in item["recall"]
-        assert not item["rejected"]
-        assembly = item["assemblies"][-1]
-        assert assembly.data["recall"]["query"] == "pong"
-        delivered = brief[brief.index("# Invariant core") :]
-        assert assembly.data["assembly_id"] == hashlib.sha256(
-            delivered.encode("utf-8")
-        ).hexdigest()
-
-
-def test_bypass_flags_are_known_for_every_registered_harness():
-    for item in HARNESSES:
-        flags = permission_flags(item.id, "bypass")
-        assert flags, f"{item.id} has no bypass flags; the meta-harness cannot control it"
-        assert permission_flags(item.id, "prompt") == ()
-
-
-def test_claude_bypass_always_skips_permissions(monkeypatch, tmp_path):
-    script = _load_script()
-    monkeypatch.setattr(script, "find_claude", lambda: "claude")
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
-    harness = harness_by_id("claude")
-    assert harness is not None
-    built = script.build_command(
-        harness,
-        task="pong",
-        cwd=tmp_path,
-        brief=tmp_path / "brief.md",
-        model=None,
-        permissions="bypass",
-    )
-    assert isinstance(built, list)
-    assert "--dangerously-skip-permissions" in built
-    prompted = script.build_command(
-        harness,
-        task="pong",
-        cwd=tmp_path,
-        brief=tmp_path / "brief.md",
-        model=None,
-        permissions="prompt",
-    )
-    assert isinstance(prompted, list)
-    assert "--dangerously-skip-permissions" not in prompted
-
-
 def test_explicit_cursor_other_model_is_attended(tmp_path, monkeypatch):
     """Automatic selection avoids the Other pool; an explicit --model is the operator naming it."""
     script = _load_script()
-    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
+    monkeypatch.setattr(seam("dispatch_launch"), "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(seam("dispatch_launch"), "help_text", lambda _argv: CAP_HELP)
     harness = harness_by_id("cursor-composer")
     assert harness is not None
     built = script.build_command(
@@ -880,662 +337,3 @@ def test_explicit_cursor_other_model_is_attended(tmp_path, monkeypatch):
     )
     assert isinstance(built, list)
     assert any("gpt-5" in str(part) for part in built)
-
-
-def test_silent_run_is_not_retried_on_another_pool(tmp_path, monkeypatch):
-    script = _load_script()
-    grok = harness_by_id("grok")
-    assert grok is not None
-    calls = {"n": 0}
-
-    def fake_run(harness: Harness, **kwargs):
-        calls["n"] += 1
-        assert kwargs["max_turns"] == 7
-        assert kwargs["max_tokens"] == 1234
-        return script.RunResult(
-            harness=harness,
-            status="silent",
-            reason="harness produced no work: 'workspace trust required' (exit 0)",
-            exit_code=0,
-            stdout="Workspace Trust Required\n",
-            stderr="",
-            artefact_bytes=24,
-            diff_bytes=0,
-            timed_out=False,
-            duration_s=0.1,
-            command=("cursor-agent", "-p"),
-            run_id="run-silent",
-            stdout_path=str(tmp_path / "stdout.txt"),
-            stderr_path=str(tmp_path / "stderr.txt"),
-        )
-
-    monkeypatch.setattr(script, "run_harness", fake_run)
-    payload, code = script.dispatch_one(
-        decision=select(probes=INSTALLED, pools=DEFAULT_POOLS, requested="grok"),
-        task="pong",
-        cwd=tmp_path,
-        log_dir=tmp_path / "log",
-        runs_dir=tmp_path / "runs",
-        timeout_s=5,
-        model=None,
-        dry_run=False,
-        max_turns=7,
-        max_tokens=1234,
-    )
-    assert calls["n"] == 1
-    assert payload["status"] == "silent"
-    assert code == 3
-    events, rejected = read(tmp_path / "log" / f"{datetime.now(timezone.utc).date().isoformat()}.jsonl")
-    assert not rejected
-    # The claim lifecycle (open before the run, complete after) means the outcome is
-    # no longer the last event in the file; find it by kind, not position.
-    outcomes = [event for event in events if event.kind == "dispatch.outcome"]
-    assert outcomes[-1].data["status"] == "silent"
-
-
-def test_fanout_plumbs_cap_overrides_to_both_children(tmp_path, monkeypatch):
-    script = _load_script()
-    seen: list[tuple[int, int]] = []
-
-    def fake_run(harness: Harness, **kwargs):
-        seen.append((kwargs["max_turns"], kwargs["max_tokens"]))
-        return script.RunResult(
-            harness=harness,
-            status="ok",
-            reason="produced an artefact",
-            exit_code=0,
-            stdout="pong\n",
-            stderr="",
-            artefact_bytes=5,
-            diff_bytes=0,
-            timed_out=False,
-            duration_s=0.1,
-            command=("agent", "--max-turns", "7", "--max-tokens", "1234"),
-            run_id=kwargs["run_id"],
-            stdout_path=str(tmp_path / "stdout.txt"),
-            stderr_path=str(tmp_path / "stderr.txt"),
-        )
-
-    monkeypatch.setattr(script, "run_harness", fake_run)
-    payload, code = script.dispatch_fanout(
-        decision=select_fanout(probes=INSTALLED, pools=DEFAULT_POOLS),
-        task="pong",
-        cwd=tmp_path,
-        log_dir=tmp_path / "log",
-        runs_dir=tmp_path / "runs",
-        timeout_s=5,
-        model=None,
-        dry_run=False,
-        max_turns=7,
-        max_tokens=1234,
-    )
-
-    assert code == 0
-    assert payload["status"] == "agree"
-    assert seen == [(7, 1234), (7, 1234)]
-
-
-def test_resolve_cwd_allows_this_repository_root():
-    script = _load_script()
-    assert script.resolve_cwd(str(script.ROOT)) == script.ROOT
-
-
-def test_resolve_cwd_allows_a_directory_inside_this_repository():
-    script = _load_script()
-    inside = script.ROOT / "scripts"
-    assert inside.is_dir()
-    assert script.resolve_cwd(str(inside)) == inside.resolve()
-
-
-def test_resolve_cwd_refuses_a_path_outside_this_repository(tmp_path):
-    """Gate B has a check now. AGENTS.md forbade pointing this at another repository and
-    nothing enforced it; `Path(value).resolve()` accepted every path on the machine.
-
-    The outside path is constructed under tmp_path deliberately: proving the boundary must
-    not require reading, resolving or naming a private corpus.
-    """
-    script = _load_script()
-    outside = tmp_path / "some-other-repo"
-    outside.mkdir()
-    with pytest.raises(ValueError, match="only inside its own repository"):
-        script.resolve_cwd(str(outside))
-
-
-def test_resolve_cwd_has_no_override_flag():
-    """A second path to the same state is the same hole. There is no --gate-b-approved."""
-    source = DISPATCH_PATH.read_text(encoding="utf-8")
-    assert "gate-b-approved" not in source
-    assert "--allow-foreign" not in source
-
-
-def test_load_allowed_roots_missing_file_is_empty(tmp_path):
-    script = _load_script()
-    assert script.load_allowed_roots(tmp_path / "no-such.json") == ()
-
-
-def test_load_allowed_roots_skips_missing_directories(tmp_path):
-    script = _load_script()
-    present = tmp_path / "present"
-    present.mkdir()
-    allow = tmp_path / "allowed-cwds.json"
-    allow.write_text(
-        json.dumps({"roots": [str(present), str(tmp_path / "gone")]}) + "\n",
-        encoding="utf-8",
-    )
-    assert script.load_allowed_roots(allow) == (present.resolve(),)
-
-
-def test_load_allowed_roots_refuses_a_filesystem_root(tmp_path):
-    script = _load_script()
-    allow = tmp_path / "allowed-cwds.json"
-    allow.write_text(json.dumps({"roots": [str(tmp_path.anchor)]}) + "\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="filesystem root"):
-        script.load_allowed_roots(allow)
-
-
-def test_load_allowed_roots_malformed_json_fails_closed(tmp_path):
-    script = _load_script()
-    allow = tmp_path / "allowed-cwds.json"
-    allow.write_text("{not json", encoding="utf-8")
-    with pytest.raises(ValueError, match="not valid JSON"):
-        script.load_allowed_roots(allow)
-
-
-def test_resolve_cwd_allows_an_instance_listed_root(tmp_path):
-    script = _load_script()
-    foreign = tmp_path / "authorised-repo"
-    foreign.mkdir()
-    allow = tmp_path / "allowed-cwds.json"
-    allow.write_text(json.dumps({"roots": [str(foreign)]}) + "\n", encoding="utf-8")
-    assert script.resolve_cwd(str(foreign), allowed_file=allow) == foreign.resolve()
-
-
-def test_resolve_cwd_allows_a_subdirectory_of_an_instance_listed_root(tmp_path):
-    script = _load_script()
-    foreign = tmp_path / "authorised-repo"
-    inside = foreign / "frontend"
-    inside.mkdir(parents=True)
-    allow = tmp_path / "allowed-cwds.json"
-    allow.write_text(json.dumps({"roots": [str(foreign)]}) + "\n", encoding="utf-8")
-    assert script.resolve_cwd(str(inside), allowed_file=allow) == inside.resolve()
-
-
-def test_resolve_cwd_still_refuses_an_unlisted_foreign_root_when_allowlist_exists(tmp_path):
-    script = _load_script()
-    listed = tmp_path / "authorised-repo"
-    listed.mkdir()
-    other = tmp_path / "some-other-repo"
-    other.mkdir()
-    allow = tmp_path / "allowed-cwds.json"
-    allow.write_text(json.dumps({"roots": [str(listed)]}) + "\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="only inside its own repository"):
-        script.resolve_cwd(str(other), allowed_file=allow)
-
-
-def test_allowed_cwds_instance_file_is_gitignored_and_the_example_ships():
-    """PRODUCT ships the shape; INSTANCE keeps the machine paths."""
-    ignored = Path(".gitignore").read_text(encoding="utf-8")
-    assert ".harness/allowed-cwds.json" in ignored
-    example = json.loads(
-        Path(".harness/allowed-cwds.example.json").read_text(encoding="utf-8")
-    )
-    assert example["roots"] == []
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    tracked = subprocess.run(
-        ["git", "ls-files", ".harness/allowed-cwds.json", ".harness/allowed-cwds.example.json"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        check=True,
-    ).stdout.split()
-    assert ".harness/allowed-cwds.example.json" in tracked
-    assert ".harness/allowed-cwds.json" not in tracked
-
-
-def _git(cwd: Path, *args: str) -> None:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    env["GIT_AUTHOR_NAME"] = "test"
-    env["GIT_AUTHOR_EMAIL"] = "t@example.com"
-    env["GIT_COMMITTER_NAME"] = "test"
-    env["GIT_COMMITTER_EMAIL"] = "t@example.com"
-    subprocess.run(
-        ["git", "-C", str(cwd), *args],
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-    )
-
-
-def test_wsl_cursor_inner_exports_git_dir_for_a_linked_worktree(tmp_path, monkeypatch):
-    """R4. WSL git cannot resolve a Windows gitdir pointer in a linked worktree."""
-    script = _load_script()
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _git(repo, "init")
-    _git(repo, "commit", "--allow-empty", "-m", "seed")
-    linked = tmp_path / "linked"
-    _git(repo, "worktree", "add", str(linked))
-    monkeypatch.setattr(script, "cursor_native", lambda: None)
-    monkeypatch.setattr(script, "wsl_bridge", lambda: "wsl")
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
-    harness = harness_by_id("cursor-composer")
-    assert harness is not None
-    built = script.build_command(
-        harness,
-        task="pong",
-        cwd=linked,
-        brief=tmp_path / "brief.md",
-        model="composer-2.5",
-    )
-    assert isinstance(built, list)
-    inner = built[-1]
-    git_dir, work_tree = script.git_workspace(linked)
-    assert git_dir is not None
-    assert f"GIT_DIR={script.to_wsl_path(git_dir)}" in inner
-    assert f"GIT_WORK_TREE={script.to_wsl_path(work_tree)}" in inner
-    assert "cursor-agent" in inner
-    assert "--max-turns 20" in inner
-    assert "--max-tokens 100000" in inner
-
-
-def test_native_cursor_command_does_not_inject_wsl_git_exports(tmp_path, monkeypatch):
-    script = _load_script()
-    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
-    harness = harness_by_id("cursor-composer")
-    assert harness is not None
-    built = script.build_command(
-        harness,
-        task="pong",
-        cwd=tmp_path,
-        brief=tmp_path / "brief.md",
-        model="composer-2.5",
-    )
-    assert isinstance(built, list)
-    assert all("GIT_DIR" not in str(part) for part in built)
-    assert built[0] == "cursor-agent"
-
-
-def test_cursor_run_holds_the_agent_lock(tmp_path, monkeypatch):
-    script = _load_script()
-    lock = tmp_path / "cursor-agent.lock"
-    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", lock)
-    monkeypatch.setattr(script, "build_command", lambda *_a, **_k: ["agent"])
-    calls: list[str] = []
-    orig = script.ExclusiveFileLock
-
-    class Spy(orig):  # type: ignore[misc, valid-type]
-        def __enter__(self):
-            calls.append("enter")
-            return super().__enter__()
-
-        def __exit__(self, *exc: object):
-            calls.append("exit")
-            return super().__exit__(*exc)
-
-    monkeypatch.setattr(script, "ExclusiveFileLock", Spy)
-    monkeypatch.setattr(script, "run_process", lambda *_a, **_k: (0, False, 0.1, None))
-    harness = harness_by_id("cursor-composer")
-    assert harness is not None
-    result = script.run_harness(
-        harness,
-        task="pong",
-        cwd=tmp_path,
-        run_dir=tmp_path / "run",
-        timeout_s=5,
-        model=None,
-        run_id="run-lock",
-    )
-    assert result.status in {"ok", "silent"}
-    assert calls == ["enter", "exit"]
-
-
-def test_non_cursor_run_does_not_take_the_cursor_lock(tmp_path, monkeypatch):
-    script = _load_script()
-    lock = tmp_path / "cursor-agent.lock"
-    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", lock)
-    monkeypatch.setattr(script, "build_command", lambda *_a, **_k: ["agent"])
-    held: dict[str, bool] = {}
-
-    def fake_run_process(_argv, **_kwargs):
-        held["exists"] = lock.exists()
-        return 0, False, 0.1, None
-
-    monkeypatch.setattr(script, "run_process", fake_run_process)
-    harness = harness_by_id("codex")
-    assert harness is not None
-    script.run_harness(
-        harness,
-        task="pong",
-        cwd=tmp_path,
-        run_dir=tmp_path / "run",
-        timeout_s=5,
-        model=None,
-        run_id="run-codex",
-    )
-    assert held.get("exists") is False
-
-
-def test_dry_run_does_not_hold_the_cursor_lock(tmp_path, monkeypatch):
-    script = _load_script()
-    lock = tmp_path / "cursor-agent.lock"
-    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", lock)
-    monkeypatch.setattr(script, "cursor_native", lambda: "cursor-agent")
-    monkeypatch.setattr(script, "help_text", lambda _argv: CAP_HELP)
-    harness = harness_by_id("cursor-composer")
-    assert harness is not None
-    decision = Decision(
-        kind="run",
-        harness=harness,
-        reason="cursor-composer",
-        considered=(),
-    )
-    payload, code = script.dispatch_one(
-        decision=decision,
-        task="noop",
-        cwd=script.ROOT,
-        log_dir=tmp_path / "log",
-        runs_dir=tmp_path / "runs",
-        timeout_s=5,
-        model="composer-2.5",
-        dry_run=True,
-        permissions="bypass",
-    )
-    assert code == 0
-    assert payload["status"] == "dry-run"
-    assert not lock.exists()
-
-
-def test_cursor_agent_lock_is_gitignored():
-    ignored = Path(".gitignore").read_text(encoding="utf-8")
-    assert ".harness/cursor-agent.lock" in ignored
-
-
-def test_dry_run_outside_this_repository_is_refused_and_prints_no_command(tmp_path, capsys):
-    script = _load_script()
-    outside = tmp_path / "some-other-repo"
-    outside.mkdir()
-    code = script.main(["--dry-run", "--json", "--cwd", str(outside), "noop"])
-    assert code == 2
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["status"] == "refused"
-    assert "repository" in payload["reason"]
-    assert str(outside.resolve()) in payload["reason"]
-    assert "command" not in payload
-
-
-def test_write_brief_without_a_log_is_the_task_alone(tmp_path):
-    script = _load_script()
-    brief = script.write_brief(tmp_path / "run", "pong")
-    assert brief.read_text(encoding="utf-8") == "pong\n"
-
-
-def test_main_injects_one_fail_closed_task_capability_context(
-    monkeypatch, tmp_path, capsys
-):
-    script = _load_script()
-    now = datetime.now(timezone.utc).isoformat()
-    headroom = tmp_path / "headroom.json"
-    headroom.write_text(
-        json.dumps(
-            {
-                "observed_at": now,
-                "source": "test",
-                "pools": {
-                    pool.name: {
-                        "used_percent": 10,
-                        "exhausted": False,
-                        "note": "test",
-                    }
-                    for pool in DEFAULT_POOLS
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    inventory = tmp_path / "inventory.json"
-    inventory.write_text(
-        json.dumps(
-            {
-                "allowlist": [
-                    {
-                        "kind": "tool",
-                        "name": "pytest",
-                        "available": True,
-                        "provenance": ["probe:pytest"],
-                        # An entry with no gate defaults to "gated" and is refused, which is
-                        # what this test's own name asks for. Unit AF made that default real;
-                        # this fixture predates it and had been relying on absence meaning
-                        # permission. Declaring the grant is the honest repair -- relaxing the
-                        # check to admit an ungated entry would delete the guarantee instead.
-                        "gate": {
-                            "state": "admitted",
-                            "reason": "exact_grant",
-                            "grant_kind": "principal_authority",
-                            "authority_event": {
-                                "event_id": "evt-authority-1",
-                                "event_kind": "human.approval",
-                                "event_sha256": "b" * 64,
-                            },
-                            "decision_id": None,
-                            "recovery_proof_ref": None,
-                            "scope": [],
-                            "operations": [],
-                            "effect_classes": [],
-                            "expires_at": "2099-01-01T00:00:00+00:00",
-                        },
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    request = tmp_path / "request.json"
-    request.write_text(
-        json.dumps(
-            {
-                "capabilities": [
-                    {"kind": "tool", "name": "pytest", "reason": "verify task"}
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    captured = {}
-    monkeypatch.setattr(script, "probe_all", lambda: INSTALLED)
-
-    def fake_dispatch_one(**kwargs):
-        captured["task"] = kwargs["task"]
-        return {"status": "ok"}, 0
-
-    monkeypatch.setattr(script, "dispatch_one", fake_dispatch_one)
-
-    code = script.main(
-        [
-            "pong",
-            "--cwd",
-            str(Path.cwd()),
-            "--headroom",
-            str(headroom),
-            "--harness",
-            "grok",
-            "--capability-inventory",
-            str(inventory),
-            "--capability-request",
-            str(request),
-            "--json",
-        ]
-    )
-
-    assert code == 0, capsys.readouterr().out
-    task = captured["task"]
-    assert "Selected capability context" in task
-    assert '\"name\":\"pytest\"' in task
-    assert '\"reason\":\"verify task\"' in task
-
-
-def test_capability_context_refuses_unpaired_or_unknown_inputs(tmp_path):
-    script = _load_script()
-    with pytest.raises(ValueError, match="must be passed together"):
-        script.task_with_capabilities("pong", str(tmp_path / "one.json"), None)
-
-    inventory = tmp_path / "inventory.json"
-    request = tmp_path / "request.json"
-    inventory.write_text(json.dumps({"allowlist": []}), encoding="utf-8")
-    request.write_text(
-        json.dumps(
-            {
-                "capabilities": [
-                    {"kind": "tool", "name": "missing", "reason": "needed"}
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(ValueError, match="unknown capability"):
-        script.task_with_capabilities("pong", str(inventory), str(request))
-
-
-def test_write_brief_includes_a_recall_pack_from_the_log(tmp_path):
-    from datetime import datetime, timezone
-
-    from consilient.events import SCHEMA_VERSION, append
-
-    script = _load_script()
-    log = tmp_path / "log"
-    log.mkdir()
-    ts = datetime.now(timezone.utc).isoformat()
-    append(
-        log / f"{ts[:10]}.jsonl",
-        {
-            "v": SCHEMA_VERSION,
-            "ts": ts,
-            "event": "dispatch.outcome",
-            "actor": "consilient.dispatch",
-            "data": {
-                "status": "ok",
-                "harness": "grok",
-                "task": "pong",
-                "supervised": True,
-            },
-        },
-    )
-    brief = script.write_brief(tmp_path / "run", "continue the work", log_dir=log)
-    text = brief.read_text(encoding="utf-8")
-    assert text.startswith("continue the work")
-    assert "Recall pack" in text
-    assert "dispatch.outcome" in text
-
-
-def test_make_run_id_is_stable_for_the_same_inputs():
-    ts = "2026-08-21T12:00:00+00:00"
-    assert make_run_id(ts, "pong", "grok") == make_run_id(ts, "pong", "grok")
-    assert make_run_id(ts, "pong", "grok") != make_run_id(ts, "pong", "claude")
-
-
-def test_parse_status_rejects_unknown_values():
-    assert parse_status("silent") == "silent"
-    with pytest.raises(ValueError, match="unknown dispatch status"):
-        parse_status("success")
-
-
-def test_every_write_admitted_form_proves_read_write_stage_commit_and_index_isolation(
-    tmp_path,
-):
-    script = _load_script()
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    (repo / "tracked.txt").write_text("seed\n", encoding="utf-8")
-    _git(repo, "init")
-    _git(repo, "add", "tracked.txt")
-    _git(repo, "commit", "-m", "seed")
-    indexes: list[Path] = []
-    for form in script.WORKSPACE_FORMS:
-        dest = tmp_path / form
-        workspace = script.probe_workspace_form(
-            form, repo, dest, runtime_id="grok", runtime_version="1.0"
-        )
-        assert workspace.form == form
-        assert workspace.index_path.exists()
-        indexes.append(workspace.index_path)
-    assert len(set(indexes)) == len(indexes)
-
-
-def test_failed_workspace_probe_does_not_reach_run_process(tmp_path, monkeypatch):
-    script = _load_script()
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    (repo / "tracked.txt").write_text("seed\n", encoding="utf-8")
-    _git(repo, "init")
-    _git(repo, "add", "tracked.txt")
-    _git(repo, "commit", "-m", "seed")
-
-    def boom(*_args, **_kwargs):
-        raise AssertionError("run_process must not run after a failed workspace probe")
-
-    monkeypatch.setattr(script, "run_process", boom)
-    monkeypatch.setattr(
-        script,
-        "provision_isolated_workspace",
-        lambda *_args, **_kwargs: "linked_worktree failed: probe refused",
-    )
-    payload, code = script.dispatch_one(
-        decision=select(probes=INSTALLED, pools=DEFAULT_POOLS, requested="grok"),
-        task="pong",
-        cwd=repo,
-        log_dir=tmp_path / "log",
-        runs_dir=tmp_path / "runs",
-        timeout_s=5,
-        model=None,
-        dry_run=False,
-        claims=("src",),
-    )
-    assert payload["status"] == "failed"
-    assert code == 1
-    assert "probe refused" in payload["reason"]
-    events, _rejected = read_all(tmp_path / "log")
-    kinds = [event.kind for event in events]
-    assert "dispatch.outcome" in kinds
-    assert "work_item.opened" in kinds
-    assert "work_item.completed" in kinds
-
-
-def test_unready_native_item_does_not_reach_run_process(tmp_path, monkeypatch):
-    from consilient import work_items
-
-    script = _load_script()
-
-    def boom(*_args, **_kwargs):
-        raise AssertionError("run_process must not run for an unready native item")
-
-    monkeypatch.setattr(script, "run_process", boom)
-    payload, code = script.dispatch_one(
-        decision=select(probes=INSTALLED, pools=DEFAULT_POOLS, requested="grok"),
-        task="pong",
-        cwd=tmp_path,
-        log_dir=tmp_path / "log",
-        runs_dir=tmp_path / "runs",
-        timeout_s=5,
-        model=None,
-        dry_run=False,
-        native_claim={
-            "ticket": "native:missing",
-            "revision": 1,
-            "task_family": "code",
-            "protocol_id": "pytest",
-            "protocol_version": "v1",
-        },
-    )
-    assert payload["status"] == "refused"
-    assert code == 2
-    assert "unready" in payload["reason"]
-    events, _rejected = read_all(tmp_path / "log")
-    assert work_items.OPENED not in [
-        event.kind for event in events if event.data.get("run_id")
-    ]
-    del work_items

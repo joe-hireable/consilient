@@ -20,6 +20,17 @@ from consilient.local_fit import FRAMEWORK_FLOOR_BYTES
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "voice_cascade.py"
 
 
+def _load_admission():
+    """The sibling holding the GPU reading, which is where `subprocess` now lives.
+
+    voice_cascade.py was split on 28 August 2026; `nvidia_used_bytes` and its `subprocess`
+    import moved to voice_cascade_admission.py. Patching the entry point raised rather than
+    silently missing, which is the loud version of the facade hazard.
+    """
+    _load_script()  # puts the scripts directory on sys.path via the entry point bootstrap
+    return sys.modules["voice_cascade_admission"]
+
+
 def _load_script():
     name = "consilient_voice_cascade_script"
     spec = importlib.util.spec_from_file_location(name, SCRIPT)
@@ -135,14 +146,28 @@ def test_ordinary_speech_is_not_refused_as_telephony() -> None:
 def test_the_module_names_no_telephony_provider_outside_its_own_prohibition() -> None:
     """ADR-0102's enforcement, scoped to this unit: the tokens may appear only in the
     denylist that states the rule, exactly as the private-repo names may."""
-    lines = SCRIPT.read_text(encoding="utf-8").splitlines()
-    start = next(
-        index for index, line in enumerate(lines) if line.startswith("TELEPHONY_TOKENS")
-    )
-    end = next(
-        index for index in range(start, len(lines)) if lines[index].rstrip() == ")"
-    )
-    rest = "\n".join(lines[:start] + lines[end + 1 :]).casefold()
+    # Across the whole family: the split moved the denylist into a sibling, and reading only
+    # the entry point raised StopIteration rather than checking anything. The rule is about
+    # the unit, and the unit is now several files.
+    rest_parts: list[str] = []
+    for path in [SCRIPT, *sorted(SCRIPT.parent.glob(f"{SCRIPT.stem}_*.py"))]:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        start = next(
+            (
+                index
+                for index, line in enumerate(lines)
+                if line.startswith("TELEPHONY_TOKENS")
+            ),
+            None,
+        )
+        if start is None:
+            rest_parts.append(chr(10).join(lines))
+            continue
+        end = next(
+            index for index in range(start, len(lines)) if lines[index].rstrip() == ")"
+        )
+        rest_parts.append(chr(10).join(lines[:start] + lines[end + 1 :]))
+    rest = chr(10).join(rest_parts).casefold()
     for token in vc.TELEPHONY_TOKENS:
         assert token not in rest, f"telephony token {token!r} outside the prohibition"
 
@@ -357,7 +382,7 @@ def test_the_gpu_reading_queries_memory_used_not_total(monkeypatch: pytest.Monke
         seen["argv"] = list(argv)
         return Completed()
 
-    monkeypatch.setattr(vc.subprocess, "run", fake_run)
+    monkeypatch.setattr(_load_admission().subprocess, "run", fake_run)
     assert vc.nvidia_used_bytes() == 1536 * 1024 * 1024
     assert "--query-gpu=memory.used" in seen["argv"]
 
@@ -368,7 +393,7 @@ def test_nvidia_used_bytes_is_none_when_the_binary_is_missing(
     def fake_run(argv: object, **kwargs: object) -> object:
         raise FileNotFoundError("nvidia-smi")
 
-    monkeypatch.setattr(vc.subprocess, "run", fake_run)
+    monkeypatch.setattr(_load_admission().subprocess, "run", fake_run)
     assert vc.nvidia_used_bytes() is None
 
 

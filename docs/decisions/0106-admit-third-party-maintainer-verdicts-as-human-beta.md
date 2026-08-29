@@ -1,9 +1,18 @@
 # 0106. Admit identified third-party maintainer verdicts as human-β authors
 
-- **Status:** PROPOSED — awaiting the principal. This ADR changes who may author a human verdict,
-  and ADR-0039 reserves that to him. Nothing in it is applied until he accepts it. The killing
-  experiment is the rejection-fraction floor in § Enforcement: if it is not cleared, this route
-  is declared failed rather than quietly reported.
+- **Status:** ACCEPTED 28 August 2026 by the principal, recorded as `human.approval`
+  `832f3d99-4f92-4281-b236-360f9e1fafc2` in the trajectory, with permission to submit upstream
+  recorded separately as `78c1ea9e-f519-43a2-b80a-29395ee04de9`. Both were typed by him through
+  the local CLI; neither was authored by the orchestrator, which is the whole subject of this
+  ADR. The killing experiment is the rejection-fraction floor in § Enforcement
+  (`beta.MIN_COMPOSITE_REJECTION_FRACTION = 0.05`): if it is not cleared, this route is declared
+  failed rather than quietly reported.
+
+  **Accepted is not yet exercised.** EXP-144, the experiment this decision rests on, is BLOCKED
+  on the upstream collector and maintainer-verdict join, and the B4 receipt store was found on 28
+  August to contain nothing but test-stub placeholders — so the external-contribution path has no
+  evidence of ever having run end to end. Rows continue to be recorded under the proxy estimand
+  until it has.
 - **Date:** 2026-08-25
 - **Deciders:** Joe Brown (principal) — proposed by the orchestrator from his own instruction
 - **Relates to:** V0-18 (a human verdict is valid only when the principal authored it),

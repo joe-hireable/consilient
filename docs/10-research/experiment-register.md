@@ -1525,7 +1525,7 @@ Evaluated across `pytest` (96 tests), `mypy` (mypy.ini), and `ruff` (`ruff check
 - Detection of inert checks in non-Python or non-code artefacts without a domain-specific mutation engine for ADRs/CI;
 - Higher-order multi-point semantic failures not captured by single-mutant operators.
 
-### EXP-58 · Harness uplift on a mainstream eval — and the number nobody else reports `READY`
+### EXP-147 · Harness uplift on a mainstream eval — and the number nobody else reports `READY`
 **Pre-registered 20 Aug 2026. Not run.** The flagship proof experiment.
 **Decides:** whether attaching this harness to a model produces a transformative, replicable gain on
 a benchmark outsiders already trust — and whether the gain is real or bought.
@@ -1716,7 +1716,7 @@ pairwise difference, because a difference whose interval spans zero is not a dif
 which is most real work, and the honest reason this experiment is a first step rather than an
 answer.
 
-### EXP-58 · β for SWE-bench Verified's own oracle — how often does a *resolved* patch break something the oracle never ran? `PHASE 1 RUNNING`
+### EXP-148 · β for SWE-bench Verified's own oracle — how often does a *resolved* patch break something the oracle never ran? `PHASE 1 RUNNING`
 **Pre-registered 20 Aug 2026, 23:20 UTC+1, before any β-relevant run.** The dispatching brief
 (`brief-swebench.md`) stated that this entry already existed and that "its stopping rules were fixed
 before any data". **It did not exist.** `rg -n "EXP-5[89]" docs/` returned only the brief itself.
@@ -1746,7 +1746,7 @@ What is left, and it is narrower than the brief's framing:
 |---|---|---|
 | SWE-Bench+ | the selected tests were **too weak** to distinguish a wrong fix; the answer **leaked** into the issue text | manual inspection of a sample, on SWE-bench (original / Lite) |
 | METR | the patch would not be **accepted by a maintainer** | human judgement |
-| **EXP-58** | the patch **breaks a test the oracle never ran** | mechanical execution, on SWE-bench **Verified** |
+| **EXP-148** | the patch **breaks a test the oracle never ran** | mechanical execution, on SWE-bench **Verified** |
 
 Those are three different things. A patch can be specific, unleaked, and mergeable-looking, and still
 regress a module the selected tests do not touch. SWE-bench Verified exists *because* OpenAI filtered
@@ -1826,7 +1826,7 @@ with no audit trail; this is one rule with twelve outputs, and the rule is in th
   installed in an experiment-local venv outside this repository — **no dependency is added here**).
   Writing twelve parsers would put the measurement's most disputable step in our own hands.
 
-**Sample, frozen before the run — see `experiments/exp58/sample-exp58.json`.** Frame: SWE-bench
+**Sample, frozen before the run — see `experiments/exp148/sample-exp148.json`.** Frame: SWE-bench
 Verified instances resolved by **at least one** of three submitted systems, because β is defined only
 over accepted patches. The three systems, chosen for architectural spread rather than score:
 `20250807_openhands_gpt5` (agentic scaffold, frontier model, 359 resolved),
@@ -2435,7 +2435,7 @@ self-adjudicated corpus is echo (ADR-0010).
 - Specification defects, where the code and the tests agree on the wrong thing. No arm here can
   see those; only P2's hand audit found any.
 
-### EXP-58 · Can output-free local adaptation predict verifier false accepts? `BLOCKED: EXP-56 + exact-model/dependency approval + provenance-complete fixture bank`
+### EXP-149 · Can output-free local adaptation predict verifier false accepts? `BLOCKED: EXP-56 + exact-model/dependency approval + provenance-complete fixture bank`
 **Pre-registered 20 Aug 2026. Not run.** This is the training gate proposed in
 `local-training-legality-and-feasibility-2026-08-20.md`, not authority to add a learned router.
 [measured]
@@ -2575,7 +2575,7 @@ class; anything about a graphical surface, which this run does not have. Those l
 the load-bearing ones and are stated in the note before this experiment exists.
 
 
-### EXP-58 · Where inside its sharp bound does composite β actually land? `READY`
+### EXP-150 · Where inside its sharp bound does composite β actually land? `READY`
 **Pre-registered 20 Aug 2026 in `composite-beta-under-dependence-2026-08-20.md`, before any
 additional check was run.**
 
@@ -3427,9 +3427,23 @@ is an **INSTANCE** finding until a second user's stream is measured.
 > allocated at claim time was EXP-64; `grep -rn "EXP-[0-9]" docs/` confirmed 65–89 unused.
 > **65–69 are deliberately left unallocated** for agents working concurrently in other
 > worktrees on 21 August 2026 — a gap costs nothing and a collision costs a cross-reference.
-> This file already records five-way and two-way collisions; **EXP-58 is still one of them and
-> currently names five different experiments in this file.** [measured] That is not fixed here
-> because renumbering another agent's entries mid-flight is how the first collision happened.
+> This file already records five-way and two-way collisions; **EXP-58 was one of them and named
+> five different experiments in this file until 29 August 2026.** [measured] It was not fixed
+> at the time because renumbering another agent's entries mid-flight is how the first
+> collision happened.
+> **Resolved on 29 August 2026 on the principal's instruction, once no entry was mid-flight.**
+> The agent-framework entry keeps EXP-58, because it heads the contiguous EXP-58–EXP-64 block
+> anchored in `../20-design/orchestration-dependencies-2026-08-20.md` and breaking that range
+> would fragment a recorded allocation. The other four were renumbered above the highest
+> registered number: harness uplift on a mainstream eval to **EXP-147**, β for SWE-bench
+> Verified's own oracle to **EXP-148**, output-free local adaptation to **EXP-149**, and where
+> composite β lands inside its sharp bound to **EXP-150**.
+>
+> Every one of the 41 mentions of EXP-58 in the tracked tree was resolved to one of the five
+> before any edit, and each resolution was checked by a second reader against the file itself.
+> **Eighteen were META** — prose about the collision rather than a reference to an experiment,
+> including the three paragraphs above — and renumbering those would have destroyed the record
+> of why the collision happened. They are deliberately untouched. [measured]
 >
 > All four entries are **PRODUCT** — they measure the harness anyone would ship, not Joe's
 > configuration of it. EXP-77 additionally requires an **INSTANCE** input (Joe recruiting
@@ -6043,7 +6057,7 @@ worth running as one.
 ### EXP-133 · Does threshold-triggered effort allocation beat a fixed phase budget? `BLOCKED: phase-labelled dispatch accounting, frozen task bank`
 
 **Registered 23 August 2026 by the orchestrator**, because ADR-0090 nominated it and did not write it;
-`tests/test_v0_invariants.py::test_provisional_adrs_name_a_live_experiment` caught the omission and
+`tests/test_v0_enforcement_ratchets.py::test_provisional_adrs_name_a_live_experiment` caught the omission and
 blocked every unit retirement until it was repaired. [measured] **The ADR is the specification for
 this entry; nothing here extends its scope.**
 

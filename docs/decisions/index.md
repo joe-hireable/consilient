@@ -2,7 +2,7 @@
 
 > **Producer:** `scripts/build_decision_index.py`
 > **Source:** `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`
-> **Source SHA-256:** `1ec901aa71760773bbe48071d5b849570ae331935263a1bdec62f9f441d356de`
+> **Source SHA-256:** `ee46617f4f145aad33d7cd63011872593c82f85107220ca878a2d9246b9353c1`
 > **Do not hand-edit:** regenerate with `python scripts/build_decision_index.py`.
 
 | ADR | Decision | Status | Supersession |
@@ -110,8 +110,9 @@
 | [0103](0103-make-contract-beta-the-gate-quantity-and-keep-human-beta-unblocking.md) | Make contract-β the gate quantity, and keep human-β as alignment rather than a blocker | PROVISIONAL | — |
 | [0104](0104-re-derive-both-halves-of-beta-star-from-evidence.md) | Re-derive both halves of β\\\* from evidence, and let the arithmetic fall where it does | PROVISIONAL | — |
 | [0105](0105-baseline-the-22-august-capture-loss.md) | Baseline the 22 August capture loss under its own pinned ratchet | ACCEPTED | — |
-| [0106](0106-admit-third-party-maintainer-verdicts-as-human-beta.md) | Admit identified third-party maintainer verdicts as human-β authors | PROPOSED | — |
+| [0106](0106-admit-third-party-maintainer-verdicts-as-human-beta.md) | Admit identified third-party maintainer verdicts as human-β authors | ACCEPTED | — |
 | [0107](0107-a-unit-may-merge-into-a-red-tree-but-nothing-may-publish-from-one.md) | A unit may merge into a red tree; nothing may publish from one | ACCEPTED | — |
 | [0108](0108-rotate-dispatch-across-a-users-own-accounts-per-harness.md) | Rotate dispatch across a user's own accounts, per harness, where the vendor allows it | PROVISIONAL | — |
 | [0109](0109-bind-a-review-verdict-to-the-units-own-diff-not-to-every-blob-it-claims.md) | Bind a review verdict to the unit's own diff, not to every blob it claims | ACCEPTED | supersedes 0037 |
 | [0110](0110-record-the-in-place-rewrite-of-adr-0105.md) | Record the in-place rewrite of ADR-0105, and advance the history pin over it | ACCEPTED | supersedes 0105 |
+| [0111](0111-derive-the-source-file-cap-from-named-corpora-and-keep-it-reversible.md) | Derive the source-file cap from named corpora, raise it to 1,000, and keep it reversible | ACCEPTED | — |

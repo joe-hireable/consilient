@@ -1,212 +1,42 @@
-"""D01 — immutable delivery estimate and reforecast."""
+"""D01 — the estimate is frozen before the work starts, and may only be superseded on
+the record.
 
-from __future__ import annotations
+Revision zero must carry its required fields: the delivery id, the commitment and plan
+digests it is bound to, the stream bounds, the resource snapshot digest, the checkpoint
+interval and recovery allowance, and a digest recomputable from the data itself. That
+digest must be deterministic — two derivations at the same instant, with the identifiers
+held equal, agree — because everything downstream is a digest comparison.
 
-import math
-from datetime import datetime, timedelta, timezone
+A reforecast appends rather than overwrites: the successor names its predecessor and the
+original, states its cause, and the projected chain still shows revision zero with its
+original upper bound intact. The refusals are the substance of the invariant and each
+pins one way the record could be quietly rewritten — a reforecast with no cause and no
+new range; a reforecast issued after the upper bound has already been breached, which
+must be given pre-breach or not at all; a second revision zero silently overwriting the
+first; an estimate whose analogue set has been trimmed after derivation, which is
+outcome-aware cohort selection and is refused; a delivery claim opened before revision
+zero exists; and an estimate whose digest does not match its data.
+
+The last test closes the loop: two independent rebuilds of the projection from the same
+log agree on the state digest, so the chain above is a property of the log rather than
+of the database that read it."""
+
+from datetime import datetime, timedelta
 from pathlib import Path
-
 import pytest
-
 from consilient import events, projection, work_items
-from consilient.events import EventError, SCHEMA_VERSION, append, append_transaction
-
-CONVERSATION_ID = "conv-est-001"
-TURN_ID = "turn-est-001"
-COMMITMENT_ID = "commit-est-001"
-PLAN_ID = "plan-est-001"
-DELIVERY_ID = "delivery-est-001"
-COHORT = {
-    "artefact_kind": "code",
-    "verifier_contract_digest": "a" * 64,
-    "size_band": "small",
-    "route_capability_class": "cursor-composer",
-}
-RESOURCE_SNAPSHOT = "b" * 64
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _issued() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _event(kind: str, data: dict[str, object], *, ts: str | None = None) -> dict[str, object]:
-    stamp = ts or _now()
-    return {
-        "v": SCHEMA_VERSION,
-        "ts": stamp,
-        "event": kind,
-        "actor": events.DELIVERY_ACTOR,
-        "data": data,
-    }
-
-
-def _log_file(log: Path) -> Path:
-    files = sorted(log.glob("*.jsonl"))
-    if files:
-        return files[0]
-    stamp = _now()
-    return log / f"{stamp[:10]}.jsonl"
-
-
-def _minimal_commitment(**over: object) -> dict[str, object]:
-    success_criteria = ["tests pass"]
-    non_goals: list[str] = []
-    contract: dict[str, object] = {
-        "commitment_id": COMMITMENT_ID,
-        "revision": 1,
-        "conversation_id": CONVERSATION_ID,
-        "source_turn_ids": [TURN_ID],
-        "request_text": "ship delivery estimate",
-        "goal_text": "freeze estimate before work",
-        "success_criteria": success_criteria,
-        "non_goals": non_goals,
-        "success_digest": work_items.success_digest(success_criteria, non_goals),
-        "incumbent": {
-            "name": "manual dispatch",
-            "source": "measured",
-            "retrieval_date": "2026-08-22",
-            "search_digest": "0" * 64,
-            "evidence_tag": "measured",
-            "delta": "dated window before claims",
-            "killing_check": "estimate ordering",
-        },
-        "deliverable_contract": {
-            "kind": "code",
-            "handoff_schema": "git-diff",
-            "allowed_locators": ["repository"],
-        },
-        "accountable": "delivery-owner",
-        "composition": {"owner": "delivery-owner"},
-        "assumptions": [],
-        "autonomous_decision_refs": [],
-        "reserved_decisions": [],
-        "authority_ref": {"kind": "unprotected"},
-        "verifier_contracts": [
-            {
-                "id": "pytest",
-                "digest": COHORT["verifier_contract_digest"],
-                "task_family": "code",
-                "required_outcome": "pass",
-            }
-        ],
-        "mutation_scope": {"paths": ["src/consilient/"]},
-        "budget_ref": "none",
-        "expires_at": "2026-09-22T12:00:00+00:00",
-        "question_count": 0,
-    }
-    contract.update(over)
-    contract["source_turn_digest"] = work_items.source_turn_digest(
-        str(contract["conversation_id"]),
-        list(contract["source_turn_ids"]),
-        {TURN_ID: "ship delivery estimate"},
-    )
-    contract["commitment_digest"] = work_items.commitment_digest(contract)
-    return contract
-
-
-def _stream(*, stream_id: str = "S1", integration: bool = True) -> dict[str, object]:
-    return {
-        "stream_id": stream_id,
-        "deliverable": "implement estimate",
-        "accountable": "owner-a",
-        "owned_paths": ["src/consilient/events.py"],
-        "dependencies": [],
-        "deliverable_contract": {
-            "kind": "code",
-            "handoff_schema": "git-diff",
-            "allowed_locators": ["repository"],
-        },
-        "handoff_contract": {
-            "schema": "git-diff",
-            "digest": work_items.handoff_contract_digest("git-diff", ["repository"]),
-        },
-        "verifier_contracts": [
-            {
-                "id": "pytest",
-                "digest": COHORT["verifier_contract_digest"],
-                "task_family": "code",
-                "required_outcome": "pass",
-            }
-        ],
-        "composition": {"owner": "owner-a"},
-        "checkpoint_required": True,
-        "integration": integration,
-    }
-
-
-def _seed_plan(log: Path) -> dict[str, object]:
-    work_items.seal_turn(
-        log,
-        conversation_id=CONVERSATION_ID,
-        turn_id=TURN_ID,
-        root_request_turn_id=TURN_ID,
-        role="user",
-        text="ship delivery estimate",
-    )
-    commitment = work_items.commit_request(log, _minimal_commitment())["data"]
-    line_count = sum(1 for _ in _log_file(log).open(encoding="utf-8"))
-    plan: dict[str, object] = {
-        "plan_id": PLAN_ID,
-        "revision": 1,
-        "commitment_id": commitment["commitment_id"],
-        "commitment_digest": commitment["commitment_digest"],
-        "prefix_anchor": {
-            "line_count": line_count,
-            "prefix_digest": events.prefix_digest(_log_file(log), line_count),
-        },
-        "streams": [_stream()],
-        "estimate_inputs": {
-            "duration_lower_s": 120,
-            "duration_upper_s": 900,
-            "derivation": "cold start slice budget",
-            "evidence_class": "asserted: low evidence",
-        },
-        "budget_ref": commitment["budget_ref"],
-        "expires_at": commitment["expires_at"],
-        "plan_digest": "",
-    }
-    plan["plan_digest"] = work_items.plan_digest(plan)
-    work_items.freeze_plan(log, plan)
-    return plan
-
-
-def _analogue_outcome(
-    log: Path,
-    *,
-    duration_s: float,
-    timed_out: bool = False,
-    status: str = "ok",
-    ts: str = "2026-08-22T10:00:00+00:00",
-) -> dict[str, object]:
-    stamp = _now()
-    payload = _event(
-        "dispatch.outcome",
-        {
-            "run_id": f"run-{duration_s}",
-            "task": "prior delivery",
-            "cwd": "/tmp",
-            "harness": "cursor",
-            "family": "cursor",
-            "pool": "cursor-models",
-            "status": status,
-            "reason": "done",
-            "exit_code": 0 if status == "ok" else 1,
-            "artefact_bytes": 10,
-            "diff_bytes": 5,
-            "timed_out": timed_out,
-            "duration_s": duration_s,
-            "command": ["echo"],
-            "supervised": True,
-            "estimate_cohort": dict(COHORT),
-            "occurred_at": ts,
-        },
-        ts=stamp,
-    )
-    return append(_log_file(log), payload)
+from consilient.events import EventError, append, append_transaction
+from delivery_estimate_helpers import (
+    COHORT,
+    DELIVERY_ID,
+    RESOURCE_SNAPSHOT,
+    _analogue_outcome,
+    _event,
+    _issued,
+    _log_file,
+    _now,
+    _seed_plan,
+)
 
 
 def _build_estimate(
@@ -321,87 +151,6 @@ def test_estimate_digest_is_deterministic(tmp_path):
     assert events.estimate_digest(first) == events.estimate_digest(second)
 
 
-def test_five_comparable_outcomes_use_percentile_range(tmp_path):
-    log = tmp_path / "log"
-    durations = [100.0, 200.0, 300.0, 400.0, 500.0]
-    for duration in durations:
-        _analogue_outcome(log, duration_s=duration)
-    plan = _seed_plan(log)
-    prefix = tuple(events.read_all(log)[0])
-    issued = _issued()
-    derived = events.derive_delivery_estimate(
-        prefix,
-        plan=plan,
-        delivery_id=DELIVERY_ID,
-        issued_at=issued,
-        cohort_key=COHORT,
-        resource_snapshot_digest=RESOURCE_SNAPSHOT,
-        checkpoint_interval_s=300,
-        recovery_allowance_s=600,
-    )
-
-    assert derived["sample_size"] == 5
-    assert derived["method"] == "comparable_deliveries_percentile"
-    assert derived["evidence_class"] == "measured"
-    sorted_durations = sorted(durations)
-    lower_index = max(0, min(4, math.ceil(0.10 * 5) - 1))
-    upper_index = max(0, min(4, math.ceil(0.90 * 5) - 1))
-    expected_lower = issued + timedelta(seconds=sorted_durations[lower_index])
-    expected_upper = issued + timedelta(seconds=sorted_durations[upper_index])
-    assert derived["earliest_at"] == expected_lower.isoformat()
-    assert derived["latest_at"] == expected_upper.isoformat()
-    assert len(derived["analogue_ids"]) == 5
-
-
-def test_fewer_than_five_uses_cold_start_fallback(tmp_path):
-    log = tmp_path / "log"
-    for duration in (100.0, 200.0, 300.0):
-        _analogue_outcome(log, duration_s=duration)
-    plan = _seed_plan(log)
-    prefix = tuple(events.read_all(log)[0])
-    issued = _issued()
-    derived = events.derive_delivery_estimate(
-        prefix,
-        plan=plan,
-        delivery_id=DELIVERY_ID,
-        issued_at=issued,
-        cohort_key=COHORT,
-        resource_snapshot_digest=RESOURCE_SNAPSHOT,
-        checkpoint_interval_s=300,
-        recovery_allowance_s=600,
-    )
-
-    assert derived["sample_size"] == 3
-    assert derived["method"] == "cold_start_slice_schedule"
-    assert derived["evidence_class"] == "asserted: low evidence"
-    assert derived["earliest_at"] == (issued + timedelta(seconds=120)).isoformat()
-    assert derived["latest_at"] == (issued + timedelta(seconds=900)).isoformat()
-
-
-def test_censored_timeout_raises_upper_bound(tmp_path):
-    log = tmp_path / "log"
-    for duration in (100.0, 200.0, 300.0, 400.0, 500.0):
-        _analogue_outcome(log, duration_s=duration)
-    _analogue_outcome(log, duration_s=250.0, timed_out=True, status="error")
-    plan = _seed_plan(log)
-    prefix = tuple(events.read_all(log)[0])
-    issued = _issued()
-    derived = events.derive_delivery_estimate(
-        prefix,
-        plan=plan,
-        delivery_id=DELIVERY_ID,
-        issued_at=issued,
-        cohort_key=COHORT,
-        resource_snapshot_digest=RESOURCE_SNAPSHOT,
-        checkpoint_interval_s=300,
-        recovery_allowance_s=600,
-    )
-
-    censored_floor = issued + timedelta(seconds=250.0 + 600)
-    assert datetime.fromisoformat(derived["latest_at"]) >= censored_floor
-    assert len(derived["analogue_ids"]) == 6
-
-
 def test_reforecast_appends_new_revision_preserves_original(tmp_path):
     log = tmp_path / "log"
     plan = _seed_plan(log)
@@ -415,7 +164,9 @@ def test_reforecast_appends_new_revision_preserves_original(tmp_path):
         predecessor=original,
         cause="route_change",
         earliest_at=original["earliest_at"],
-        latest_at=(datetime.fromisoformat(original["latest_at"]) + timedelta(hours=2)).isoformat(),
+        latest_at=(
+            datetime.fromisoformat(original["latest_at"]) + timedelta(hours=2)
+        ).isoformat(),
     )["data"]
 
     assert successor["revision"] == 1
@@ -454,7 +205,9 @@ def test_reforecast_refused_after_upper_bound_breach(tmp_path):
     plan = _seed_plan(log)
     original = _append_estimate(log, plan)["data"]
     prefix = tuple(events.read_all(log)[0])
-    breach_ts = (datetime.fromisoformat(original["latest_at"]) + timedelta(minutes=5)).isoformat()
+    breach_ts = (
+        datetime.fromisoformat(original["latest_at"]) + timedelta(minutes=5)
+    ).isoformat()
     successor = _build_estimate(
         plan,
         prefix=prefix,
@@ -462,7 +215,9 @@ def test_reforecast_refused_after_upper_bound_breach(tmp_path):
         predecessor=original,
         cause="estimate_error",
         earliest_at=original["earliest_at"],
-        latest_at=(datetime.fromisoformat(original["latest_at"]) + timedelta(hours=2)).isoformat(),
+        latest_at=(
+            datetime.fromisoformat(original["latest_at"]) + timedelta(hours=2)
+        ).isoformat(),
     )
     successor["issued_at"] = breach_ts
     successor["estimate_digest"] = events.estimate_digest(successor)

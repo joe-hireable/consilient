@@ -191,7 +191,9 @@ def profile_to_mapping(profile: HardwareProfile) -> dict[str, object]:
     }
 
 
-def unknown_profile(*, provenance: str, probed_at: str | None = None) -> HardwareProfile:
+def unknown_profile(
+    *, provenance: str, probed_at: str | None = None
+) -> HardwareProfile:
     """All-unknown profile for a failed probe — the gate must refuse."""
     return HardwareProfile(
         total_vram_bytes=None,
@@ -336,7 +338,9 @@ def fit(request: LocalModelRequest, profile: HardwareProfile) -> FitResult:
         reason = f"required {required} bytes within {spare} bytes of limit {limit}"
     else:
         verdict = "comfortable"
-        reason = f"required {required} bytes with {spare} bytes spare below limit {limit}"
+        reason = (
+            f"required {required} bytes with {spare} bytes spare below limit {limit}"
+        )
 
     return FitResult(
         verdict=verdict,

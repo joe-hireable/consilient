@@ -22,9 +22,17 @@ is not rewritten as a success. [asserted] Repository findings are the first publ
 surface; a versioned archive, dataset venue or practitioner article is added only when it
 improves reuse. [asserted]
 
-Private measurement corpora remain private. [asserted] Notes may report aggregate metrics
-from `hireable-3.0` or `jobboard-v2`, but never their content, excerpts or detailed paths;
-a result that cannot be reproduced without private material must say so and needs a public
+Private measurement corpora remain private, without exception. [cited: AGENTS.md, 23 August 2026]
+An earlier version of this paragraph permitted notes to report aggregate metrics from the two
+private corpora, and named them. The principal rejected that carve-out on 23 August 2026 --
+his words were that they must not be published as part of this repo, flat and with no
+carve-out -- and the flat reading wins wherever an earlier document relies on the narrowing.
+Nothing from those repositories is published from here: not their content, not excerpts, not
+file paths, not commit identifiers, not aggregate metrics, and not their names. They are
+named only where a rule states the prohibition itself, in the checks that enforce it, and in
+the gitignore that excludes them -- which is why they are not named here.
+
+A result that cannot be reproduced without private material must say so, and needs a public
 replication before it can clear G1 for a formal paper. [asserted]
 
 ### Lane B — formal synthesis

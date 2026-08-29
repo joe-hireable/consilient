@@ -83,7 +83,9 @@ class RunSpec:
             )
         unknown = [kind for kind in self.oracle_kinds if kind not in ANCHOR_KINDS]
         if unknown:
-            raise ValueError(f"unknown oracle kinds: {unknown!r}; known: {ANCHOR_KINDS}")
+            raise ValueError(
+                f"unknown oracle kinds: {unknown!r}; known: {ANCHOR_KINDS}"
+            )
         if not self.information_boundary:
             raise ValueError(
                 "RunSpec.information_boundary must say what the operator may read; "
@@ -157,7 +159,9 @@ def compose_acceptance(
     nothing and is refused under either mode.
     """
     if not verifiers:
-        return f"{VERIFIER_BETA_UNMEASURED}: an empty acceptance predicate accepts nothing"
+        return (
+            f"{VERIFIER_BETA_UNMEASURED}: an empty acceptance predicate accepts nothing"
+        )
     if mode not in ("conjunct", "disjunct"):
         return f"{VERIFIER_BETA_UNMEASURED}: unknown composition mode {mode!r}"
     if mode == "disjunct":

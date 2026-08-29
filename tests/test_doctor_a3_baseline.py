@@ -52,12 +52,16 @@ import pytest
 
 from consilient.cli import CAPTURE_REFUSAL_BASELINE, HISTORICAL_REFUSAL_DIGESTS
 from consilient.events import EventError, read_all
-from tests.test_v0_invariants import (
+
+# These four moved out of tests/test_v0_invariants.py when it was split on 28 August 2026.
+# They are imported from their new homes rather than re-exported from the old module: a stale
+# name must fail loudly here, not land on an alias that quietly still resolves.
+from tests.test_v0_capture_health import (
     HISTORICAL_REFUSAL_LINES,
     PINNED_TRAJECTORY_REJECTIONS,
     _a3,
-    write_capture_days,
 )
+from tests.v0_invariants_helpers import write_capture_days
 
 AUGUST_20_DIGESTS: frozenset[str] = frozenset(
     {
@@ -93,7 +97,9 @@ def test_pinned_trajectory_rejections_match_operational_baseline():
     assert pinned_digests == HISTORICAL_REFUSAL_DIGESTS
 
 
-def test_a3_still_passes_when_only_august_20_baseline_refusals_are_present(tmp_path, capsys):
+def test_a3_still_passes_when_only_august_20_baseline_refusals_are_present(
+    tmp_path, capsys
+):
     """Extending the baseline to six digests must not break tolerance of the original three."""
     log = tmp_path / "log"
     days = [f"2026-08-{day:02d}" for day in range(10, 17)]

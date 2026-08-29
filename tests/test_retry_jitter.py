@@ -18,7 +18,9 @@ import statistics
 
 import pytest
 
-from consilient import events
+from family_source import family_source
+
+from consilient import events, events_vocabulary
 
 SRC = pathlib.Path(__file__).resolve().parent.parent / "src" / "consilient"
 
@@ -64,13 +66,13 @@ def test_no_retry_sleeps_in_lockstep(module: str) -> None:
 def test_retry_sleep_is_bounded_by_the_unjittered_schedule() -> None:
     """Full jitter keeps the same ceiling; it only spreads waiters underneath it."""
     slept: list[float] = []
-    original = events.time.sleep
-    events.time.sleep = slept.append  # type: ignore[assignment]
+    original = events_vocabulary.time.sleep
+    events_vocabulary.time.sleep = slept.append  # type: ignore[assignment]
     try:
         for attempt in range(events._READ_RETRIES):
             events._retry_sleep(attempt)
     finally:
-        events.time.sleep = original  # type: ignore[assignment]
+        events_vocabulary.time.sleep = original  # type: ignore[assignment]
 
     assert len(slept) == events._READ_RETRIES
     for attempt, delay in enumerate(slept):
@@ -117,14 +119,14 @@ def test_the_unjittered_schedule_would_have_failed_that() -> None:
 def _draw_as_pid(attempt: int, pid: int) -> float:
     """One jitter draw as if this were process `pid`, without sleeping."""
     captured: list[float] = []
-    real_sleep, real_getpid = events.time.sleep, events.os.getpid
-    events.time.sleep = captured.append  # type: ignore[assignment]
-    events.os.getpid = lambda: pid  # type: ignore[assignment]
+    real_sleep, real_getpid = events_vocabulary.time.sleep, events_vocabulary.os.getpid
+    events_vocabulary.time.sleep = captured.append  # type: ignore[assignment]
+    events_vocabulary.os.getpid = lambda: pid  # type: ignore[assignment]
     try:
         events._retry_sleep(attempt)
     finally:
-        events.time.sleep = real_sleep  # type: ignore[assignment]
-        events.os.getpid = real_getpid  # type: ignore[assignment]
+        events_vocabulary.time.sleep = real_sleep  # type: ignore[assignment]
+        events_vocabulary.os.getpid = real_getpid  # type: ignore[assignment]
     return captured[0]
 
 
@@ -139,7 +141,9 @@ def test_the_retry_budget_was_not_widened_to_make_this_pass() -> None:
 
 def test_the_refusal_still_fails_closed() -> None:
     """Jitter must not have turned a refused read into a silent empty trajectory."""
-    source = (SRC / "events.py").read_text(encoding="utf-8")
+    # The refusal message lives wherever the reader does. It moved to a sibling in the
+    # 28 August 2026 split, so this reads the family rather than the entry point alone.
+    source = family_source("events")
     assert re.search(r"could not be read after .* attempts", source), (
         "the read refusal message is gone; a reader that silently returns an incomplete "
         "trajectory is far worse than one that stops"

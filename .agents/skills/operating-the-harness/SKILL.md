@@ -49,6 +49,63 @@ Orchestration is `python scripts/dispatch.py`. That is a deliberate split
 (ADR-0058): a shipped test pins the `consil` command set, and growing it
 without the principal is how a surface change gets laundered.
 
+## The build loop: stopping it, and starting it again
+
+Not `consil`, and not a command you type more than once. The loop is
+`.harness/build_loop.py`, run by a Windows scheduled task that fires every five
+minutes and has never been stopped. It ticks `.harness/build_driver.py`, which
+does everything. [measured]
+
+**To stop it**, and prefer this to killing the task — a tick killed mid-suite
+leaves a worktree half-judged:
+
+```
+touch .harness/STOP-LOOP
+```
+
+The token is read twice per iteration: before a tick, and again after the driver
+returns. The loop finishes the tick it is in, writes
+`loop: STOP-LOOP present, exiting cleanly after N tick(s)` to
+`.harness/build-loop.log`, and exits 0. Nothing is killed and no state is
+rewritten on the way out. [measured]
+
+**To start it again**, the whole procedure is one deletion:
+
+```
+rm .harness/STOP-LOOP
+tail .harness/build-loop.log      # confirm it ticked, within five minutes
+```
+
+There is no confirmation step and no second gate. The scheduler kept firing all
+through the pause, so the token is the only thing holding it — which is why the
+preconditions below are checked *before* the deletion, not around it.
+
+**Do not run `.harness/resume_loop.py`.** It is the only file in the tree whose
+name suggests resuming, and it is not the restart command: it force-retires a
+hard-coded list of units frozen on 24 August 2026 and starts the loop in the same
+breath. It refuses without `--apply` for that reason. [measured]
+
+**Before removing the token**, four things, because the loop is unattended once
+it starts:
+
+- `git rev-list --count public/main..HEAD` — and confirm
+  `.harness/STOP-PUBLISH` exists unless publishing that backlog is intended.
+  Publication is the only irreversible act the driver performs, and
+  `publish_if_ready` re-runs the suite itself rather than trusting a stale result.
+- One green suite run inside `SUITE_TIMEOUT_S` (900s). `suite_green()` fails
+  closed, so a red or timed-out suite means the loop spends its build slots on
+  work it cannot then land. Run it in a throwaway clone: `tests/test_supervision.py`
+  writes a fixture git identity into the local config, so a full run is not
+  read-only. [measured]
+- The claims in `.harness/plan-units.json` still name files that hold behaviour.
+  Claim disjointness is the driver's real concurrency guard and dispatch refuses
+  on overlapping *paths*, so a unit claiming a file whose logic has moved into a
+  sibling either writes logic back into a facade or edits a path no claim covers,
+  where two apparently disjoint units collide with nothing to detect it.
+- `.harness/driver-state.json` `conflicts` is empty, or each entry is one you
+  intend a resolver to pick up. Expired `in_flight` slots reap themselves;
+  conflicts do not.
+
 ## Exhausted pools
 
 `--probe` prints installed harnesses and used-percent. The default selector

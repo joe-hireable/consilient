@@ -1,6 +1,6 @@
 %% **Producer:** `scripts/build_diagrams.py`
 %% **Source:** `src/consilient/projection.py`
-%% **Source SHA-256:** `8b1ca456f1e738f900113a135e4438e5a24ab7b14f431b31d2b91eed730ebd03`
+%% **Source SHA-256:** `873c805fbcdf8d4afa24d0bb3f3c1e48509d6ba7e3d1d47d765796f691721884`
 %% **Do not hand-edit:** regenerate with `python scripts/build_diagrams.py`.
 
 erDiagram
@@ -179,5 +179,36 @@ erDiagram
     INTEGER revision
     TEXT state
     TEXT blockers
+  }
+  capability_versions {
+    INTEGER position
+    TEXT event_id PK
+    TEXT event_sha256
+    TEXT identity
+    TEXT version_digest
+    TEXT content_digest
+    TEXT execution_contract_key
+    TEXT destination_class
+    TEXT status
+    TEXT evidence_class
+    TEXT permission_boundary
+    TEXT trust_boundary
+  }
+  capability_heads {
+    TEXT execution_contract_key
+    TEXT destination_class
+    TEXT event_id
+    TEXT identity
+    TEXT version_digest
+    TEXT status
+    TEXT evidence_class
+    TEXT permission_boundary
+    TEXT trust_boundary
+  }
+  capability_conflicts {
+    TEXT execution_contract_key
+    TEXT destination_class
+    TEXT identity
+    TEXT event_ids
   }
 

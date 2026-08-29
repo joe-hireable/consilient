@@ -250,7 +250,10 @@ def test_cmd_beta_closes_the_connection_when_from_connection_raises(
     def boom(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("from_connection failed")
 
-    monkeypatch.setattr("consilient.cli.beta_mod.from_connection", boom)
+    # `cmd_beta` and its `beta_mod` alias moved into cli_measurements.py on 28 August 2026, so
+    # the old target no longer resolves -- "consilient.cli is not a package". Patch the module
+    # whose namespace the call is resolved in.
+    monkeypatch.setattr("consilient.cli_measurements.beta_mod.from_connection", boom)
     with pytest.raises(RuntimeError, match="from_connection failed"):
         cmd_beta(
             argparse.Namespace(

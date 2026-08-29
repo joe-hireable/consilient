@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from family_source import seam
+
 import importlib.util
 import json
 import sys
@@ -74,10 +76,10 @@ def test_cursor_lock_covers_startup_but_not_the_runtime(tmp_path, monkeypatch):
             label,
         ]
 
-    monkeypatch.setattr(script, "build_command", local_cursor)
-    monkeypatch.setattr(script, "DEFAULT_CURSOR_LOCK", tmp_path / "cursor.lock")
-    monkeypatch.setattr(script, "CURSOR_START_SETTLE_S", 1.6, raising=False)
-    monkeypatch.setattr(script, "CURSOR_START_LOCK_TIMEOUT_S", 15.0, raising=False)
+    monkeypatch.setattr(seam("dispatch_invocation"), "build_command", local_cursor)
+    monkeypatch.setattr(seam("dispatch_launch"), "DEFAULT_CURSOR_LOCK", tmp_path / "cursor.lock")
+    monkeypatch.setattr(seam("dispatch_vocabulary"), "CURSOR_START_SETTLE_S", 1.6, raising=False)
+    monkeypatch.setattr(seam("dispatch_vocabulary"), "CURSOR_START_LOCK_TIMEOUT_S", 15.0, raising=False)
     harness = harness_by_id("cursor-composer")
     assert harness is not None
     barrier = threading.Barrier(3)

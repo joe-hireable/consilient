@@ -167,8 +167,10 @@ def prepare_contribution(
         raise UpstreamError("policy repository does not match the contribution")
     text = body.rstrip()
     if MACHINE_AUTHORED_DISCLOSURE not in text:
-        text = f"{text}\n\n{MACHINE_AUTHORED_DISCLOSURE}\n" if text else (
-            MACHINE_AUTHORED_DISCLOSURE + "\n"
+        text = (
+            f"{text}\n\n{MACHINE_AUTHORED_DISCLOSURE}\n"
+            if text
+            else (MACHINE_AUTHORED_DISCLOSURE + "\n")
         )
     contribution_id = hashlib.sha256(
         f"{repository}\n{title}\n{diff}".encode()
@@ -197,13 +199,9 @@ def verify_host_ci(
 
 def _refuse_unsubmittable(prepared: PreparedContribution) -> None:
     if prepared.policy.automated_pull_requests == "prohibited":
-        raise UpstreamError(
-            f"{prepared.repository} prohibits automated pull requests"
-        )
+        raise UpstreamError(f"{prepared.repository} prohibits automated pull requests")
     if not prepared.wanted_on_merits:
-        raise UpstreamError(
-            "refusing a change that is not wanted on its own merits"
-        )
+        raise UpstreamError("refusing a change that is not wanted on its own merits")
     if prepared.weakened_to_probe_verifier:
         raise UpstreamError("refusing to weaken a contribution to probe the verifier")
     if not prepared.verifier_accept:
@@ -294,9 +292,7 @@ def record_outcome(
     return outcome
 
 
-def persist_outcome(
-    outcome: UpstreamOutcome, *, dest: Path, root: Path
-) -> Path:
+def persist_outcome(outcome: UpstreamOutcome, *, dest: Path, root: Path) -> Path:
     """Append an outcome to gitignored instance storage (ADR-0057)."""
     return _write(
         dest,

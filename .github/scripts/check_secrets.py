@@ -20,6 +20,10 @@ PATTERNS = (
     "sk" + r"-(proj-)?[A-Za-z0-9]{32,}",
     "AI" + r"za[0-9A-Za-z_-]{35}",
     "gh" + r"[pousr]_[A-Za-z0-9]{20,}",
+    # Fine-grained PATs are `github_pat_...`, which the class above cannot match: after "gh"
+    # comes "i", not one of pousr. MEASURED 29 August 2026 -- the scanner detected a classic
+    # ghp_ token and missed the format GitHub has issued by default since 2022.
+    "github" + r"_pat_[A-Za-z0-9_]{20,}",
     "xox" + r"[baprs]-[0-9A-Za-z-]{10,}",
     "pypi-" + r"AgEIcH[A-Za-z0-9_-]{20,}",
     "AK" + r"IA[0-9A-Z]{16}",
@@ -28,7 +32,9 @@ PATTERNS = (
     # list is now checked against the installed runtimes rather than maintained by memory.
     "xa" + r"i-[A-Za-z0-9]{20,}",
     # Bearer tokens and signed blobs, which carry credentials without matching a vendor prefix.
-    r"-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----",
+    # ENCRYPTED included: a passphrase-protected key is still a key, and the passphrase is
+    # not in the repository to protect it. Measured missing on the same day.
+    r"-----BEGIN (RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----",
     r"ey" + r"J[A-Za-z0-9_-]{10,}\.ey" + r"J[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
 )
 COMBINED = "(" + ")|(".join(PATTERNS) + ")"
@@ -125,6 +131,11 @@ def self_test() -> None:
         # Split so this file does not match its own checker. Every sample above follows the
         # same convention for the same reason.
         "-----BEGIN " + "PRIVATE" + " KEY-----",
+        # Both added 29 August 2026 after an outside review found them missing. The
+        # fine-grained PAT is the format GitHub issues by default and the class above
+        # cannot match it; a passphrase-protected key is still a key.
+        "github" + "_pat_" + "1" * 30,
+        "-----BEGIN " + "ENCRYPTED PRIVATE" + " KEY-----",
     )
     assert all(SECRET_RE.search(sample) for sample in samples)
     assert not SECRET_RE.search("OPENROUTER_API_KEY")
@@ -132,6 +143,9 @@ def self_test() -> None:
     assert not SECRET_RE.search("XAI_API_KEY"), "the env var NAME is not a secret"
     assert not SECRET_RE.search("@xai-official/grok"), "the npm package name is not a secret"
     assert not SECRET_RE.search("xai-org/grok-build"), "the GitHub org is not a secret"
+    assert not SECRET_RE.search("github" + "_patterns_are_documented"), (
+        "a word beginning github_pat is not a token"
+    )
     assert is_private_env_file("service/.env.local")
     assert not is_private_env_file("service/.env.example")
 

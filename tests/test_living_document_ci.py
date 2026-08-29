@@ -13,6 +13,15 @@ EXPECTED_COMMANDS = (
     "python .github/scripts/check_adr_trail.py",
     "python .github/scripts/check_living_documents.py --check "
     "docs/superpowers/specs/2026-08-22-*.md",
+    # The file-length ratchet. Listed here so the gate cannot be silently unwired --
+    # which is exactly the finding unit W07 raised about check_links.
+    "python .github/scripts/check_file_length.py",
+    # The per-FUNCTION ratchet (ADR-0111), and its self-test, which runs first so a broken
+    # checker is caught before its verdict is trusted. This half is the one worth protecting
+    # from a silent unwiring: a size rule enforced on files alone is satisfied by a facade
+    # split that leaves every function exactly as long as it was.
+    "python .github/scripts/check_function_size.py --self-test",
+    "python .github/scripts/check_function_size.py",
 )
 WEEKLY_CRON = re.compile(
     r"(?m)^  schedule:\n    - cron: ['\"]\d+ \d+ \* \* [0-6]['\"]$"

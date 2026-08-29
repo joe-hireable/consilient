@@ -45,11 +45,14 @@ ALLOWED_HARNESS_TRACKED = frozenset(
     {
         ".harness/HANDOFF.md",
         ".harness/STOP-PUBLISH.lifted-20260824-joe-authorised",
+        ".harness/STOP-PUBLISH.lifted-20260829-joe-authorised",
         ".harness/allowed-cwds.example.json",
         ".harness/board_snapshot.py",
         ".harness/build_board.py",
         ".harness/build_driver.py",
         ".harness/build_loop.py",
+        ".harness/build_loop_git.py",
+        ".harness/build_loop_housekeeping.py",
         ".harness/integrate_when_quiet.sh",
         ".harness/limits.example.json",
         ".harness/permissions.example.json",
@@ -57,6 +60,15 @@ ALLOWED_HARNESS_TRACKED = frozenset(
         ".harness/resume_loop.py",
     }
 )
+
+# Tracked when it exists, and absent the rest of the time. The live publication hold is a
+# governance record like the lifted marker beside it -- an orchestrator re-imposed one on
+# 29 August 2026 and it belongs in the history -- but a hold is LIFTED by renaming it to
+# `STOP-PUBLISH.lifted-<date>-<who>`, so requiring it to be tracked would make lifting it fail
+# this test. Allowed, never required. Tracking it is also the fail-safe direction: an old
+# checkout that restores the hold blocks a publish, where restoring only a lifted marker
+# permits one.
+OPTIONAL_HARNESS_TRACKED = frozenset({".harness/STOP-PUBLISH"})
 
 BLANKET_HARNESS_IGNORES = frozenset(
     {
@@ -162,7 +174,7 @@ def test_harness_source_stays_tracked() -> None:
 def test_harness_index_is_source_and_documentation_only() -> None:
     """`git ls-files .harness` must return only source and documentation."""
     tracked = set(_tracked_harness())
-    unexpected = sorted(tracked - ALLOWED_HARNESS_TRACKED)
+    unexpected = sorted(tracked - ALLOWED_HARNESS_TRACKED - OPTIONAL_HARNESS_TRACKED)
     assert unexpected == [], (
         "git ls-files .harness returned instance data; a checkout can restore "
         f"it: {unexpected}. `git rm --cached` the path; do not delete it from disk."
@@ -171,6 +183,22 @@ def test_harness_index_is_source_and_documentation_only() -> None:
     assert missing == [], (
         "a blanket .harness/ ignore (or an over-broad untrack) dropped source "
         f"that must stay tracked: {missing}"
+    )
+
+
+def test_an_optional_tracked_path_is_never_also_required() -> None:
+    """The point of OPTIONAL_HARNESS_TRACKED is that its absence is legal.
+
+    A path listed in both sets would be required by the `missing` half of the check above, which
+    is exactly the trap this set exists to avoid: the publication hold is lifted by renaming it,
+    so a rule requiring it to be tracked would make lifting the hold fail CI, and the obvious
+    way out of that would be to leave the hold in place. A guard that punishes the correct
+    action is worse than no guard.
+    """
+    both = sorted(ALLOWED_HARNESS_TRACKED & OPTIONAL_HARNESS_TRACKED)
+    assert both == [], (
+        f"{both} is listed as both required and optional, so removing it fails the "
+        "index check even though the whole point of the optional set is that it may go"
     )
 
 

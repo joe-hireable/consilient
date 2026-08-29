@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from family_source import seam
+
 import importlib.util
 import os
 import subprocess
@@ -30,9 +32,9 @@ def _load_dispatch():
 
 def test_prompt_permissions_do_not_auto_approve_grok(monkeypatch, tmp_path):
     script = _load_dispatch()
-    monkeypatch.setattr(script, "find_grok", lambda: "grok")
-    monkeypatch.setattr(script, "metered_grok_reason", lambda: None)
-    monkeypatch.setattr(script, "help_text", lambda _argv: "--always-approve")
+    monkeypatch.setattr(seam("dispatch_evidence"), "find_grok", lambda: "grok")
+    monkeypatch.setattr(seam("dispatch_evidence"), "metered_grok_reason", lambda: None)
+    monkeypatch.setattr(seam("dispatch_launch"), "help_text", lambda _argv: "--always-approve")
     harness = harness_by_id("grok")
     assert harness is not None
 

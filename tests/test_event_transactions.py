@@ -26,6 +26,8 @@ from pathlib import Path
 import pytest
 
 from consilient import events as events_mod
+from consilient import events_transactions
+from consilient import events_durability
 from consilient.events import (
     SCHEMA_VERSION,
     EventError,
@@ -256,7 +258,7 @@ def test_a_failure_after_the_fsync_is_never_returned_as_a_partial_success(
     def fail(directory: Path) -> None:
         raise OSError("injected directory fsync failure")
 
-    monkeypatch.setattr(events_mod, "_fsync_directory", fail)
+    monkeypatch.setattr(events_durability, "_fsync_directory", fail)
     with pytest.raises(EventError, match="not acknowledged"):
         append_transaction(tmp_path, [ev(data={"seq": 1}), ev(data={"seq": 2})], lambda p, r, c: None)
 
@@ -280,7 +282,7 @@ def test_a_prefix_read_failure_is_refused_not_treated_as_an_empty_history(
     def unreadable(path, fd):
         raise OSError("injected read failure")
 
-    monkeypatch.setattr(events_mod, "_read_under_lock", unreadable)
+    monkeypatch.setattr(events_transactions, "_read_under_lock", unreadable)
     with pytest.raises(EventError, match="not acknowledged|refused"):
         append_transaction(tmp_path, [ev()], spy)
     assert calls == [], "the validator ran against an unread prefix"

@@ -88,7 +88,9 @@ def test_no_rating_surface_in_tracked_source_or_dashboard() -> None:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if rel.endswith("events.py"):
+        # The schema ban IS events.py, and events.py is now a family. A facade re-export of
+        # RESPONSE_RATING_FIELDS in a sibling is the ban being stated, not a rating surface.
+        if rel.endswith("events.py") or Path(rel).stem.startswith("events_"):
             continue  # the ban list itself
         for number, line in enumerate(text.splitlines(), start=1):
             if pattern.search(line):

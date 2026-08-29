@@ -95,6 +95,13 @@ _OUTCOME_REFERENCE_ALLOWLIST = frozenset(
         "events.py",
         "verification.py",
         "projection.py",
+        # Split out of projection.py on 28 August 2026; these two hold the handlers that read
+        # the kind, so they inherit its place here. Listed by name rather than by a `projection`
+        # prefix, so a future module that merely resembles one of these does not admit itself.
+        "projection_verdicts.py",
+        "projection_consilience.py",
+        # events.py's kind constants moved here in the same split.
+        "events_kinds.py",
     }
 )
 
@@ -217,9 +224,15 @@ def begin_attempt(
     queue_event: EventPayload | None = None
     exposure_count = 0
     for event in events:
-        if event.kind == REVIEW_QUEUE_OPENED_KIND and event.data.get("queue_id") == queue_id:
+        if (
+            event.kind == REVIEW_QUEUE_OPENED_KIND
+            and event.data.get("queue_id") == queue_id
+        ):
             queue_event = event.raw
-        if event.kind == CANDIDATE_EXPOSED_KIND and event.data.get("queue_id") == queue_id:
+        if (
+            event.kind == CANDIDATE_EXPOSED_KIND
+            and event.data.get("queue_id") == queue_id
+        ):
             exposure_count += 1
     if queue_event is None:
         raise EventError(
@@ -319,13 +332,21 @@ def scan_component_outcome_producers() -> list[str]:
         if path.name in _OUTCOME_REFERENCE_ALLOWLIST:
             continue
         text = path.read_text(encoding="utf-8")
-        if events_mod.VERIFICATION_OUTCOME_KIND in text or '"verification.outcome"' in text:
-            violations.append(f"{path.name} references verification.outcome outside the allowlist")
+        if (
+            events_mod.VERIFICATION_OUTCOME_KIND in text
+            or '"verification.outcome"' in text
+        ):
+            violations.append(
+                f"{path.name} references verification.outcome outside the allowlist"
+            )
     scripts = root.parent.parent / "scripts"
     if scripts.is_dir():
         for path in sorted(scripts.glob("*.py")):
             text = path.read_text(encoding="utf-8")
-            if events_mod.VERIFICATION_OUTCOME_KIND not in text and '"verification.outcome"' not in text:
+            if (
+                events_mod.VERIFICATION_OUTCOME_KIND not in text
+                and '"verification.outcome"' not in text
+            ):
                 continue
             tree = ast.parse(text, filename=str(path))
             for node in ast.walk(tree):

@@ -35,452 +35,67 @@ This script adds a B4-specific upstream-red-phase rule and records every
 classification and reason in a private instance artefact. [asserted]
 
 Usage: ``python scripts/b4_pool.py [--self-check]``.
+
+The evidence vocabulary — the regexes, the snippet, invocation and marker extractors, the unauthenticated ``_open``/``_json`` read and the reason tallies — now lives in ``b4_pool_evidence.py``. The admission rule itself, ``classify_issue``, together with the marker readers and the issue and repository listings, lives in ``b4_pool_admission.py``. This file keeps the sweep: the test-archive walk, the classifier ratchet and the command line.
 """
 
 from __future__ import annotations
-
+import sys
 import argparse
-import ast
 import io
 import json
-import re
 import tarfile
-from collections import Counter
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping
-from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
 
+# bootstrap
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / ".harness" / "b4-pool.json"
-API = "https://api.github.com"
-API_VERSION = "2022-11-28"
-USER_AGENT = "ConsilientB4Pool/1.0 (public-read)"
-TIMEOUT_S = 60
-ARCHIVE_TIMEOUT_S = 180
-SEVENTEEN = 17
-ALREADY_CREDITED = frozenset(
-    {
-        # Superseded 26 August 2026: 13369, 14774 and 6505 were closed before the
-        # principal required open-issue work (see scripts/b4_tickets.py) and were
-        # replaced with three verified, currently-open issues.
-        ("pytest-dev/pytest", 14324),
-        ("pytest-dev/pytest", 10644),
-        ("pytest-dev/pytest", 12175),
-    }
-)
-PERMISSIVE_LICENCES = frozenset(
-    {"Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT"}
+from typing import Any
+from urllib.parse import quote
+from b4_pool_evidence import (
+    API,
+    ARCHIVE_TIMEOUT_S,
+    OUT,
+    PERMISSIVE_LICENCES,
+    PoolError,
+    REPOS,
+    Repo,
+    _now,
+    _open,
+    _print_counts,
+    _reason_counts,
 )
 
-FENCE = re.compile(
-    r"```(?:python|py|pycon|pytb|sh|bash|console|text)?\s*\n(.*?)```", re.S | re.I
-)
-RUNNABLE = re.compile(
-    r"(?m)^\s*(?:import |from |def |class |assert |@pytest|with pytest)"
-)
-INVOCATION = re.compile(
-    r"(?im)^\s*(?:[$]\s*)?(?:python(?:3)?\s+-m\s+pytest|python(?:3)?\s+-c)\b[^\r\n]*"
-    r"|^\s*(?:[$]\s*)?(?:py\.test|pytest)\s+(?:[-./]\S*|\S+\.py(?:\S*)?)[^\r\n]*"
-)
-INVOCATION_LOOSE = re.compile(
-    r"(?im)^\s*(?:[$]\s*)?(?:python(?:3)?\s+-m\s+pytest|python(?:3)?\s+-c|py\.test|pytest)\b"
-)
-FAILURE = re.compile(
-    r"(?i)\b(assertionerror|assert(?:ion)?\s+(?:fails?|failed|failure)|fails?|failed|failure)\b"
-)
-PASSING_COMMENT = re.compile(r"(?i)#.*\bpass(?:es|ed|ing)?\b")
-EXPECTED_ACTUAL = re.compile(
-    r"(?is)\bexpected(?:\s+(?:result|behavio[u]?r))?\s*:\s*(?P<expected>[^\r\n.;]+?)"
-    r"\s*(?:\.\s*|;|\r?\n+)\s*"
-    r"(?:actual|got)(?:\s+(?:result|behavio[u]?r))?\s*:\s*(?P<actual>[^\r\n.]+)"
-)
-ORACLE = re.compile(
-    r"(?ix)\b(expected|should(?:\s+not)?|correct\s+behavio(?:u)?r|instead|but\s+got|"
-    r"unexpected|incorrect(?:ly)?)\b"
-)
-ASSERTION = re.compile(r"\b(?:assert|pytest\.raises|RaisesGroup)\b")
-MARKER = re.compile(r"mark\.(?:xfail|skip|skipif)\b")
-BARE_ISSUE = re.compile(r"(?<![/\w])#(\d{3,6})\b")
-ISSUE_WORD = re.compile(r"\bissues?\s+#?(\d{3,6})\b", re.I)
-NEXT = re.compile(r'<([^>]+)>;\s*rel="next"', re.I)
-
-
-class PoolError(RuntimeError):
-    """An unauthenticated public read failed."""
-
-
-@dataclass(frozen=True)
-class Repo:
-    name: str
-    bug_label: str
-    test_paths: tuple[str, ...]
-
-
-REPOS = (
-    Repo("pytest-dev/pytest", "type: bug", ("/testing/",)),
-    Repo("pypa/setuptools", "bug", ("/tests/", "/testing/")),
+from b4_pool_admission import (
+    _issues,
+    _metadata,
+    classify_issue,
+    marker_evidence,
+    marker_issue_numbers,
 )
 
-MarkerIndex = Mapping[int, list[dict[str, Any]]]
 
-
-def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _labels(raw: object) -> list[str]:
-    if not isinstance(raw, list):
-        return []
-    names: list[str] = []
-    for item in raw:
-        if isinstance(item, str):
-            names.append(item)
-        elif isinstance(item, Mapping) and isinstance(item.get("name"), str):
-            names.append(item["name"])
-    return names
-
-
-def _dotted_name(node: ast.expr) -> str:
-    parts: list[str] = []
-    while isinstance(node, ast.Attribute):
-        parts.append(node.attr)
-        node = node.value
-    if isinstance(node, ast.Name):
-        parts.append(node.id)
-    return ".".join(reversed(parts))
-
-
-def _marker_span(text: str, start: int) -> str:
-    opening = text.find("(", start)
-    if opening < 0:
-        return ""
-    depth = 0
-    for index in range(opening, len(text)):
-        if text[index] == "(":
-            depth += 1
-        elif text[index] == ")":
-            depth -= 1
-            if depth == 0:
-                return text[start : index + 1]
-    return ""
-
-
-def _marker_ast(node: ast.expr) -> ast.Call | None:
-    if not isinstance(node, ast.Call):
-        return None
-    if _dotted_name(node.func) in {
-        "pytest.mark.xfail",
-        "pytest.mark.skip",
-        "pytest.mark.skipif",
-        "mark.xfail",
-        "mark.skip",
-        "mark.skipif",
-    }:
-        return node
-    return None
-
-
-def _marker_call(
-    text_or_node: str | ast.expr, start: int | None = None
-) -> str | ast.Call | None:
-    """Extract a marker call from source text *or* from an AST node.
-
-    Both shapes landed in this file: the regex span ``(text, start)`` and the
-    AST recogniser ``(node,)``. Callers that used either must keep working.
-    """
-    if isinstance(text_or_node, str):
-        if start is None:
-            raise TypeError(
-                "start is required when extracting a marker from source text"
-            )
-        return _marker_span(text_or_node, start)
-    return _marker_ast(text_or_node)
-
-
-def marker_issue_numbers(text: str, repository: str) -> set[int]:
-    """Read only issue references inside xfail/skip/skipif calls for *repository*."""
-    owner, project = repository.split("/", 1)
-    own_url = re.compile(
-        rf"https?://github\.com/{re.escape(owner)}/{re.escape(project)}/issues/(\d{{3,6}})",
-        re.I,
-    )
-    found: set[int] = set()
-    for match in MARKER.finditer(text):
-        call = _marker_call(text, match.start())
-        if not isinstance(call, str) or not call:
-            continue
-        found.update(int(number) for number in own_url.findall(call))
-        call = own_url.sub("", call)
-        found.update(int(number) for number in BARE_ISSUE.findall(call))
-        found.update(int(number) for number in ISSUE_WORD.findall(call))
-    return found
-
-
-def marker_evidence(
-    text: str, repository: str, source_path: str
-) -> dict[int, list[dict[str, Any]]]:
-    """Return issue evidence from real test decorators or module pytestmark calls."""
-    try:
-        tree = ast.parse(text, filename=source_path)
-    except SyntaxError:
-        return {}
-    owner, project = repository.split("/", 1)
-    own_url = re.compile(
-        rf"https?://github\.com/{re.escape(owner)}/{re.escape(project)}/issues/(\d{{3,6}})",
-        re.I,
-    )
-    found: dict[int, list[dict[str, Any]]] = {}
-
-    def add(call: ast.Call, context: str) -> None:
-        source = ast.get_source_segment(text, call) or _dotted_name(call.func)
-        numbers = {int(number) for number in own_url.findall(source)}
-        scrubbed = own_url.sub("", source)
-        numbers.update(int(number) for number in BARE_ISSUE.findall(scrubbed))
-        numbers.update(int(number) for number in ISSUE_WORD.findall(scrubbed))
-        for number in numbers:
-            found.setdefault(number, []).append(
-                {
-                    "kind": "upstream_test_marker",
-                    "source_path": source_path,
-                    "line": call.lineno,
-                    "context": context,
-                    "text": source,
-                }
-            )
-
-    def add_marks(value: ast.AST, context: str) -> None:
-        for node in ast.walk(value):
-            if isinstance(node, ast.expr):
-                call = _marker_call(node)
-                if isinstance(call, ast.Call):
-                    add(call, context)
-
-    for node in ast.walk(tree):
-        if isinstance(
-            node, (ast.FunctionDef, ast.AsyncFunctionDef)
-        ) and node.name.startswith("test"):
-            for decorator in node.decorator_list:
-                add_marks(decorator, f"test:{node.name}")
-        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
-            for decorator in node.decorator_list:
-                add_marks(decorator, f"class:{node.name}")
-    for statement in tree.body:
-        if isinstance(statement, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "pytestmark"
-            for target in statement.targets
-        ):
-            add_marks(statement.value, "module:pytestmark")
-    return found
-
-
-def _blocks(body: str) -> list[str]:
-    return [block.strip() for block in FENCE.findall(body) if block.strip()]
-
-
-def _reproducer(body: str) -> tuple[bool, str]:
-    blocks = _blocks(body)
-    if any(RUNNABLE.search(block) or ASSERTION.search(block) for block in blocks):
-        return True, "snippet"
-    if INVOCATION_LOOSE.search(body):
-        return True, "invocation"
-    if any(INVOCATION_LOOSE.search(block) for block in blocks):
-        return True, "invocation"
-    return False, ""
-
-
-def _has_oracle(title: str, body: str) -> bool:
-    return bool(ORACLE.search(f"{title}\n{body}") or ASSERTION.search(body))
-
-
-def _dynamic_assertion(node: ast.Assert) -> bool:
-    if (
-        isinstance(node.test, ast.Compare)
-        and len(node.test.ops) == 1
-        and isinstance(node.test.ops[0], ast.Eq)
-    ):
-        if ast.dump(node.test.left, include_attributes=False) == ast.dump(
-            node.test.comparators[0], include_attributes=False
-        ):
-            return False
-    return any(
-        isinstance(child, (ast.Attribute, ast.Call, ast.Name, ast.Subscript))
-        for child in ast.walk(node.test)
-    )
-
-
-def _failing_assertion(blocks: Iterable[str]) -> tuple[str, str]:
-    for block in blocks:
-        try:
-            tree = ast.parse(block)
-        except SyntaxError:
-            continue
-        lines = block.splitlines()
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Assert) or not _dynamic_assertion(node):
-                continue
-            source = ast.get_source_segment(block, node) or lines[node.lineno - 1]
-            assertion = source.split("#", 1)[0].strip()
-            if PASSING_COMMENT.search(lines[node.lineno - 1]):
-                continue
-            start = max(0, node.lineno - 2)
-            end_lineno = node.end_lineno
-            end = min(
-                len(lines), (end_lineno if end_lineno is not None else node.lineno) + 1
-            )
-            for index in range(start, end):
-                passage = lines[index].strip()
-                if PASSING_COMMENT.search(passage) or FAILURE.search(passage) is None:
-                    continue
-                if index == node.lineno - 1 or "".join(assertion.split()) in "".join(
-                    passage.split()
-                ):
-                    return assertion, passage
-    return "", ""
-
-
-def _invocation(body: str, blocks: Iterable[str]) -> str:
-    outside_fences = FENCE.sub("", body)
-    match = INVOCATION.search(outside_fences)
-    if match is not None and match.group(0).lstrip().startswith("$"):
-        return match.group(0).strip()
-    for block in blocks:
-        match = INVOCATION.search(block)
-        if match is not None:
-            return match.group(0).strip()
-    return ""
-
-
-def _expected_actual(body: str) -> str:
-    match = EXPECTED_ACTUAL.search(body)
-    if match is None:
-        return ""
-    expected = match.group("expected").strip()
-    actual = match.group("actual").strip()
-    if not expected or not actual:
-        return ""
-    return match.group(0).strip()
-
-
-def _marker_evidence_for(
-    number: int,
-    positional: set[int] | MarkerIndex | None,
-    markers: MarkerIndex | None,
-) -> tuple[bool, list[dict[str, Any]]]:
-    """Accept both marker shapes: a set of numbers, or an evidence mapping."""
-    evidence: list[dict[str, Any]] = []
-    marked = False
-    if isinstance(positional, Mapping):
-        hit = positional.get(number)
-        if hit:
-            marked = True
-            evidence.extend(hit)
-    elif isinstance(positional, (set, frozenset)):
-        marked = number in positional
-    if markers:
-        hit = markers.get(number)
-        if hit:
-            marked = True
-            evidence.extend(hit)
-    return marked, evidence
-
-
-def classify_issue(
-    issue: Mapping[str, Any],
-    marker_numbers: set[int] | MarkerIndex | None = None,
-    retrieval_date: str = "",
-    *,
-    markers: MarkerIndex | None = None,
-) -> dict[str, Any]:
-    """Classify one API issue without network access.
-
-    The second positional argument accepts both shapes that landed here: a set
-    of marker issue numbers, or a mapping of number to evidence records.
-    """
-    number = int(issue["number"])
-    title = str(issue.get("title") or "")
-    body = str(issue.get("body") or "")
-    record: dict[str, Any] = {
-        "number": number,
-        "title": title,
-        "url": str(issue.get("html_url") or ""),
-        "labels": _labels(issue.get("labels")),
-        "created_date": str(issue.get("created_at") or ""),
-        "retrieval_date": retrieval_date,
-        "admissible": False,
-        "reason": "",
-        "reason_code": "",
-    }
-    marked, evidence = _marker_evidence_for(number, marker_numbers, markers)
-    if marked:
-        record.update(
-            admissible=True,
-            reason_code="admissible_marker",
-            reason="upstream test marker names this issue; upstream supplies red phase and oracle",
-        )
-        if evidence:
-            record["reproducer_evidence"] = evidence
-            record["oracle_evidence"] = evidence
-        return record
-    blocks = _blocks(body)
-    assertion, failure = _failing_assertion(blocks)
-    invocation = _invocation(body, blocks)
-    oracle = _expected_actual(body)
-    has_assertion = any(ASSERTION.search(block) for block in blocks)
-    if assertion:
-        record.update(
-            admissible=True,
-            reason_code="admissible_assertion",
-            reason="upstream assertion supplies a concrete red phase and oracle",
-            reproducer_evidence={
-                "kind": "failing_assertion",
-                "text": assertion,
-                "failure_passage": failure,
-            },
-            oracle_evidence={"kind": "assertion", "text": assertion},
-        )
-        return record
-    if invocation and oracle:
-        record.update(
-            admissible=True,
-            reason_code="admissible_invocation",
-            reason="upstream supplies a reproducer and expected behaviour; no oracle is invented",
-            reproducer_evidence={"kind": "invocation", "text": invocation},
-            oracle_evidence={"kind": "expected_actual", "text": oracle},
-        )
-        return record
-    if has_assertion and oracle:
-        snippet = next((block for block in blocks if ASSERTION.search(block)), oracle)
-        record.update(
-            admissible=True,
-            reason_code="admissible_snippet",
-            reason="upstream supplies a reproducer and expected behaviour; no oracle is invented",
-            reproducer_evidence={"kind": "snippet", "text": snippet},
-            oracle_evidence={"kind": "expected_actual", "text": oracle},
-        )
-        return record
-    if invocation:
-        record.update(
-            reason_code="no_oracle",
-            reason="has a reproducer but no upstream-stated expected behaviour",
-        )
-        return record
-    runnable, _kind = _reproducer(body)
-    if runnable and not has_assertion and not _has_oracle(title, body):
-        record.update(
-            reason_code="no_oracle",
-            reason="has a reproducer but no upstream-stated expected behaviour",
-        )
-        return record
-    record.update(
-        reason_code="no_reproducer",
-        reason="no runnable snippet, stated failing invocation, or matching upstream test marker",
-    )
-    return record
+__all__ = [
+    "API",
+    "ARCHIVE_TIMEOUT_S",
+    "OUT",
+    "PERMISSIVE_LICENCES",
+    "PoolError",
+    "REPOS",
+    "Repo",
+    "_issues",
+    "_metadata",
+    "_now",
+    "_open",
+    "_print_counts",
+    "_reason_counts",
+    "classify_issue",
+    "main",
+    "marker_evidence",
+    "marker_issue_numbers",
+    "self_check",
+    "sweep",
+]
 
 
 def self_check() -> None:
@@ -660,73 +275,6 @@ def self_check() -> None:
     assert ignored == {}, ignored
 
 
-def _open(url: str, timeout: int) -> tuple[bytes, dict[str, str]]:
-    request = Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": USER_AGENT,
-            "X-GitHub-Api-Version": API_VERSION,
-        },
-    )
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            return response.read(), {
-                key.lower(): value for key, value in response.headers.items()
-            }
-    except HTTPError as error:
-        detail = error.read().decode("utf-8", "replace")[:300]
-        raise PoolError(
-            f"unauthenticated GET {url} failed: HTTP {error.code}: {detail}"
-        ) from error
-    except URLError as error:
-        raise PoolError(f"unauthenticated GET {url} failed: {error.reason}") from error
-
-
-def _json(url: str, timeout: int = TIMEOUT_S) -> tuple[Any, dict[str, str]]:
-    payload, headers = _open(url, timeout)
-    try:
-        return json.loads(payload), headers
-    except json.JSONDecodeError as error:
-        raise PoolError(f"invalid JSON from {url}") from error
-
-
-def _metadata(repo: Repo) -> dict[str, Any]:
-    owner, project = repo.name.split("/", 1)
-    data, _ = _json(f"{API}/repos/{owner}/{project}")
-    if not isinstance(data, dict):
-        raise PoolError(f"repository metadata for {repo.name} is not an object")
-    licence = data.get("license")
-    if not isinstance(licence, dict):
-        licence = {}
-    return {
-        "repository": repo.name,
-        "licence_spdx": licence.get("spdx_id"),
-        "licence_name": licence.get("name"),
-        "default_branch": data.get("default_branch") or "main",
-    }
-
-
-def _issues(repo: Repo) -> list[dict[str, Any]]:
-    owner, project = repo.name.split("/", 1)
-    url: str | None = f"{API}/repos/{owner}/{project}/issues?" + urlencode(
-        {"state": "open", "labels": repo.bug_label, "per_page": 100}
-    )
-    issues: list[dict[str, Any]] = []
-    while url:
-        page, headers = _json(url)
-        if not isinstance(page, list):
-            raise PoolError(f"issues payload for {repo.name} is not a list")
-        issues.extend(
-            item
-            for item in page
-            if isinstance(item, dict) and "pull_request" not in item
-        )
-        next_link = NEXT.search(headers.get("link", ""))
-        url = next_link.group(1) if next_link else None
-    return issues
-
-
 def _markers(repo: Repo, branch: str) -> dict[int, list[dict[str, Any]]]:
     owner, project = repo.name.split("/", 1)
     url = f"https://codeload.github.com/{quote(owner)}/{quote(project)}/tar.gz/refs/heads/{quote(branch)}"
@@ -751,18 +299,6 @@ def _markers(repo: Repo, branch: str) -> dict[int, list[dict[str, Any]]]:
     return result
 
 
-def _reason_counts(records: Iterable[Mapping[str, Any]]) -> dict[str, int]:
-    return dict(
-        sorted(
-            Counter(
-                str(record["reason_code"])
-                for record in records
-                if not record["admissible"]
-            ).items()
-        )
-    )
-
-
 def sweep(repo: Repo, retrieval_date: str) -> dict[str, Any]:
     metadata = _metadata(repo)
     if metadata["licence_spdx"] not in PERMISSIVE_LICENCES:
@@ -785,39 +321,6 @@ def sweep(repo: Repo, retrieval_date: str) -> dict[str, Any]:
         "inadmissible_reasons": _reason_counts(records),
         "issues": records,
     }
-
-
-def _print_counts(pools: list[dict[str, Any]]) -> None:
-    totals: Counter[str] = Counter()
-    reasons: Counter[str] = Counter()
-    further = 0
-    for pool in pools:
-        print(pool["repository"])
-        print(f"  licence: {pool['licence_spdx'] or pool['licence_name']}")
-        print(f"  retrieval_date: {pool['retrieval_date']}")
-        for key in ("swept", "admissible", "inadmissible"):
-            print(f"  {key}: {pool[key]}")
-            totals[key] += int(pool[key])
-        print("  inadmissible-with-reason-breakdown:")
-        for reason, count in pool["inadmissible_reasons"].items():
-            print(f"    {reason}: {count}")
-        reasons.update(pool["inadmissible_reasons"])
-        for issue in pool["issues"]:
-            if (
-                issue["admissible"]
-                and (pool["repository"], issue["number"]) not in ALREADY_CREDITED
-            ):
-                further += 1
-    print("combined")
-    for key in ("swept", "admissible", "inadmissible"):
-        print(f"  {key}: {totals[key]}")
-    print("  inadmissible-with-reason-breakdown:")
-    for reason, count in sorted(reasons.items()):
-        print(f"    {reason}: {count}")
-    print(
-        "  seventeen further admissible tickets exist: "
-        f"{'yes' if further >= SEVENTEEN else 'no'} (further={further}; excluding pytest #14324, #10644, #12175)"
-    )
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from consilient import coordination, work_items
+from consilient import coordination, coordination_projection, work_items
 from consilient.events import read_all
 
 T0 = datetime(2026, 8, 24, 13, 0, 0, tzinfo=timezone.utc)
@@ -196,7 +196,13 @@ def test_worker_gone_from_pid_record_is_unknown_when_process_check_is_unknown(
         json.dumps({"pid": os.getpid()}), encoding="utf-8"
     )
 
+    # Patch the module that DEFINES the helper, not the one that re-exports it. Both
+    # `_process_still_running` and its only caller moved into coordination_projection.py in the
+    # 28 August 2026 split, and `coordination` now merely re-exports the name -- so a patch there
+    # lands on a facade alias no code reads, and this test went green-to-red saying the liveness
+    # check returned False where it should have returned None. Measured: of 99 patch targets in
+    # the suite this was the only one the split invalidated.
     monkeypatch.setattr(
-        coordination, "_process_still_running", lambda _pid: None, raising=False
+        coordination_projection, "_process_still_running", lambda _pid: None, raising=False
     )
     assert coordination.worker_gone_from_pid_record(runs, "run-c") is None

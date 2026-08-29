@@ -31,6 +31,8 @@ def _load_script() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+    if _RECEIPT_ROOT is not None:
+        module.RECEIPT_ROOT = _RECEIPT_ROOT
     return module
 
 
@@ -69,6 +71,32 @@ def _agent_on_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]
     executable.write_text("@exit /b 0\n", encoding="utf-8")
     monkeypatch.setenv("PATH", str(executable.parent) + os.pathsep + os.environ["PATH"])
     return ["codex"]
+
+
+# Set per test by the autouse fixture below; `_load_script` applies it to the freshly
+# loaded module, which is the only place every test passes through.
+_RECEIPT_ROOT: Path | None = None
+
+
+@pytest.fixture(autouse=True)
+def _receipts_never_reach_the_production_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No test may write into `.harness/objects/b4-receipts/`.
+
+    MEASURED 28 August 2026: it had been doing exactly that. All sixteen files in the real
+    store were 21-23 bytes holding the literal strings this module's stub writes --
+    "stdout:agent.stdout.txt" and its siblings. `run_ticket` resolves RECEIPT_ROOT from module
+    globals and no test redirected it.
+
+    That is not untidiness. A receipt is the evidence that the external oracle actually ran,
+    and every receipt in the store was evidence only that a test ran. Nothing distinguished
+    them, so the B4 path could be believed to have executed when it never had -- and the first
+    real upstream submission would have been its first real execution.
+    """
+    monkeypatch.setattr(
+        sys.modules[__name__], "_RECEIPT_ROOT", tmp_path / "b4-receipts"
+    )
 
 
 def _process(
@@ -121,7 +149,9 @@ def test_script_entrypoint_imports_without_project_pythonpath(tmp_path: Path) ->
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.skipif(not PYTEST_PYTHON.is_file(), reason="pytest upstream venv unavailable")
+@pytest.mark.skipif(
+    not PYTEST_PYTHON.is_file(), reason="pytest upstream venv unavailable"
+)
 def test_verify_source_accepts_pinned_pytest_upstream() -> None:
     _load_script().verify_source(PYTEST_UPSTREAM)
 
@@ -141,7 +171,12 @@ def test_net_zero_restoration_is_rejected(
     log = tmp_path / "log" / "events.jsonl"
 
     assert not script.run_ticket(
-        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+        source,
+        ticket,
+        _agent_on_path(monkeypatch, tmp_path),
+        log,
+        timeout_s=1,
+        python=sys.executable,
     )
     assert not log.exists()
     assert _foreign_tickets(log.parent) == 0
@@ -162,7 +197,12 @@ def test_undeclared_changed_path_is_rejected(
     log = tmp_path / "log" / "events.jsonl"
 
     assert not script.run_ticket(
-        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+        source,
+        ticket,
+        _agent_on_path(monkeypatch, tmp_path),
+        log,
+        timeout_s=1,
+        python=sys.executable,
     )
     assert not log.exists()
     assert _foreign_tickets(log.parent) == 0
@@ -178,7 +218,12 @@ def test_bounded_real_repair_is_credited_and_counted(
     log = tmp_path / "log" / "events.jsonl"
 
     assert script.run_ticket(
-        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+        source,
+        ticket,
+        _agent_on_path(monkeypatch, tmp_path),
+        log,
+        timeout_s=1,
+        python=sys.executable,
     )
     assert _foreign_tickets(log.parent) == 1
     outcome = _outcome(log)
@@ -196,7 +241,12 @@ def test_durable_receipts_have_the_recorded_fixed_order_digest(
     log = tmp_path / "log" / "events.jsonl"
 
     assert script.run_ticket(
-        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+        source,
+        ticket,
+        _agent_on_path(monkeypatch, tmp_path),
+        log,
+        timeout_s=1,
+        python=sys.executable,
     )
     receipt_dir = script.RECEIPT_ROOT / ticket.id
     assert receipt_dir.is_dir()
@@ -240,6 +290,11 @@ def test_collection_error_remains_ineligible_for_credit(
     log = tmp_path / "log" / "events.jsonl"
 
     assert not script.run_ticket(
-        source, ticket, _agent_on_path(monkeypatch, tmp_path), log, timeout_s=1, python=sys.executable
+        source,
+        ticket,
+        _agent_on_path(monkeypatch, tmp_path),
+        log,
+        timeout_s=1,
+        python=sys.executable,
     )
     assert not log.exists()

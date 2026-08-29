@@ -188,6 +188,10 @@ def main(argv: list[str] | None = None) -> int:
         ),
         gate("ruff", [sys.executable, "-m", "ruff", "check", "."]),
         gate(
+            "file length ratchet",
+            [sys.executable, ".github/scripts/check_file_length.py"],
+        ),
+        gate(
             "secret scan",
             [
                 sys.executable,

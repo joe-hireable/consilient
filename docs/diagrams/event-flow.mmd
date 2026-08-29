@@ -1,6 +1,6 @@
 %% **Producer:** `scripts/build_diagrams.py`
 %% **Source:** `src/consilient/events.py`
-%% **Source SHA-256:** `840457b70265736d3c2667df020eafa8e2473d56aba166272343626b4721c808`
+%% **Source SHA-256:** `24a2bdb592746ed280f94ca1eeca67eb90fe25f3a4353ee2002c31ab89b430b0`
 %% **Do not hand-edit:** regenerate with `python scripts/build_diagrams.py`.
 
 flowchart TB
@@ -20,19 +20,22 @@ flowchart TB
     k12["spend.reserved"]
     k13["knowledge.retrieved"]
     k14["record.captured"]
-    k15["capability.gap"]
-    k16["intent.recorded"]
-    k17["intent.starved"]
-    k18["feedback.asked"]
-    k19["feedback.declined"]
-    k20["feedback.answered"]
-    k21["promote.impact_contract.registered"]
-    k22["promote.promoter_beta.receipt"]
-    k23["promote.activation.refused"]
-    k24["visibility.change"]
-    k25["delivery.estimate"]
-    k26["measurement.registered"]
-    k27["measurement.result"]
+    k15["capability.versioned"]
+    k16["model.change"]
+    k17["capability.gap"]
+    k18["intent.recorded"]
+    k19["intent.starved"]
+    k20["escalation.attempted"]
+    k21["feedback.asked"]
+    k22["feedback.declined"]
+    k23["feedback.answered"]
+    k24["promote.impact_contract.registered"]
+    k25["promote.promoter_beta.receipt"]
+    k26["promote.activation.refused"]
+    k27["visibility.change"]
+    k28["delivery.estimate"]
+    k29["measurement.registered"]
+    k30["measurement.result"]
   end
   NEW["new kind"] --> CONST["*_KIND constant"]
   CONST --> kinds

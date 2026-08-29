@@ -110,9 +110,15 @@ def main(argv: list[str] | None = None) -> int:
         print("source-depth invariant FAILED:", file=sys.stderr)
         for finding in findings:
             print(f"  {finding}", file=sys.stderr)
+        # Split on the LINE NUMBER, not the first colon: a Windows path starts 'C:\',
+        # so splitting on ':' counted every finding as the same file and reported 1 of 5.
+        offending = {re.sub(r':[0-9]+:.*$', '', f) for f in findings}
         print(
-            f"{len(findings)} unverified citation(s) in {len(paths)} publication-facing "
-            "file(s). Verify the source and upgrade the marker to [FULL]/[ABS], or remove "
+            # `paths` is what was SCANNED. Reporting it here read as though the findings were
+            # spread across all of them: 60 citations sat in two files while this said five.
+            f"{len(findings)} unverified citation(s) in {len(offending)} of {len(paths)} "
+            "publication-facing file(s) scanned. Verify the source and upgrade the marker "
+            "to [FULL]/[ABS], or remove "
             "the claim it carries. Joe's rule: never cite a [SNIP] or [2ND] source publicly.",
             file=sys.stderr,
         )

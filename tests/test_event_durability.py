@@ -3,48 +3,48 @@
 `events.append` is the single writer of the authoritative log. Until this unit it
 buffered a line and closed the file: no serialisation across processes (three torn
 concurrent appends reached the real trajectory on 22 Aug 2026 [measured: the pinned
-incident in `test_no_new_event_may_bypass_append`]) and no fsync (the `loop.py`
-ponytail names the gap). These tests pin the repair: one complete UTF-8 line per
-acknowledged event, serialised by a kernel-backed per-log lock, fsynced before the
-call returns, and an error — never a success acknowledgement — for every injected
-durability failure.
+incident in `test_no_new_event_may_bypass_append`]) and no fsync (the `loop.py` ponytail
+names the gap). These tests pin the repair: one complete UTF-8 line per acknowledged
+event, serialised by a kernel-backed per-log lock, fsynced before the call returns, and
+an error — never a success acknowledgement — for every injected durability failure.
 
 The write path is unbuffered (`os.write`), so flush and write are one operation and
 "flush failure" is exercised as write failure; fsync is the durability boundary.
-"""
 
-from __future__ import annotations
+Two classes of evidence sit here deliberately. Ten spawned writers really race for the
+lock, and the lock is kernel-backed so killing the holder releases it — no stale lock
+file can strand the log. Against that, syscall failures are injected at every step of a
+single append: a short write is completed in full before acknowledgement, a write making
+no progress is an error, a failure half way through a line rolls its bytes back so the
+log is byte-for-byte unchanged, and a failed fsync acknowledges nothing. Either class
+alone would leave the other's failure mode unexamined.
+
+The two round-trip checks close the contract: an acknowledged append is immediately re-
+readable, and a log that already ends in a torn prefix refuses the next append rather
+than writing new bytes after it. The directory-entry rule moved to
+test_event_durability_directory.py, the reader's behaviour under contention to
+test_event_read_contention.py, and the read_all cache to test_event_read_all_cache.py."""
 
 import multiprocessing
 import os
-import pathlib
 import sys
 import threading
 import time
-from datetime import datetime, timezone
 from multiprocessing.connection import Connection
 from pathlib import Path
-
 import pytest
-
 from consilient import events as events_mod
-from consilient.events import SCHEMA_VERSION, EventError, append, canonical, read
-
-_OPEN_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_APPEND | (
-    os.O_BINARY if sys.platform == "win32" else 0
+from consilient.events import EventError, append, canonical, read
+from event_durability_helpers import (
+    ev,
 )
 
-
-def ev(**over):
-    base = {
-        "v": SCHEMA_VERSION,
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "event": "test.durability",
-        "actor": "durability-test",
-        "data": {},
-    }
-    base.update(over)
-    return base
+_OPEN_FLAGS = (
+    os.O_WRONLY
+    | os.O_CREAT
+    | os.O_APPEND
+    | (os.O_BINARY if sys.platform == "win32" else 0)
+)
 
 
 def _append_batch(log_path: str, writer: int, count: int, go) -> None:
@@ -67,7 +67,9 @@ def _hold_lock(log_path: str, conn: Connection) -> None:
     time.sleep(60)
 
 
-def test_two_hundred_concurrent_appends_produce_two_hundred_valid_distinct_lines(tmp_path):
+def test_two_hundred_concurrent_appends_produce_two_hundred_valid_distinct_lines(
+    tmp_path,
+):
     log = tmp_path / "concurrent.jsonl"
     ctx = multiprocessing.get_context("spawn")
     go = ctx.Event()
@@ -144,7 +146,9 @@ def test_a_killed_lock_holder_releases_the_per_log_lock(tmp_path):
     assert [event.data["marker"] for event in events] == ["after-kill"]
 
 
-def test_a_short_write_is_completed_in_full_before_acknowledgement(tmp_path, monkeypatch):
+def test_a_short_write_is_completed_in_full_before_acknowledgement(
+    tmp_path, monkeypatch
+):
     """A short os.write is ordinary OS behaviour; the line is acknowledged only
     once every byte is written."""
     marker = b"short-write-marker"
@@ -247,150 +251,6 @@ def test_an_fsync_failure_is_an_error_and_acknowledges_nothing(tmp_path, monkeyp
     assert events == [] and rejected == []
 
 
-def test_first_file_creation_fsyncs_the_directory_where_the_platform_exposes_it(
-    tmp_path, monkeypatch
-):
-    """A new log's directory entry is made durable on creation (POSIX); on Windows
-    the standard library exposes no directory fsync, so the guarantee there covers
-    the file-content fsync and nothing broader."""
-    calls: list[Path] = []
-    real = events_mod._fsync_directory
-
-    def spy(directory: Path) -> None:
-        calls.append(Path(directory))
-        real(directory)
-
-    monkeypatch.setattr(events_mod, "_fsync_directory", spy)
-    log = tmp_path / "fresh" / "log.jsonl"
-    append(log, ev(data={"marker": "first"}))
-    assert calls == [log.parent], "the first append to a file must fsync its directory"
-
-    append(log, ev(data={"marker": "second"}))
-    assert calls == [log.parent, log.parent], (
-        "every acknowledgement must establish directory durability while holding the log lock"
-    )
-
-    events, rejected = read(log)
-    assert not rejected
-    assert [event.data["marker"] for event in events] == ["first", "second"]
-
-
-def test_later_append_retries_directory_durability_after_the_initial_attempt_fails(
-    tmp_path, monkeypatch
-):
-    """A later writer must not acknowledge a file whose creation was not durable."""
-    calls = 0
-
-    def fail_once(directory: Path) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            raise OSError("injected initial directory fsync failure")
-
-    monkeypatch.setattr(events_mod, "_fsync_directory", fail_once)
-    log = tmp_path / "retry-directory.jsonl"
-
-    with pytest.raises(EventError, match="directory entry"):
-        append(log, ev(data={"marker": "unacknowledged"}))
-
-    append(log, ev(data={"marker": "acknowledged"}))
-    assert calls == 2, "a later append must retry directory durability before returning"
-
-
-def test_later_transaction_retries_directory_durability_after_the_initial_attempt_fails(
-    tmp_path, monkeypatch
-):
-    """The F02 transaction path has the same first-file acknowledgement rule."""
-    calls = 0
-
-    def fail_once(directory: Path) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            raise OSError("injected initial directory fsync failure")
-
-    monkeypatch.setattr(events_mod, "_fsync_directory", fail_once)
-    candidate = ev(event="test.durability.transaction", data={"marker": "unacknowledged"})
-
-    with pytest.raises(EventError, match="directory entry"):
-        events_mod.append_transaction(tmp_path, [candidate], lambda _p, _r, _c: None)
-
-    events_mod.append_transaction(
-        tmp_path,
-        [ev(event="test.durability.transaction", data={"marker": "acknowledged"})],
-        lambda _p, _r, _c: None,
-    )
-    assert calls == 2, "a later transaction must retry directory durability before returning"
-
-
-def test_follower_cannot_acknowledge_while_creator_directory_sync_is_pending(
-    tmp_path, monkeypatch
-):
-    """Directory durability stays inside the per-log lock for every acknowledgement."""
-    directory_sync_started = threading.Event()
-    release_directory_sync = threading.Event()
-    follower_attempting_append = threading.Event()
-    follower_returned = threading.Event()
-    calls_lock = threading.Lock()
-    calls = 0
-    outcomes: dict[str, object] = {}
-
-    def block_creator(directory: Path) -> None:
-        nonlocal calls
-        with calls_lock:
-            calls += 1
-            first = calls == 1
-        if first:
-            directory_sync_started.set()
-            assert release_directory_sync.wait(10), "test did not release creator directory sync"
-
-    def write(name: str, marker: str) -> None:
-        try:
-            if name == "follower":
-                follower_attempting_append.set()
-            append(tmp_path / "contended-directory.jsonl", ev(data={"marker": marker}))
-            outcomes[name] = "ok"
-        except Exception as exc:
-            outcomes[name] = exc
-        finally:
-            if name == "follower":
-                follower_returned.set()
-
-    monkeypatch.setattr(events_mod, "_fsync_directory", block_creator)
-    creator = threading.Thread(target=write, args=("creator", "first"))
-    follower = threading.Thread(target=write, args=("follower", "second"))
-    creator.start()
-    try:
-        assert directory_sync_started.wait(5), "creator never reached directory sync"
-        follower.start()
-        assert follower_attempting_append.wait(5), "follower never attempted append"
-        assert not follower_returned.wait(0.5), (
-            "follower acknowledged while the creator's directory sync was pending"
-        )
-    finally:
-        release_directory_sync.set()
-        creator.join(timeout=10)
-        follower.join(timeout=10)
-
-    assert not creator.is_alive() and not follower.is_alive()
-    assert outcomes == {"creator": "ok", "follower": "ok"}
-
-
-def test_a_directory_fsync_failure_is_an_error_and_never_a_partial_line(
-    tmp_path, monkeypatch
-):
-    def fail(directory: Path) -> None:
-        raise OSError("injected directory fsync failure")
-
-    monkeypatch.setattr(events_mod, "_fsync_directory", fail)
-    log = tmp_path / "dirfail.jsonl"
-    with pytest.raises(EventError, match="not acknowledged"):
-        append(log, ev())
-
-    _events, rejected = read(log)
-    assert not rejected, "no partial JSON line may be left behind"
-
-
 def test_an_acknowledged_append_is_immediately_rereadable(tmp_path):
     log = tmp_path / "now.jsonl"
     record = ev(data={"marker": "reread"})
@@ -409,143 +269,3 @@ def test_a_torn_prefix_refuses_a_later_append_without_writing_new_bytes(tmp_path
         append(log, ev(data={"marker": "after"}))
 
     assert log.read_bytes() == before
-
-
-def test_a_reader_survives_a_concurrent_writer_holding_the_file(tmp_path, monkeypatch):
-    """Windows denies a reader while a writer holds the path; the read must retry, not die.
-
-    This is not hypothetical. On 23 August 2026 every one of six failed dispatches died with
-    PermissionError raised out of `instructions.assemble` -> `read_all` -> `read`, seconds after
-    the scheduler had already printed that the work was dispatched. Among them was the only Grok
-    run, which is why one arm's usage never moved while the scheduler reported it as busy.
-    """
-    log = tmp_path / "2026-08-23.jsonl"
-    log.write_text("", encoding="utf-8")
-
-    real_open = pathlib.Path.open
-    attempts = {"n": 0}
-
-    def flaky(self, *args, **kwargs):
-        if self == log and attempts["n"] < 3:
-            attempts["n"] += 1
-            raise PermissionError(13, "Permission denied")
-        return real_open(self, *args, **kwargs)
-
-    monkeypatch.setattr(pathlib.Path, "open", flaky)
-    monkeypatch.setattr(events_mod, "_READ_BACKOFF", 0.001)
-
-    got, rejected = read(log)
-    assert attempts["n"] == 3, "the reader must actually have been denied before succeeding"
-    assert got == [] and rejected == []
-
-
-def test_a_permanently_held_file_refuses_rather_than_reporting_an_empty_trajectory(
-    tmp_path, monkeypatch
-):
-    """Failing closed matters more than failing rarely.
-
-    A reader that gave up and returned no events would let every downstream decision be made
-    against an empty history while looking perfectly healthy — the same class of defect as a
-    check that cannot tell "condition false" from "check failed".
-    """
-    log = tmp_path / "2026-08-23.jsonl"
-    log.write_text("", encoding="utf-8")
-
-    def always_denied(self, *args, **kwargs):
-        raise PermissionError(13, "Permission denied")
-
-    monkeypatch.setattr(pathlib.Path, "open", always_denied)
-    monkeypatch.setattr(events_mod, "_READ_BACKOFF", 0.001)
-
-    with pytest.raises(EventError) as excinfo:
-        read(log)
-    assert "held by another process" in str(excinfo.value)
-
-
-def _write_day(directory, name, payloads):
-    """Write a day file of raw JSONL lines, bypassing the append transaction."""
-    import json as _json
-
-    path = directory / name
-    with path.open('a', encoding='utf-8') as handle:
-        for payload in payloads:
-            handle.write(_json.dumps(payload) + chr(10))
-    return path
-
-
-def test_read_all_cache_returns_what_a_fresh_parse_would(tmp_path) -> None:
-    """The memoised path must be indistinguishable from re-parsing.
-
-    MEASURED 28 August 2026: one read_all over the live trajectory is 1.8 seconds and 224 MB
-    retained, and coordination.py calls it at SIX sites per dispatch while a dozen dispatches
-    run. The driver was recording MemoryError crashes on that path.
-
-    A cache is only allowed here because it changes nothing: same events, same rejections,
-    same order. If it ever does not, the horizon has effectively narrowed -- and an epoch
-    derived over less history is LOWER, which is the one direction that is unsafe.
-    """
-    from consilient.events import read_all
-
-    log = tmp_path / 'log'
-    log.mkdir()
-    _write_day(log, '2026-08-01.jsonl', [{'event_id': 'a', 'kind': 'note'}])
-
-    first_events, first_rejected = read_all(log)
-    second_events, second_rejected = read_all(log)  # served from cache
-    # Totals, because a synthetic payload parses as a Rejection rather than an Event. Either
-    # way a cache that hid a line would show here.
-    assert len(second_events) == len(first_events)
-    assert len(second_rejected) == len(first_rejected)
-    assert len(second_events) + len(second_rejected) == 1
-
-
-def test_read_all_cache_is_invalidated_by_an_append(tmp_path) -> None:
-    """A stale hit would hide history, and hidden history lowers the fencing epoch.
-
-    The fingerprint includes each file's SIZE, and an append-only log cannot grow without
-    changing one. This is the test that makes the cache safe rather than merely fast: if it
-    fails, read_all is returning less than the trajectory holds.
-    """
-    from consilient.events import read_all
-
-    log = tmp_path / 'log'
-    log.mkdir()
-    _write_day(log, '2026-08-01.jsonl', [{'event_id': 'a', 'kind': 'note'}])
-    be, br = read_all(log)
-    before = len(be) + len(br)
-
-    _write_day(log, '2026-08-01.jsonl', [{'event_id': 'b', 'kind': 'note'}])
-    ae, ar = read_all(log)
-    after = len(ae) + len(ar)
-    assert after == before + 1, 'an append did not invalidate the cache'
-
-    # A whole new day file must also be seen -- the midnight roll is exactly when the
-    # fencing epoch collapsed once before.
-    _write_day(log, '2026-08-02.jsonl', [{'event_id': 'c', 'kind': 'note'}])
-    re_, rr = read_all(log)
-    rolled = len(re_) + len(rr)
-    assert rolled == after + 1, 'a new day file did not invalidate the cache'
-
-
-def test_read_all_never_hands_back_a_list_a_caller_can_corrupt(tmp_path) -> None:
-    """Callers append to the returned history; a shared list would poison the cache.
-
-    coordination.py does `history.append(Event(candidate))` on the result while validating a
-    claim. If that were the cached list, the next reader would see a phantom event that was
-    never committed -- and would compute a fencing epoch from it.
-    """
-    from consilient.events import read_all
-
-    log = tmp_path / 'log'
-    log.mkdir()
-    _write_day(log, '2026-08-01.jsonl', [{'event_id': 'a', 'kind': 'note'}])
-
-    events, rejected = read_all(log)
-    original = len(events) + len(rejected)
-    events.append('phantom')  # a caller mutating its own copy
-    rejected.append('nonsense')
-
-    again, again_rejected = read_all(log)
-    assert len(again) + len(again_rejected) == original, 'a caller mutated the cache'
-    assert 'phantom' not in again
-    assert 'nonsense' not in again_rejected

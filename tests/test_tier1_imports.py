@@ -64,8 +64,20 @@ def test_tier1_list_names_exactly_the_eight_modules_and_they_exist() -> None:
 def test_tier1_modules_import_nothing_outside_stdlib_and_the_package() -> None:
     offenders: set[str] = set()
     for module in TIER1_MODULES:
-        external = _external_imports(PACKAGE / f"{module}.py") - {"consilient"}
-        offenders.update(f"{module}.py: {name}" for name in sorted(external))
+        # The whole FAMILY, not just <module>.py. Splitting a tier-1 module used to
+        # move its imports out of this ban's reach without failing anything.
+        # [measured 28 August 2026]. TIER1_MODULES itself is left alone: the test
+        # above asserts it equals exactly eight names, and a ninth entry would fail
+        # that -- so the widening belongs here, in the scan.
+        for path in [PACKAGE / f"{module}.py"] + sorted(
+            PACKAGE.glob(f"{module}_*.py")
+        ):
+            if not path.is_file():
+                continue
+            external = _external_imports(path) - {"consilient"}
+            offenders.update(
+                f"{path.name}: {name}" for name in sorted(external)
+            )
     assert not offenders, (
         "tier-1 modules (ADR-0065) import outside stdlib and the package:\n"
         + "\n".join(sorted(offenders))

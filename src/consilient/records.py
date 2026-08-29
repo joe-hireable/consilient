@@ -84,7 +84,9 @@ def _resolve_source(
     try:
         relative = resolved.relative_to(workspace)
     except ValueError as exc:
-        raise events.EventError("the capture source is outside the authorised workspace") from exc
+        raise events.EventError(
+            "the capture source is outside the authorised workspace"
+        ) from exc
     if not resolved.is_file():
         raise events.EventError("the capture source must be a regular file")
     return resolved, relative.as_posix()
@@ -181,7 +183,9 @@ def capture_file(
     except (OSError, RuntimeError) as exc:
         raise events.EventError("the canonical object path cannot be resolved") from exc
     if resolved_object_path != object_path:
-        raise events.EventError("the canonical object path escaped the private object store")
+        raise events.EventError(
+            "the canonical object path escaped the private object store"
+        )
 
     timestamp = datetime.now(timezone.utc).isoformat()
     record_id = events.new_event_id()
@@ -218,7 +222,9 @@ def capture_file(
         try:
             _install_object(object_path, payload)
         except (OSError, events.EventError) as exc:
-            raise events.EventError("object install failed; capture not acknowledged") from exc
+            raise events.EventError(
+                "object install failed; capture not acknowledged"
+            ) from exc
         try:
             _verify_object(object_path, digest, byte_count)
         except (OSError, events.EventError) as exc:
@@ -230,7 +236,9 @@ def capture_file(
     try:
         appended = events.append(log_path, candidate)
     except OSError as exc:
-        raise events.EventError("event append failed; capture not acknowledged") from exc
+        raise events.EventError(
+            "event append failed; capture not acknowledged"
+        ) from exc
     expected_event_digest = events.event_sha256(appended)
     event_id = appended["event_id"]
     try:
@@ -248,7 +256,9 @@ def capture_file(
         raise events.EventError(
             "the appended event was not reread as one exact linked record; capture not acknowledged"
         )
-    if not isinstance(event_id, str):  # validate() makes this unreachable; keeps the return typed.
+    if not isinstance(
+        event_id, str
+    ):  # validate() makes this unreachable; keeps the return typed.
         raise events.EventError("the appended event has no stable identity")
 
     return RecordRef(

@@ -153,6 +153,9 @@ def test_every_registry_entry_names_a_real_refusal_and_real_tests():
     for guard in checker.GUARDS:
         module = ROOT / guard.module
         assert module.is_file(), f"{guard.guard_id}: {guard.module} does not exist"
+        # Follow the split the same way the checker does, or this asserts against a filename
+        # while the checker asserts against the code, and the two answer different questions.
+        module = checker._resolve_within_family(module, guard.function)
         # Raises GuardMutationError if the function is absent or refuses nothing.
         _, deleted = checker.delete_guard(
             module.read_text(encoding="utf-8"), guard.function

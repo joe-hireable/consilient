@@ -35,7 +35,7 @@ python .github/scripts/check_record_numbers.py
 **`check_foreign_identifiers.py` exits 1 by design.** Fourteen identifiers remain and are
 individually accounted for — ten GitHub permalinks to upstream projects, three to EXP-49's
 pre-registration, one to EXP-05. The invariant is the **ratchet** —
-`test_foreign_commit_identifiers_may_only_decrease` in `tests/test_v0_invariants.py`, which
+`test_foreign_commit_identifiers_may_only_decrease` in `tests/test_v0_foreign_identifiers.py`, which
 asserts the total may only fall. Do not read the exit code as the verdict, and do not raise the ratchet to make it green.
 Verify by artefact, not by exit code — this project has lost time to that three times.
 

@@ -1,26 +1,39 @@
-"""Refuse a merged Python file that rebinds a module name or breaks its DDL.
+"""Refuse a merged Python file that rebinds a module name or breaks its DDL — the gate
+itself, its two fixtures, the AST sweep and the command line.
 
-ruff and mypy already own function/class/import redefinition (F811, no-redef).
-They do not own a module-level `KINDS = ...` rebound, and they cannot see SQL
-that lives inside a string. Both defects parsed cleanly in the T01 specimen
-[measured 24 Aug 2026]. This gate is those two checks and nothing else.
+ruff and mypy already own function, class and import redefinition. They do not own a
+module-level `KINDS = ...` rebound, and they cannot see SQL that lives inside a string.
+Both defects parsed cleanly in the T01 specimen [measured 24 Aug 2026]. This gate is
+those two checks and nothing else. C1 lives in `merge_acceptance_rebinding.py`; the
+string grammar behind C3 lives in `merge_acceptance_sql.py`. What stays here is what
+cannot leave, and the reason is measured rather than editorial.
 
-C1 walks `tree.body` only and collects names bound by `ast.Assign` and
-`ast.AnnAssign`. Widening it to `ast.walk`, or to FunctionDef/ClassDef/Import,
-duplicates ruff/mypy and reintroduces false alarms.
+Running this checker against a byte-identical copy of itself at another path produces
+five findings [measured 28 August 2026]: the two `CREATE TABLE` fragments inside
+SPECIMEN, the one inside CONTROL, the `create table` prefix literal inside `_ddl_start`,
+and the `CREATE TABLE` fallback label inside `ddl_tree_findings`. All five are DDL-
+shaped by the check's own rule, and `report()` exempts exactly one path — `_SELF_PATH`.
+A sibling carrying any of them would therefore refuse itself the moment a commit touched
+it, including the commit that created it, because the merge gate runs this script with
+`--files` over every changed Python file. Widening the exemption to a second path would
+be loosening a boundary this docstring says to narrow and never disable, so those four
+symbols stay.
 
-C3 runs `sqlite3.executescript` on every `ast.Constant` string that is
-SQL-shaped: it contains `CREATE TABLE` (case-insensitive), the stripped text
-starts with `CREATE TABLE`, and it contains no backslash. A naive walk that
-executes every Constant containing the words fires on the regex in
+SPECIMEN, CONTROL and `ddl_findings` stay for a second, independent reason:
+`tests/test_merge_acceptance.py` reaches them by attribute on a module loaded with
+`importlib.util.spec_from_file_location`, which does not put this directory on
+`sys.path`. The one-line insert below is what makes the sibling imports resolve under
+that loader; without it four of that file's seven tests raise ModuleNotFoundError.
+
+C3 runs `sqlite3.executescript` on every `ast.Constant` string that is SQL-shaped. A
+naive walk that executes every Constant containing the words fires on the regex in
 `scripts/build_diagrams.py` and on a Python-source fixture in
-`tests/test_build_diagrams.py` [measured]. Those are not DDL. If a future
-`--scan` is non-zero, narrow further. Never disable. Never threshold.
+`tests/test_build_diagrams.py` [measured]. Those are not DDL. If a future `--scan` is
+non-zero, narrow further. Never disable. Never threshold.
 
-The incumbent for C1 is ruff F811 / pyflakes F811 / mypy no-redef — they miss
-Assign rebinding. The incumbent for C3 is sqlite3 itself (stdlib); sqlfluff
-would need a dependency this repository does not take. Equal to the standard
-validator, scoped to strings the parser cannot see.
+The incumbent for C3 is sqlite3 itself (stdlib); sqlfluff would need a dependency this
+repository does not take. Equal to the standard validator, scoped to strings the parser
+cannot see.
 
 Usage:
 
@@ -29,19 +42,90 @@ Usage:
     python .github/scripts/check_merge_acceptance.py --files path/a.py path/b.py
 
 Exit 0 clean, 1 on findings. One `file:line:name` per finding.
-"""
 
-from __future__ import annotations
+Preserved from before the 28 August 2026 split, which rewrote this docstring and carried
+the paragraph below into no sibling. It is reproduced WHOLE. An earlier restoration took
+only the individual lines a checker had reported missing, which spliced halves of two
+different sentences together beneath a claim of being verbatim -- found by an outside
+review on 29 August 2026.
+
+    ruff and mypy already own function/class/import redefinition (F811, no-redef).
+    They do not own a module-level `KINDS = ...` rebound, and they cannot see SQL
+    that lives inside a string. Both defects parsed cleanly in the T01 specimen
+    [measured 24 Aug 2026]. This gate is those two checks and nothing else.
+
+    C1 walks `tree.body` only and collects names bound by `ast.Assign` and
+    `ast.AnnAssign`. Widening it to `ast.walk`, or to FunctionDef/ClassDef/Import,
+    duplicates ruff/mypy and reintroduces false alarms.
+
+    C3 runs `sqlite3.executescript` on every `ast.Constant` string that is
+    SQL-shaped: it contains `CREATE TABLE` (case-insensitive), the stripped text
+    starts with `CREATE TABLE`, and it contains no backslash. A naive walk that
+    executes every Constant containing the words fires on the regex in
+    `scripts/build_diagrams.py` and on a Python-source fixture in
+    `tests/test_build_diagrams.py` [measured]. Those are not DDL. If a future
+    `--scan` is non-zero, narrow further. Never disable. Never threshold.
+
+    The incumbent for C1 is ruff F811 / pyflakes F811 / mypy no-redef — they miss
+    Assign rebinding. The incumbent for C3 is sqlite3 itself (stdlib); sqlfluff
+    would need a dependency this repository does not take. Equal to the standard
+    validator, scoped to strings the parser cannot see.
+"""
 
 import argparse
 import ast
 import functools
 import os
-import sqlite3
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+# This directory is not a package, so a sibling module is importable only when it is on
+# sys.path. Running this file as a script puts it there; loading it through importlib by
+# path does not. A no-op in the script case.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from merge_acceptance_rebinding import (
+    _bound_at_module,
+    _display,
+    _names_in_target,
+    rebinding_findings,
+)
+
+from merge_acceptance_sql import (
+    _after_table_name,
+    _create_table_shaped,
+    _ddl_error,
+    _ddl_slice,
+    _without_leading_sql_comments,
+)
+
+__all__ = [
+    "CONTROL",
+    "GIT_ENV",
+    "REPO_ROOT",
+    "SELFTEST_TIMEOUT_S",
+    "SKIP_DIRS",
+    "SPECIMEN",
+    "_after_table_name",
+    "_bound_at_module",
+    "_create_table_shaped",
+    "_ddl_error",
+    "_ddl_slice",
+    "_display",
+    "_names_in_target",
+    "_without_leading_sql_comments",
+    "ddl_findings",
+    "ddl_tree_findings",
+    "findings_in_file",
+    "iter_python",
+    "main",
+    "rebinding_findings",
+    "report",
+    "self_test",
+    "sql_shaped",
+]
 
 # git exports GIT_DIR and GIT_INDEX_FILE into every hook it runs, and GIT_DIR
 # overrides cwd. Every gate script here scrubs them; the invariant is blunt
@@ -124,105 +208,6 @@ CONTROL = "\n".join(
 )
 
 
-def _display(path: Path) -> str:
-    resolved = path.resolve()
-    try:
-        return resolved.relative_to(Path.cwd().resolve()).as_posix()
-    except ValueError:
-        return path.as_posix()
-
-
-def _names_in_target(target: ast.expr, lineno: int) -> list[tuple[str, int]]:
-    if isinstance(target, ast.Name):
-        return [(target.id, lineno)]
-    if isinstance(target, (ast.Tuple, ast.List)):
-        names: list[tuple[str, int]] = []
-        for element in target.elts:
-            names.extend(_names_in_target(element, lineno))
-        return names
-    return []
-
-
-def _bound_at_module(node: ast.stmt) -> list[tuple[str, int]]:
-    if isinstance(node, ast.Assign):
-        names: list[tuple[str, int]] = []
-        for target in node.targets:
-            names.extend(_names_in_target(target, node.lineno))
-        return names
-    if isinstance(node, ast.AnnAssign) and node.value is not None:
-        return _names_in_target(node.target, node.lineno)
-    return []
-
-
-def rebinding_findings(path: Path, tree: ast.AST) -> list[str]:
-    """C1: a name bound more than once at module level by Assign/AnnAssign."""
-    seen: dict[str, list[int]] = {}
-    for node in tree.body:
-        for name, lineno in _bound_at_module(node):
-            seen.setdefault(name, []).append(lineno)
-    findings: list[str] = []
-    displayed = _display(path)
-    for name, lines in seen.items():
-        for lineno in lines[1:]:
-            findings.append(f"{displayed}:{lineno}:{name}")
-    return findings
-
-
-def _without_leading_sql_comments(value: str) -> str:
-    text = value.lstrip()
-    while text:
-        if text.startswith("--"):
-            _, separator, text = text.partition("\n")
-            if not separator:
-                return ""
-            text = text.lstrip()
-            continue
-        if text.startswith("/*"):
-            end = text.find("*/", 2)
-            if end < 0:
-                return ""
-            text = text[end + 2 :].lstrip()
-            continue
-        break
-    return text
-
-
-def _after_table_name(value: str) -> str | None:
-    if not value:
-        return ""
-    if value[0] in {'"', "`", "["}:
-        closing = "]" if value[0] == "[" else value[0]
-        end = value.find(closing, 1)
-        return "" if end < 0 else value[end + 1 :].lstrip()
-    end = 0
-    while end < len(value) and (value[end].isalnum() or value[end] in "_.$"):
-        end += 1
-    if end == 0:
-        return None
-    return value[end:].lstrip()
-
-
-def _create_table_shaped(tail: str) -> bool:
-    """Does `tail` (already past a "create table" match) look like real DDL?"""
-    if tail and not tail[0].isspace():
-        return False
-    tail = tail.lstrip()
-    conditional = "if not exists"
-    if tail.casefold().startswith(conditional):
-        remainder = tail[len(conditional) :]
-        if not remainder or remainder[0].isspace():
-            tail = remainder.lstrip()
-    after_name = _after_table_name(tail)
-    if after_name is None:
-        return False
-    if not after_name:
-        return True
-    folded = after_name.casefold()
-    return (
-        after_name.startswith(("(", ";")) or folded == "as" or folded.startswith("as ")
-    )
-
-
 def _ddl_start(value: str) -> int | None:
     """Absolute index in `value` where a genuine CREATE TABLE statement begins.
 
@@ -253,24 +238,6 @@ def sql_shaped(value: str) -> bool:
     return _ddl_start(value) is not None
 
 
-def _ddl_slice(value: str, start: int) -> str:
-    """The DDL statement(s) at `start`, trimmed of anything trailing the last ';'.
-
-    A CREATE TABLE match can sit embedded inside a larger non-SQL string (Python
-    source text being written out as a file, in `test_build_diagrams.py`'s own
-    fixtures) -- running the WHOLE original string through sqlite from `start`
-    onward would drag in whatever non-SQL text follows the real DDL (a closing
-    docstring quote, more Python) and raise a syntax error that has nothing to do
-    with whether the DDL itself is sound. Trim to the last statement boundary at
-    or after `start`; a script with no closing ';' (the truncated-mid-statement
-    case this check exists to catch) is used unchanged.
-    """
-    last_semicolon = value.rfind(";", start)
-    if last_semicolon < 0:
-        return value[start:]
-    return value[start : last_semicolon + 1]
-
-
 def _assigned_constant_names(tree: ast.AST) -> dict[int, str]:
     names: dict[int, str] = {}
     for node in ast.walk(tree):
@@ -285,17 +252,6 @@ def _assigned_constant_names(tree: ast.AST) -> dict[int, str]:
         ):
             names[id(node.value)] = node.target.id
     return names
-
-
-def _ddl_error(script: str) -> sqlite3.Error | None:
-    connection = sqlite3.connect(":memory:")
-    try:
-        connection.executescript(script)
-    except sqlite3.Error as error:
-        return error
-    finally:
-        connection.close()
-    return None
 
 
 def ddl_findings(label: str, text: str) -> list[str]:

@@ -49,6 +49,16 @@ def probe_playwright() -> str | None:
     return "playwright-python"
 
 
+# PINNED. `npx --yes playwright` resolves whatever the registry serves at the moment it runs,
+# and this module ships as the `consilient-computer` console script, so `pip install consilient`
+# puts an unpinned remote-code fetch on the user's PATH. MEASURED 29 August 2026: on this
+# machine the bare spec is the SELECTED runner -- the Python playwright package is not
+# importable here -- and the npx cache already records it resolving to ^1.62.1. The pin below is
+# that same version, so it changes nothing about what runs today and makes tomorrow a decision
+# rather than a download. Raising it is a deliberate edit with a licence check, per ADR-0009.
+PLAYWRIGHT_SPEC = "playwright@1.62.1"
+
+
 def _npx_binary() -> str | None:
     return shutil.which("npx") or shutil.which("npx.cmd")
 
@@ -59,7 +69,7 @@ def probe_npx_playwright() -> str | None:
         return None
     try:
         completed = subprocess.run(
-            [npx, "--yes", "playwright", "--version"],
+            [npx, "--yes", PLAYWRIGHT_SPEC, "--version"],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -145,7 +155,7 @@ def npx_screenshot_runner(
     argv = [
         npx,
         "--yes",
-        "playwright",
+        PLAYWRIGHT_SPEC,
         "screenshot",
         "--full-page",
         "--viewport-size",

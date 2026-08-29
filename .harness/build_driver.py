@@ -345,9 +345,10 @@ def spawn_logged(
     same path. The 24 August audit named this leak. [cited: subprocess.Popen]
     """
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
-    with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open(
-        "w", encoding="utf-8"
-    ) as err:
+    with (
+        stdout_path.open("w", encoding="utf-8") as out,
+        stderr_path.open("w", encoding="utf-8") as err,
+    ):
         subprocess.Popen(args, cwd=str(ROOT), stdout=out, stderr=err)
 
 
@@ -397,8 +398,8 @@ def preserve_review_artefacts(uid: str, attempt: int) -> None:
                 # __main__ costs every unit in flight. The rename is history-keeping, so it is
                 # the half that yields -- and the loop keeps going.
                 print(
-                    f'driver: could not preserve {src_name} ({type(exc).__name__}); '
-                    f'the next attempt will overwrite it',
+                    f"driver: could not preserve {src_name} ({type(exc).__name__}); "
+                    f"the next attempt will overwrite it",
                     flush=True,
                 )
 
@@ -699,6 +700,54 @@ def committed(uid: str, unit: dict) -> bool:
     )
 
 
+def family_claims(claims: list[str]) -> list[str]:
+    """Expand a claimed module to its split family, because that is where its behaviour went.
+
+    MEASURED 29 August 2026, and this is a safety fix rather than tidying. The 28 August refactor
+    moved behaviour out of 22 modules into `<stem>_*.py` siblings and `.harness/plan-units.json`
+    was never updated: 102 of 147 units -- 76 of them not yet done -- claim a path that is now an
+    almost-empty re-export facade. `events.py` is claimed by 41 units and has 15 siblings;
+    `projection.py` by 34 with 5; `dispatch.py` by 31 with 12.
+
+    Claim disjointness is this driver's real concurrency guard, and `scripts/dispatch.py` refuses
+    a second dispatch whose PATHS overlap a live claim. So a unit claiming `events.py` and needing
+    to change something that now lives in `events_projection.py` has two exits and both are bad.
+    Stage only what it claimed, and it writes logic back into a re-export manifest. Edit the
+    sibling it actually needs, and it edits a path no claim covers -- where two units that look
+    disjoint (`events.py` and `projection.py`) collide inside a file neither of them named, with
+    nothing to detect it.
+
+    Expanding here rather than in the plan, or in `coordination.paths_overlap`:
+
+      * The plan would go stale again at the next split. This reads the tree, so it is correct
+        for whatever the tree currently is.
+      * `paths_overlap` is a path primitive whose contract is "equality or containment at a path
+        boundary". Teaching it that `a.py` and `a_b.py` are the same module would put Python
+        naming conventions inside a general path function, and would widen every claim in the
+        product, not just the ones this driver makes.
+
+    Only an ENTRY POINT expands. A unit that claims `events_kinds.py` directly is taken at its
+    word; widening that to the whole family would cost concurrency to protect a unit that already
+    said precisely what it meant.
+    """
+    out: list[str] = []
+    for claim in claims:
+        out.append(claim)
+        path = ROOT / claim
+        if path.suffix != ".py":
+            continue
+        stem = path.stem
+        # A sibling names an entry point that exists; that file is not itself an entry point.
+        if "_" in stem and (path.parent / (stem.split("_")[0] + ".py")).is_file():
+            continue
+        out.extend(
+            str(sibling.relative_to(ROOT)).replace("\\", "/")
+            for sibling in sorted(path.parent.glob(stem + "_*.py"))
+        )
+    seen: set[str] = set()
+    return [c for c in out if not (c in seen or seen.add(c))]
+
+
 def artefact_identity(unit: dict[str, Any]) -> str | None:
     """Hash the current committed blobs the review is permitted to judge."""
     claims = unit.get("claims")
@@ -778,7 +827,9 @@ def _unit_added_line_hashes(uid: str) -> dict[str, list[str]]:
         return {}
     own = [
         ln.strip()
-        for ln in sh(["git", "rev-list", "--reverse", f"HEAD..{head}"]).stdout.splitlines()
+        for ln in sh(
+            ["git", "rev-list", "--reverse", f"HEAD..{head}"]
+        ).stdout.splitlines()
         if ln.strip()
     ]
     added: dict[str, list[str]] = {}
@@ -2027,6 +2078,52 @@ def reclaim_expired_slots(state: dict) -> list[str]:
     return sorted(freed)
 
 
+# Domains reserved by RFC 2606 and RFC 6761 precisely so that they can never belong to anyone.
+# An address in one of these cannot certify the origin of anything, because there is nobody to
+# certify it.
+UNCERTIFIABLE_DOMAINS = (
+    "example.com",
+    "example.net",
+    "example.org",
+    "example",
+    "invalid",
+    "test",
+    "localhost",
+)
+
+
+def _identity_cannot_certify(signer: str) -> bool:
+    """Whether a sign-off identity is a fixture rather than a person.
+
+    MEASURED 29 August 2026, and this widening is the repair for a near miss. The check here
+    was `"fixture" in signer or ".invalid" in signer`, and it was found looking at the identity
+    this worktree's LOCAL git config actually held at the time:
+
+        Test <t@example.com>
+
+    which contains neither substring. `tests/test_supervision.py` and its siblings write a
+    fixture identity into a local config, the override had leaked into the real worktree, and
+    every commit made that day was authored by it. The guard would have passed, `commit-tree`
+    would have taken that identity, and a squash certifying the origin of 376 commits would
+    have been filed in public over an address that resolves to nobody.
+
+    The two spellings the old check knew were the two that had been seen. Reserved domains are
+    the property the check was reaching for, so test the property.
+    """
+    lowered = signer.lower()
+    if "fixture" in lowered:
+        return True
+    # The DOMAIN is the property, so extract it rather than matching substrings against the
+    # whole line. A substring test cuts both ways: ".localhost" misses the bare `a@localhost`,
+    # and a bare "example" would refuse a real company such as examples-ltd.co.uk.
+    if "@" not in lowered:
+        return False
+    domain = lowered.rsplit("@", 1)[1].split(">")[0].strip().rstrip(".")
+    return domain in UNCERTIFIABLE_DOMAINS or any(
+        domain.endswith("." + reserved) for reserved in UNCERTIFIABLE_DOMAINS
+    )
+
+
 def publish_if_ready(state: dict, green: bool | None) -> str:
     """Push to the public remote when the tree is green and every publication gate passes.
 
@@ -2112,7 +2209,7 @@ def publish_if_ready(state: dict, green: bool | None) -> str:
     signer = ident.rsplit(">", 1)[0] + ">" if ">" in ident else ""
     if not signer:
         return "publish held: no git identity configured to sign off with"
-    if "fixture" in signer.lower() or ".invalid" in signer.lower():
+    if _identity_cannot_certify(signer):
         return f"publish REFUSED: identity {signer!r} cannot certify origin"
     message = "\n".join(
         [
@@ -2454,7 +2551,7 @@ def write_verify_brief(
     """
     BRIEFS.mkdir(parents=True, exist_ok=True)
     path = BRIEFS / f"{uid}-verify.md"
-    claims = "\n".join(f"- `{c}`" for c in unit["claims"])
+    claims = "\n".join(f"- `{c}`" for c in family_claims(unit["claims"]))
     # A unit's specification does not always live in docs/superpowers/plans/. The design work
     # of 23 August 2026 specified units inside docs/20-design/ documents, and a brief
     # pointing at a path that does not exist sends the agent hunting instead of building.
@@ -2541,7 +2638,7 @@ def write_resolve_brief(uid: str, unit: dict, why: str) -> pathlib.Path:
     """
     BRIEFS.mkdir(parents=True, exist_ok=True)
     path = BRIEFS / f"{uid}-resolve.md"
-    claims = chr(10).join(f"- `{c}`" for c in unit["claims"])
+    claims = chr(10).join(f"- `{c}`" for c in family_claims(unit["claims"]))
     path.write_text(
         f"""# Rebase {uid} onto current main and resolve the conflict. Do not rebuild it.
 
@@ -2588,7 +2685,7 @@ def write_brief(
 ) -> pathlib.Path:
     BRIEFS.mkdir(parents=True, exist_ok=True)
     path = BRIEFS / f"{uid}.md"
-    claims = "\n".join(f"- `{c}`" for c in unit["claims"])
+    claims = "\n".join(f"- `{c}`" for c in family_claims(unit["claims"]))
     # A unit's specification does not always live in docs/superpowers/plans/. The design work
     # of 23 August 2026 specified units inside docs/20-design/ documents, and a brief
     # pointing at a path that does not exist sends the agent hunting instead of building.
@@ -3471,7 +3568,9 @@ def main() -> int:
     # Before the ceiling, not behind it: releasing a unit whose code has moved spends no
     # review slot, and running it inside the loop below meant it never ran at all while the
     # lane was full. See `clear_escalations_whose_artefact_moved`.
-    for cleared_uid in clear_escalations_whose_artefact_moved(state, units, pending_review):
+    for cleared_uid in clear_escalations_whose_artefact_moved(
+        state, units, pending_review
+    ):
         print(
             f"driver: {cleared_uid}'s artefact changed since its last review attempt; "
             "review budget reset"
@@ -3560,9 +3659,7 @@ def main() -> int:
         if rm:
             vargs += ["--model", rm]
         preserve_review_artefacts(uid, attempt)
-        spawn_logged(
-            vargs, BRIEFS / f"{uid}-verify.out", BRIEFS / f"{uid}-verify.err"
-        )
+        spawn_logged(vargs, BRIEFS / f"{uid}-verify.out", BRIEFS / f"{uid}-verify.err")
         state["review_dispatched"].append(uid)
         state.setdefault("review_started", {})[uid] = [time.time(), rl]
         reviews_out += 1
@@ -3660,11 +3757,7 @@ def main() -> int:
         for uid, absent in unretirable:
             unit = units.get(uid) or {}
             worktree = WORKTREES / uid
-            never_written = [
-                p
-                for p in absent
-                if not (worktree / p).is_file()
-            ]
+            never_written = [p for p in absent if not (worktree / p).is_file()]
             if not never_written or len(never_written) != len(absent):
                 continue
             built_list = state.setdefault("built", [])
@@ -3789,7 +3882,7 @@ def main() -> int:
         ]
         if model:
             args += ["--model", model]
-        for c in unit["claims"]:
+        for c in family_claims(unit["claims"]):
             args += ["--claim", c]
         wt = unit_worktree(uid)
         if wt is not None:
@@ -3869,7 +3962,7 @@ def main() -> int:
         ]
         if model:
             rargs += ["--model", model]
-        for c in unit["claims"]:
+        for c in family_claims(unit["claims"]):
             rargs += ["--claim", c]
         wt = unit_worktree(uid)
         if wt is not None:
@@ -3884,7 +3977,6 @@ def main() -> int:
         print(
             f"driver: RESOLVE dispatched for {uid} to {harness}/{model or 'default'} [{leash}s]"
         )
-
 
     if not launched:
         print(
@@ -4021,8 +4113,8 @@ def _self_test() -> None:
     os.utime(out, (aged, aged))
     globals()["BRIEFS"] = briefs
     globals()["run_dir_progress"] = lambda _uid, _started: 0.0
-    globals()["release_dead_claims"] = (
-        lambda uids: released.extend(sorted(uids)) or len(uids)
+    globals()["release_dead_claims"] = lambda uids: (
+        released.extend(sorted(uids)) or len(uids)
     )
     try:
         silent_state = {

@@ -238,7 +238,13 @@ def test_no_module_outside_feedback_and_its_schema_reads_feedback_events() -> No
     strings, reflection or generic event dataflow.
     """
     for path in sorted(SOURCE_ROOT.rglob("*.py")):
-        if path.name in {"events.py", "feedback.py"}:
+        # A family, not a filename. events.py's validator was split across events_*.py on
+        # 28 August 2026, so exempting the entry point alone reported its own authoritative
+        # validator as an unauthorised consumer. What the invariant means is that nothing
+        # OUTSIDE these two modules reads feedback events, and a module is now a set of files.
+        if path.name in {"events.py", "feedback.py"} or path.stem.startswith(
+            ("events_", "feedback_")
+        ):
             continue
         _assert_no_feedback_consumer(
             path.read_text(encoding="utf-8"), str(path.relative_to(ROOT))

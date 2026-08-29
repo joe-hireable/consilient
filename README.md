@@ -144,7 +144,7 @@ it cannot route, block or accept anything, and a test asserts the CLI exposes no
 could. Everything past instrumentation is gated on ADR-0015 Gate A, which has not been passed.
 
 <!-- BEGIN GENERATED: scripts/build_counts.py#inventory -->
-108 ADRs, 116 registered experiments, 13 invariant checks in CI.
+109 ADRs, 116 registered experiments, 14 invariant checks in CI.
 <!-- END GENERATED: scripts/build_counts.py#inventory -->
 
 ## What it is for
@@ -207,7 +207,7 @@ to recover. It assumes none of the vocabulary below.
 | | What | Why |
 |---|---|---|
 | **1** | **EXP-05** — write an adapter for Claude Code, then one for Codex *without refactoring the first*. Record what breaks. **One day.** | Highest-information hour available. If adapter #2 forces a redesign, ADR-0001 is in trouble. |
-| **2** | **EXP-01** — measure β on `jobboard-v2` history: replay checks against known PR outcomes. | Promotes ADR-0002 from PROVISIONAL to ACCEPTED, or kills it. Needs no harness. |
+| **2** | **EXP-01** — measure β on the history of a private commercial repository: replay checks against known PR outcomes. | Promotes ADR-0002 from PROVISIONAL to ACCEPTED, or kills it. Needs no harness. |
 
 Everything else is downstream of those two.
 
@@ -255,7 +255,7 @@ and scale with blast radius — [ADR-0023](docs/decisions/0023-pr-review-gates.m
 ## Provenance and known bias
 
 Assembled by Claude (Opus 5) in one chat session with Joe Brown, from web research, executed
-simulations, and a read of `jobboard-v2`. **One model, one framing, one session, with a
+simulations, and a read of a private commercial repository. **One model, one framing, one session, with a
 declared conflict of interest** — Anthropic makes one of the four agents this would
 orchestrate. Q19 in `open-questions.md` asks what was systematically missed as a result, and
 that question cannot be answered by anyone who was in the room.

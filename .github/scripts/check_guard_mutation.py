@@ -71,6 +71,12 @@ class Guard:
 # unmutated and red against the mutant. An entry is a claim that these tests protect
 # this refusal, and this check is what makes the claim falsifiable.
 _V0 = "tests/test_v0_invariants.py"
+# tests/test_v0_invariants.py was split on 28 August 2026. The evidence-class selection went
+# with the V0-26 tests; the human-authority selection did not move. A guard whose named tests
+# no longer exist does not fail loudly -- pytest simply selects nothing, the control goes red,
+# and the guard reports that it would kill any mutant VACUOUSLY. That is what this file said
+# on 28 August, and it is why the selections are pinned by full path rather than by prefix.
+_V0_EVIDENCE = "tests/test_v0_evidence_records.py"
 
 GUARDS: tuple[Guard, ...] = (
     Guard(
@@ -82,12 +88,12 @@ GUARDS: tuple[Guard, ...] = (
         module="src/consilient/events.py",
         function="_check_evidence_class",
         tests=(
-            f"{_V0}::test_multi_contributor_event_with_duplicate_evidence_class_is_refused",
-            f"{_V0}::test_multi_contributor_event_with_case_variant_duplicate_is_refused",
-            f"{_V0}::test_multi_contributor_event_with_missing_evidence_class_is_refused",
-            f"{_V0}::test_multi_contributor_event_with_non_dict_contributor_is_refused",
-            f"{_V0}::test_multi_contributor_event_with_non_list_contributors_is_refused",
-            f"{_V0}::test_many_contributors_with_partial_duplicate_is_refused",
+            f"{_V0_EVIDENCE}::test_multi_contributor_event_with_duplicate_evidence_class_is_refused",
+            f"{_V0_EVIDENCE}::test_multi_contributor_event_with_case_variant_duplicate_is_refused",
+            f"{_V0_EVIDENCE}::test_multi_contributor_event_with_missing_evidence_class_is_refused",
+            f"{_V0_EVIDENCE}::test_multi_contributor_event_with_non_dict_contributor_is_refused",
+            f"{_V0_EVIDENCE}::test_multi_contributor_event_with_non_list_contributors_is_refused",
+            f"{_V0_EVIDENCE}::test_many_contributors_with_partial_duplicate_is_refused",
         ),
     ),
     Guard(
@@ -112,7 +118,10 @@ GUARDS: tuple[Guard, ...] = (
         guard_id="record-contract",
         module="src/consilient/events.py",
         function="_check_record_contract",
-        tests=("tests/test_records.py",),
+        # test_records.py was split on 28 August 2026; the record.captured schema checks
+        # are spread across two of the three resulting files, and a selection naming only
+        # the original let the mutant SURVIVE while the suite stayed green.
+        tests=("tests/test_records.py", "tests/test_records_contract.py"),
     ),
 )
 
@@ -157,6 +166,42 @@ class _DeleteRaises(ast.NodeTransformer):
     def visit_Raise(self, node: ast.Raise) -> ast.stmt:
         self.deleted += 1
         return ast.copy_location(ast.Pass(), node)
+
+
+def _resolve_within_family(module: Path, qualified: str) -> Path:
+    """The file that actually defines the guard, following a split.
+
+    The registry names a module and a function, and both were exact while a module was one file.
+    After the 28 August 2026 splits `_check_evidence_class` lives in a sibling of events.py, and
+    this checker reported "no definition named" -- a registry error, when the registry was right
+    and only the filename had moved.
+
+    Resolving through the family keeps the registry stable across future splits, which matters
+    more here than anywhere: this is the check that proves the OTHER checks have teeth, and a
+    guard-mutation harness reporting a registry error tells you nothing about whether the guard
+    it names can still be deleted with the suite green.
+    """
+    name = qualified.split(".")[0]
+    if _defines(module, name):
+        return module
+    for sibling in sorted(module.parent.glob(f"{module.stem}_*.py")):
+        if _defines(sibling, name):
+            return sibling
+    return module
+
+
+def _defines(path: Path, name: str) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return False
+    return any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and node.name == name
+        for node in tree.body
+    )
 
 
 def delete_guard(source: str, qualified: str) -> tuple[str, int]:
@@ -235,7 +280,9 @@ def check_registry(guards: tuple[Guard, ...] = GUARDS) -> int:
         shutil.copytree(ROOT / "src", src)
         baselines: dict[tuple[str, tuple[str, ...]], bool] = {}
         for guard in guards:
-            module = src / Path(guard.module).relative_to("src")
+            module = _resolve_within_family(
+                src / Path(guard.module).relative_to("src"), guard.function
+            )
             original = module.read_text(encoding="utf-8")
             try:
                 mutated, deleted = delete_guard(original, guard.function)

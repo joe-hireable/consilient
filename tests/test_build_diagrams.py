@@ -23,9 +23,16 @@ DIAGRAMS = (
 
 
 def _install_script(root: Path) -> Path:
+    """Copy the generator AND its siblings.
+
+    build_diagrams.py was split on 28 August 2026, and scripts/ is not a package: a sibling is
+    importable only because the entry point puts its own directory on sys.path. Copying one file
+    into a scratch tree therefore produced a ModuleNotFoundError rather than a diagram.
+    """
     destination = root / "scripts" / SCRIPT.name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(SCRIPT, destination)
+    for path in [SCRIPT, *sorted(SCRIPT.parent.glob(f"{SCRIPT.stem}_*.py"))]:
+        shutil.copy2(path, destination.parent / path.name)
     return destination
 
 
@@ -358,7 +365,42 @@ def test_failed_replace_preserves_existing_diagram(
     def fail_replace(_source: Path, _target: Path) -> None:
         raise OSError("replace failed")
 
-    monkeypatch.setattr(module.os, "replace", fail_replace)
+    # `write_atomic` and its `os` import moved into build_diagrams_sources.py on 28 August
+    # 2026. The entry point no longer imports os at all, so patching it there raised rather
+    # than silently missing -- the loud version of the facade hazard, for once.
+    sources = sys.modules["build_diagrams_sources"]
+    monkeypatch.setattr(sources.os, "replace", fail_replace)
     with pytest.raises(OSError, match="replace failed"):
         module.write_atomic(target, b"new diagram\n")
     assert target.read_bytes() == b"old diagram\n"
+
+
+def test_committed_diagrams_match_a_fresh_render() -> None:
+    """The files say "do not hand-edit, regenerate" -- so something must check they were.
+
+    Nothing did. `build_diagrams.py` appears in no workflow and no test compared its output to
+    what is committed, and MEASURED on 28 August 2026 the committed data model was three tables
+    short: capability_versions, capability_heads and capability_conflicts had been added to
+    `SCHEMA` and the diagram was never regenerated. The instruction in the header was the whole
+    of the enforcement, which is to say there was none.
+
+    This is cheap because the renderers are pure functions of the source tree, so the check is
+    simply to run them and compare bytes. It fails loudly on the next drift instead of leaving a
+    stale document that still looks authoritative.
+    """
+    spec = importlib.util.spec_from_file_location("build_diagrams_live", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    stale = [
+        name
+        for name, content in module.render_all(ROOT)
+        if (ROOT / "docs" / "diagrams" / name).read_bytes() != content
+    ]
+    assert not stale, (
+        "these committed diagrams no longer match their source: "
+        + ", ".join(stale)
+        + ". Run `python scripts/build_diagrams.py` and commit the result."
+    )

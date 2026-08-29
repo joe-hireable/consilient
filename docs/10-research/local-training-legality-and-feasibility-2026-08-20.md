@@ -26,7 +26,7 @@ tightly engineered experiment, not a reliable unattended default; a conventional
 fine-tune is realistically about 1B parameters; and a 70B QLoRA base does not fit wholly in
 VRAM. [algebra]
 
-This does **not** authorise a learned router in v0. ADR-0003 still excludes one, and EXP-58
+This does **not** authorise a learned router in v0. ADR-0003 still excludes one, and EXP-149
 below is a blocked experiment rather than a product decision. [measured]
 
 ## 1. “Own data” is conditional, not automatic
@@ -313,7 +313,7 @@ review. [asserted]
 EXP-56 measures the hindsight routing ceiling among its fixed set of zero-shot reviewer
 models on mutation detection. It does not bound a future fine-tuned model that is not in that
 candidate set, and it does not by itself establish that verifier-outcome prediction improves
-routing. [algebra] EXP-58 therefore treats EXP-56 as a baseline and gate, not as proof that
+routing. [algebra] EXP-149 therefore treats EXP-56 as a baseline and gate, not as proof that
 training is useful. [asserted]
 
 ## 7. Decision record
@@ -330,7 +330,7 @@ output-free, provenance-complete corpus. [asserted]
 
 **Falsifiers.** Reopen the frontier-output boundary if a provider gives written
 account-specific permission or publishes terms that unambiguously permit the exact training
-and distribution use. Reject the local-training direction if EXP-58 cannot beat its frozen
+and distribution use. Reject the local-training direction if EXP-149 cannot beat its frozen
 and non-neural baselines under a leakage-resistant split, or if its gain disappears on an
 output-free held-out corpus. [asserted]
 

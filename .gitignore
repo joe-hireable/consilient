@@ -101,6 +101,12 @@ red-cells-evidence.json
 .harness/allowed-cwds.json
 # Exclusive lock around cursor-agent. Two processes race ~/.cursor/cli-config.json.
 .harness/cursor-agent.lock
+# The loop's pause switch. It is a fact about THIS machine right now, never about the
+# repository: a checkout that restored it would arrive with the loop already stopped, and a
+# checkout that restored its absence would silently un-pause a loop someone had halted. It
+# was committed by an over-broad `git add -A` on 28 August 2026 and untracked in the same
+# hour by tests/test_harness_tracking.py, which is the only reason anyone noticed.
+.harness/STOP-LOOP
 # INSTANCE private harvest (ADR-0057). Never published.
 .harness/training/
 # Computer-use screenshots and session dirs. Playwright is instance.
