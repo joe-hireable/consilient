@@ -2206,6 +2206,29 @@ def reclaim_expired_slots(state: dict) -> list[str]:
     inflight = state.setdefault("in_flight", {})
     now = _t.time()
     freed = []
+
+    # HOW LONG WAS THE DRIVER AWAY? A tick that follows a long absence explains its own mass
+    # expiry: every leash ran out while nothing was watching, so the batch is ONE
+    # infrastructure event -- the pause ending -- and not one repair attempt per unit.
+    #
+    # MEASURED 30 August 2026. A 90-minute STOP-LOOP pause left eight units in flight. The
+    # first tick back reclaimed all eight in the same second; eleven restarts landed inside
+    # two minutes against MAX_RESTARTS of 6 per RESTART_WINDOW_S of 600; `record_restart`
+    # escalated to `quarantine_unit(state, "*")`, and `dispatch_allowed` then refused every
+    # build dispatch. The loop ticked and dispatched nothing until the "*" was cleared by
+    # hand. The same tick had already REFUNDED each unit's attempt under F-05 -- "an
+    # infrastructure death is not evidence about the work" -- so the reasoning was present
+    # and simply had not reached the restart counter.
+    #
+    # This exempts nothing in ordinary operation: ticks are five minutes apart, comfortably
+    # inside the window. A missing stamp counts as an absence because it occurs exactly twice
+    # -- on the first tick after this change lands, and on a fresh checkout -- and neither is
+    # a repair cycle. The batch still records ONE restart, so repeated pause-resume cycling
+    # escalates as it should.
+    last_tick = state.get("last_tick_at")
+    absent_tick = last_tick is None or now - float(last_tick) > RESTART_WINDOW_S
+    state["last_tick_at"] = now
+    batch_counted = False
     for uid in list(inflight):
         started, leash = inflight[uid]
 
@@ -2240,7 +2263,11 @@ def reclaim_expired_slots(state: dict) -> list[str]:
         if expired or stale:
             inflight.pop(uid, None)
             release_dead_claims({uid})
-            if record_restart(state, uid, now=now):
+            # One restart for the whole batch when the driver was away; one per unit
+            # otherwise. See the absence note at the top of this function.
+            count_this = not (absent_tick and batch_counted)
+            batch_counted = True
+            if count_this and record_restart(state, uid, now=now):
                 print(
                     "driver: ESCALATION -- "
                     + uid

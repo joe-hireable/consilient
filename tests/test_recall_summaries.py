@@ -224,3 +224,45 @@ def test_live_shaped_crowd_is_not_an_empty_pack() -> None:
     assert title in selection.text
     assert "brief-body-padding " * 8 not in selection.text
     assert len(selection.selected_event_ids) > 1
+
+
+def test_long_query_does_not_evict_summaries() -> None:
+    """The pack header must not inline a task longer than RECALL_LIMIT_CHARS.
+
+    instructions.assemble passes query=task unclipped; matching uses the full
+    string while the displayed query line is clipped like scripts/dispatch.py.
+    [measured] 261 of 601 live assemblies had empty selection and query length > 8000.
+    """
+    event_id = "00000000-0000-4000-8000-000000000116"
+    event = _oversized_dispatch_outcome(event_id=event_id)
+    selection = recall.select_events([event], query="Q" * 9000, limit_chars=8000)
+    assert event_id in selection.selected_event_ids
+    assert selection.selected_forms == (recall.SUMMARY_FORM,)
+    assert not selection.empty_while_available
+    assert ("Q" * 400) not in selection.text
+    assert len(selection.text) <= 8000
+
+
+def test_query_matching_uses_the_full_string_not_the_clipped_header() -> None:
+    """Clipping the displayed query must not clip the matcher.
+
+    A needle past character 240 of the task still has to select the event that
+    carries it; otherwise the header clip would silently change retrieval.
+    """
+    event_id = "00000000-0000-4000-8000-000000000117"
+    event = Event(
+        _event(
+            event_id=event_id,
+            event="note.recorded",
+            data={"body": "unique-needle-xyzzy"},
+        )
+    )
+    selection = recall.select_events(
+        [event],
+        query=("P" * 9000) + " unique-needle-xyzzy",
+        limit_chars=8000,
+    )
+    assert event_id in selection.selected_event_ids
+    assert "unique-needle-xyzzy" in selection.text
+    assert ("P" * 400) not in selection.text
+

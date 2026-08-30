@@ -160,3 +160,37 @@ def test_reconstruct_matches_a_full_event_and_a_summary_event(tmp_path: Path) ->
     replayed_after = instructions.reconstruct(log, skills, after.sha256)
     assert replayed_after.ok, [layer for layer in replayed_after.layers if not layer.ok]
     assert recall.SUMMARY_FORM in after.recall_selection.selected_forms
+
+
+def test_assemble_selects_summaries_when_task_exceeds_recall_limit(
+    tmp_path: Path,
+) -> None:
+    """A brief longer than RECALL_LIMIT_CHARS must not yield an empty recall pack.
+
+    Production `instructions.assemble` passes query=task unclipped. The measured
+    failure: 261 of 601 live assemblies had empty selected_event_ids and query
+    length > 8000. [measured] Matching still uses the full task; only the pack
+    header is clipped. Replay must still verify.
+    """
+    from consilient import instructions
+
+    log = tmp_path / "log"
+    log.mkdir()
+    events.append(
+        log / "2026-08-25.jsonl",
+        _oversized_dispatch_outcome(
+            event_id="00000000-0000-4000-8000-000000000115"
+        ).raw,
+    )
+    long_task = "Q" * 9000
+    skills = _skills_dir(tmp_path)
+    assembly = instructions.assemble(skills, log, task=long_task)
+    assert assembly.recall_selection.selected_event_ids
+    assert recall.SUMMARY_FORM in assembly.recall_selection.selected_forms
+    assert not assembly.recall_selection.empty_while_available
+    assert len(assembly.recall_pack) <= instructions.RECALL_LIMIT_CHARS
+    assert ("Q" * 400) not in assembly.recall_pack
+    instructions.record_assembly(log, assembly, task=long_task)
+    replayed = instructions.reconstruct(log, skills, assembly.sha256)
+    assert replayed.ok, [layer for layer in replayed.layers if not layer.ok]
+

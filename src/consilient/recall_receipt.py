@@ -47,6 +47,7 @@ from .recall_vocabulary import (
     SENTINEL_FIELDS,
     SUMMARY_FORM,
     _SUMMARY_FIELD_CHARS,
+    _clip_scalar_line,
     _collect_keys,
     _decode_cursor,
     _format_event,
@@ -75,6 +76,7 @@ __all__ = [
     "SUMMARY_FORM",
     "Selection",
     "_SUMMARY_FIELD_CHARS",
+    "_clip_scalar_line",
     "_collect_keys",
     "_decode_cursor",
     "_format_event",
@@ -146,19 +148,7 @@ def _scalar_field(value: object, *, limit: int = _SUMMARY_FIELD_CHARS) -> str | 
     """Extractive one-line clip so a summary cannot refill the pack budget."""
     if not isinstance(value, str):
         return None
-    line = ""
-    for candidate in value.splitlines():
-        stripped = candidate.strip()
-        if stripped:
-            line = stripped
-            break
-    if not line:
-        return None
-    if len(line) <= limit:
-        return line
-    if limit < 4:
-        return line[:limit]
-    return line[: limit - 3].rstrip() + "..."
+    return _clip_scalar_line(value, limit=limit)
 
 
 def _summary_projection(event: Event) -> dict[str, str] | None:

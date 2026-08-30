@@ -54,6 +54,11 @@ _EMPTY_WHILE_AVAILABLE = "empty_while_available"
 # events have no `unit`; `task` is the whole brief (median 5,079 characters,
 # 677 of 1,476 over the pack bound on 26 August 2026). [measured]
 _SUMMARY_FIELD_CHARS = 240
+# Bound the displayed query to the same clip scripts/dispatch.py uses for
+# recall.md (`task[:240]`). Matching and the query digest still use the full
+# string; only the pack header is clipped, so a long brief cannot empty the
+# selection. [measured] 261 of 601 live assemblies had query length > 8000.
+_QUERY_HEADER_CHARS = 240
 
 OMISSION_REASONS = frozenset(
     {
@@ -315,8 +320,33 @@ def _format_summary(event: Event, projection: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+def _clip_scalar_line(value: str, *, limit: int) -> str | None:
+    """Extractive one-line clip for display fields that must not refill the budget."""
+    line = ""
+    for candidate in value.splitlines():
+        stripped = candidate.strip()
+        if stripped:
+            line = stripped
+            break
+    if not line:
+        return None
+    if len(line) <= limit:
+        return line
+    if limit < 4:
+        return line[:limit]
+    return line[: limit - 3].rstrip() + "..."
+
+
+def _display_query(query: str) -> str:
+    """Clip the query line shown in the pack; matching still uses the full string."""
+    if not query:
+        return query
+    clipped = _clip_scalar_line(query, limit=_QUERY_HEADER_CHARS)
+    return clipped if clipped is not None else query[:_QUERY_HEADER_CHARS]
+
+
 def _header(query: str) -> str:
-    return f"# Recall pack\n\nquery: `{query}`\n"
+    return f"# Recall pack\n\nquery: `{_display_query(query)}`\n"
 
 
 def _omitted_footer(omitted: int, limit_chars: int) -> str:
