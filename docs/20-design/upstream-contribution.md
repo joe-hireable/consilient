@@ -37,9 +37,9 @@ committed by us, in our own headline metric.
 
 Z09 holds the design that *does* yield β (submission gated on an admission bar that is not
 our verifier, so both cells vary). Z10 holds the inverted cross-check on PRs we did not
-write. ADR-0106 (PROPOSED, reserved to the principal) is the governance question of whether
-a third-party maintainer verdict may ever become a human-β author. `[cited]` This unit
-does not answer that question and does not add the rate to the gate.
+write. ADR-0106 was ACCEPTED on 28 August 2026; EXP-144 remains blocked, so rows remain
+under the proxy estimand until the external path is exercised. `[measured: ADR-0106]` This
+unit does not add this rate to the gate.
 
 Non-response and closure without a decision are recorded, then excluded from the rate: a
 PR nobody looked at is not evidence of quality. `[asserted]` `as_meter_row` labels those
@@ -65,6 +65,8 @@ Submission is refused when:
 
 - the host CI is missing or not green;
 - the host policy prohibits automated pull requests;
+- the body omits the machine-authored disclosure (`prepare_contribution` adds it;
+  `submit_contribution` still refuses a dataclass constructed without it);
 - the change is not a contribution that project would want on its own merits;
 - the change was weakened to see whether the verifier would catch it;
 - our verifier did not accept it (this channel's sampling condition, stated rather than
@@ -85,7 +87,7 @@ ADR-0057 — and `assert_unpublishable` refuses a dest git would ship. `[measure
 | ADR-0036 | Upstream-first policy: PR rather than fork; outbound PRs meet inbound standard; read *their* `CONTRIBUTING.md`. PROPOSED. `[cited]` | Policy without a capability. |
 | [`ruflo-adoption-and-upstream-plan-2026-08-20.md`](ruflo-adoption-and-upstream-plan-2026-08-20.md) | A one-shot plan for one project, explicitly unauthorised to send anything. `[cited]` | Not standing, not recorded. |
 | [`upstream-drafts-2026-08-20.md`](../00-context/upstream-drafts-2026-08-20.md) | Two Ollama issue drafts, never sent. `[measured]` | Drafts are not a capability. |
-| DeepMind CodeMender | 72 upstreamed patches over six months, gated by mandatory human review; no published yield ratio. `[cited]` `docs/10-research/ambient-loops-and-organisational-self-design-2026-08-23.md` | Records merges, not rejects, silence, or a named conditional rate. |
+| DeepMind CodeMender | 72 upstreamed patches over six months, gated by mandatory human review; no published yield ratio. `[cited]` `docs/10-research/ambient-loops-and-organisational-self-design-2026-08-23.md`. Re-checked 30 August 2026: [OSS-Fuzz attaches CodeMender patches to eligible C/C++ memory-safety reports](https://blog.google/security/from-finding-to-fixing-reducing-maintainer-burden-with-automated-patches/) (Google, 29 July 2026) `[cited]`; still no published reject, silence, or conditional false-accept rate. | Records merges, not rejects, silence, or a named conditional rate. |
 | GitHub Dependabot / Renovate | Automated dependency PRs as a product. `[asserted: category; not re-retrieved this session]` | Dependency bumps, not in-line development; no β-hygiene. |
 | R36 in `docs/40-spec/requirements.md` | "Adopt the best existing open-source component and contribute fixes upstream." Status PARTIAL. `[measured]` | The missing limb this unit builds. |
 
@@ -127,6 +129,7 @@ A chokepoint without a check is not a chokepoint.
 |---|---|
 | Red host CI cannot submit | `test_submit_refuses_when_host_ci_is_not_green` |
 | Policy-prohibited automation cannot submit | `test_submit_refuses_when_policy_prohibits_automated_prs` |
+| A body without machine-authored disclosure cannot submit | `test_submit_refuses_when_machine_authored_disclosure_is_missing` |
 | The rate is not β and cannot enter the gate | `test_false_accept_among_accepted_is_not_beta_and_cannot_enter_the_gate` |
 | Harvested outcomes are untracked instance data | `test_harvested_outcomes_are_untracked_instance_data` |
 | A dest git would publish is refused | `test_persist_refuses_a_path_git_would_publish` |

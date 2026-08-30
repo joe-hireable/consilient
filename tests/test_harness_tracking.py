@@ -18,14 +18,21 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # Names that decide what the driver dispatches, or that a checkout must never
-# restore. The unit names these exactly.
+# restore. The unit names these exactly. STOP-LOOP, board-snapshot.json and
+# gate-specs.json are the same class: a checkout that restores them asserts a
+# machine-local fact about a different moment.
 FORBIDDEN_BASENAMES = frozenset(
     {
         "driver-state.json",
         "plan-units.json",
+        "STOP-LOOP",
+        "board-snapshot.json",
+        "gate-specs.json",
     }
 )
 
@@ -79,6 +86,47 @@ BLANKET_HARNESS_IGNORES = frozenset(
     }
 )
 
+# Patterns the plan named, plus the same-class lines already in .gitignore.
+# Deleting any of them makes an ordinary `git add` able to re-track the path.
+REQUIRED_GITIGNORE = (
+    ".harness/driver-state.json",
+    ".harness/plan-units.json",
+    ".harness/driver-tick.lock",
+    ".harness/*.lock",
+    ".harness/build-loop.out",
+    ".harness/build-loop.err",
+    ".harness/build-loop.*",
+    ".harness/**/src/consilient/",
+    ".harness/STOP-LOOP",
+    ".harness/board-snapshot.json",
+    ".harness/build-board.html",
+    ".harness/exp79-scratch/",
+    ".harness/exp130-out.txt",
+    ".harness/exp130-scratch/",
+    ".harness/fallback-result.json",
+    ".harness/stray-debris-*/",
+    ".harness/gate-specs.json",
+    # The two trees that actually held extra copies of src/consilient/,
+    # plus the orch- prefix measured beside them. **/src/consilient/
+    # covers future copies; these cover the measured locations.
+    ".harness/exp-s02-audit-*/",
+    ".harness/orch-*/",
+    ".harness/s02-mut-*/",
+)
+
+# Paths the unit said `git ls-files .harness` must never return. Used for
+# `git check-ignore --no-index` so the probe works even when the file is
+# absent from this worktree.
+READD_PROBES = (
+    ".harness/driver-state.json",
+    ".harness/plan-units.json",
+    ".harness/driver-tick.lock",
+    ".harness/build-loop.out",
+    ".harness/build-loop.err",
+    ".harness/exp-s02-audit-probe/src/consilient/events.py",
+    ".harness/s02-mut-probe/src/consilient/events.py",
+)
+
 
 def _posix_git_dir(raw: str) -> str:
     """Resolve a worktree `gitdir:` pointer on this runtime.
@@ -111,17 +159,25 @@ def _git_env() -> dict[str, str]:
     return env
 
 
-def _tracked_harness() -> list[str]:
-    result = subprocess.run(
-        ["git", "ls-files", "-z", "--", ".harness"],
+def _git(
+    *args: str,
+    env: dict[str, str] | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
         cwd=ROOT,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
-        env=_git_env(),
-        check=True,
+        env=env or _git_env(),
+        check=check,
     )
+
+
+def _tracked_harness(env: dict[str, str] | None = None) -> list[str]:
+    result = _git("ls-files", "-z", "--", ".harness", env=env)
     return [path for path in result.stdout.split("\0") if path]
 
 
@@ -139,6 +195,17 @@ def _is_forbidden(path: str) -> bool:
     except ValueError:
         return False
     return src_at + 1 < len(parts) and parts[src_at + 1] == "consilient"
+
+
+def _is_lifted_publication_hold(path: str) -> bool:
+    """A lift renames STOP-PUBLISH; the new name is still a governance record.
+
+    Listing each lift in ALLOWED_HARNESS_TRACKED made the next lift fail CI,
+    which is the same trap OPTIONAL_HARNESS_TRACKED exists to avoid for the
+    unlifted hold. Known lifts stay in the allowlist so they remain required;
+    a future lift is allowed, never required.
+    """
+    return Path(path).name.startswith("STOP-PUBLISH.lifted-")
 
 
 def _gitignore_patterns() -> list[str]:
@@ -174,7 +241,13 @@ def test_harness_source_stays_tracked() -> None:
 def test_harness_index_is_source_and_documentation_only() -> None:
     """`git ls-files .harness` must return only source and documentation."""
     tracked = set(_tracked_harness())
-    unexpected = sorted(tracked - ALLOWED_HARNESS_TRACKED - OPTIONAL_HARNESS_TRACKED)
+    unexpected = sorted(
+        path
+        for path in tracked
+        if path not in ALLOWED_HARNESS_TRACKED
+        and path not in OPTIONAL_HARNESS_TRACKED
+        and not _is_lifted_publication_hold(path)
+    )
     assert unexpected == [], (
         "git ls-files .harness returned instance data; a checkout can restore "
         f"it: {unexpected}. `git rm --cached` the path; do not delete it from disk."
@@ -204,23 +277,7 @@ def test_an_optional_tracked_path_is_never_also_required() -> None:
 
 def test_gitignore_names_the_mutable_paths_and_is_not_a_blanket() -> None:
     patterns = _gitignore_patterns()
-    required = (
-        ".harness/driver-state.json",
-        ".harness/plan-units.json",
-        ".harness/*.lock",
-        ".harness/build-loop.out",
-        ".harness/build-loop.err",
-        ".harness/build-loop.*",
-        ".harness/**/src/consilient/",
-        ".harness/build-board.html",
-        ".harness/exp79-scratch/",
-        ".harness/exp130-out.txt",
-        ".harness/exp130-scratch/",
-        ".harness/fallback-result.json",
-        ".harness/stray-debris-*/",
-        ".harness/gate-specs.json",
-    )
-    missing = [pattern for pattern in required if pattern not in patterns]
+    missing = [pattern for pattern in REQUIRED_GITIGNORE if pattern not in patterns]
     assert missing == [], (
         "gitignore is missing the Z04 ignore that stops the path being "
         f"re-added by an ordinary git add: {missing}"
@@ -229,4 +286,52 @@ def test_gitignore_names_the_mutable_paths_and_is_not_a_blanket() -> None:
     assert blanket == [], (
         "gitignore blanket-ignores .harness/; HANDOFF.md and the driver "
         f"scripts would drop out of the index: {blanket}"
+    )
+
+
+def test_gitignore_blocks_readding_the_named_mutable_paths() -> None:
+    """An ordinary `git add` of a named instance path must be a no-op.
+
+    `git check-ignore --no-index` is the probe that works whether or not the
+    file is on disk in this worktree. Exit 0 means ignored.
+    """
+    missed = []
+    for probe in READD_PROBES:
+        result = _git("check-ignore", "-q", "--no-index", "--", probe, check=False)
+        if result.returncode != 0:
+            missed.append(probe)
+    assert missed == [], (
+        "gitignore does not ignore these paths; an ordinary git add would "
+        f"re-track them and a checkout could restore an older copy: {missed}"
+    )
+
+
+def test_readding_a_forbidden_path_fails_the_index_check(tmp_path: Path) -> None:
+    """DONE WHEN: the new test fails when any untracked path is re-added.
+
+    Uses a throwaway index so the real index is never touched. An ordinary
+    add must not stage the path; a force-add must then be caught by the
+    denylist that `test_mutable_harness_state_is_not_tracked` runs.
+    """
+    probe = ".harness/plan-units.json"
+    if not (ROOT / probe).is_file():
+        pytest.skip(
+            "no on-disk instance copy to force-add; "
+            "test_gitignore_blocks_readding_the_named_mutable_paths covers the gitignore half"
+        )
+    env = _git_env()
+    env["GIT_INDEX_FILE"] = str(tmp_path / "index")
+    _git("read-tree", "HEAD", env=env)
+    ordinary = _git("add", "--", probe, env=env, check=False)
+    assert ordinary.returncode != 0, (
+        f"ordinary git add of {probe} succeeded; gitignore is not blocking re-add"
+    )
+    assert probe not in _tracked_harness(env), (
+        f"ordinary git add re-tracked {probe}; gitignore is not blocking re-add"
+    )
+    _git("add", "-f", "--", probe, env=env)
+    leaked = [path for path in _tracked_harness(env) if _is_forbidden(path)]
+    assert probe in leaked, (
+        f"force-adding {probe} did not fire the denylist; the ls-files "
+        "ratchet would stay green after a re-add"
     )

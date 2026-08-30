@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -115,6 +116,17 @@ def test_submit_refuses_when_policy_prohibits_automated_prs(tmp_path: Path) -> N
     prepared = verify_host_ci(_prepared(policy=policy), _green)
     with pytest.raises(UpstreamError, match="prohibits automated"):
         submit_contribution(prepared, sink=_sink, dest=tmp_path, root=ROOT)
+
+
+def test_submit_refuses_when_machine_authored_disclosure_is_missing(
+    tmp_path: Path,
+) -> None:
+    """Disclosure is a chokepoint: constructing the dataclass must not bypass it."""
+    prepared = verify_host_ci(_prepared(), _green)
+    stripped = replace(prepared, body="A useful fix with no authorship disclosure.")
+    assert MACHINE_AUTHORED_DISCLOSURE not in stripped.body
+    with pytest.raises(UpstreamError, match="disclosure"):
+        submit_contribution(stripped, sink=_sink, dest=tmp_path, root=ROOT)
 
 
 def test_submit_refuses_a_contribution_not_wanted_on_its_merits(tmp_path: Path) -> None:

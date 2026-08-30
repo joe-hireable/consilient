@@ -10,7 +10,12 @@ Two tests hold the omitted-digest change honest in both directions. An event rec
 before the change still carries the full omitted list and must still verify, because
 events already in a trajectory cannot be rewritten. A digest-era event that also inlines
 the list must not verify: that co-resident fat list is the mutant which previously still
-passed."""
+passed.
+
+Matching is not enough. reconstruct must also refuse a tampered omitted_digest, a
+tampered or malformed legacy omitted list, and a record that stripped every receipt
+field — or a mutant that compared the pack digest and ignored the omission set, or
+skipped the receipt comparison when no receipt keys were present, would still pass."""
 
 import copy
 from pathlib import Path
@@ -62,16 +67,85 @@ def test_reconstruct_matches_an_event_recorded_with_the_old_fat_omitted_list(
     legacy = copy.deepcopy(recorded)
     legacy.pop("event_id")
     legacy["ts"] = now()
+    # Own identity, so last-event-wins on the slim record cannot silently skip fold-forward.
+    legacy_id = f"legacy-{assembly.sha256}"
+    legacy["data"]["assembly_id"] = legacy_id
     recall = legacy["data"]["recall"]
     recall.pop("omitted_digest")
     recall.pop("omitted_count")
     recall["omitted"] = instructions._omission_rows(assembly.recall_selection)
     append(tmp_path / f"{legacy['ts'][:10]}.jsonl", legacy)
-    result = reconstruct(tmp_path, skills, assembly.sha256)
+    result = reconstruct(tmp_path, skills, legacy_id)
     assert result.ok, [report for report in result.layers if not report.ok]
     recall_layer = next(report for report in result.layers if report.layer == "recall")
     assert recall_layer.ok
     assert str(protected["event_id"]) in assembly.recall_pack
+
+
+def test_reconstruct_rejects_a_tampered_omitted_digest(tmp_path: Path) -> None:
+    """The audit property through reconstruct, not the helper.
+
+    Matching before/after tests pass if reconstruct compares the pack digest or
+    selected_digest and ignores omitted_digest.
+    """
+    note(tmp_path, "beta work continued")
+    skills = skills_tree(tmp_path)
+    assembly = assemble(skills, tmp_path, task="measure the beta verifier outcome")
+    recorded = record_assembly(
+        tmp_path, assembly, task="measure the beta verifier outcome"
+    )
+    tampered = copy.deepcopy(recorded)
+    tampered.pop("event_id")
+    tampered["ts"] = now()
+    tampered_id = f"tampered-digest-{assembly.sha256}"
+    tampered["data"]["assembly_id"] = tampered_id
+    tampered["data"]["recall"]["omitted_digest"] = "0" * 64
+    append(tmp_path / f"{tampered['ts'][:10]}.jsonl", tampered)
+    result = reconstruct(tmp_path, skills, tampered_id)
+    assert not result.ok
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert not recall_layer.ok
+    assert "selection receipt" in recall_layer.detail
+
+
+def test_reconstruct_rejects_a_tampered_legacy_omitted_list(tmp_path: Path) -> None:
+    """Fold-forward must fail closed when the stored list is not the replayed set."""
+    record_event(
+        tmp_path,
+        "review.recorded",
+        {"dissent": "protected dissent", "padding": "x" * 2000},
+    )
+    for index in range(4):
+        note(tmp_path, f"crowd {index} " + "y" * 200)
+    skills = skills_tree(tmp_path)
+    assembly = assemble(skills, tmp_path, task="crowd", recall_limit_chars=300)
+    recorded = record_assembly(tmp_path, assembly, task="crowd")
+    legacy = copy.deepcopy(recorded)
+    legacy.pop("event_id")
+    legacy["ts"] = now()
+    legacy_id = f"tampered-legacy-{assembly.sha256}"
+    legacy["data"]["assembly_id"] = legacy_id
+    recall = legacy["data"]["recall"]
+    recall.pop("omitted_digest")
+    recall.pop("omitted_count")
+    rows = instructions._omission_rows(assembly.recall_selection)
+    assert rows, "this fixture must produce omissions so the tamper is a different set"
+    rows = [
+        {
+            "event_id": "tampered-id",
+            "event_kind": rows[0]["event_kind"],
+            "reason": rows[0]["reason"],
+            "protected": rows[0]["protected"],
+        },
+        *rows[1:],
+    ]
+    recall["omitted"] = rows
+    append(tmp_path / f"{legacy['ts'][:10]}.jsonl", legacy)
+    result = reconstruct(tmp_path, skills, legacy_id)
+    assert not result.ok
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert not recall_layer.ok
+    assert "selection receipt" in recall_layer.detail
 
 
 def test_reconstruct_rejects_a_digest_era_event_that_still_inlines_omitted(
@@ -85,17 +159,95 @@ def test_reconstruct_rejects_a_digest_era_event_that_still_inlines_omitted(
         tmp_path, assembly, task="measure the beta verifier outcome"
     )
     bloated = copy.deepcopy(recorded)
-    bloated.pop("event_id")
+    bloated.pop("event_id", None)
     bloated["ts"] = now()
+    bloated_id = f"bloated-{assembly.sha256}"
+    bloated["data"]["assembly_id"] = bloated_id
     bloated["data"]["recall"]["omitted"] = instructions._omission_rows(
         assembly.recall_selection
     )
     append(tmp_path / f"{bloated['ts'][:10]}.jsonl", bloated)
-    result = reconstruct(tmp_path, skills, assembly.sha256)
+    result = reconstruct(tmp_path, skills, bloated_id)
     assert not result.ok
     recall_layer = next(report for report in result.layers if report.layer == "recall")
     assert not recall_layer.ok
     assert "inlines omitted" in recall_layer.detail
+
+    nulled = copy.deepcopy(bloated)
+    nulled.pop("event_id", None)
+    nulled["ts"] = now()
+    nulled_id = f"nulled-{assembly.sha256}"
+    nulled["data"]["assembly_id"] = nulled_id
+    nulled["data"]["recall"]["omitted_digest"] = None
+    append(tmp_path / f"{nulled['ts'][:10]}.jsonl", nulled)
+    result = reconstruct(tmp_path, skills, nulled_id)
+    assert not result.ok
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert not recall_layer.ok
+    assert "inlines omitted" in recall_layer.detail
+
+
+def test_reconstruct_rejects_an_event_with_no_selection_receipt(
+    tmp_path: Path,
+) -> None:
+    """A record that stripped every receipt field used to skip the comparison."""
+    note(tmp_path, "beta work continued")
+    skills = skills_tree(tmp_path)
+    assembly = assemble(skills, tmp_path, task="measure the beta verifier outcome")
+    recorded = record_assembly(
+        tmp_path, assembly, task="measure the beta verifier outcome"
+    )
+    stripped = copy.deepcopy(recorded)
+    stripped.pop("event_id")
+    stripped["ts"] = now()
+    stripped_id = f"stripped-{assembly.sha256}"
+    stripped["data"]["assembly_id"] = stripped_id
+    recall = stripped["data"]["recall"]
+    for field in (
+        "selected_event_ids",
+        "selected_digest",
+        "omitted_count",
+        "omitted_digest",
+        "context_complete",
+        "continuation",
+    ):
+        recall.pop(field)
+    append(tmp_path / f"{stripped['ts'][:10]}.jsonl", stripped)
+
+    result = reconstruct(tmp_path, skills, stripped_id)
+    assert not result.ok
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert not recall_layer.ok
+    assert "selection receipt" in recall_layer.detail
+
+
+def test_reconstruct_does_not_treat_a_malformed_omitted_list_as_empty(
+    tmp_path: Path,
+) -> None:
+    """This assembly has zero omissions. Folding `omitted: ["garbage"]` forward
+    as the empty list used to leave reconstruct matching."""
+    note(tmp_path, "beta work continued")
+    skills = skills_tree(tmp_path)
+    assembly = assemble(skills, tmp_path, task="measure the beta verifier outcome")
+    recorded = record_assembly(
+        tmp_path, assembly, task="measure the beta verifier outcome"
+    )
+    assert recorded["data"]["recall"]["omitted_count"] == 0
+    malformed = copy.deepcopy(recorded)
+    malformed.pop("event_id")
+    malformed["ts"] = now()
+    malformed_id = f"malformed-{assembly.sha256}"
+    malformed["data"]["assembly_id"] = malformed_id
+    recall = malformed["data"]["recall"]
+    recall.pop("omitted_digest")
+    recall.pop("omitted_count")
+    recall["omitted"] = ["not-an-object"]
+    append(tmp_path / f"{malformed['ts'][:10]}.jsonl", malformed)
+    result = reconstruct(tmp_path, skills, malformed_id)
+    assert not result.ok
+    recall_layer = next(report for report in result.layers if report.layer == "recall")
+    assert not recall_layer.ok
+    assert "selection receipt" in recall_layer.detail
 
 
 def test_an_assembly_is_reconstructable_after_the_fact(tmp_path: Path):

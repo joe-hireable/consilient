@@ -207,23 +207,29 @@ def _recorded_selection_receipt(recall_data: Mapping[str, object]) -> dict[str, 
     A digest-era record that also inlines `omitted` is not either of those shapes. The
     extra key is kept so equality with `_selection_receipt` fails, and `reconstruct`
     names the co-resident list rather than treating it as invisible extra.
+
+    A pre-digest record whose `omitted` value is not a list of mappings is also kept
+    as an extra key rather than hashed as the empty set. Dropping non-mapping rows
+    used to let `omitted: ["garbage"]` verify against a complete selection.
+    Key presence, not truthiness, decides the digest-era branch: `omitted_digest: null`
+    beside `omitted` is still that co-resident shape, not a legacy list.
     """
     data = {field: recall_data.get(field) for field in _RECEIPT_FIELDS}
     if "omitted" in recall_data:
-        if recall_data.get("omitted_digest") is not None:
+        if "omitted_digest" in recall_data:
             # Digest-era record that still inlines the list. Reconstruct refuses
             # this shape before comparing; keep the key so a caller that only
             # compares receipts cannot treat the fat list as invisible extra.
             data["omitted"] = recall_data.get("omitted")
         else:
             legacy = recall_data.get("omitted")
-            rows = (
-                [row for row in legacy if isinstance(row, Mapping)]
-                if isinstance(legacy, list)
-                else []
-            )
-            data["omitted_count"] = len(rows)
-            data["omitted_digest"] = _omitted_digest(rows)
+            if isinstance(legacy, list) and all(
+                isinstance(row, Mapping) for row in legacy
+            ):
+                data["omitted_count"] = len(legacy)
+                data["omitted_digest"] = _omitted_digest(legacy)
+            else:
+                data["omitted"] = legacy
     return data
 
 

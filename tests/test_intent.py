@@ -27,6 +27,8 @@ import pytest
 from consilient import events as events_mod
 from consilient.events import EventError, read_all
 
+from build_driver_helpers import _sandbox_instance_paths
+
 ROOT = Path(__file__).resolve().parent.parent
 DRIVER_PATH = ROOT / ".harness" / "build_driver.py"
 
@@ -41,6 +43,7 @@ def _driver():
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)
+    _sandbox_instance_paths(module)
     return module
 
 NO_WINDOW = timedelta(0)

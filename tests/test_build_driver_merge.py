@@ -36,8 +36,10 @@ refused by this exact gate. It now compares against the tree the cherry-pick sta
 from and refuses only a genuine increase, and a baseline that cannot be established at
 all fails closed rather than waving the merge through."""
 
+import json
 import subprocess
 from pathlib import Path
+import pytest
 from build_driver_helpers import (
     _load_driver,
 )
@@ -92,6 +94,52 @@ def test_merge_unit_worktree_signs_off_the_cherry_pick(
     cherry_pick_calls = [c for c in calls if "cherry-pick" in c]
     assert cherry_pick_calls, "expected a cherry-pick call"
     assert "--signoff" in cherry_pick_calls[0]
+
+
+def test_failed_rollback_reports_the_commit_that_remains_landed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed reset leaves the cherry-pick on HEAD, so ADR-0107 must still see it."""
+    driver = _load_driver()
+    worktrees = tmp_path / "worktrees"
+    (worktrees / "U01").mkdir(parents=True)
+    calls: list[list[str]] = []
+    main_heads = iter(["pre-sha", "post-sha", "post-sha", "post-sha"])
+
+    class _Result:
+        def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_sh(args: list[str]) -> _Result:
+        calls.append(args)
+        if "-C" in args and "rev-parse" in args:
+            return _Result("unit-head-sha\n")
+        if args[:2] == ["git", "rev-parse"]:
+            return _Result(next(main_heads) + "\n")
+        if "rev-list" in args:
+            return _Result("abc123\n")
+        if args[:3] == ["git", "show", "--name-only"]:
+            return _Result("some/file.py\n")
+        if "diff" in args and "--numstat" in args:
+            return _Result()
+        if "reset" in args:
+            return _Result("reset refused", 1)
+        return _Result()
+
+    monkeypatch.setattr(driver, "WORKTREES", worktrees)
+    monkeypatch.setattr(driver, "sh", fake_sh)
+    monkeypatch.setattr(driver, "replays_over_instance_state", lambda _sha: [])
+    monkeypatch.setattr(driver, "regenerate_generated_documents", lambda _uid: [])
+    monkeypatch.setattr(
+        driver, "gate_merged_tree", lambda _touched, _baseline: "gate failed"
+    )
+
+    result = driver.merge_unit_worktree("U01")
+
+    assert any("reset" in call for call in calls)
+    assert "(1 applied)" in result, result
 
 
 def test_mypy_gate_does_not_refuse_a_files_own_pre_existing_debt(
@@ -283,6 +331,75 @@ def test_main_merges_a_built_units_worktree_when_it_gains_new_commits(
     assert calls == ["U01"], (
         "a built unit's worktree must still be checked for new commits to merge"
     )
+
+
+def test_red_suite_allows_merge_and_records_the_observed_failing_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0107: local repair keeps landing on red; publication remains green-only.
+
+    One post-merge observation is shared across the batch rather than using a stale
+    prior-tick result or running the full suite again for every unit.
+    """
+    driver = _load_driver()
+    worktrees = tmp_path / "unit-worktrees"
+    (worktrees / "U01").mkdir(parents=True)
+    state: dict[str, object] = {
+        "in_flight": {},
+        "attempts": {},
+        "built": ["U01"],
+        "review_dispatched": ["U01"],
+    }
+    units = {
+        "U01": {
+            "title": "repair on a red tree",
+            "commit": "fix(unit): repair",
+            "claims": [],
+            "deps": [],
+        }
+    }
+    merges: list[str] = []
+    log = tmp_path / "log"
+    log.mkdir()
+
+    class _Result:
+        stdout = "3 failed, 2 errors, 100 passed in 1.0s"
+        stderr = ""
+
+    def fake_merge(uid: str) -> str:
+        merges.append(uid)
+        return "CONFLICT cherry-picking deadbeef for U01 (1 applied); needs resolution"
+
+    monkeypatch.setattr(driver, "WORKTREES", worktrees)
+    monkeypatch.setattr(driver, "LOG", log)
+    monkeypatch.setattr(
+        driver, "load", lambda path, _default: units if path == driver.UNITS else state
+    )
+    monkeypatch.setattr(driver, "committed", lambda _uid, _unit: False)
+    monkeypatch.setattr(driver, "artefact_identity", lambda _unit: None)
+    monkeypatch.setattr(driver, "start_failed_dispatches", lambda: [])
+    monkeypatch.setattr(driver, "crashed_dispatches", lambda _state: [])
+    monkeypatch.setattr(driver, "save_state", lambda _state: None)
+    monkeypatch.setattr(driver, "record_tick_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(driver, "rebase_mergeable_worktrees", lambda *_args: None)
+    monkeypatch.setattr(driver, "sh", lambda _args, **_kwargs: _Result())
+    monkeypatch.setattr(
+        driver,
+        "merge_unit_worktree",
+        fake_merge,
+    )
+    assert driver.main() == 0
+
+    assert merges == ["U01"], "a red suite must not refuse the local merge"
+    event = json.loads(next(log.glob("*.jsonl")).read_text(encoding="utf-8"))
+    assert event["event"] == "merge.into_red"
+    assert event["data"] == {
+        "unit": "U01",
+        "applied": 1,
+        "failing_count": 5,
+        "summary": "3 failed, 2 errors, 100 passed in 1.0s",
+        "policy": "adr-0107",
+    }
 
 
 def test_an_originally_empty_unit_commit_lands_no_commit_at_all(

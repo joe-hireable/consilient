@@ -89,15 +89,20 @@ def test_heldout_contract_named_in_brief_refuses_before_preflight(
     assert DISTINCTIVE_LINE not in output
 
 
+@pytest.mark.parametrize(
+    "quoted",
+    (DISTINCTIVE_LINE, DISTINCTIVE_LINE.upper(), DISTINCTIVE_LINE.lower()),
+)
 def test_heldout_contract_quoted_in_brief_refuses(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    quoted: str,
 ) -> None:
     checker = _load_checker()
     worktree, contract = _isolated_pair(tmp_path)
     reason = checker.refusal_reason(
         str(contract),
-        brief=f'The builder must not copy "{DISTINCTIVE_LINE}"',
+        brief=f'The builder must not copy "{quoted}"',
         worktree=str(worktree),
         claims=(),
     )
@@ -105,7 +110,10 @@ def test_heldout_contract_quoted_in_brief_refuses(
     assert "brief" in reason.lower()
     assert "refusing before child launch" in reason
     assert DISTINCTIVE_LINE not in reason
-    assert DISTINCTIVE_LINE not in capsys.readouterr().out
+    assert quoted not in reason
+    output = capsys.readouterr().out
+    assert DISTINCTIVE_LINE not in output
+    assert quoted not in output
 
 
 def test_heldout_contract_covered_by_claim_refuses_before_preflight(

@@ -73,7 +73,9 @@ def matching_files(revision: str | None) -> list[str]:
 
 
 def tracked_paths(revision: str | None) -> list[str]:
-    command = ["ls-files"] if revision is None else ["ls-tree", "-r", "--name-only", revision]
+    command = (
+        ["ls-files"] if revision is None else ["ls-tree", "-r", "--name-only", revision]
+    )
     completed = git(*command)
     if completed.returncode != 0:
         raise RuntimeError(completed.stderr.strip() or "cannot enumerate tracked files")
@@ -99,7 +101,9 @@ def _scan_paths(paths: list[str]) -> list[str]:
 def scan_untracked() -> list[str]:
     completed = git("ls-files", "--others", "--exclude-standard")
     if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip() or "cannot enumerate untracked files")
+        raise RuntimeError(
+            completed.stderr.strip() or "cannot enumerate untracked files"
+        )
     return _scan_paths([line for line in completed.stdout.splitlines() if line])
 
 
@@ -141,7 +145,9 @@ def self_test() -> None:
     assert not SECRET_RE.search("OPENROUTER_API_KEY")
     assert not SECRET_RE.search("sk-or-v1-REDACTED")
     assert not SECRET_RE.search("XAI_API_KEY"), "the env var NAME is not a secret"
-    assert not SECRET_RE.search("@xai-official/grok"), "the npm package name is not a secret"
+    assert not SECRET_RE.search("@xai-official/grok"), (
+        "the npm package name is not a secret"
+    )
     assert not SECRET_RE.search("xai-org/grok-build"), "the GitHub org is not a secret"
     assert not SECRET_RE.search("github" + "_patterns_are_documented"), (
         "a word beginning github_pat is not a token"
@@ -180,10 +186,26 @@ def main() -> int:
     if args.staged:
         findings.extend(("staged", path) for path in scan_staged())
     findings.extend(
-        ("working-tree", path) for path in tracked_paths(None) if is_private_env_file(path)
+        ("working-tree", path)
+        for path in tracked_paths(None)
+        if is_private_env_file(path)
     )
     if args.history:
-        revisions = git("rev-list", "--all")
+        # EXCLUDE refs/stash. A stash is local scratch that no push can carry: publication sends
+        # a squash of HEAD's tree, and a stash is unreachable from every branch. Scanning it can
+        # therefore only produce refusals that protect nothing.
+        #
+        # MEASURED 30 August 2026, and it cost the whole pipeline. A `git stash` of UNTRACKED
+        # files on a unit worktree captured 109 machine-scratch files -- .mypy_cache, a lock
+        # file, driver-state.json and .pytest_cache. One of them, .pytest_cache/v/cache/nodeids,
+        # holds pytest node ids of the form tests/<name>.py::<test_name>[escalate], and a long
+        # token pattern matched them. The gate refused every publish while the "credential" was
+        # a list of test names.
+        #
+        # This opens no bypass. Popping a stash puts its content into the working tree and the
+        # index, both of which are scanned above, so a real secret in a stash is caught at the
+        # moment it becomes capable of reaching anything.
+        revisions = git("rev-list", "--exclude=refs/stash", "--all")
         if revisions.returncode != 0:
             raise RuntimeError(revisions.stderr.strip() or "git rev-list failed")
         for revision in revisions.stdout.splitlines():

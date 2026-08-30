@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from build_driver_helpers import _load_driver
+
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / ".github" / "scripts" / "check_guard_mutation.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "invariants.yml"
@@ -226,4 +228,60 @@ def test_ruff_lint_selects_ruf100():
 def test_mypy_ini_targets_strict_mode():
     assert "strict = True" in MYPY_INI.read_text(encoding="utf-8"), (
         "mypy.ini must declare strict mode alongside pyproject's tested floor"
+    )
+
+
+def test_a_loaded_driver_holds_no_live_instance_path() -> None:
+    """The pollution of 30 August 2026 was read out of the live tree, not written by it."""
+    driver = _load_driver()
+    live = (driver.ROOT / ".harness").resolve()
+    stray = sorted(
+        name
+        for name, value in vars(driver).items()
+        if isinstance(value, Path)
+        and name != "UNITS"
+        and live in value.resolve().parents
+    )
+    assert not stray, (
+        "a driver loaded for a check points at live instance state: "
+        + ", ".join(stray)
+        + ". Four zero-byte U01 files in the live briefs directory failed three checks "
+        "for ten hours, 30 minutes after they were written. Route the load through "
+        "_sandbox_instance_paths, or exempt the global there with the reason it must "
+        "stay live."
+    )
+
+
+def test_every_driver_loader_sandboxes_the_module_it_loads() -> None:
+    """Four loaders of the driver already exist; the fifth is where this regresses.
+
+    A CALL is required, not a mention. Measured while proving this guard could be made
+    red: deleting `_sandbox_instance_paths(module)` from a loader left a substring check
+    green, because the import line above it still carried the name. The import is not the
+    isolation; the call is.
+    """
+    bypass = []
+    # This file states the rule, so it names the driver and calls spec_from_file_location
+    # (for the guard-mutation checker) without being a loader. Excluded by name because
+    # every sharper filter tried -- string constants, exec_module, path shape -- matched
+    # it too; a filter tuned until it missed this file is this exclusion, hidden.
+    self_name = Path(__file__).name
+    for source_path in sorted(TESTS.glob("*.py")):
+        if source_path.name == self_name:
+            continue
+        source = source_path.read_text(encoding="utf-8")
+        if "spec_from_file_location" not in source or "build_driver.py" not in source:
+            continue
+        called = any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_sandbox_instance_paths"
+            for node in ast.walk(ast.parse(source))
+        )
+        if not called:
+            bypass.append(source_path.name)
+    assert not bypass, (
+        "these load the build driver without sandboxing its instance paths, so a "
+        "fixture id they write survives in the live tree and decides a later check: "
+        + ", ".join(bypass)
     )

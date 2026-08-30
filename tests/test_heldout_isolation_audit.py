@@ -21,6 +21,8 @@ detected. [asserted]"""
 from family_source import seam
 
 import hashlib
+import os
+import subprocess
 from pathlib import Path
 from types import ModuleType
 import pytest
@@ -31,7 +33,12 @@ from heldout_helpers import (
     _load_checker,
     _load_dispatch,
     _load_module,
+    _write_contract,
 )
+
+_GIT_ENV = {
+    key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+}
 
 
 def _load_corpus() -> ModuleType:
@@ -238,11 +245,57 @@ def test_audit_normalises_distinctive_lines_but_ignores_short_ones(
     assert expected in capsys.readouterr().out
 
 
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=_GIT_ENV,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    return result
+
+
+def _init_repo(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    _git(path, "init")
+    _git(path, "config", "user.email", "ar@test")
+    _git(path, "config", "user.name", "AR")
+    (path / "README").write_text("init\n", encoding="utf-8")
+    _git(path, "add", "README")
+    _git(path, "commit", "-m", "init")
+    return path
+
+
+def _audit(
+    dispatch: ModuleType,
+    *,
+    contract: Path,
+    cwd: Path,
+    run_dir: Path,
+    stdout: str = "clean stdout\n",
+    stderr: str = "clean stderr\n",
+) -> str | None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return dispatch.heldout_contract_audit(
+        str(contract),
+        run_dir=run_dir,
+        run_id="AR",
+        cwd=cwd,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+
 def test_audit_finding_voids_the_child_result(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     dispatch = _load_dispatch()
-    worktree, contract = _isolated_pair(tmp_path)
+    worktree = _init_repo(tmp_path / "work")
+    contract = _write_contract(tmp_path / "heldout" / "secret-contract.md")
     harness = dispatch.harness_by_id("codex")
     assert harness is not None
     monkeypatch.setattr(seam("dispatch_invocation"), "build_command", lambda *_args, **_kwargs: ["fake"])
@@ -256,11 +309,6 @@ def test_audit_finding_voids_the_child_result(
             Path(kwargs["stderr_path"]).write_text(str(contract), encoding="utf-8"),
             (0, False, 0.1, None),
         )[-1],
-    )
-    monkeypatch.setattr(
-        seam("dispatch_boundaries"),
-        "heldout_contract_audit",
-        lambda *_args, **_kwargs: "held-out contract LEAKED; measurement VOID",
     )
 
     result = dispatch.run_harness(
@@ -281,6 +329,65 @@ def test_audit_finding_voids_the_child_result(
     assert result.stderr == ""
     assert str(contract) not in str(payload)
     assert DISTINCTIVE_LINE not in str(payload)
+
+
+def test_audit_voids_a_staged_worktree_leak(tmp_path: Path) -> None:
+    dispatch = _load_dispatch()
+    worktree = _init_repo(tmp_path / "work")
+    contract = _write_contract(tmp_path / "heldout" / "secret-contract.md")
+    (worktree / "staged.md").write_text(f"{DISTINCTIVE_LINE}\n", encoding="utf-8")
+    _git(worktree, "add", "staged.md")
+    unstaged = _git(worktree, "diff", "--no-ext-diff")
+    staged = _git(worktree, "diff", "--cached", "--no-ext-diff")
+    assert unstaged.stdout == ""
+    assert DISTINCTIVE_LINE in staged.stdout
+
+    reason = _audit(
+        dispatch, contract=contract, cwd=worktree, run_dir=tmp_path / "run"
+    )
+
+    assert reason is not None
+    assert "LEAKED" in reason
+    assert "VOID" in reason
+    assert DISTINCTIVE_LINE not in reason
+    assert str(contract) not in reason
+
+
+def test_audit_voids_an_untracked_worktree_leak(tmp_path: Path) -> None:
+    dispatch = _load_dispatch()
+    worktree = _init_repo(tmp_path / "work")
+    contract = _write_contract(tmp_path / "heldout" / "secret-contract.md")
+    leaked = worktree / "untracked.md"
+    leaked.write_text(f"{DISTINCTIVE_LINE}\n", encoding="utf-8")
+    unstaged = _git(worktree, "diff", "--no-ext-diff")
+    staged = _git(worktree, "diff", "--cached", "--no-ext-diff")
+    assert unstaged.stdout == ""
+    assert staged.stdout == ""
+    assert leaked.exists()
+
+    reason = _audit(
+        dispatch, contract=contract, cwd=worktree, run_dir=tmp_path / "run"
+    )
+
+    assert reason is not None
+    assert "LEAKED" in reason
+    assert "VOID" in reason
+    assert DISTINCTIVE_LINE not in reason
+    assert str(contract) not in reason
+
+
+def test_audit_clean_when_worktree_has_no_contract_content(tmp_path: Path) -> None:
+    dispatch = _load_dispatch()
+    worktree = _init_repo(tmp_path / "work")
+    contract = _write_contract(tmp_path / "heldout" / "secret-contract.md")
+    (worktree / "note.md").write_text("unrelated working-tree note\n", encoding="utf-8")
+    _git(worktree, "add", "note.md")
+
+    reason = _audit(
+        dispatch, contract=contract, cwd=worktree, run_dir=tmp_path / "run"
+    )
+
+    assert reason is None
 
 
 def test_audit_refuses_invalid_inputs_without_reporting_clean(

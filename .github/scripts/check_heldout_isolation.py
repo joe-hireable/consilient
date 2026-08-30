@@ -59,7 +59,10 @@ def refusal_reason(
         quoted = Path(contract).read_text(encoding="utf-8")
     except OSError:
         return "held-out contract input is invalid; refusing before child launch"
-    if any(line.strip() and line.strip() in brief for line in quoted.splitlines()):
+    if any(
+        line.strip() and line.strip().casefold() in brief_folded
+        for line in quoted.splitlines()
+    ):
         return "held-out contract is quoted in the brief; refusing before child launch"
     for claim in claims:
         if claim.strip() and paths_overlap(contract_path, canonical_path(claim, cwd=Path(worktree))):

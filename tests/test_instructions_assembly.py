@@ -21,7 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 import pytest
-from consilient import instructions, promote
+from consilient import instructions, instructions_audit, promote
 from consilient.events import append, canonical, read_all
 from consilient.instructions import (
     ADAPTED_LIMIT_CHARS,
@@ -32,11 +32,13 @@ from consilient.instructions import (
     SKILL_CHARS,
     AdaptedLayer,
     Assembly,
+    InstructionError,
     assemble,
     reconstruct,
     record_assembly,
     select_skills,
 )
+from consilient.instructions_vocabulary import _RECEIPT_FIELDS
 from consilient.recall import Omission, Selection
 from instructions_helpers import (
     note,
@@ -247,6 +249,126 @@ def test_a_logged_assembled_event_that_used_to_be_110kb_is_under_8kb(
         "is the compounding loop that took the trajectory to 40 MB"
     )
     assert b'"omitted":' not in line
+
+
+def test_receipt_fields_copied_into_the_event_exclude_the_omission_list() -> None:
+    """A chokepoint that copies named fields is not one if `omitted` is in the names."""
+    assert "omitted" not in _RECEIPT_FIELDS
+    assert "omitted_count" in _RECEIPT_FIELDS
+    assert "omitted_digest" in _RECEIPT_FIELDS
+
+
+def test_omitted_digest_is_sha256_of_canonical_rows_and_discriminates() -> None:
+    """Independent of `_omitted_digest` calling itself. A constant digest still
+    matches `== _omitted_digest(same_rows)` and would let two different omission
+    sets verify as one."""
+    budget = {
+        "event_id": "e1",
+        "event_kind": "conversation.turn",
+        "reason": "budget",
+        "protected": False,
+    }
+    privileged = {**budget, "reason": "privileged"}
+    expected = promote.digest(canonical({"omitted": [budget]}))
+    assert instructions._omitted_digest([budget]) == expected
+    assert instructions._omitted_digest([budget]) != instructions._omitted_digest(
+        [privileged]
+    )
+
+
+def test_a_malformed_legacy_omitted_list_does_not_hash_as_empty() -> None:
+    """Fold-forward used to drop non-mapping rows and treat the rest as the list.
+    `omitted: ["garbage"]` then digested as zero omissions, so a tampered record
+    verified against a complete selection."""
+    empty = instructions._selection_receipt(_selection_with_omissions(0))
+    garbage = {
+        "selected_event_ids": list(empty["selected_event_ids"]),
+        "selected_digest": empty["selected_digest"],
+        "omitted": ["not-an-object"],
+        "context_complete": empty["context_complete"],
+        "continuation": empty["continuation"],
+    }
+    assert instructions._recorded_selection_receipt(garbage) != empty
+
+
+def test_record_assembly_refuses_a_receipt_that_inlines_omitted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The raise must inspect the receipt itself. Checking the payload after copying
+    only `_RECEIPT_FIELDS` cannot fire, and a chokepoint that cannot fail is not one."""
+    original = instructions_audit._selection_receipt
+
+    def fat(selection: Selection) -> dict[str, object]:
+        receipt = original(selection)
+        receipt["omitted"] = instructions._omission_rows(selection)
+        return receipt
+
+    monkeypatch.setattr(instructions_audit, "_selection_receipt", fat)
+    with pytest.raises(InstructionError, match="must not inline the omission list"):
+        record_assembly(
+            tmp_path, _stub_assembly(_selection_with_omissions(1)), task="crowd"
+        )
+
+
+def test_the_omission_chokepoint_sees_the_event_not_an_intermediate_payload() -> None:
+    """Spreading omitted at the append call site is the mutant that previously landed.
+
+    A check on recall_payload cannot see that. The chokepoint has to inspect
+    data.recall on the event that would be written.
+    """
+    with pytest.raises(InstructionError, match="must not inline the omission list"):
+        instructions_audit._reject_inlined_omission(
+            {
+                "v": 1,
+                "event": ASSEMBLED,
+                "data": {
+                    "recall": {
+                        "omitted": [
+                            {
+                                "event_id": "x",
+                                "event_kind": "conversation.turn",
+                                "reason": "budget",
+                                "protected": False,
+                            }
+                        ]
+                    }
+                },
+            }
+        )
+    instructions_audit._reject_inlined_omission(
+        {
+            "v": 1,
+            "event": ASSEMBLED,
+            "data": {"recall": {"omitted_count": 0, "omitted_digest": "abc"}},
+        }
+    )
+
+
+def test_record_assembly_hands_the_event_to_the_omission_chokepoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the writer inspects recall_payload, this test fails: that dict has no `data`."""
+    seen: list[object] = []
+    original = instructions_audit._reject_inlined_omission
+
+    def spy(event: object) -> None:
+        seen.append(event)
+        original(event)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(instructions_audit, "_reject_inlined_omission", spy)
+    record_assembly(
+        tmp_path, _stub_assembly(_selection_with_omissions(1)), task="crowd"
+    )
+    assert seen, "record_assembly never called the omission chokepoint"
+    event = seen[0]
+    assert isinstance(event, dict)
+    assert "data" in event, (
+        "the chokepoint was handed an intermediate payload, not the event; "
+        "spreading omitted at the append call site would not be seen"
+    )
+    data = event["data"]
+    assert isinstance(data, dict)
+    assert "recall" in data
 
 
 def test_select_skills_is_deterministic_bounded_and_records_why(tmp_path: Path):

@@ -200,6 +200,10 @@ def verify_host_ci(
 def _refuse_unsubmittable(prepared: PreparedContribution) -> None:
     if prepared.policy.automated_pull_requests == "prohibited":
         raise UpstreamError(f"{prepared.repository} prohibits automated pull requests")
+    if MACHINE_AUTHORED_DISCLOSURE not in prepared.body:
+        raise UpstreamError(
+            "machine-authored disclosure is required before a contribution may be sent"
+        )
     if not prepared.wanted_on_merits:
         raise UpstreamError("refusing a change that is not wanted on its own merits")
     if prepared.weakened_to_probe_verifier:

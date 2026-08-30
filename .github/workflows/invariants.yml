@@ -84,6 +84,8 @@ jobs:
         # are pinned in KNOWN_BROKEN and that list may only shrink. `--self-test` first:
         # the detector is exercised against a synthetic tree, so a green run means the
         # links resolve rather than that the matcher stopped matching.
+        # C0 (tests/test_living_document_ci.py) pins this invocation. Deleting
+        # the step must fail the suite: a check that is not invoked is not a check.
         run: python .github/scripts/check_links.py --self-test
       - name: Rename safety invariant check
         if: ${{ !cancelled() }}

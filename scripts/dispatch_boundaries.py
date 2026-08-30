@@ -7,9 +7,11 @@ ADR-0063; the product default is still refuse-everything-else, and naming a root
 not pass Gate B.
 
 The held-out audit runs after a child exits. It writes the checker's explicit local
-inputs — stdout, stderr and the diff — and returns a VOID measurement rather than a pass
-whenever any of them cannot be produced, because an audit that cannot see its inputs has
-audited nothing.
+inputs — stdout, stderr, the unstaged diff, the staged diff, and untracked file
+contents — and returns a VOID measurement rather than a pass whenever any of them
+cannot be produced, because an audit that cannot see its inputs has audited nothing.
+`git diff` alone is not the produced artefact: a leak that is only staged, or only
+written as an untracked file, would otherwise be reported CLEAN.
 
 The isolated recovery proof is handed a new scratch root and a verifier log and nothing
 else. No live target, network, credential, provider or spend handle is reachable from
@@ -122,6 +124,45 @@ __all__ = [
 ]
 
 
+def _heldout_git_output(git: str, cwd: Path, *args: str) -> str | None:
+    completed = subprocess.run(
+        [git, "-C", str(cwd), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        env=dispatch_vocabulary.GIT_ENV,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+    return completed.stdout
+
+
+def _heldout_untracked_text(git: str, cwd: Path) -> str | None:
+    listing = _heldout_git_output(
+        git, cwd, "ls-files", "-o", "--exclude-standard", "-z"
+    )
+    if listing is None:
+        return None
+    chunks: list[str] = []
+    for rel in listing.split("\0"):
+        if not rel:
+            continue
+        path = cwd / rel
+        try:
+            if not path.is_file():
+                continue
+            data = path.read_bytes()
+        except OSError:
+            continue
+        if b"\0" in data[:1024]:
+            continue
+        chunks.append(data.decode("utf-8", errors="replace"))
+    return "\n".join(chunks)
+
+
 def heldout_contract_audit(
     contract: str, *, run_dir: Path, run_id: str, cwd: Path, stdout: str, stderr: str
 ) -> str | None:
@@ -135,19 +176,16 @@ def heldout_contract_audit(
         git = which_binary("git")
         if git is None:
             return "held-out audit input is invalid; measurement VOID"
-        completed = subprocess.run(
-            [git, "-C", str(cwd), "diff", "--no-ext-diff"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            env=dispatch_vocabulary.GIT_ENV,
-            check=False,
-        )
-        if completed.returncode != 0:
+        unstaged = _heldout_git_output(git, cwd, "diff", "--no-ext-diff")
+        staged = _heldout_git_output(git, cwd, "diff", "--cached", "--no-ext-diff")
+        untracked = _heldout_untracked_text(git, cwd)
+        if unstaged is None or staged is None or untracked is None:
             return "held-out audit input is invalid; measurement VOID"
-        audit_diff.write_text(completed.stdout, encoding="utf-8", newline="\n")
+        audit_diff.write_text(
+            "\n".join((unstaged, staged, untracked)),
+            encoding="utf-8",
+            newline="\n",
+        )
         spec = importlib.util.spec_from_file_location(
             "check_heldout_isolation", HELDOUT_ISOLATION_CHECKER
         )

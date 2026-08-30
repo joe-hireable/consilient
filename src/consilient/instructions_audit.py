@@ -2,10 +2,11 @@
 warranted.
 
 record_assembly appends through the single writer, naming every layer, and it refuses to
-write one thing: the omission list. Copying only the receipt fields already drops it,
-and the raise beside them is the chokepoint, so a later edit that re-adds the key cannot
-append at all — the compounding receipt that grew the log from 21 KB to 40 MB in six
-days entered exactly there.
+write one thing: the omission list. The raise inspects the receipt itself — a copy that
+already dropped the key cannot fail, and a chokepoint that cannot fail is not one — and
+then inspects the event that would be appended, so spreading omitted onto data.recall
+at the append call site cannot land. The compounding receipt that grew the log from
+21 KB to 40 MB in six days entered exactly there.
 
   V0-47  Assemblies are recorded through append() with the identity of every layer,
          and record_assembly is the package's only writer of instructions.assembled.
@@ -172,6 +173,23 @@ def _selection_receipt(selection: recall.Selection) -> dict[str, object]:
     }
 
 
+def _reject_inlined_omission(event: Mapping[str, object]) -> None:
+    """Refuse an assembled event whose recall layer inlines the omission list.
+
+    Checking the payload after copying only `_RECEIPT_FIELDS` cannot fire:
+    omitted is not in those names. Spreading the list at the append call site
+    never touched that dict. The event that would be written is the artefact.
+    """
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return
+    recall = data.get("recall")
+    if isinstance(recall, dict) and "omitted" in recall:
+        raise InstructionError(
+            "instructions.assembled must not inline the omission list"
+        )
+
+
 def record_assembly(
     log_dir: Path,
     assembly: Assembly,
@@ -182,6 +200,12 @@ def record_assembly(
     """Append the assembly through the single writer, naming every layer (V0-47)."""
     now = datetime.now(timezone.utc)
     receipt = _selection_receipt(assembly.recall_selection)
+    # Inspect the receipt, not the payload after a copy that already drops the
+    # key. Checking recall_payload after looping `_RECEIPT_FIELDS` cannot fire.
+    if "omitted" in receipt:
+        raise InstructionError(
+            "instructions.assembled must not inline the omission list"
+        )
     recall_payload: dict[str, object] = {
         "query": task,
         "limit_chars": assembly.recall_limit_chars,
@@ -191,50 +215,42 @@ def record_assembly(
     }
     for field in _RECEIPT_FIELDS:
         recall_payload[field] = receipt[field]
-    # The compounding loop was this list landing on instructions.assembled. Copying
-    # only `_RECEIPT_FIELDS` already drops it; the raise is the chokepoint so a
-    # later edit that re-adds the key cannot append.
-    if "omitted" in recall_payload:
-        raise InstructionError(
-            "instructions.assembled must not inline the omission list"
-        )
-    return append(
-        log_dir / f"{now.date().isoformat()}.jsonl",
-        {
-            "v": SCHEMA_VERSION,
-            "ts": now.isoformat(),
-            "event": ASSEMBLED,
-            "actor": ACTOR,
-            "data": {
-                "assembly_id": assembly.sha256,
-                "core": {
-                    "version": assembly.core_version,
-                    "sha256": promote.digest(_render_core(assembly.core_version)),
-                },
-                "skills": [
-                    {
-                        "name": skill.name,
-                        "path": skill.path,
-                        "sha256": skill.sha256,
-                        "matched": list(skill.matched),
-                    }
-                    for skill in assembly.skills
-                ],
-                "skills_omitted": assembly.skills_omitted,
-                "recall": recall_payload,
-                "adapted": {
-                    "status": assembly.adapted.status,
-                    "sha256": assembly.adapted.sha256,
-                    "candidate_id": assembly.adapted.candidate_id,
-                },
-                "recall_receipt": dict(assembly.recall_receipt),
-                "capability_manifests": [
-                    dict(row) for row in assembly.capability_manifests
-                ],
-                "pre_run_records": dict(pre_run_records or {}),
+    event: EventPayload = {
+        "v": SCHEMA_VERSION,
+        "ts": now.isoformat(),
+        "event": ASSEMBLED,
+        "actor": ACTOR,
+        "data": {
+            "assembly_id": assembly.sha256,
+            "core": {
+                "version": assembly.core_version,
+                "sha256": promote.digest(_render_core(assembly.core_version)),
             },
+            "skills": [
+                {
+                    "name": skill.name,
+                    "path": skill.path,
+                    "sha256": skill.sha256,
+                    "matched": list(skill.matched),
+                }
+                for skill in assembly.skills
+            ],
+            "skills_omitted": assembly.skills_omitted,
+            "recall": recall_payload,
+            "adapted": {
+                "status": assembly.adapted.status,
+                "sha256": assembly.adapted.sha256,
+                "candidate_id": assembly.adapted.candidate_id,
+            },
+            "recall_receipt": dict(assembly.recall_receipt),
+            "capability_manifests": [
+                dict(row) for row in assembly.capability_manifests
+            ],
+            "pre_run_records": dict(pre_run_records or {}),
         },
-    )
+    }
+    _reject_inlined_omission(event)
+    return append(log_dir / f"{now.date().isoformat()}.jsonl", event)
 
 
 def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruction:
@@ -371,10 +387,7 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
                         "recall", False, "the replayed pack does not match the record"
                     )
                 )
-            elif (
-                recall_data.get("omitted_digest") is not None
-                and "omitted" in recall_data
-            ):
+            elif "omitted_digest" in recall_data and "omitted" in recall_data:
                 reports.append(
                     LayerReport(
                         "recall",
@@ -382,9 +395,7 @@ def reconstruct(log_dir: Path, skills_dir: Path, assembly_id: str) -> Reconstruc
                         "the recorded receipt inlines omitted next to omitted_digest",
                     )
                 )
-            elif any(
-                key in recall_data for key in (*_RECEIPT_FIELDS, "omitted")
-            ) and _selection_receipt(selection) != _recorded_selection_receipt(
+            elif _selection_receipt(selection) != _recorded_selection_receipt(
                 recall_data
             ):
                 reports.append(

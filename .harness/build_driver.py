@@ -615,6 +615,7 @@ def live_dispatchers(state: dict) -> int:
 # short of the loop's 3000 s tick abandonment, which is the outcome this exists to avoid.
 SUITE_TIMEOUT_S = 900
 _LAST_SUITE_SUMMARY: str | None = None
+_LAST_SUITE_RED: tuple[int, str] | None = None
 
 
 def suite_baseline_line() -> str:
@@ -656,6 +657,9 @@ def suite_green() -> bool:
     word boundary is what does the work: `\\b\\d+ failed` cannot match "1 xfailed", because the
     "x" is a word character. Fails closed still -- no counted pass means not green.
     """
+    global _LAST_SUITE_RED, _LAST_SUITE_SUMMARY
+    _LAST_SUITE_RED = None
+
     # BOUNDED, and the bound is the point.
     #
     # MEASURED 25 August 2026, 21:36: a driver tick sat for THIRTY-FIVE MINUTES on this call
@@ -695,9 +699,15 @@ def suite_green() -> bool:
         return False
     last = summary[-1]
     if re.search(r"\b\d+ (failed|error|errors)\b", last):
+        failed = re.search(r"\b(\d+) failed\b", last)
+        errors = re.search(r"\b(\d+) errors?\b", last)
+        _LAST_SUITE_RED = (
+            (int(failed.group(1)) if failed else 0)
+            + (int(errors.group(1)) if errors else 0),
+            last.strip(),
+        )
         return False
     green = bool(re.search(r"\b\d+ passed\b", last))
-    global _LAST_SUITE_SUMMARY
     if green:
         _LAST_SUITE_SUMMARY = last.strip()
     return green
@@ -855,6 +865,28 @@ def append_review_outcome(outcome: dict[str, Any]) -> None:
             "event": "review.outcome",
             "actor": "build_driver",
             "data": outcome,
+        },
+    )
+
+
+def append_merge_into_red(record: dict[str, Any]) -> None:
+    """Record the reversible merge; publication remains green-only under ADR-0107."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from datetime import datetime, timezone
+
+    from consilient import events
+
+    now = datetime.now(timezone.utc)
+    data = dict(record)
+    data["policy"] = "adr-0107"
+    events.append(
+        LOG / (now.date().isoformat() + ".jsonl"),
+        {
+            "v": 1,
+            "ts": now.isoformat(),
+            "event": "merge.into_red",
+            "actor": "build_driver",
+            "data": data,
         },
     )
 
@@ -2046,6 +2078,74 @@ def _mypy_gate(python_files: list[str], baseline: str) -> str | None:
             shutil.rmtree(scratch, ignore_errors=True)
 
 
+def generated_document_producers() -> list[list[str]]:
+    """Every command that regenerates a committed artefact from source.
+
+    Read from `docs/generated-manifest.json` where possible, because that file is the
+    repository's own registry of class-G documents and duplicating it here would create a second
+    source of truth that drifts -- the failure this project names most often.
+
+    The diagrams and the counts are appended because they are generated exactly the same way and
+    are simply not in the manifest. That absence is not academic: on 30 August 2026 a unit added
+    four lines to src/consilient/upstream.py, the module diagram's recorded source SHA moved,
+    tests/test_build_diagrams.py failed, `suite_green()` went false, and since suite_green gates
+    BOTH retirement and publication the entire pipeline stopped for ten hours. The diagram's
+    content had not changed at all -- one provenance header line.
+    """
+    commands: list[list[str]] = []
+    manifest = ROOT / "docs" / "generated-manifest.json"
+    try:
+        entries = json.loads(manifest.read_text(encoding="utf-8")).get("entries", [])
+    except (OSError, ValueError):
+        entries = []
+    for entry in entries:
+        producer = entry.get("producer")
+        if isinstance(producer, str) and (ROOT / producer).is_file():
+            commands.append([sys.executable, producer])
+    for extra in ("scripts/build_diagrams.py", "scripts/build_counts.py"):
+        if (ROOT / extra).is_file():
+            commands.append([sys.executable, extra])
+    return commands
+
+
+def regenerate_generated_documents(uid: str) -> list[str]:
+    """Re-run the producers and commit whatever moved. Returns the paths committed.
+
+    A unit cannot reasonably be asked to know that editing a source file invalidates a diagram
+    it never looked at, and the Engineering Ratchet says the fix goes in code rather than in a
+    brief. So the driver does it, on the unit's behalf, in its own commit -- attributed to the
+    merge rather than folded into the unit's work, so the trail says who regenerated what.
+
+    Failures are deliberately not fatal. A producer that cannot run leaves the drift in place and
+    the gate then fails loudly, which is the same outcome as before this existed; swallowing the
+    error and pressing on would be worse than the problem.
+    """
+    for command in generated_document_producers():
+        sh(command)
+    dirty = sh(["git", "status", "--porcelain"]).stdout.splitlines()
+    changed = sorted(
+        row[3:].strip().strip('"') for row in dirty if row[:2] in (" M", "M ", "MM")
+    )
+    if not changed:
+        return []
+    sh(["git", "add", *changed])
+    message = (
+        f"regenerate generated documents invalidated by {uid}"
+        + chr(10) * 2
+        + "Produced by the driver, not by the unit. A unit that edits a source file cannot be"
+        + chr(10)
+        + "expected to know which committed artefact records a hash of it; leaving that to the"
+        + chr(10)
+        + "unit stopped this pipeline for ten hours on 30 August 2026."
+    )
+    result = sh(["git", "commit", "--signoff", "-m", message])
+    if result.returncode != 0:
+        print(f"driver: regeneration commit FAILED for {uid}; the gate will see the drift")
+        return []
+    print(f"driver: regenerated {len(changed)} document(s) after {uid}: {' '.join(changed)}")
+    return changed
+
+
 def gate_merged_tree(touched: list[str], baseline: str) -> str | None:
     """Run the existing merge gate on the files this cherry-pick touched.
 
@@ -2634,6 +2734,21 @@ def merge_unit_worktree(uid: str) -> str:
         applied += 1
         post_pick_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
     if applied:
+        # BEFORE the gate, because the merge is what invalidated them. Regenerating afterwards
+        # would be repairing a tree the gate has already refused.
+        if regenerate_generated_documents(uid):
+            # That commit is THIS merge's own work, so advance the mark the rollback below
+            # compares HEAD against. The bystander guard exists to protect a commit the merge
+            # did not make; counting the driver's own regeneration as a bystander made it
+            # refuse EVERY rollback that followed a regeneration.
+            #
+            # MEASURED 30 August 2026, within an hour of the regeneration being added. S02's
+            # gate failed, the rollback was refused as "another writer's commit", and the
+            # unit's work stayed applied: promote.py returned to a 604-line monolith with its
+            # four sibling modules orphaned, the suite lost 5 modules to collection errors, and
+            # the loop escalated both S02 and Z01 on the churn that followed. The regeneration
+            # exists only to serve these cherry-picks, so discarding it with them is right.
+            post_pick_sha = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
         gate_fail = gate_merged_tree(sorted(touched), pre_sha)
         if gate_fail:
             # `reset --hard pre_sha` discards EVERYTHING committed since pre_sha was read, not
@@ -2657,11 +2772,24 @@ def merge_unit_worktree(uid: str) -> str:
             head_now = sh(["git", "rev-parse", "HEAD"]).stdout.strip()
             if head_now and head_now != post_pick_sha:
                 return (
-                    f"CONFLICT gate failed for {uid} after cherry-pick, and HEAD moved to "
+                    f"CONFLICT gate failed for {uid} after cherry-pick ({applied} applied), "
+                    "and HEAD moved to "
                     f"{head_now[:9]} while the gate ran -- refusing to roll back over "
                     "another writer's commit; needs resolution\n" + gate_fail
                 )
             sh(["git", "reset", "--hard", pre_sha])
+            # Verify the rollback by its artefact, not git's exit code. A refused reset leaves
+            # the unit's commits landed; hiding their count would also hide the red-tree merge
+            # ADR-0107 requires the later suite observation to record.
+            rolled_back_to = sh(  # type: ignore[no-untyped-call]
+                ["git", "rev-parse", "HEAD"]
+            ).stdout.strip()
+            if rolled_back_to != pre_sha:
+                return (
+                    f"CONFLICT gate failed for {uid}; rollback left HEAD at "
+                    f"{rolled_back_to[:9]} ({applied} applied); needs resolution\n"
+                    + gate_fail
+                )
             return (
                 f"CONFLICT gate failed for {uid} after cherry-pick; needs resolution\n"
                 + gate_fail
@@ -3638,8 +3766,14 @@ def main() -> int:
         if uid not in done and uid not in force_done and (WORKTREES / uid).exists()
     ]
     rebase_mergeable_worktrees(mergeable, state, _now_m, _dispatchers_alive)
+    merged_into_pending_suite: list[tuple[str, int]] = []
     for uid in mergeable:
         msg = merge_unit_worktree(uid)
+        applied_match = re.match(r"applied (\d+)\b", msg) or re.search(
+            r"\((\d+) applied\)", msg
+        )
+        if applied_match and int(applied_match.group(1)):
+            merged_into_pending_suite.append((uid, int(applied_match.group(1))))
         if msg not in ("no commits", "no worktree"):
             print(f"driver: {msg}")
         if msg.startswith("CONFLICT"):
@@ -3673,6 +3807,26 @@ def main() -> int:
                 conflicts.pop(uid, None)
                 print(
                     f"driver: {uid} built (plan commit present, suite green) — awaiting review"
+                )
+
+    # ADR-0107 deliberately keeps local merging live on a red tree: a strict gate can block the
+    # repair that would make the suite green. Publication is the irreversible boundary and stays
+    # gated by this same `suite_green` result. The cost is weaker attribution, so every merge in
+    # the batch is paired with the exact post-merge failure count observed this tick. One shared
+    # batch observation avoids stale prior-tick evidence and a full-suite run per unit.
+    if merged_into_pending_suite:
+        if green is None:
+            green = suite_green()
+        if not green and _LAST_SUITE_RED is not None:
+            observed_failures, summary = _LAST_SUITE_RED
+            for uid, applied_count in merged_into_pending_suite:
+                append_merge_into_red(
+                    {
+                        "unit": uid,
+                        "applied": applied_count,
+                        "failing_count": observed_failures,
+                        "summary": summary,
+                    }
                 )
     state["done"] = sorted(done)
 
