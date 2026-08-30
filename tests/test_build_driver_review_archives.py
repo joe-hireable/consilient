@@ -28,9 +28,12 @@ directly and never the dispatch site. Positive controls on the same command show
 suite is not blind in general; it was blind exactly there."""
 
 import ast
+import sys
+import subprocess
 from pathlib import Path
 from build_driver_helpers import (
     DRIVER,
+    ROOT,
     _load_driver,
 )
 
@@ -151,3 +154,35 @@ def test_the_review_dispatch_archives_before_it_truncates() -> None:
             f"the verify dispatch at line {spawn_at} is not preceded by "
             "preserve_review_artefacts; attempt 1 will be truncated"
         )
+
+
+def test_the_driver_self_test_is_actually_run() -> None:
+    """`build_driver.py --self-test` must pass, and something must invoke it. This is that thing.
+
+    MEASURED 30 August 2026. Every other `--self-test` in this repository has an invoker --
+    check_adr_trail, check_merge_acceptance, check_source_depth, check_foreign_identifiers and
+    split_module are each run by a test. build_driver's had none: no test, no CI step, nothing.
+
+    So it rotted silently. `_self_test` asserted that preserve_review_artefacts REMOVES the live
+    file, which was true until 28 August when the helper moved to shutil.copy2 because a rename
+    fails with WinError 32 while another handle holds the file. From that day the driver's own
+    self-test exited 1 on every invocation nobody made, for two days, while the pytest suite
+    beside it stayed green -- the suite tested the helper, and only the self-test tested the
+    self-test.
+
+    Unit AI's review found it, was refused three times, and was right each time. A self-test that
+    nothing runs is not a check; it is a comment that happens to be executable, and working
+    principle 3 says a chokepoint without an enforcement rule is no chokepoint. This is the rule.
+    """
+    result = subprocess.run(
+        [sys.executable, str(DRIVER), "--self-test"],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert result.returncode == 0, (
+        "build_driver.py --self-test failed:\n" + (result.stdout + result.stderr)[-1500:]
+    )

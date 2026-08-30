@@ -360,8 +360,10 @@ def preserve_review_artefacts(uid: str, attempt: int) -> None:
     docs/10-research/failure-classes-and-resilience-2026-08-24.md, 24 August 2026]
 
     The live names stay `{uid}-verify.out` and `{uid}-verdict.json` so the reviewer
-    contract and the identity-bound consumer do not move; history is renamed aside
-    before the next attempt truncates them.
+    contract and the identity-bound consumer do not move; history is COPIED aside
+    before the next attempt truncates them. It said "renamed" until 30 August 2026,
+    describing behaviour the code abandoned two days earlier -- see the measurement
+    below, where rename fails with WinError 32 while a copy succeeds.
     """
     previous = attempt - 1
     if previous < 1:
@@ -4247,7 +4249,16 @@ def _self_test() -> None:
         globals()["BRIEFS"] = briefs
         try:
             preserve_review_artefacts("U01", 2)
-            assert not (briefs / "U01-verify.out").exists()
+            # The live file SURVIVES. This asserted `not ... exists()` -- rename semantics --
+            # and had been failing since the helper moved to copy2 on 28 August 2026 for
+            # WinError 32. Nothing noticed, because nothing runs this self-test: unlike every
+            # other --self-test in the repo, build_driver's is invoked by no test and no CI
+            # step. Unit AI's review found it, was refused three times, and was right.
+            #
+            # Leaving the original in place is the documented behaviour: the next dispatch
+            # truncates it, and if that dispatch never starts the live file still holds
+            # attempt 1.
+            assert (briefs / "U01-verify.out").exists()
             assert (briefs / "U01-verify-1.out").read_text(encoding="utf-8") == (
                 "attempt-1-out"
             )
