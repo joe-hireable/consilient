@@ -113,3 +113,40 @@ def test_a_regeneration_commit_does_not_block_the_rollback() -> None:
         "treats it as another writer and refuses to roll back a failed merge -- which is "
         "how a red tree was published-blocked and two units escalated on 30 August 2026"
     )
+
+def test_the_regeneration_commit_names_its_committer() -> None:
+    """The pre-commit hook refuses an unnamed committer while dispatch claims are live.
+
+    MEASURED 30 August 2026: "driver: regeneration commit FAILED for Z07". The hook's words
+    are "a commit must name its committer: CONSILIENT_RUN_ID=<run id> git commit". This call
+    passed no environment, so it succeeded only while no claim happened to be held -- which is
+    why it worked twice before failing, and why the failure looked intermittent.
+    """
+    source = Path(DRIVER.__file__ or "").read_text(encoding="utf-8")
+    body = source.partition("def regenerate_generated_documents")[2].partition("\ndef ")[0]
+    # The QUOTED dict key, not the bare name: the comment above the call explains the hook
+    # using the words "CONSILIENT_RUN_ID=<run id>", so a bare-substring check stays green when
+    # the env= argument is deleted. Measured while proving this very check could fail.
+    assert '"CONSILIENT_RUN_ID"' in body and "env=" in body, (
+        "the regeneration commit no longer names its committer, so the pre-commit hook will "
+        "refuse it whenever a dispatch claim is live in the worktree"
+    )
+
+
+def test_a_refused_regeneration_commit_leaves_no_staged_files() -> None:
+    """A dirty index breaks `git merge -s ours`, which is how publication records ancestry.
+
+    MEASURED 30 August 2026, in the SAME tick as the Z07 failure above. The refused commit left
+    docs/diagrams/module-dependency.mmd staged; `git merge -s ours` then refused; the published
+    squash 16a3b8e3b was never recorded as an ancestor, and the driver reported "the next tick
+    will over-count; merge it by hand". One unnamed commit broke publication bookkeeping two
+    functions away, so the cleanup matters as much as the naming.
+    """
+    source = Path(DRIVER.__file__ or "").read_text(encoding="utf-8")
+    body = source.partition("def regenerate_generated_documents")[2].partition("\ndef ")[0]
+    failure = body.partition("if result.returncode != 0:")[2]
+    assert failure, "the regeneration failure branch has moved; re-read this test"
+    assert "reset" in failure, (
+        "a refused regeneration commit no longer unstages what it staged, so the dirty index "
+        "will make the -s ours ancestry merge refuse and publication will over-count"
+    )

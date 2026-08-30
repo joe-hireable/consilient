@@ -1106,7 +1106,25 @@ def _load_verdict_file(
         and inner.get("unit") == uid
         and inner.get("artefact") == artefact
         and isinstance(inner.get("attempt"), int)
-        and artefact_identity(unit) == artefact
+        # The unit's OWN work still standing is enough; the tree need not be frozen.
+        #
+        # Re-deriving identity from HEAD made a valid verdict die whenever ANY commit touched
+        # a file this unit merely claims, during the ~20 minute review window. MEASURED 30
+        # August 2026: 5 of 24 consumptions were receipt_mismatched, and Z02's discarded
+        # receipt is still on disk reading {"verdict":"SOUND","findings":[]} -- a unit that
+        # would have entered `done` and did not. AI and BJ were killed by two commits to
+        # `.harness/build_driver.py`, a file 11 of the 147 units claim.
+        #
+        # `retired_units` already made exactly this call, and its comment states the reason:
+        # "Someone else's unrelated edit to a shared file does not move that. Deleting or
+        # rewriting THIS unit's lines does." The receipt path was left behind. This is not a
+        # relaxation: the receipt must still name this unit and match the artefact it was
+        # handed, and `deliverable_present` refuses a deliverable under twenty lines rather
+        # than waving a weak signal through.
+        and (
+            artefact_identity(unit) == artefact
+            or deliverable_present(expected.get("deliverable"))
+        )
     )
     schema_ok = (
         isinstance(inner, dict)
@@ -1569,13 +1587,18 @@ def run_dir_progress(uid: str, started: float) -> float:
                 continue
         except OSError:
             continue
-        for name in ("stdout.txt", "stderr.txt"):
-            try:
-                f = d / name
-                if f.exists():
+        # THE WHOLE RUN DIRECTORY, not two filenames. MEASURED 30 August 2026: grok --
+        # 78 of that day's 205 dispatches, the largest arm -- leaves stdout.txt and stderr.txt
+        # at 0 bytes for a run's entire life while writing hundreds of megabytes into
+        # `<run>/grok-home/`. Five live grok runs were sitting at 0/0 bytes at 36 minutes, so
+        # the 1800 s silence rule declared healthy work dead and reclaimed its slot. 803 of
+        # 1355 all-time reclamations carry the `(silent)` marker.
+        try:
+            for f in d.rglob("*"):
+                if f.is_file():
                     newest = max(newest, f.stat().st_mtime)
-            except OSError:
-                pass
+        except OSError:
+            pass
     return newest
 
 
@@ -2138,8 +2161,23 @@ def regenerate_generated_documents(uid: str) -> list[str]:
         + chr(10)
         + "unit stopped this pipeline for ten hours on 30 August 2026."
     )
-    result = sh(["git", "commit", "--signoff", "-m", message])
+    # NAME THE COMMITTER. The pre-commit hook refuses an unnamed committer whenever dispatch
+    # claims are live in this worktree -- "a commit must name its committer:
+    # CONSILIENT_RUN_ID=<run id>". This call had none, so it succeeded only in the quiet
+    # moments when no claim happened to be held, which is why it worked twice before failing.
+    # MEASURED 30 August 2026: "regeneration commit FAILED for Z07".
+    result = sh(
+        ["git", "commit", "--signoff", "-m", message],
+        env={**os.environ, "CONSILIENT_RUN_ID": f"driver-regen-{uid}"},
+    )
     if result.returncode != 0:
+        # UNSTAGE. The working tree keeps the regenerated content on purpose -- the gate should
+        # see the drift and fail loudly -- but a refused commit must not leave the INDEX dirty.
+        # In the same tick as the Z07 failure above, the staged file made `git merge -s ours`
+        # refuse, so the published squash 16a3b8e3b was never recorded as an ancestor and every
+        # later tick would have recomputed `ahead` against a public/main this branch did not
+        # contain. One unnamed commit thus broke publication bookkeeping two functions away.
+        sh(["git", "reset", "-q", "HEAD", "--", *changed])
         print(f"driver: regeneration commit FAILED for {uid}; the gate will see the drift")
         return []
     print(f"driver: regenerated {len(changed)} document(s) after {uid}: {' '.join(changed)}")
@@ -2260,9 +2298,50 @@ def reclaim_expired_slots(state: dict) -> list[str]:
         if newest and now - newest > PROGRESS_SILENCE_S:
             stale = True
 
-        if expired or stale:
+        # COMPLETION, read from the artefact the dispatcher already writes and this driver
+        # has never read. `<uid>.out` is truncated at dispatch (see spawn_logged) and written
+        # once at exit with a `status:` line, so a non-empty one stamped after this slot began
+        # IS the run ending.
+        #
+        # MEASURED 30 August 2026. A slot was released only by the 1800 s silence timer or the
+        # 3600 s leash, never by the run finishing, so the median slot was held 3412 s for work
+        # whose median runtime was about 1400 s. In one batch eight units finished between
+        # 15:18 and 15:48 and were not reclaimed until 16:06 -- 20,502 dead slot-seconds --
+        # while the same ticks printed "build lane at ceiling ... shedding" with 34 units
+        # ready. Roughly 29% of build-slot-hours over 13:30-16:30 were held by runs that had
+        # already finished or died.
+        #
+        # The `status:` prefix is required rather than merely non-empty content: of 133
+        # build-lane files, five carried ANSI-coloured pytest output or a harness banner
+        # instead of an envelope, and treating those as completion would free a live slot.
+        finished = False
+        status = ""
+        try:
+            out = BRIEFS / (uid + ".out")
+            if out.exists() and out.stat().st_size and out.stat().st_mtime >= started:
+                status = out.read_text(encoding="utf-8", errors="replace")[:200]
+                finished = status.startswith("status:")
+        except OSError:
+            pass
+
+        if finished or expired or stale:
             inflight.pop(uid, None)
             release_dead_claims({uid})
+            if finished and not expired and not stale:
+                # A run that ENDED is not a repair event. It must not count toward restart
+                # intensity -- otherwise every ordinary completion would push the driver
+                # toward the global "*" quarantine -- and it must not be refunded an attempt
+                # it legitimately spent, or the retry cap could never be reached.
+                #
+                # `status: refused` is the exception. That is a claim collision, which F-05
+                # calls infrastructure rather than evidence about the work, and the existing
+                # refusal path at `_err_shows_refusal` already treats it that way.
+                if "status: refused" in status:
+                    attempts = state.setdefault("attempts", {})
+                    attempts[uid] = max(0, attempts.get(uid, 1) - 1)
+                label = status.split(chr(10))[0].removeprefix("status:").strip() or "done"
+                freed.append(uid + " (" + label + ")")
+                continue
             # One restart for the whole batch when the driver was away; one per unit
             # otherwise. See the absence note at the top of this function.
             count_this = not (absent_tick and batch_counted)
