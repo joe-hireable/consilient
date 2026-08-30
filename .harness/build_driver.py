@@ -116,17 +116,34 @@ ARMS: list[tuple[str, str | None, int]] = [
     # replaced. A weighting whose evidence no longer exists is a guess with a history, so the
     # split is even until there is something to measure. Codex is the only pool exposing a
     # verified counter (2.0% used, resets 3 September); cursor and grok report `unknown`.
+    # GROK WITHDRAWN, 30 August 2026, by the principal, because the account cannot pay for
+    # a request. MEASURED: a live dispatch through the real path returns
+    #   API error (status 402 Payment Required): Grok Build usage balance exhausted
+    # so every selection of this arm spent a slot to buy an HTTP 402. It was the LARGEST arm
+    # by volume -- 78 of that day's 205 dispatches -- so the waste was proportionate, and the
+    # `status: failed` outcomes it produced were being read as units failing at their work.
+    #
+    # WITHDRAWN, NOT DELETED. The four entries are commented rather than removed so restoring
+    # is one edit once the balance is funded, and so the reason travels with the change. grok
+    # stays in FAMILY below: that map is a lookup used to judge cross-family review, and a unit
+    # already reviewed by grok must keep resolving to "xai" or its recorded verdicts lose their
+    # provenance.
+    #
+    # THE COST, STATED RATHER THAN DISCOVERED LATER. Reviewer selection is
+    # `[a for a in ARMS if FAMILY.get(a[0]) != FAMILY.get(builder)]`, so this drops the pool
+    # from three families to two: a codex build can now only be reviewed by cursor, and a
+    # cursor build only by codex. Cross-family review survives, which is what CONSILIENCE.md
+    # requires, but the diversity behind it is thinner -- with two families every review is the
+    # only available second opinion rather than one of two. Restore grok before drawing any
+    # conclusion that leans on independent agreement between reviewers.
+    #     ("grok", None, 3600),   x4, one per rotation block below
     ("codex", None, 3600),
-    ("grok", None, 3600),
     ("cursor-composer", "composer-2.5", 3600),
     ("codex", None, 3600),
-    ("grok", None, 3600),
     ("cursor-composer", "composer-2.5-fast", 3600),
     ("codex", None, 3600),
-    ("grok", None, 3600),
     ("cursor-composer", "composer-2.5", 3600),
     ("codex", None, 3600),
-    ("grok", None, 3600),
     ("cursor-composer", "composer-2.5-fast", 3600),
 ]
 
@@ -1944,11 +1961,38 @@ def retest_conflicts(state: dict) -> int:
             landed = _cherry_and_diff_match(worktree_head, touched)
         if landed:
             conflicts.pop(uid, None)
+            if uid in state.setdefault("resolve_dispatched", []):
+                state["resolve_dispatched"].remove(uid)
+            # CONTENT IN HEAD MEANS IT MERGED, NOT THAT A REVIEW ACCEPTED IT.
+            #
+            # A DEFECTIVE verdict removes a unit from `built` and records the artefact it
+            # rejected. This path then found the unit's lines present in HEAD -- which they
+            # are, because the work merged before it was judged -- and put it straight back
+            # into `built`, with no check against that rejection. `built` is what makes a unit
+            # a REVIEW candidate, so the identical artefact was queued for review again, and
+            # again returned DEFECTIVE.
+            #
+            # MEASURED 30 August 2026. W01 took 7 verdicts over 2 distinct artefacts, the last
+            # SIX all on f0083e6ec527; BJ 5 over 2; W07 10 over 4. Every repeat spent a review
+            # -- a full clone of a ~136 MB workspace -- to re-derive a verdict already on file,
+            # and each drove the unit into a "reached 3 attempts" escalation that no repair
+            # could ever clear: a unit sitting in `built` is not a build candidate, so the
+            # repair brief written for it (W01.md:43, "## Repair required") was never
+            # dispatched. The three units held repair findings and could not act on them.
+            #
+            # Re-entry is left to the registration path, which guards on
+            # `rejected.get(uid) != artefact` and so admits the unit the moment it carries
+            # genuinely new work. Nothing is waived: the findings stand and the unit returns
+            # to the build lane to answer them.
+            if uid in state.setdefault("rejected_artefacts", {}):
+                print(
+                    f"driver: {uid} landed but a review rejected this artefact -- "
+                    "leaving the review queue so its repair can be built"
+                )
+                continue
             built = state.setdefault("built", [])
             if uid not in built:
                 built.append(uid)
-            if uid in state.setdefault("resolve_dispatched", []):
-                state["resolve_dispatched"].remove(uid)
             print(
                 f"driver: {uid} already landed -- its added lines are present in HEAD; retiring"
             )
