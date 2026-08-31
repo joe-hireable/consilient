@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
+import os
 import re
 import sys
 from collections.abc import Callable
@@ -20,7 +21,7 @@ from typing import Any, cast
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from consilient.coordination import canonical_path, paths_overlap  # noqa: E402
+from consilient.coordination import paths_overlap  # noqa: E402
 
 
 def _private_corpus_module() -> Any:
@@ -39,6 +40,46 @@ content_digest = cast(
 )
 
 
+def _local_path(path: str, *, cwd: str | None = None) -> Path:
+    """Return the local spelling of a path without losing case before resolution."""
+    text = path.strip().replace("\\", "/")
+    if not (len(text) >= 2 and text[1] == ":") and not text.startswith("/"):
+        base = cwd if cwd is not None else str(Path.cwd())
+        text = str(base).replace("\\", "/").rstrip("/") + "/" + text
+    if os.name == "nt" and text.startswith("/mnt/") and len(text) > 6 and text[6] == "/":
+        text = f"{text[5]}:{text[6:]}"
+    elif os.name != "nt" and len(text) >= 3 and text[1:3] == ":/":
+        text = f"/mnt/{text[0].lower()}{text[2:]}"
+    return Path(text)
+
+
+def _comparison_path(path: Path) -> str:
+    """Preserve native POSIX case while folding Windows and WSL drive paths."""
+    text = os.path.normpath(str(path)).replace("\\", "/")
+    if os.name == "nt" or re.match(r"^/mnt/[A-Za-z](?:/|$)", text):
+        return text.casefold()
+    return text
+
+
+def _paths_reachable(
+    first: str,
+    second: str,
+    *,
+    first_cwd: str | None = None,
+    second_cwd: str | None = None,
+) -> bool:
+    """Return lexical or resolved containment, refusing if resolution raises."""
+    first_path = _local_path(first, cwd=first_cwd)
+    second_path = _local_path(second, cwd=second_cwd)
+    first_lexical = _comparison_path(first_path)
+    second_lexical = _comparison_path(second_path)
+    if paths_overlap(first_lexical, second_lexical):
+        return True
+    resolved_first = _comparison_path(first_path.resolve())
+    resolved_second = _comparison_path(second_path.resolve())
+    return paths_overlap(resolved_first, resolved_second)
+
+
 def refusal_reason(
     contract: str,
     *,
@@ -49,24 +90,30 @@ def refusal_reason(
     """Return a boundary reason without printing private context."""
     if not contract.strip():
         return "held-out contract input is invalid; refusing before child launch"
-    contract_path = canonical_path(contract)
-    if worktree and paths_overlap(contract_path, canonical_path(worktree)):
-        return "held-out contract is reachable from the worktree; refusing before child launch"
+    try:
+        if worktree and _paths_reachable(contract, worktree):
+            return "held-out contract is reachable from the worktree; refusing before child launch"
+        for claim in claims:
+            if claim.strip() and _paths_reachable(
+                contract, claim, second_cwd=worktree
+            ):
+                return "held-out contract is covered by a claim; refusing before child launch"
+        if _local_path(contract).stat().st_nlink != 1:
+            return "held-out contract filesystem aliases cannot be isolated; refusing before child launch"
+    except (OSError, RuntimeError, ValueError):
+        return "held-out contract input is invalid; refusing before child launch"
     brief_folded = brief.casefold()
     if contract.casefold() in brief_folded or Path(contract).name.casefold() in brief_folded:
         return "held-out contract is named in the brief; refusing before child launch"
     try:
         quoted = Path(contract).read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, ValueError):
         return "held-out contract input is invalid; refusing before child launch"
     if any(
         line.strip() and line.strip().casefold() in brief_folded
         for line in quoted.splitlines()
     ):
         return "held-out contract is quoted in the brief; refusing before child launch"
-    for claim in claims:
-        if claim.strip() and paths_overlap(contract_path, canonical_path(claim, cwd=Path(worktree))):
-            return "held-out contract is covered by a claim; refusing before child launch"
     return None
 
 

@@ -3,11 +3,21 @@
 The row must carry every field named in
 docs/20-design/measurement-and-efficiency-2026-08-23.md BU5. A harness dispatch that
 completes without a request.record in the trajectory is a silent regression.
+
+The checks that keep this unit honest:
+
+- Two flushed writes 1.2s apart must be two chunks, with first-nonempty delay
+  near the first flush — not one buffered read timestamped at EOF.
+- Missing provider usage stays None. Zero is only recorded when the provider
+  reported zero. Cursor ``--output-format text`` destroys the JSON envelope
+  (docs/20-design/quota-pools-and-routes-2026-08-21.md); production must not
+  request text, and a text transcript must not invent tokens.
+- dispatch_one records timing from a live child through run_harness, not from a
+  hand-built RequestTiming stub. A metered provider call is refused by the
+  brief; a local unbuffered child on the production path is the substitute.
 """
 
 from __future__ import annotations
-
-from family_source import seam
 
 import importlib.util
 import json
@@ -16,6 +26,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
+from family_source import seam
 
 from consilient.events import read, read_all, validate
 from consilient.harness import (
@@ -32,9 +44,23 @@ from consilient.harness import (
 
 ROOT = Path(__file__).resolve().parent.parent
 DISPATCH_PATH = ROOT / "scripts" / "dispatch.py"
+CURSOR = next(item for item in HARNESSES if item.id == "cursor-composer")
 
 INSTALLED = tuple(
     Probe(item.id, True, "1.0", f"{item.binary} (fixture)") for item in HARNESSES
+)
+
+TWO_FLUSH_CHILD = (
+    "import json, sys, time\n"
+    "sys.stdout.write('first\\n')\n"
+    "sys.stdout.flush()\n"
+    "time.sleep(0.6)\n"
+    "sys.stdout.write('second\\n')\n"
+    "sys.stdout.flush()\n"
+    "sys.stdout.write(json.dumps("
+    "{'usage': {'output_tokens': 7, 'cache': {'read': 2}}}"
+    ") + '\\n')\n"
+    "sys.stdout.flush()\n"
 )
 
 
@@ -58,7 +84,7 @@ def _iso(offset_s: float = 0.0) -> str:
 
 
 def _complete_timing(**over: object) -> RequestTiming:
-    base = {
+    base: dict[str, object] = {
         "t_send": _iso(),
         "t_first_chunk": _iso(0.01),
         "t_first_nonempty_chunk": _iso(0.02),
@@ -69,6 +95,12 @@ def _complete_timing(**over: object) -> RequestTiming:
     }
     base.update(over)
     return RequestTiming(**base)  # type: ignore[arg-type]
+
+
+def _delay_s(start: str, later: str) -> float:
+    return (
+        datetime.fromisoformat(later) - datetime.fromisoformat(start)
+    ).total_seconds()
 
 
 def test_request_record_schema_lists_every_bu5_field() -> None:
@@ -103,6 +135,19 @@ def test_validate_request_record_requires_every_field() -> None:
             **{k: v for k, v in timing.as_data().items() if k != "n_chunks"},
         }
         validate_request_record(data)
+
+
+def test_validate_request_record_allows_unknown_usage() -> None:
+    timing = _complete_timing(output_tokens=None, cache_read_input_tokens=None)
+    row = validate_request_record(
+        {
+            "run_id": "20260823T200000-abc",
+            "harness": "cursor-composer",
+            **timing.as_data(),
+        }
+    )
+    assert row["output_tokens"] is None
+    assert row["cache_read_input_tokens"] is None
 
 
 def test_record_request_appends_a_valid_event(tmp_path: Path) -> None:
@@ -152,6 +197,47 @@ def test_extract_usage_from_cursor_result_event() -> None:
     assert usage == {"output_tokens": 9, "cache_read_input_tokens": 3}
 
 
+def test_extract_usage_from_cursor_exp05_field_names() -> None:
+    # EXP-05 adapter_cursor.py observed cacheReadTokens, not cacheReadInputTokens.
+    stdout = json.dumps(
+        {
+            "type": "result",
+            "usage": {"outputTokens": 11, "cacheReadTokens": 5},
+        }
+    )
+    usage = extract_usage_from_output(stdout, "cursor-composer")
+    assert usage == {"output_tokens": 11, "cache_read_input_tokens": 5}
+
+
+def test_extract_usage_from_pretty_printed_cursor_json() -> None:
+    stdout = (
+        "{\n"
+        '  "type": "result",\n'
+        '  "usage": {"outputTokens": 4, "cacheReadTokens": 1}\n'
+        "}\n"
+    )
+    usage = extract_usage_from_output(stdout, "cursor-composer")
+    assert usage == {"output_tokens": 4, "cache_read_input_tokens": 1}
+
+
+def test_missing_usage_is_not_fabricated_as_zero() -> None:
+    # quota-pools-and-routes-2026-08-21.md: text destroys the JSON envelope.
+    usage = extract_usage_from_output(
+        "I'll edit the file.\nDone.\n", "cursor-composer"
+    )
+    assert usage["output_tokens"] is None
+    assert usage["cache_read_input_tokens"] is None
+    empty = extract_usage_from_output("", "grok")
+    assert empty["output_tokens"] is None
+    assert empty["cache_read_input_tokens"] is None
+
+
+def test_provider_reported_zero_is_measured_zero() -> None:
+    stdout = json.dumps({"usage": {"output_tokens": 0, "cache": {"read": 0}}})
+    usage = extract_usage_from_output(stdout, "grok")
+    assert usage == {"output_tokens": 0, "cache_read_input_tokens": 0}
+
+
 def test_run_process_returns_stream_timing(tmp_path: Path) -> None:
     script = _load_script()
     stdout_path = tmp_path / "stdout.txt"
@@ -159,8 +245,9 @@ def test_run_process_returns_stream_timing(tmp_path: Path) -> None:
     code, timed_out, _duration, timing = script.run_process(
         [
             sys.executable,
+            "-u",
             "-c",
-            "import sys, time; time.sleep(0.05); print('chunk'); sys.stdout.flush()",
+            "import sys; print('chunk'); sys.stdout.flush()",
         ],
         cwd=tmp_path,
         stdout_path=stdout_path,
@@ -177,7 +264,72 @@ def test_run_process_returns_stream_timing(tmp_path: Path) -> None:
     assert timing.t_first_nonempty_chunk >= timing.t_first_chunk >= timing.t_send
 
 
-def test_dispatch_once_emits_request_record_in_production_path(
+def test_run_process_observes_separate_flushed_chunks(tmp_path: Path) -> None:
+    script = _load_script()
+    stdout_path = tmp_path / "stdout.txt"
+    stderr_path = tmp_path / "stderr.txt"
+    _code, timed_out, duration, timing = script.run_process(
+        [sys.executable, "-u", "-c", TWO_FLUSH_CHILD],
+        cwd=tmp_path,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        timeout_s=20,
+    )
+    assert timed_out is False
+    assert timing is not None
+    assert timing.n_chunks >= 2
+    delay = _delay_s(timing.t_send, timing.t_first_nonempty_chunk)
+    assert delay < 0.3, (
+        f"first nonempty delay {delay:.3f}s looks like EOF, not the first flush"
+    )
+    assert duration >= 0.5
+    text = stdout_path.read_text(encoding="utf-8")
+    assert "first" in text and "second" in text
+
+
+def test_cursor_command_requests_json_not_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script = _load_script()
+    monkeypatch.setattr(seam("dispatch_launch"), "cursor_native", lambda: "cursor-agent")
+    monkeypatch.setattr(seam("dispatch_launch"), "help_text", lambda _argv: "  --force\n  --trust\n")
+    argv = script.build_command(
+        CURSOR,
+        task="pong",
+        cwd=tmp_path,
+        brief=tmp_path / "brief.md",
+        model="composer-2.5",
+        permissions="bypass",
+    )
+    assert isinstance(argv, list)
+    assert "--output-format" in argv
+    fmt = argv[argv.index("--output-format") + 1]
+    assert fmt == "json"
+    assert "text" not in argv
+
+
+def test_cursor_wsl_command_requests_json_not_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script = _load_script()
+    monkeypatch.setattr(seam("dispatch_launch"), "cursor_native", lambda: None)
+    monkeypatch.setattr(seam("dispatch_launch"), "wsl_bridge", lambda: "wsl")
+    monkeypatch.setattr(seam("dispatch_launch"), "help_text", lambda _argv: "  --force\n  --trust\n")
+    argv = script.build_command(
+        CURSOR,
+        task="pong",
+        cwd=tmp_path,
+        brief=tmp_path / "brief.md",
+        model="composer-2.5",
+        permissions="bypass",
+    )
+    assert isinstance(argv, list)
+    inner = argv[-1]
+    assert "--output-format json" in inner
+    assert "--output-format text" not in inner
+
+
+def test_dispatch_once_emits_request_record_from_live_child(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     script = _load_script()
@@ -187,29 +339,13 @@ def test_dispatch_once_emits_request_record_in_production_path(
     cwd.mkdir()
     monkeypatch.setattr(seam("dispatch_evidence"), "find_grok", lambda: "grok")
     monkeypatch.setattr(seam("dispatch_evidence"), "metered_grok_reason", lambda: None)
-    monkeypatch.setattr(seam("dispatch_launch"), "help_text", lambda _argv: "  --max-turns <N>\n")
     monkeypatch.setattr(
-        seam("dispatch_harness"),
-        "run_harness",
-        lambda *args, **kwargs: script.RunResult(
-            harness=HARNESSES[2],
-            status="ok",
-            reason="produced an artefact",
-            exit_code=0,
-            stdout='{"usage": {"output_tokens": 7, "cache": {"read": 2}}}',
-            stderr="",
-            artefact_bytes=40,
-            diff_bytes=0,
-            timed_out=False,
-            duration_s=0.5,
-            command=("grok",),
-            run_id=kwargs["run_id"],
-            stdout_path=str(runs_dir / kwargs["run_id"] / "stdout.txt"),
-            stderr_path=str(runs_dir / kwargs["run_id"] / "stderr.txt"),
-            request_timing=_complete_timing(
-                output_tokens=7, cache_read_input_tokens=2
-            ),
-        ),
+        seam("dispatch_launch"), "help_text", lambda _argv: "  --max-turns <N>\n"
+    )
+    monkeypatch.setattr(
+        seam("dispatch_invocation"),
+        "build_command",
+        lambda *_args, **_kwargs: [sys.executable, "-u", "-c", TWO_FLUSH_CHILD],
     )
     decision = script.select(
         probes=INSTALLED,
@@ -238,8 +374,11 @@ def test_dispatch_once_emits_request_record_in_production_path(
     record = next(event for event in events if event.kind == REQUEST_RECORD_KIND)
     for field in REQUEST_RECORD_FIELDS:
         assert field in record.data
+    assert record.data["n_chunks"] >= 2
     assert record.data["output_tokens"] == 7
     assert record.data["cache_read_input_tokens"] == 2
+    delay = _delay_s(str(record.data["t_send"]), str(record.data["t_first_nonempty_chunk"]))
+    assert delay < 0.3
     assert payload["status"] == "ok"
 
 
@@ -257,3 +396,20 @@ def test_request_record_survives_event_validation() -> None:
         },
     }
     validate(event)
+
+
+def test_unknown_usage_record_survives_event_validation() -> None:
+    timing = _complete_timing(output_tokens=None, cache_read_input_tokens=None)
+    event = {
+        "v": 1,
+        "ts": _iso(),
+        "event": REQUEST_RECORD_KIND,
+        "actor": "consilient.dispatch",
+        "data": {
+            "run_id": "20260823T200000-abc",
+            "harness": "cursor-composer",
+            **timing.as_data(),
+        },
+    }
+    validate(event)
+    assert event["data"]["output_tokens"] is None

@@ -632,7 +632,7 @@ def live_dispatchers(state: dict) -> int:
 # short of the loop's 3000 s tick abandonment, which is the outcome this exists to avoid.
 SUITE_TIMEOUT_S = 900
 _LAST_SUITE_SUMMARY: str | None = None
-_LAST_SUITE_RED: tuple[int, str] | None = None
+_LAST_SUITE_RED: tuple[int | None, str] | None = None
 
 
 def suite_baseline_line() -> str:
@@ -705,6 +705,10 @@ def suite_green() -> bool:
             f"driver: suite did not finish within {SUITE_TIMEOUT_S}s -- treating as NOT GREEN "
             "and continuing the tick rather than wedging it"
         )
+        _LAST_SUITE_RED = (
+            None,
+            f"unmeasured: suite did not finish within {SUITE_TIMEOUT_S}s",
+        )
         return False
     text = (r.stdout or "") + (r.stderr or "")
     summary = [
@@ -713,6 +717,7 @@ def suite_green() -> bool:
         if re.search(r"\b\d+ (passed|failed|error|errors|xfailed|skipped)\b", ln)
     ]
     if not summary:
+        _LAST_SUITE_RED = (None, "unmeasured: no parseable pytest summary")
         return False
     last = summary[-1]
     if re.search(r"\b\d+ (failed|error|errors)\b", last):
@@ -727,6 +732,8 @@ def suite_green() -> bool:
     green = bool(re.search(r"\b\d+ passed\b", last))
     if green:
         _LAST_SUITE_SUMMARY = last.strip()
+    else:
+        _LAST_SUITE_RED = (None, last.strip())
     return green
 
 
@@ -970,15 +977,49 @@ def deliverable_present(deliverable: dict[str, list[str]] | None) -> bool:
         return False
     absent = 0
     for file_path, wanted in deliverable.items():
-        head = sh(["git", "show", f"HEAD:{file_path}"])
-        blob = head.stdout if head.returncode == 0 else ""
+        # The FAMILY, not the single claimed path -- the identical fix `_content_landed` already
+        # carries, and for the identical reason. This function was written on the same day and
+        # did not get it. MEASURED 31 August 2026 against the live state: Z01's deliverable reads
+        # 3.73% present at its own paths and 89.44% across their families, because the 28 August
+        # refactor split `instructions.py` and left the claim naming a re-export facade. Two ways
+        # of asking "did this work land" that disagree about drift are worse than either, and this
+        # docstring already promised they were the same thing.
         present = {
-            hashlib.sha256(ln.rstrip().encode("utf-8")).hexdigest()[:16]
-            for ln in blob.splitlines()
+            hashlib.sha256(ln.encode("utf-8")).hexdigest()[:16]
+            for ln in _family_lines_at_head(file_path)
             if ln.strip()
         }
         absent += sum(1 for h in wanted if h not in present)
     return (total - absent) / total >= 0.99
+
+
+def _plan_commit(unit: dict[str, Any]) -> str | None:
+    """The one commit in HEAD's whole history that this unit's plan subject names, or None.
+
+    `committed()` asks a version of this question over `git log -200`, which is a WINDOW and not
+    a history. MEASURED 31 August 2026 at 1190 commits: all 26 units holding a stranded SOUND
+    verdict have their plan commit in the tree and NOT ONE is inside that window, so a retirement
+    check built on that window would always miss. `committed()` is deliberately left alone --
+    widening it flips 87 more units to "built" through the unguarded door in `main`, which is a
+    different change with a different blast radius.
+
+    NONE UNLESS THERE IS EXACTLY ONE MATCH, and that is the whole safety of this helper. A subject
+    is not identity -- `_content_landed`'s own docstring says so, 14 subjects recur here and one
+    recurs 24 times -- and `review_results` records no timestamp, so nothing in stored state can
+    say which of several same-subject commits the reviewer was handed. MEASURED 31 August 2026:
+    133 commits share W07's plan subject and 114 share X01's; K02's subject is a strict PREFIX of
+    AX's, so a prefix match on K02 also returns AX's commit. Retiring on a union of those would
+    certify attempts no reviewer read, or another unit's work entirely. Ambiguity refuses.
+    """
+    want = (unit.get("commit") or "").strip().lower()
+    if not want:
+        return None
+    found = [
+        line.split(" ", 1)[0]
+        for line in sh(["git", "log", "--format=%H %s"]).stdout.splitlines()
+        if " " in line and line.split(" ", 1)[1].strip().lower().startswith(want)
+    ]
+    return found[0] if len(found) == 1 else None
 
 
 def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> set[str]:
@@ -1013,6 +1054,29 @@ def retired_units(state: dict[str, Any], units: dict[str, dict[str, Any]]) -> se
         # tell from coincidence. Fall back to the old binding rather than retiring on nothing.
         artefact = artefact_identity(units[uid])
         if artefact is not None and result.get("artefact") == artefact:
+            retired.add(uid)
+            continue
+        # LAST: DID THE WORK ARRIVE, rather than DO THESE PATHS STILL HASH THE SAME.
+        #
+        # Both branches above ask about the unit's own diff and both need a record of it. When
+        # neither has one the unit is stranded with a SOUND verdict it can never spend. MEASURED
+        # 31 August 2026: 26 units are in that state, 18% of the plan, and NINE of them are also
+        # retry-capped at three attempts, so they can neither retire nor rebuild. 25 of the 26
+        # have no `deliverable` at all -- 14 earned their verdict before ADR-0109 existed and 11
+        # got an empty one because 92 of 138 unit worktrees no longer resolve `rev-parse HEAD`,
+        # which is where that fingerprint is captured. It cannot be captured for them now.
+        #
+        # So ask git instead of asking stored state, using the predicate this driver already
+        # trusts for the same question elsewhere (`retest_conflicts` clears an escalation on it).
+        # ADDITIVE, never a replacement: 11 of the 12 units done on 31 August retire through
+        # `artefact_identity` above and FIVE of those fail the rung below -- BJ on content, and
+        # A02, AQ, X06 and Z11 on the ambiguity guard -- so replacing that branch rather than
+        # appending to it would UN-RETIRE FIVE FINISHED UNITS. Retirement may only ever grow.
+        #
+        # ponytail: one `git log` per unit reaching here, ~45 ms, and only for units both cheaper
+        # branches already refused. Hoist it to one call per tick if the tick budget notices.
+        own = _plan_commit(units[uid])
+        if own is not None and _content_landed(own):
             retired.add(uid)
     return retired
 
@@ -1123,25 +1187,36 @@ def _load_verdict_file(
         and inner.get("unit") == uid
         and inner.get("artefact") == artefact
         and isinstance(inner.get("attempt"), int)
-        # The unit's OWN work still standing is enough; the tree need not be frozen.
+        # THE FROZEN TOKEN IS THE WHOLE BINDING. DO NOT RE-DERIVE IT FROM HEAD.
         #
-        # Re-deriving identity from HEAD made a valid verdict die whenever ANY commit touched
-        # a file this unit merely claims, during the ~20 minute review window. MEASURED 30
-        # August 2026: 5 of 24 consumptions were receipt_mismatched, and Z02's discarded
-        # receipt is still on disk reading {"verdict":"SOUND","findings":[]} -- a unit that
+        # `artefact` is `expected["artefact"]` -- the exact string written at review dispatch,
+        # naming the code this reviewer was handed. `inner.get("artefact") == artefact`, three
+        # lines above, answers the only question this function asks: does this receipt judge
+        # that code. Re-deriving the identity from HEAD asked a second and DIFFERENT question --
+        # has the tree moved since -- and answered it with a live value inside a historical
+        # check. Two questions, one predicate, and the live one kept winning.
+        #
+        # MEASURED 30 August 2026: 5 of 24 consumptions were receipt_mismatched, and Z02's
+        # discarded receipt still reads {"verdict":"SOUND","findings":[]} on disk -- a unit that
         # would have entered `done` and did not. AI and BJ were killed by two commits to
-        # `.harness/build_driver.py`, a file 11 of the 147 units claim.
+        # `.harness/build_driver.py`, a file 11 of the 147 units claim, made while their reviews
+        # were running. A review takes ~20 minutes, so any commit by anyone inside that window
+        # destroyed the verdict it overlapped.
         #
-        # `retired_units` already made exactly this call, and its comment states the reason:
-        # "Someone else's unrelated edit to a shared file does not move that. Deleting or
-        # rewriting THIS unit's lines does." The receipt path was left behind. This is not a
-        # relaxation: the receipt must still name this unit and match the artefact it was
-        # handed, and `deliverable_present` refuses a deliverable under twenty lines rather
-        # than waving a weak signal through.
-        and (
-            artefact_identity(unit) == artefact
-            or deliverable_present(expected.get("deliverable"))
-        )
+        # MEASURED 31 August 2026: 96 receipts sit in the briefs directory and 70 of them match
+        # the expectation they were dispatched under while HEAD has since moved -- 70 verdicts
+        # this clause refuses on a question it was never asked.
+        #
+        # It was not a stale-receipt guard either, which is the objection worth stating: a
+        # re-dispatch rewrites `expected["artefact"]` from the tree, so a receipt written before
+        # a move already fails the equality above and is still refused. Deleting this changes
+        # exactly one case -- the tree moved AFTER dispatch -- and that case is the bug.
+        #
+        # Whether a verdict still APPLIES to current HEAD is a different question with a
+        # different owner: `retired_units` asks it once, at retirement, and is unchanged.
+        #
+        # `unit` is now unused here. It stays in the signature: two call sites and two test
+        # files pass it, and churning them buys nothing.
     )
     schema_ok = (
         isinstance(inner, dict)
@@ -3964,11 +4039,18 @@ def main() -> int:
     # gated by this same `suite_green` result. The cost is weaker attribution, so every merge in
     # the batch is paired with the exact post-merge failure count observed this tick. One shared
     # batch observation avoids stale prior-tick evidence and a full-suite run per unit.
+    #
+    # The record is not optional (ADR-0107 evidence against): timeout and unparseable pytest output
+    # are still non-green suite states and must be logged with failing_count honestly null rather
+    # than dropped because `_LAST_SUITE_RED` was never set.
     if merged_into_pending_suite:
         if green is None:
             green = suite_green()
-        if not green and _LAST_SUITE_RED is not None:
-            observed_failures, summary = _LAST_SUITE_RED
+        if not green:
+            observed_failures, summary = _LAST_SUITE_RED or (
+                None,
+                "unmeasured: suite state not captured",
+            )
             for uid, applied_count in merged_into_pending_suite:
                 append_merge_into_red(
                     {

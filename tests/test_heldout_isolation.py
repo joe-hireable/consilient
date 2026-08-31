@@ -14,6 +14,7 @@ what is being refused is reachability, not the presence of the flag."""
 
 from family_source import seam
 
+import os
 from pathlib import Path
 import pytest
 from heldout_helpers import (
@@ -56,6 +57,173 @@ def test_heldout_contract_refuses_before_dispatch_preflight(
     assert "refusing before child launch" in output
     assert "worktree" in output.lower()
     assert "same-OS-user unsandboxed dispatch" not in output
+
+
+def test_external_contract_alias_that_resolves_inside_worktree_refuses(
+    tmp_path: Path,
+) -> None:
+    """A lexical path outside the worktree must not hide its target within it."""
+    checker = _load_checker()
+    worktree = tmp_path / "work"
+    contract = worktree / "heldout" / "secret-contract.md"
+    contract.parent.mkdir(parents=True)
+    contract.write_text(DISTINCTIVE_LINE, encoding="utf-8")
+    alias = tmp_path / "external-contract-alias"
+    try:
+        alias.symlink_to(contract)
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable in this Windows test environment: {exc}")
+
+    reason = checker.refusal_reason(
+        str(alias), brief="build", worktree=str(worktree), claims=()
+    )
+
+    assert reason is not None
+    assert "worktree" in reason.lower()
+
+
+@pytest.mark.parametrize("target_kind", ("contract", "containing directory"))
+def test_claim_alias_to_heldout_path_refuses(
+    tmp_path: Path, target_kind: str
+) -> None:
+    """A claim symlink must not hide the contract or its containing directory."""
+    checker = _load_checker()
+    worktree, contract = _isolated_pair(tmp_path)
+    target = contract if target_kind == "contract" else contract.parent
+    alias = worktree / "claimed-alias"
+    try:
+        alias.symlink_to(target, target_is_directory=target.is_dir())
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable in this Windows test environment: {exc}")
+
+    reason = checker.refusal_reason(
+        str(contract), brief="build", worktree=str(worktree), claims=(alias.name,)
+    )
+
+    assert reason is not None
+    assert "claim" in reason.lower()
+
+
+def test_hard_linked_contract_refuses(
+    tmp_path: Path,
+) -> None:
+    """An additional hard link makes the contract's location unsafe to establish."""
+    checker = _load_checker()
+    worktree, contract = _isolated_pair(tmp_path)
+    try:
+        os.link(contract, worktree / "contract-hard-link")
+    except OSError as exc:
+        pytest.skip(f"hard links unavailable in this test environment: {exc}")
+
+    reason = checker.refusal_reason(
+        str(contract), brief="build", worktree=str(worktree), claims=()
+    )
+
+    assert reason is not None
+    assert "refusing before child launch" in reason
+
+
+@pytest.mark.parametrize("with_worktree", (False, True))
+def test_embedded_nul_refuses_in_resolution_and_contract_validation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, with_worktree: bool
+) -> None:
+    """An embedded NUL is invalid whether resolution or contract reading sees it first."""
+    checker = _load_checker()
+    if with_worktree:
+        original_resolve = Path.resolve
+
+        def reject_nul(path: Path, strict: bool = False) -> Path:
+            if "\0" in str(path):
+                raise ValueError("embedded null character")
+            return original_resolve(path, strict=strict)
+
+        monkeypatch.setattr(Path, "resolve", reject_nul)
+
+    reason = checker.refusal_reason(
+        "\0",
+        brief="build",
+        worktree=str(tmp_path) if with_worktree else "",
+        claims=(),
+    )
+
+    assert reason is not None
+    assert "input is invalid" in reason
+
+
+@pytest.mark.skipif(os.name == "nt", reason="native Windows paths are case-insensitive")
+def test_distinct_case_native_posix_paths_do_not_overlap(tmp_path: Path) -> None:
+    """Native POSIX containment comparisons preserve case before checking overlap."""
+    checker = _load_checker()
+    worktree = tmp_path / "worktree"
+    contract = tmp_path / "Worktree" / "secret-contract.md"
+    worktree.mkdir()
+    contract.parent.mkdir()
+    contract.write_text(DISTINCTIVE_LINE, encoding="utf-8")
+
+    reason = checker.refusal_reason(
+        str(contract), brief="build", worktree=str(worktree), claims=()
+    )
+
+    assert reason is None
+
+
+@pytest.mark.parametrize("failure", (OSError("unavailable"), RuntimeError("cycle")))
+def test_unresolvable_path_refuses(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, failure: Exception
+) -> None:
+    """Resolution failures are unsafe rather than treated as an unreachable contract."""
+    checker = _load_checker()
+    worktree, contract = _isolated_pair(tmp_path)
+    original_resolve = Path.resolve
+
+    def unresolved(path: Path, strict: bool = False) -> Path:
+        if path == contract:
+            raise failure
+        return original_resolve(path, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", unresolved)
+
+    reason = checker.refusal_reason(
+        str(contract), brief="build", worktree=str(worktree), claims=()
+    )
+
+    assert reason is not None
+    assert "input is invalid" in reason
+
+
+def test_wsl_path_spelling_resolves_before_canonical_comparison(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A WSL path must resolve before its Windows canonical spelling is compared."""
+    checker = _load_checker()
+    worktree = tmp_path / "work"
+    contract = worktree / "heldout" / "secret-contract.md"
+    contract.parent.mkdir(parents=True)
+    contract.write_text(DISTINCTIVE_LINE, encoding="utf-8")
+    alias = Path("/mnt/c/External-Contract-Alias")
+    wsl_worktree = Path("/mnt/c/Work")
+    local_alias = Path("c:/External-Contract-Alias") if os.name == "nt" else alias
+    local_worktree = Path("c:/Work") if os.name == "nt" else wsl_worktree
+    original_resolve = Path.resolve
+    seen: list[str] = []
+
+    def resolve(path: Path, strict: bool = False) -> Path:
+        seen.append(str(path))
+        if str(path) == str(local_alias):
+            return contract
+        if str(path) == str(local_worktree):
+            return worktree
+        return original_resolve(path, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+
+    reason = checker.refusal_reason(
+        str(alias), brief="build", worktree=str(wsl_worktree), claims=()
+    )
+
+    assert reason is not None
+    assert "worktree" in reason.lower()
+    assert seen == [str(local_alias), str(local_worktree)]
 
 
 def test_heldout_contract_named_in_brief_refuses_before_preflight(

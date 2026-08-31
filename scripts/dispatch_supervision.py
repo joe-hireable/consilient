@@ -30,7 +30,7 @@ import sys
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # This directory is not a package, so a sibling module is importable only when it is on
@@ -155,28 +155,95 @@ def kill_process_tree(process: subprocess.Popen[bytes]) -> None:
             pass
 
 
+def _pipe_bytes_available(fd: int) -> int:
+    """How many bytes can be read without blocking. 0 means wait for the next write."""
+    if os.name == "nt":
+        import ctypes
+        import msvcrt
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        peek = kernel32.PeekNamedPipe
+        peek.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+            ctypes.POINTER(ctypes.c_ulong),
+            ctypes.POINTER(ctypes.c_ulong),
+            ctypes.POINTER(ctypes.c_ulong),
+        ]
+        peek.restype = ctypes.c_int
+        try:
+            handle = msvcrt.get_osfhandle(fd)
+        except OSError:
+            return 0
+        avail = ctypes.c_ulong(0)
+        if not peek(handle, None, 0, None, ctypes.byref(avail), None):
+            return 0
+        return int(avail.value)
+    import select
+
+    ready, _, _ = select.select([fd], [], [], 0)
+    return 65536 if ready else 0
+
+
+def _stamp_from_mono(
+    origin_wall: datetime, origin_mono: float, event_mono: float
+) -> str:
+    elapsed = max(0.0, event_mono - origin_mono)
+    return (origin_wall + timedelta(seconds=elapsed)).isoformat()
+
+
 def _drain_stream(
     pipe: Any,
     out_path: Path,
     *,
-    chunk_size: int = 4096,
+    origin_wall: datetime,
+    origin_mono: float,
 ) -> tuple[int, str | None, str | None]:
-    """Read pipe in chunks; return count and first-chunk timestamps."""
+    """Observe provider flushes, not a buffered EOF.
+
+    ``BufferedReader.read(n)`` on Windows waits for n bytes or close, so two
+    flushed writes 1.2s apart collapse into one chunk timestamped at EOF.
+    AIPerf stamps each non-empty content response with a monotonic clock
+    (``content_responses[0].perf_ns - request.start_perf_ns``); we do the
+    same at the pipe: block for the first byte, drain what is already
+    available as one chunk, repeat.
+    """
+    try:
+        raw = pipe.detach()
+    except (AttributeError, ValueError):
+        raw = pipe
+    fd = raw.fileno()
     n_chunks = 0
     t_first: str | None = None
     t_first_nonempty: str | None = None
     with out_path.open("wb") as handle:
         while True:
-            chunk = pipe.read(chunk_size)
-            if not chunk:
+            try:
+                first = os.read(fd, 1)
+            except OSError:
                 break
-            now = datetime.now(timezone.utc).isoformat()
+            if not first:
+                break
+            event_mono = time.perf_counter()
+            extra = bytearray()
+            while True:
+                avail = _pipe_bytes_available(fd)
+                if avail <= 0:
+                    break
+                piece = os.read(fd, avail)
+                if not piece:
+                    break
+                extra.extend(piece)
+            chunk = first + bytes(extra)
+            stamp = _stamp_from_mono(origin_wall, origin_mono, event_mono)
             n_chunks += 1
             if t_first is None:
-                t_first = now
+                t_first = stamp
             if t_first_nonempty is None and chunk.strip():
-                t_first_nonempty = now
+                t_first_nonempty = stamp
             handle.write(chunk)
+            handle.flush()
     return n_chunks, t_first, t_first_nonempty
 
 

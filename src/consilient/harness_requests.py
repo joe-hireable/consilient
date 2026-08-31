@@ -59,17 +59,21 @@ REQUEST_RECORD_FIELDS: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class RequestTiming:
-    """Per-request timing row for BU5 / X05. Timestamps are RFC3339 UTC."""
+    """Per-request timing row for BU5 / X05. Timestamps are RFC3339 UTC.
+
+    Token fields are None when the provider did not report them. Zero is a
+    measured zero, never a stand-in for unknown (V0-30).
+    """
 
     t_send: str
     t_first_chunk: str
     t_first_nonempty_chunk: str
     n_chunks: int
-    output_tokens: int
-    cache_read_input_tokens: int
+    output_tokens: int | None
+    cache_read_input_tokens: int | None
     in_flight_at_dispatch: int
 
-    def as_data(self) -> dict[str, int | str]:
+    def as_data(self) -> dict[str, int | str | None]:
         return {
             "t_send": self.t_send,
             "t_first_chunk": self.t_first_chunk,
@@ -89,6 +93,16 @@ def _as_non_negative_int(value: object, field: str) -> int:
     return value
 
 
+def _as_optional_non_negative_int(value: object, field: str) -> int | None:
+    if value is None:
+        return None
+    return _as_non_negative_int(value, field)
+
+
+_USAGE_FIELDS = frozenset({"output_tokens", "cache_read_input_tokens"})
+_COUNT_FIELDS = frozenset({"n_chunks", "in_flight_at_dispatch"})
+
+
 def _as_timestamp(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty RFC3339 timestamp")
@@ -101,7 +115,7 @@ def _as_timestamp(value: object, field: str) -> str:
     return value
 
 
-def validate_request_record(data: object) -> dict[str, int | str]:
+def validate_request_record(data: object) -> dict[str, int | str | None]:
     """Validate a request.record payload before append."""
     if not isinstance(data, dict):
         raise ValueError("request record must be an object")
@@ -111,7 +125,7 @@ def validate_request_record(data: object) -> dict[str, int | str]:
         raise ValueError("run_id must be a non-empty string")
     if not isinstance(harness, str) or not harness.strip():
         raise ValueError("harness must be a non-empty string")
-    row: dict[str, int | str] = {
+    row: dict[str, int | str | None] = {
         "run_id": run_id.strip(),
         "harness": harness.strip(),
     }
@@ -119,13 +133,10 @@ def validate_request_record(data: object) -> dict[str, int | str]:
         if field not in data:
             raise ValueError(f"{field} is required")
         value = data[field]
-        if field in (
-            "n_chunks",
-            "output_tokens",
-            "cache_read_input_tokens",
-            "in_flight_at_dispatch",
-        ):
+        if field in _COUNT_FIELDS:
             row[field] = _as_non_negative_int(value, field)
+        elif field in _USAGE_FIELDS:
+            row[field] = _as_optional_non_negative_int(value, field)
         else:
             row[field] = _as_timestamp(value, field)
     send_ts = datetime.fromisoformat(str(row["t_send"])).astimezone(timezone.utc)
@@ -152,10 +163,38 @@ def _usage_int(payload: object, *keys: str) -> int | None:
     return None
 
 
-def extract_usage_from_output(stdout: str, harness_id: str) -> dict[str, int]:
-    """Best-effort token fields from a harness transcript. Unknown → zero."""
-    output_tokens = 0
-    cache_read = 0
+_CACHE_READ_KEYS = (
+    "cache_read_input_tokens",
+    "cacheReadInputTokens",
+    "cacheReadTokens",
+    "cache_read_tokens",
+)
+
+
+def _usage_from_payload(payload: object) -> tuple[int | None, int | None]:
+    if not isinstance(payload, dict):
+        return None, None
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None, None
+    output_tokens = _usage_int(usage, "output_tokens", "outputTokens")
+    cache = usage.get("cache")
+    if isinstance(cache, dict):
+        cache_read = _usage_int(cache, "read", "read_tokens", "readTokens")
+    else:
+        cache_read = _usage_int(usage, *_CACHE_READ_KEYS)
+    return output_tokens, cache_read
+
+
+def extract_usage_from_output(stdout: str, harness_id: str) -> dict[str, int | None]:
+    """Token fields from a harness transcript. Unknown stays None, never zero.
+
+    harness_id is kept so callers stay keyed to the arm; extraction is from the
+    transcript shape, not from the label. Cursor ``text`` format has no envelope.
+    """
+    del harness_id
+    output_tokens: int | None = None
+    cache_read: int | None = None
     for raw in reversed(stdout.splitlines()):
         line = raw.strip()
         if not line.startswith("{"):
@@ -164,44 +203,23 @@ def extract_usage_from_output(stdout: str, harness_id: str) -> dict[str, int]:
             payload = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if not isinstance(payload, dict):
-            continue
-        usage = payload.get("usage")
-        if not isinstance(usage, dict):
-            continue
-        found_out = _usage_int(usage, "output_tokens", "outputTokens")
+        found_out, found_cache = _usage_from_payload(payload)
         if found_out is not None:
             output_tokens = found_out
-        cache = usage.get("cache")
-        if isinstance(cache, dict):
-            found_cache = _usage_int(cache, "read", "read_tokens", "readTokens")
-            if found_cache is not None:
-                cache_read = found_cache
-        else:
-            found_cache = _usage_int(
-                usage, "cache_read_input_tokens", "cacheReadInputTokens"
-            )
-            if found_cache is not None:
-                cache_read = found_cache
-        if output_tokens or cache_read:
+        if found_cache is not None:
+            cache_read = found_cache
+        if output_tokens is not None or cache_read is not None:
             break
-    if harness_id == "grok" and output_tokens == 0 and cache_read == 0:
-        # Grok often prints JSON on the last line; a single-object stdout is common.
+    if output_tokens is None and cache_read is None:
         try:
             payload = json.loads(stdout.strip())
         except json.JSONDecodeError:
             payload = None
-        if isinstance(payload, dict):
-            usage = payload.get("usage")
-            if isinstance(usage, dict):
-                found_out = _usage_int(usage, "output_tokens", "outputTokens")
-                if found_out is not None:
-                    output_tokens = found_out
-                cache = usage.get("cache")
-                if isinstance(cache, dict):
-                    found_cache = _usage_int(cache, "read")
-                    if found_cache is not None:
-                        cache_read = found_cache
+        found_out, found_cache = _usage_from_payload(payload)
+        if found_out is not None:
+            output_tokens = found_out
+        if found_cache is not None:
+            cache_read = found_cache
     return {
         "output_tokens": output_tokens,
         "cache_read_input_tokens": cache_read,
@@ -214,8 +232,8 @@ def build_request_timing(
     t_first_chunk: str,
     t_first_nonempty_chunk: str,
     n_chunks: int,
-    output_tokens: int,
-    cache_read_input_tokens: int,
+    output_tokens: int | None,
+    cache_read_input_tokens: int | None,
     in_flight_at_dispatch: int,
 ) -> RequestTiming:
     return RequestTiming(

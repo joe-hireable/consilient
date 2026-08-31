@@ -206,7 +206,9 @@ def run_process(
         kwargs["start_new_session"] = True
     started = time.perf_counter()
     timed_out = False
-    t_send = datetime.now(timezone.utc).isoformat()
+    origin_wall = datetime.now(timezone.utc)
+    t_send = origin_wall.isoformat()
+    origin_mono = started
     timing: StreamTiming | None = None
     try:
         process = subprocess.Popen(
@@ -225,12 +227,12 @@ def run_process(
     stderr_meta: dict[str, Any] = {}
     stdout_thread = threading.Thread(
         target=_stream_reader,
-        args=(process.stdout, stdout_path, stdout_meta),
+        args=(process.stdout, stdout_path, stdout_meta, origin_wall, origin_mono),
         daemon=True,
     )
     stderr_thread = threading.Thread(
         target=_stream_reader,
-        args=(process.stderr, stderr_path, stderr_meta),
+        args=(process.stderr, stderr_path, stderr_meta, origin_wall, origin_mono),
         daemon=True,
     )
     stdout_thread.start()
@@ -248,22 +250,13 @@ def run_process(
             pass
     stdout_thread.join(timeout=10)
     stderr_thread.join(timeout=10)
-    n_chunks = int(stdout_meta.get("n_chunks", 0)) + int(stderr_meta.get("n_chunks", 0))
-    candidates = [
-        ts
-        for ts in (stdout_meta.get("t_first"), stderr_meta.get("t_first"))
-        if isinstance(ts, str)
-    ]
-    nonempty_candidates = [
-        ts
-        for ts in (
-            stdout_meta.get("t_first_nonempty"),
-            stderr_meta.get("t_first_nonempty"),
-        )
-        if isinstance(ts, str)
-    ]
-    t_first = min(candidates) if candidates else t_send
-    t_first_nonempty = min(nonempty_candidates) if nonempty_candidates else t_first
+    n_chunks = int(stdout_meta.get("n_chunks", 0))
+    t_first = stdout_meta.get("t_first")
+    t_first_nonempty = stdout_meta.get("t_first_nonempty")
+    if not isinstance(t_first, str):
+        t_first = t_send
+    if not isinstance(t_first_nonempty, str):
+        t_first_nonempty = t_first
     timing = StreamTiming(
         t_send=t_send,
         t_first_chunk=t_first,

@@ -38,6 +38,7 @@ all fails closed rather than waving the merge through."""
 
 import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 import pytest
 from build_driver_helpers import (
@@ -333,14 +334,13 @@ def test_main_merges_a_built_units_worktree_when_it_gains_new_commits(
     )
 
 
-def test_red_suite_allows_merge_and_records_the_observed_failing_count(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """ADR-0107: local repair keeps landing on red; publication remains green-only.
-
-    One post-merge observation is shared across the batch rather than using a stale
-    prior-tick result or running the full suite again for every unit.
-    """
+def _drive_red_merge_tick(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    suite_sh: Callable[..., object],
+) -> tuple[object, list[str], Path]:
+    """Run one driver tick with U01 merging onto a non-green suite."""
     driver = _load_driver()
     worktrees = tmp_path / "unit-worktrees"
     (worktrees / "U01").mkdir(parents=True)
@@ -362,10 +362,6 @@ def test_red_suite_allows_merge_and_records_the_observed_failing_count(
     log = tmp_path / "log"
     log.mkdir()
 
-    class _Result:
-        stdout = "3 failed, 2 errors, 100 passed in 1.0s"
-        stderr = ""
-
     def fake_merge(uid: str) -> str:
         merges.append(uid)
         return "CONFLICT cherry-picking deadbeef for U01 (1 applied); needs resolution"
@@ -382,11 +378,26 @@ def test_red_suite_allows_merge_and_records_the_observed_failing_count(
     monkeypatch.setattr(driver, "save_state", lambda _state: None)
     monkeypatch.setattr(driver, "record_tick_intent", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(driver, "rebase_mergeable_worktrees", lambda *_args: None)
-    monkeypatch.setattr(driver, "sh", lambda _args, **_kwargs: _Result())
-    monkeypatch.setattr(
-        driver,
-        "merge_unit_worktree",
-        fake_merge,
+    monkeypatch.setattr(driver, "sh", suite_sh)
+    monkeypatch.setattr(driver, "merge_unit_worktree", fake_merge)
+    return driver, merges, log
+
+
+def test_red_suite_allows_merge_and_records_the_observed_failing_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0107: local repair keeps landing on red; publication remains green-only.
+
+    One post-merge observation is shared across the batch rather than using a stale
+    prior-tick result or running the full suite again for every unit.
+    """
+
+    class _Result:
+        stdout = "3 failed, 2 errors, 100 passed in 1.0s"
+        stderr = ""
+
+    driver, merges, log = _drive_red_merge_tick(
+        tmp_path, monkeypatch, suite_sh=lambda _args, **_kwargs: _Result()
     )
     assert driver.main() == 0
 
@@ -400,6 +411,61 @@ def test_red_suite_allows_merge_and_records_the_observed_failing_count(
         "summary": "3 failed, 2 errors, 100 passed in 1.0s",
         "policy": "adr-0107",
     }
+
+
+def test_red_suite_timeout_still_records_merge_into_red(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0107: the record is not optional when the suite times out before a summary.
+
+    A merge onto a tree whose colour is unknown must still land in the trajectory with an
+    honest unmeasured marker, not disappear because `_LAST_SUITE_RED` was never set.
+    """
+
+    def _timeout(args, **kwargs):
+        if args and "pytest" in args:
+            assert "timeout" in kwargs, "the suite call must carry a timeout"
+            raise subprocess.TimeoutExpired(cmd="pytest", timeout=kwargs["timeout"])
+        class _Result:
+            stdout = ""
+            stderr = ""
+            returncode = 0
+        return _Result()
+
+    driver, merges, log = _drive_red_merge_tick(
+        tmp_path, monkeypatch, suite_sh=_timeout
+    )
+    assert driver.main() == 0
+
+    assert merges == ["U01"]
+    event = json.loads(next(log.glob("*.jsonl")).read_text(encoding="utf-8"))
+    assert event["event"] == "merge.into_red"
+    assert event["data"]["unit"] == "U01"
+    assert event["data"]["applied"] == 1
+    assert event["data"]["failing_count"] is None
+    assert event["data"]["summary"].startswith("unmeasured:")
+    assert event["data"]["policy"] == "adr-0107"
+
+
+def test_red_suite_no_summary_still_records_merge_into_red(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0107: pytest output with no parseable summary is still a red merge to record."""
+
+    class _Result:
+        stdout = "ERROR: usage: pytest [options]\nunrecognised argument: --timeout=600"
+        stderr = ""
+
+    driver, merges, log = _drive_red_merge_tick(
+        tmp_path, monkeypatch, suite_sh=lambda _args, **_kwargs: _Result()
+    )
+    assert driver.main() == 0
+
+    assert merges == ["U01"]
+    event = json.loads(next(log.glob("*.jsonl")).read_text(encoding="utf-8"))
+    assert event["event"] == "merge.into_red"
+    assert event["data"]["failing_count"] is None
+    assert "no parseable pytest summary" in event["data"]["summary"]
 
 
 def test_an_originally_empty_unit_commit_lands_no_commit_at_all(

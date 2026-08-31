@@ -439,7 +439,7 @@ def build_command(
                 "--model",
                 chosen,
                 "--output-format",
-                "text",
+                "json",
                 *caps,
                 *extra,
                 instruction,
@@ -476,7 +476,7 @@ def build_command(
         # to WSL git (R4). Native cursor-agent is unchanged — it already sees NT paths.
         inner = (
             f"{wsl_git_exports(cwd)}cd {shlex.quote(wsl_cwd)} && cursor-agent -p "
-            f"--model {shlex.quote(chosen)} --output-format text{extra_s} "
+            f"--model {shlex.quote(chosen)} --output-format json{extra_s} "
             f"{shlex.quote(wsl_instruction)}"
         )
         return [bridge, "-e", "bash", "-lc", inner]

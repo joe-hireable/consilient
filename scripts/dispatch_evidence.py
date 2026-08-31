@@ -26,6 +26,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # This directory is not a package, so a sibling module is importable only when it is on
@@ -179,11 +180,11 @@ def _stream_reader(
     pipe: Any,
     out_path: Path,
     meta: dict[str, Any],
-    *,
-    chunk_size: int = 4096,
+    origin_wall: datetime,
+    origin_mono: float,
 ) -> None:
     n_chunks, t_first, t_first_nonempty = _drain_stream(
-        pipe, out_path, chunk_size=chunk_size
+        pipe, out_path, origin_wall=origin_wall, origin_mono=origin_mono
     )
     meta["n_chunks"] = n_chunks
     meta["t_first"] = t_first

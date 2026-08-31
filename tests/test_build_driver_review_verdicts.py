@@ -11,8 +11,8 @@ against an expected 3, AO at 1 against 2. A review takes about twenty minutes, t
 driver re-dispatches sooner, and the original agent's valid verdict arrives one attempt
 behind and is refused; nothing could be verified while agents worked continuously. The
 attempt number says which dispatch spoke; the artefact says what was judged. A verdict
-about different code is still refused, whatever its attempt number, and so is one whose
-expectation the tree has moved out from under.
+about different code is still refused, whatever its attempt number -- but the tree moving
+AFTER dispatch is a different question, and it is not this one.
 
 MEASURED the same evening, 21:50 — why the day produced so few verdicts. AE and AA both
 held well-formed receipts bound to their unit's current artefact, and
@@ -117,11 +117,27 @@ def test_a_verdict_about_a_different_artefact_is_still_refused(
     assert outcome == "receipt_mismatched"
 
 
-def test_a_verdict_is_refused_when_the_tree_has_moved_under_the_expectation(
+def test_a_verdict_survives_a_stranger_committing_during_the_review(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Both sides are still checked. If the unit's identity re-derived from the tree no longer
-    equals what the review was told to judge, the verdict is stale and refused."""
+    """A RECEIPT IS JUDGED AGAINST WHAT THE REVIEWER WAS HANDED, NOT AGAINST HEAD NOW.
+
+    `expected["artefact"]` is frozen at dispatch and names the code this review was given. The
+    receipt matches it exactly here, so the verdict is about exactly that code. The tree having
+    moved since -- `current_artefact` differs -- is somebody else's commit landing during the
+    ~20 minute review window, and it says nothing about what this reviewer read.
+
+    MEASURED 30 August 2026: 5 of 24 consumptions were refused this way. Z02's discarded receipt
+    still reads {"verdict":"SOUND","findings":[]} on disk; AI and BJ were killed by two commits
+    to `.harness/build_driver.py`, a file 11 of the 147 units claim. MEASURED 31 August 2026: 70
+    of the 96 receipts on disk match their expectation while HEAD has since moved.
+
+    This is not a relaxed gate. A receipt naming a DIFFERENT artefact is still refused -- see
+    `test_a_verdict_about_a_different_artefact_is_still_refused` -- and a receipt written before
+    a move fails that same equality, because a re-dispatch recomputes `expected["artefact"]`
+    from the tree. Whether a SOUND verdict still applies to current HEAD is `retired_units`'
+    question, asked once, at retirement.
+    """
     outcome, _ = _verdict_fixture(
         tmp_path,
         monkeypatch,
@@ -131,7 +147,10 @@ def test_a_verdict_is_refused_when_the_tree_has_moved_under_the_expectation(
         expected_artefact="a" * 64,
         current_artefact="c" * 64,
     )
-    assert outcome == "receipt_mismatched"
+    assert outcome == "SOUND", (
+        "a verdict about the code the reviewer was handed must not be destroyed by an "
+        "unrelated commit to a file this unit merely claims"
+    )
 
 
 def test_a_valid_verdict_receipt_is_consumed_even_with_an_empty_envelope(
