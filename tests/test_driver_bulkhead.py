@@ -14,10 +14,10 @@ This is the half of the file about what may *start*: the per-lane ceilings, the
 outstanding counts they are compared against, and the source-level pins that no
 admission site names the shared pool again. The resolve lane is here for the same reason
 and it is the same defect in a second place — the resolve loop admitted on
-`admit_build(len(inflight))`, where `inflight` holds builds only, so each resolver was
-admitted on an occupancy it never joined and the next on the same unchanged number. 34
-ran at once against a cap of MAX_BUILDS. Counting what is being capped is the whole of
-the fix."""
+`admit_build(len(inflight))`, so each resolver was admitted on the build lane's occupancy
+while the next was admitted on the same unchanged number. 34 ran at once against a cap of
+MAX_BUILDS. Counting what is being capped is the whole of the fix -- and counting it ONCE
+is the other half: a resolver is written to both buckets, so admission unions them."""
 
 import ast
 from driver_bulkhead_helpers import (
@@ -168,4 +168,21 @@ def test_resolvers_count_against_the_lane_they_are_gated_on() -> None:
         if ln.strip().startswith("if not admit_build(")
     ]
     assert len(sites) == 2, f"expected two admission sites, found {sites}"
-    assert "len(resolving)" in " ".join(sites), "no admission counts live resolvers"
+    assert all("lane_live" in s for s in sites), (
+        f"an admission site that does not go through lane_live() is adding the buckets "
+        f"instead of unioning them, which double-counts every live resolver: {sites}"
+    )
+
+
+def test_a_resolver_in_both_buckets_occupies_one_slot_not_two() -> None:
+    """MEASURED 31 August 2026: the resolve loop writes each resolver to `in_flight` AND to
+    `resolve_dispatched`, and admission added the two lengths. `in_flight` held 5 uids, all 5
+    of them resolvers, so the lane read 15 against MAX_BUILDS 12 and shed with two slots free.
+    68 consecutive ticks over 4h41m dispatched zero builds."""
+    driver = _load_driver()
+    inflight = {"AV": (0.0, 60.0), "BC": (0.0, 60.0)}
+    resolving = ["AV", "BC"]
+    assert driver.lane_live(inflight, resolving) == 2
+    assert driver.lane_live({}, resolving) == 2
+    assert driver.lane_live({"W01": (0.0, 60.0)}, resolving) == 3
+    assert driver.lane_live({}, []) == 0

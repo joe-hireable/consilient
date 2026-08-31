@@ -3513,6 +3513,23 @@ def admit_build(builds_out: int) -> bool:
     return not shed_lane(builds_out, MAX_BUILDS)
 
 
+def lane_live(inflight, resolving) -> int:
+    """Distinct dispatches occupying the build lane.
+
+    A resolver is written to BOTH `in_flight` and `resolve_dispatched` by the resolve loop,
+    so `len(inflight) + len(resolving)` counts every live resolver TWICE. MEASURED 31 August
+    2026: `in_flight` held 5 uids and all 5 of them were resolvers, so admission read
+    5 + 8 + 2 = 15 against MAX_BUILDS 12 and shed, while true occupancy was 8 + 2 = 10 and
+    two build slots stood empty. 68 consecutive ticks over 4h41m dispatched zero builds while
+    `done` sat at 14.
+
+    Union, not sum. It is the idiom this file already uses to enumerate live dispatches in
+    `detect_exhausted_arms` and in the cursor concurrency guard; admission was the one place
+    that added the buckets instead.
+    """
+    return len(set(inflight) | set(resolving))
+
+
 def builds_outstanding(state: dict) -> int:
     return len(state.get("in_flight", {}))
 
@@ -4394,11 +4411,12 @@ def main() -> int:
     resolving_now = state.setdefault("resolve_dispatched", [])
     reserved = resolve_slots_reserved(conflicts, resolving_now)
     for uid in startable:
-        if not admit_build(len(inflight) + len(resolving_now) + reserved):
+        if not admit_build(lane_live(inflight, resolving_now) + reserved):
             print(
-                f"driver: build lane at ceiling ({len(inflight)} building + "
-                f"{len(resolving_now)} resolving + {reserved} reserved for resolve"
-                f"/{MAX_BUILDS}); shedding"
+                f"driver: build lane at ceiling "
+                f"({lane_live(inflight, resolving_now)} live"
+                f" = {len(inflight)} in-flight | {len(resolving_now)} resolving,"
+                f" + {reserved} reserved for resolve/{MAX_BUILDS}); shedding"
             )
             break
         unit = units[uid]
@@ -4461,16 +4479,22 @@ def main() -> int:
     resolving = state.setdefault("resolve_dispatched", [])
     for uid, why in sorted(conflicts.items()):
         # RESOLVERS COUNT AGAINST THE LANE THEY ARE GATED ON. This read
-        # `admit_build(len(inflight))`, where `inflight` holds BUILDS only -- so a resolver
-        # was admitted on the build lane's occupancy while adding nothing to it, and the next
-        # was admitted on the same unchanged number. MEASURED 27 August 2026: 34 resolvers
+        # `admit_build(len(inflight))` while adding nothing to `inflight`, so each resolver was
+        # admitted on the build lane's occupancy and the next on the same unchanged number.
+        # MEASURED 27 August 2026: 34 resolvers
         # live at once, each a full workspace clone and a harness run, on a lane whose cap is
         # MAX_BUILDS. This is the MAX_REVIEWS defect in a second place: a cap that does not
         # count what it is capping is not a cap.
-        if not admit_build(len(inflight) + len(resolving)):
+        #
+        # The repair below ALSO writes the resolver to `inflight`, so the two buckets now
+        # overlap and adding their lengths counts every resolver twice. Union, via
+        # `lane_live`. MEASURED 31 August 2026: 68 ticks, 4h41m, zero builds dispatched.
+        if not admit_build(lane_live(inflight, resolving)):
             print(
                 f"driver: build lane at ceiling "
-                f"({len(inflight)} building + {len(resolving)} resolving/{MAX_BUILDS}); shedding"
+                f"({lane_live(inflight, resolving)} live"
+                f" = {len(inflight)} in-flight | {len(resolving)} resolving"
+                f"/{MAX_BUILDS}); shedding"
             )
             break
         if (
